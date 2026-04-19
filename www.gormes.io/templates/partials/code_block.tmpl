@@ -1,0 +1,7 @@
+{{define "code_block"}}
+<article>
+  <h3>{{.Title}}</h3>
+  <pre><code>{{range .Lines}}{{.}}
+{{end}}</code></pre>
+</article>
+{{end}}

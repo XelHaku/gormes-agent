@@ -1,0 +1,34 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <meta name="description" content="{{.Description}}">
+</head>
+<body>
+  <header id="top">
+    <nav aria-label="Primary">
+      <a href="#top">Gormes</a>
+      {{range .Nav}}
+      <a href="{{.Href}}">{{.Label}}</a>
+      {{end}}
+    </nav>
+  </header>
+
+  <main>
+    {{template "index" .}}
+  </main>
+
+  <footer>
+    <p>{{.FooterLine}}</p>
+    <ul>
+      {{range .FooterLinks}}
+      <li><a href="{{.Href}}">{{.Label}}</a></li>
+      {{end}}
+    </ul>
+  </footer>
+</body>
+</html>
+{{end}}
