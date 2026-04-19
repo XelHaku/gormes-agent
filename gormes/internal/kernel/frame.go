@@ -18,10 +18,15 @@ const (
 	PhaseFinalizing
 	PhaseCancelling
 	PhaseFailed
+	// PhaseReconnecting is the TDD seed for Phase-1.5 Route-B resilience
+	// (spec §9.2 of 2026-04-18-gormes-frontend-adapter-design.md). No
+	// transitions to this state exist yet — the future reconnect plan
+	// flips reconnect_test.go from Skip to real pass by wiring this up.
+	PhaseReconnecting
 )
 
 func (p Phase) String() string {
-	return [...]string{"Idle", "Connecting", "Streaming", "Finalizing", "Cancelling", "Failed"}[p]
+	return [...]string{"Idle", "Connecting", "Streaming", "Finalizing", "Cancelling", "Failed", "Reconnecting"}[p]
 }
 
 // RenderFrame is the only TUI input. The TUI never assembles assistant text
