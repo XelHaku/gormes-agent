@@ -8,6 +8,10 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/XelHaku/golang-hermes-agent/gormes/internal/hermes"
+	"github.com/XelHaku/golang-hermes-agent/gormes/internal/store"
+	"github.com/XelHaku/golang-hermes-agent/gormes/internal/telemetry"
 )
 
 // stableProxy listens on a fixed local port and forwards traffic to whatever
@@ -133,4 +137,17 @@ func tenTokenHandler() http.HandlerFunc {
 			flusher.Flush()
 		}
 	}
+}
+
+// newRealKernel constructs a kernel wired to a real hermes.NewHTTPClient
+// pointed at endpoint. Used by Route-B tests that need the genuine HTTP
+// path, not MockClient.
+func newRealKernel(t *testing.T, endpoint string) *Kernel {
+	t.Helper()
+	client := hermes.NewHTTPClient(endpoint, "")
+	return New(Config{
+		Model:     "hermes-agent",
+		Endpoint:  endpoint,
+		Admission: Admission{MaxBytes: 200_000, MaxLines: 10_000},
+	}, client, store.NewNoop(), telemetry.New(), nil)
 }
