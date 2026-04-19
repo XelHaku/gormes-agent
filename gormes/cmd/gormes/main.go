@@ -37,13 +37,14 @@ func main() {
 		SilenceUsage: true,
 		RunE:         runTUI,
 	}
+	root.Flags().Bool("offline", false, "skip startup api_server health check (dev only — turns the TUI into a cosmetic smoke-tester)")
 	root.AddCommand(doctorCmd, versionCmd)
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
-func runTUI(_ *cobra.Command, _ []string) error {
+func runTUI(cmd *cobra.Command, _ []string) error {
 	cfg, err := config.Load(nil)
 	if err != nil {
 		return err
@@ -52,15 +53,18 @@ func runTUI(_ *cobra.Command, _ []string) error {
 	c := hermes.NewHTTPClient(cfg.Hermes.Endpoint, cfg.Hermes.APIKey)
 
 	// Health check: 2s budget. Surface an actionable error if unreachable.
-	healthCtx, healthCancel := context.WithTimeout(context.Background(), 2*time.Second)
-	if err := c.Health(healthCtx); err != nil {
+	offline, _ := cmd.Flags().GetBool("offline")
+	if !offline {
+		healthCtx, healthCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		if err := c.Health(healthCtx); err != nil {
+			healthCancel()
+			fmt.Fprintf(os.Stderr,
+				"api_server not reachable at %s: %v\n\nStart it with:\n  API_SERVER_ENABLED=true hermes gateway start\n\nOr pass --offline to render the TUI without a live server (dev only).\n",
+				cfg.Hermes.Endpoint, err)
+			return err
+		}
 		healthCancel()
-		fmt.Fprintf(os.Stderr,
-			"api_server not reachable at %s: %v\n\nStart it with:\n  API_SERVER_ENABLED=true hermes gateway start\n",
-			cfg.Hermes.Endpoint, err)
-		return err
 	}
-	healthCancel()
 
 	rootCtx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
