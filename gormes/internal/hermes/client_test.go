@@ -166,3 +166,75 @@ func TestHealth_OK(t *testing.T) {
 		t.Errorf("Health: %v", err)
 	}
 }
+
+const runEventsFixture = `event: tool.started
+data: {"tool_call_id":"t1","name":"terminal","args":{"cmd":"ls"}}
+
+event: reasoning.available
+data: {"text":"I should check the listing first."}
+
+event: tool.completed
+data: {"tool_call_id":"t1","name":"terminal","result_preview":"README.md"}
+
+event: subagent.started
+data: {"id":"sub-1"}
+
+`
+
+func TestOpenRunEvents_MappingAndUnknown(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(200)
+		fmt.Fprint(w, runEventsFixture)
+	}))
+	defer srv.Close()
+
+	c := NewHTTPClient(srv.URL, "")
+	s, err := c.OpenRunEvents(context.Background(), "r-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	var got []RunEvent
+	for {
+		e, rerr := s.Recv(context.Background())
+		if rerr == io.EOF {
+			break
+		}
+		if rerr != nil {
+			t.Fatal(rerr)
+		}
+		got = append(got, e)
+	}
+	if len(got) != 4 {
+		t.Fatalf("got %d events, want 4", len(got))
+	}
+	if got[0].Type != RunEventToolStarted || got[0].ToolName != "terminal" {
+		t.Errorf("got[0] = %+v", got[0])
+	}
+	if got[0].Preview == "" {
+		t.Errorf("got[0].Preview is empty; should be a serialised args snippet")
+	}
+	if got[1].Type != RunEventReasoningAvailable || got[1].Reasoning == "" {
+		t.Errorf("got[1] = %+v", got[1])
+	}
+	if got[2].Type != RunEventToolCompleted || got[2].Preview != "README.md" {
+		t.Errorf("got[2] = %+v", got[2])
+	}
+	if got[3].Type != RunEventUnknown {
+		t.Errorf("got[3] = %+v (expected unknown for subagent.started)", got[3])
+	}
+}
+
+func TestOpenRunEvents_404ReturnsNotSupported(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "nope", 404)
+	}))
+	defer srv.Close()
+	c := NewHTTPClient(srv.URL, "")
+	_, err := c.OpenRunEvents(context.Background(), "r-1")
+	if err != ErrRunEventsNotSupported {
+		t.Errorf("err = %v, want ErrRunEventsNotSupported", err)
+	}
+}

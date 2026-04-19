@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -98,8 +99,33 @@ func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, e
 	return newChatStream(resp.Body, resp.Header.Get("X-Hermes-Session-Id")), nil
 }
 
-// OpenRunEvents is implemented in Task 7. For Task 6 we satisfy the Client
-// interface with a stub that returns the documented sentinel.
+// OpenRunEvents subscribes to SSE stream for a run's events.
+// 404 returns ErrRunEventsNotSupported for non-Hermes servers.
 func (c *httpClient) OpenRunEvents(ctx context.Context, runID string) (RunEventStream, error) {
-	return nil, ErrRunEventsNotSupported
+	// Use a short header-phase budget; the body stays open indefinitely for streaming.
+	headCtx, headCancel := context.WithTimeout(ctx, 5*time.Second)
+	req, err := http.NewRequestWithContext(headCtx, http.MethodGet, fmt.Sprintf("%s/v1/runs/%s/events", c.baseURL, runID), nil)
+	if err != nil {
+		headCancel()
+		return nil, err
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+	resp, err := c.http.Do(req)
+	headCancel()
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == 404 {
+		_ = resp.Body.Close()
+		return nil, ErrRunEventsNotSupported
+	}
+	if resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		return nil, &HTTPError{Status: resp.StatusCode, Body: string(raw)}
+	}
+	return newRunEventStream(resp.Body), nil
 }
