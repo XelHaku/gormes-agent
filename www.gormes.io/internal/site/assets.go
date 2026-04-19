@@ -1,21 +1,16 @@
 package site
 
 import (
+	"embed"
 	"html/template"
-	"os"
-	"path/filepath"
-	"runtime"
 )
 
-func parseTemplates() (*template.Template, error) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		return nil, os.ErrNotExist
-	}
+//go:embed templates/*.tmpl templates/partials/*.tmpl
+var templateFS embed.FS
 
-	root := filepath.Join(filepath.Dir(file), "..", "..")
+func parseTemplates() (*template.Template, error) {
 	return template.ParseFS(
-		os.DirFS(root),
+		templateFS,
 		"templates/*.tmpl",
 		"templates/partials/*.tmpl",
 	)
