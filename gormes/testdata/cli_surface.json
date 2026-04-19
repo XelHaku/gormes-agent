@@ -1,0 +1,31 @@
+{
+  "commands": [
+    "add",
+    "check",
+    "clear-pending",
+    "delete",
+    "edit",
+    "env-path",
+    "install",
+    "list",
+    "migrate",
+    "off",
+    "path",
+    "pause",
+    "prune",
+    "remove",
+    "rename",
+    "resume",
+    "revoke",
+    "set",
+    "setup",
+    "show",
+    "stats",
+    "status",
+    "stop",
+    "tap",
+    "test",
+    "tick",
+    "version"
+  ]
+}
