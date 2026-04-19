@@ -26,6 +26,8 @@ var targets = []string{
 	"ARCH_PLAN.md",
 	"superpowers/specs/2026-04-18-gormes-frontend-adapter-design.md",
 	"superpowers/plans/2026-04-18-gormes-phase1-frontend-adapter.md",
+	"superpowers/specs/2026-04-19-gormes-landing-page-design.md",
+	"superpowers/plans/2026-04-19-gormes-landing-page.md",
 }
 
 func TestMarkdownRendersCleanViaGoldmark(t *testing.T) {
