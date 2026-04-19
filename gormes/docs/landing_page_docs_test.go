@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
+
+var staleGormesIORefPattern = regexp.MustCompile(`(?i)(?:https?://)?(?:www\.)?gormes\.io`)
 
 func TestAICutoverDocsExistAndCarryExpectedTitles(t *testing.T) {
 	spec := readDoc(t, "superpowers/specs/2026-04-19-gormes-ai-cutover-design.md")
@@ -37,7 +40,7 @@ func TestLandingPageDesignDocDescribesCurrentGormesAIModule(t *testing.T) {
 		}
 	}
 
-	if strings.Contains(raw, "www.gormes.io") {
+	if hasStaleGormesIOReference(raw) {
 		t.Fatalf("design doc should not contain stale .io identity")
 	}
 }
@@ -62,7 +65,7 @@ func TestLandingPagePlanDocDocumentsCurrentAICutoverImplementation(t *testing.T)
 		}
 	}
 
-	if strings.Contains(raw, "www.gormes.io") {
+	if hasStaleGormesIOReference(raw) {
 		t.Fatalf("landing-page plan doc should not contain stale .io identity")
 	}
 
@@ -117,4 +120,8 @@ func readPlaywrightE2EScript(t *testing.T, rel string) string {
 	}
 
 	return script
+}
+
+func hasStaleGormesIOReference(raw string) bool {
+	return staleGormesIORefPattern.FindStringIndex(raw) != nil
 }
