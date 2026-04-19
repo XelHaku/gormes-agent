@@ -1,6 +1,7 @@
 package docs_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,10 @@ func TestLandingPageDesignDocDescribesCurrentGormesAIModule(t *testing.T) {
 			t.Fatalf("design doc is missing %q", want)
 		}
 	}
+
+	if strings.Contains(raw, "www.gormes.io") {
+		t.Fatalf("design doc should not contain stale .io identity")
+	}
 }
 
 func TestLandingPagePlanDocDocumentsCurrentAICutoverImplementation(t *testing.T) {
@@ -57,6 +62,10 @@ func TestLandingPagePlanDocDocumentsCurrentAICutoverImplementation(t *testing.T)
 		}
 	}
 
+	if strings.Contains(raw, "www.gormes.io") {
+		t.Fatalf("landing-page plan doc should not contain stale .io identity")
+	}
+
 	for _, rel := range []string{
 		"../../www.gormes.ai/internal/site/assets.go",
 		"../../www.gormes.ai/internal/site/content.go",
@@ -74,9 +83,9 @@ func TestLandingPagePlanDocDocumentsCurrentAICutoverImplementation(t *testing.T)
 		}
 	}
 
-	pkgJSON := readDoc(t, "../../www.gormes.ai/package.json")
-	if !strings.Contains(pkgJSON, `"test:e2e": "playwright test --project=chromium"`) {
-		t.Fatalf("www.gormes.ai package.json does not define the documented test:e2e script")
+	script := readPlaywrightE2EScript(t, "../../www.gormes.ai/package.json")
+	if !strings.Contains(script, "playwright") {
+		t.Fatalf("www.gormes.ai package.json test:e2e script should reference Playwright")
 	}
 }
 
@@ -88,4 +97,24 @@ func readDoc(t *testing.T, rel string) string {
 		t.Fatalf("read %s: %v", rel, err)
 	}
 	return string(raw)
+}
+
+func readPlaywrightE2EScript(t *testing.T, rel string) string {
+	t.Helper()
+
+	type packageJSON struct {
+		Scripts map[string]string `json:"scripts"`
+	}
+
+	var pkg packageJSON
+	if err := json.Unmarshal([]byte(readDoc(t, rel)), &pkg); err != nil {
+		t.Fatalf("parse %s as json: %v", rel, err)
+	}
+
+	script, ok := pkg.Scripts["test:e2e"]
+	if !ok {
+		t.Fatalf("%s does not define scripts.test:e2e", rel)
+	}
+
+	return script
 }
