@@ -28,7 +28,7 @@
 
 ## Verification
 
-- `cd gormes && go test ./docs -run 'TestTargetsIncludeLandingPageDocs|TestMarkdownRendersCleanViaGoldmark|TestMarkdownAvoidsPortabilityHazards'`
+- `cd gormes && go test ./docs`
 - `cd www.gormes.io && go test ./...`
 - `cd www.gormes.io && npm run test:e2e`
 
