@@ -11,4 +11,5 @@ test('homepage renders the phase-1 story', async ({ page }) => {
   await expect(page.locator('.hero-cta-row')).toHaveCount(1);
   await expect(page.locator('link[href="/static/site.css"]')).toHaveCount(1);
   await expect(page.locator('script')).toHaveCount(0);
+  await expect(page.locator('body')).not.toContainText('gormes.io');
 });
