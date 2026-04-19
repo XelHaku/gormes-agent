@@ -49,9 +49,14 @@ func (m Model) View() string {
 	if mainW < 10 {
 		mainW = 10
 	}
-	// Height budget: reserve 3 rows for the editor pane and 1 for the status
-	// line, plus the outer borders.
-	topH := m.height - 6
+	// Height budget: main pane (border adds 2) + editor pane (textarea +
+	// border = editor.Height()+2) + status line (1) = m.height total.
+	// So topH = m.height - (editor.Height() + 2) - 1 - 2 (outer borders).
+	editorHeight := m.editor.Height()
+	if editorHeight < 1 {
+		editorHeight = 1
+	}
+	topH := m.height - editorHeight - 5
 	if topH < 3 {
 		topH = 3
 	}
