@@ -1,0 +1,54 @@
+{{define "index"}}
+<section class="hero" aria-labelledby="hero-title">
+  <p class="hero-mark">Hermes<br>Agent</p>
+  <p class="hero-badge">{{.HeroBadge}}</p>
+  <h1 id="hero-title">{{.HeroHeadline}}</h1>
+  {{range .HeroCopy}}
+  <p class="hero-copy">{{.}}</p>
+  {{end}}
+  <p class="hero-cta-row">
+    <a class="hero-cta hero-cta-primary" href="{{.PrimaryCTA.Href}}">{{.PrimaryCTA.Label}}</a>
+    <a class="hero-cta hero-cta-secondary" href="{{.SecondaryCTA.Href}}">{{.SecondaryCTA.Label}}</a>
+    <a class="hero-cta hero-cta-secondary" href="{{.TertiaryCTA.Href}}">{{.TertiaryCTA.Label}}</a>
+  </p>
+  <p class="hero-phase-note">{{.PhaseNote}}</p>
+</section>
+
+<section id="quickstart" aria-labelledby="quickstart-title">
+  <h2 id="quickstart-title">Quick Start</h2>
+  {{range .QuickStart}}
+    {{template "code_block" .}}
+  {{end}}
+</section>
+
+<section aria-labelledby="demo-title">
+  <h2 id="demo-title">{{.DemoTitle}}</h2>
+  <pre><code>{{range .DemoLines}}{{.}}
+{{end}}</code></pre>
+</section>
+
+<section aria-labelledby="features-title">
+  <h2 id="features-title">What Changes Today</h2>
+  {{range .FeatureCards}}
+    {{template "feature_card" .}}
+  {{end}}
+</section>
+
+<section id="roadmap" aria-labelledby="roadmap-title">
+  <h2 id="roadmap-title">The Port Is Already Moving</h2>
+  <p>{{.RoadmapIntro}}</p>
+  {{range .Phases}}
+    {{template "phase_item" .}}
+  {{end}}
+</section>
+
+<section id="contribute" aria-labelledby="contribute-title">
+  <h2 id="contribute-title">{{.ContributorTitle}}</h2>
+  <p>{{.ContributorBody}}</p>
+  <ul>
+    {{range .ContributorLinks}}
+    <li><a href="{{.Href}}">{{.Label}}</a></li>
+    {{end}}
+  </ul>
+</section>
+{{end}}
