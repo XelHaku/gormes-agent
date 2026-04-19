@@ -2,6 +2,18 @@
 
 Instructions for AI coding assistants and developers working on the hermes-agent codebase.
 
+## Scope Override: Gormes-Only Edits
+
+This repository is being ported to Go. Unless the user explicitly changes this policy, AI coding assistants must follow these rules:
+
+- Do not write or modify any Python code.
+- Do not edit legacy Python paths such as `run_agent.py`, `cli.py`, `agent/`, `gateway/`, `hermes_cli/`, `tools/`, `tui_gateway/`, `cron/`, `acp_adapter/`, `tests/`, or other `.py` files.
+- Allowed edit scope is limited to the root `README.md` and files under `gormes/`.
+- Treat the Python codebase as reference material only while rebuilding behavior in Go.
+- If a requested change would require touching Python, stop and ask the user whether they want to change this repository policy first.
+
+This section overrides the legacy Python-oriented guidance below when there is any conflict.
+
 ## Development Environment
 
 ```bash
