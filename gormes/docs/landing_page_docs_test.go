@@ -7,11 +7,13 @@ import (
 	"testing"
 )
 
-var landingPageTargets = []string{
+var targets = []string{
 	"superpowers/specs/2026-04-18-gormes-frontend-adapter-design.md",
 	"superpowers/plans/2026-04-18-gormes-phase1-frontend-adapter.md",
 	"superpowers/specs/2026-04-19-gormes-landing-page-design.md",
 	"superpowers/plans/2026-04-19-gormes-landing-page.md",
+	"superpowers/specs/2026-04-19-gormes-ai-cutover-design.md",
+	"superpowers/plans/2026-04-19-gormes-ai-cutover.md",
 }
 
 func TestTargetsIncludeLandingPageDocs(t *testing.T) {
@@ -20,7 +22,26 @@ func TestTargetsIncludeLandingPageDocs(t *testing.T) {
 		"superpowers/plans/2026-04-19-gormes-landing-page.md":        false,
 	}
 
-	for _, target := range landingPageTargets {
+	for _, target := range targets {
+		if _, ok := want[target]; ok {
+			want[target] = true
+		}
+	}
+
+	for rel, seen := range want {
+		if !seen {
+			t.Fatalf("docs target missing %s", rel)
+		}
+	}
+}
+
+func TestTargetsIncludeAICutoverDocs(t *testing.T) {
+	want := map[string]bool{
+		"superpowers/specs/2026-04-19-gormes-ai-cutover-design.md": false,
+		"superpowers/plans/2026-04-19-gormes-ai-cutover.md":        false,
+	}
+
+	for _, target := range targets {
 		if _, ok := want[target]; ok {
 			want[target] = true
 		}
@@ -52,12 +73,12 @@ func TestLandingPageDesignDocCoversApprovedStory(t *testing.T) {
 func TestLandingPagePlanDocReferencesRealImplementationFilesAndCommands(t *testing.T) {
 	raw := readDoc(t, "superpowers/plans/2026-04-19-gormes-landing-page.md")
 	wants := []string{
-		"www.gormes.io/internal/site/assets.go",
-		"www.gormes.io/internal/site/content.go",
-		"www.gormes.io/internal/site/server.go",
-		"www.gormes.io/internal/site/templates/*.tmpl",
-		"www.gormes.io/internal/site/static/*",
-		"www.gormes.io/tests/home.spec.mjs",
+		"www.gormes.ai/internal/site/assets.go",
+		"www.gormes.ai/internal/site/content.go",
+		"www.gormes.ai/internal/site/server.go",
+		"www.gormes.ai/internal/site/templates/*.tmpl",
+		"www.gormes.ai/internal/site/static/*",
+		"www.gormes.ai/tests/home.spec.mjs",
 		"cd gormes && go test ./docs",
 		"npm run test:e2e",
 	}
@@ -68,25 +89,25 @@ func TestLandingPagePlanDocReferencesRealImplementationFilesAndCommands(t *testi
 	}
 
 	for _, rel := range []string{
-		"../../www.gormes.io/internal/site/assets.go",
-		"../../www.gormes.io/internal/site/content.go",
-		"../../www.gormes.io/internal/site/server.go",
-		"../../www.gormes.io/internal/site/templates/index.tmpl",
-		"../../www.gormes.io/internal/site/templates/layout.tmpl",
-		"../../www.gormes.io/internal/site/templates/partials/code_block.tmpl",
-		"../../www.gormes.io/internal/site/templates/partials/feature_card.tmpl",
-		"../../www.gormes.io/internal/site/templates/partials/phase_item.tmpl",
-		"../../www.gormes.io/internal/site/static/site.css",
-		"../../www.gormes.io/tests/home.spec.mjs",
+		"../../www.gormes.ai/internal/site/assets.go",
+		"../../www.gormes.ai/internal/site/content.go",
+		"../../www.gormes.ai/internal/site/server.go",
+		"../../www.gormes.ai/internal/site/templates/index.tmpl",
+		"../../www.gormes.ai/internal/site/templates/layout.tmpl",
+		"../../www.gormes.ai/internal/site/templates/partials/code_block.tmpl",
+		"../../www.gormes.ai/internal/site/templates/partials/feature_card.tmpl",
+		"../../www.gormes.ai/internal/site/templates/partials/phase_item.tmpl",
+		"../../www.gormes.ai/internal/site/static/site.css",
+		"../../www.gormes.ai/tests/home.spec.mjs",
 	} {
 		if _, err := os.Stat(filepath.Join(".", rel)); err != nil {
 			t.Fatalf("expected implementation file %s to exist: %v", rel, err)
 		}
 	}
 
-	pkgJSON := readDoc(t, "../../www.gormes.io/package.json")
+	pkgJSON := readDoc(t, "../../www.gormes.ai/package.json")
 	if !strings.Contains(pkgJSON, `"test:e2e": "playwright test --project=chromium"`) {
-		t.Fatalf("www.gormes.io package.json does not define the documented test:e2e script")
+		t.Fatalf("www.gormes.ai package.json does not define the documented test:e2e script")
 	}
 }
 

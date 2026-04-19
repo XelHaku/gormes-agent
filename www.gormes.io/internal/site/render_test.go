@@ -19,6 +19,7 @@ func TestServer_RendersApprovedPhase1Story(t *testing.T) {
 
 	body := rr.Body.String()
 	wants := []string{
+		"Gormes.ai | The Agent That GOes With You.",
 		"The Agent That GOes With You.",
 		"Open Source • MIT License • Phase 1 Go Port",
 		"API_SERVER_ENABLED=true hermes gateway start",
