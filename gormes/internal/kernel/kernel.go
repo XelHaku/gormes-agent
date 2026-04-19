@@ -16,6 +16,7 @@ import (
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/hermes"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/store"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/telemetry"
+	"github.com/XelHaku/golang-hermes-agent/gormes/internal/tools"
 )
 
 // ErrEventMailboxFull is returned by Submit when the platform-event mailbox
@@ -24,9 +25,12 @@ import (
 var ErrEventMailboxFull = errors.New("kernel: event mailbox full")
 
 type Config struct {
-	Model     string
-	Endpoint  string
-	Admission Admission
+	Model             string
+	Endpoint          string
+	Admission         Admission
+	Tools             *tools.Registry // nil → tool_calls are treated as fatal
+	MaxToolIterations int             // default 10 when zero
+	MaxToolDuration   time.Duration   // default 30s when zero
 }
 
 type Kernel struct {
