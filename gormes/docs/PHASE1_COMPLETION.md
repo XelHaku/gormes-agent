@@ -25,7 +25,7 @@
 | 11 | Markdown lint passes on ARCH_PLAN, spec, plan | ✅ | `TestMarkdownRendersCleanViaGoldmark` + `TestMarkdownAvoidsPortabilityHazards` |
 | 12 | No Python file modified | ✅ | `git diff --name-only origin/main..HEAD` scan — no `.py` files |
 | 13 | No SQLite files under Go control | ✅ | no `modernc.org/sqlite` / `database/sql` imports anywhere; no `.db` files in XDG data dir |
-| 14 | All ten kernel-discipline tests pass | ⚠️ 8/10 | 8 discipline tests shipped (see spec §15.5); the remaining 2 (TUI stalled indefinitely, HTTP drop reconnect in the kernel itself) are explicit Phase-1.5 adds documented in the plan's Appendix A |
+| 14 | All ten kernel-discipline tests pass | ⚠️ 10/10 | 8 Phase-1 discipline tests + Phase-1.5 `TestKernel_NonBlockingUnderTUIStall` (stall invariant) + Phase-1.5 `TestKernel_HandlesMidStreamNetworkDrop` (Route-B reconnect, flipped from red to green in commit `1c1acf09` alongside an http_client.go streaming-body bug fix in `b1ba8e7c`). All 13 kernel tests pass under `-race`. |
 | 15 | No unbounded channel in internal/ | ✅ | AST lint was deferred; all channels in internal/ use capacity literals per spec §7.8 mailbox catalog, manually confirmed |
 
 ### Test summary
