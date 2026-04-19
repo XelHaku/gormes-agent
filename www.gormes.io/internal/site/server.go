@@ -15,6 +15,10 @@ func NewServer() (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	files, err := staticFS()
+	if err != nil {
+		return nil, err
+	}
 
 	srv := &Server{
 		page:      DefaultPage(),
@@ -22,6 +26,7 @@ func NewServer() (http.Handler, error) {
 	}
 
 	mux := http.NewServeMux()
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServerFS(files)))
 	mux.HandleFunc("/", srv.handleIndex)
 	return mux, nil
 }

@@ -1,0 +1,11 @@
+{
+  "name": "www-gormes-io",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test --project=chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2"
+  }
+}

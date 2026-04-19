@@ -6,29 +6,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}}</title>
   <meta name="description" content="{{.Description}}">
+  <link rel="stylesheet" href="/static/site.css">
 </head>
 <body>
-  <header id="top">
-    <nav aria-label="Primary">
-      <a href="#top">Gormes</a>
+  <div class="page-shell">
+  <header id="top" class="site-header">
+    <nav class="nav" aria-label="Primary">
+      <a class="brand" href="#top">Gormes</a>
+      <div class="nav-links">
       {{range .Nav}}
       <a href="{{.Href}}">{{.Label}}</a>
       {{end}}
+      </div>
     </nav>
   </header>
 
-  <main>
+  <main class="content">
     {{template "index" .}}
   </main>
 
-  <footer>
+  <footer class="site-footer">
     <p>{{.FooterLine}}</p>
-    <ul>
+    <ul class="footer-links">
       {{range .FooterLinks}}
       <li><a href="{{.Href}}">{{.Label}}</a></li>
       {{end}}
     </ul>
   </footer>
+  </div>
 </body>
 </html>
 {{end}}
