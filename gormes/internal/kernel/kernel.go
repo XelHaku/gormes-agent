@@ -33,7 +33,7 @@ type Kernel struct {
 	cfg    Config
 	client hermes.Client
 	store  store.Store
-	tm     *telemetry.Telemetry
+	tm     telemetry.Telemetry
 	log    *slog.Logger
 
 	render chan RenderFrame
@@ -53,7 +53,7 @@ type Kernel struct {
 	lastError string
 }
 
-func New(cfg Config, c hermes.Client, s store.Store, tm *telemetry.Telemetry, log *slog.Logger) *Kernel {
+func New(cfg Config, c hermes.Client, s store.Store, tm telemetry.Telemetry, log *slog.Logger) *Kernel {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -150,143 +150,95 @@ func (k *Kernel) runTurn(ctx context.Context, text string) {
 	k.emitFrame("connecting")
 	prov.LogPOSTSent(k.log)
 
-	// 4. Open the stream with a run-scoped context so cancel can cascade.
-	runCtx, cancelRun := context.WithCancel(ctx)
-	defer cancelRun()
-
-	stream, err := k.client.OpenStream(runCtx, hermes.ChatRequest{
+	// 4. Retry loop — Route-B reconnect per spec §9.2.
+	retryBudget := NewRetryBudget()
+	request := hermes.ChatRequest{
 		Model:     k.cfg.Model,
 		SessionID: k.sessionID,
 		Stream:    true,
 		Messages:  []hermes.Message{{Role: "user", Content: text}},
-	})
-	if err != nil {
-		prov.ErrorClass = hermes.Classify(err).String()
-		prov.ErrorText = err.Error()
-		prov.LogError(k.log)
-		k.phase = PhaseFailed
-		k.lastError = err.Error()
-		k.emitFrame("open stream failed")
-		return
 	}
-	defer stream.Close()
-
-	k.phase = PhaseStreaming
-	k.emitFrame("streaming")
-	k.tm.StartTurn()
-	start := time.Now()
-
-	// 5. Pump goroutine: Recv in a loop, forward each result to deltaCh.
-	// Exits on runCtx.Done or when Recv returns an error (including io.EOF).
-	// Always closes deltaCh on exit — this is the cleanup handshake.
-	type streamResult struct {
-		event hermes.Event
-		err   error
-	}
-	deltaCh := make(chan streamResult, 8)
-	go func() {
-		defer close(deltaCh)
-		for {
-			ev, err := stream.Recv(runCtx)
-			// Forward or abort on cancel.
-			select {
-			case deltaCh <- streamResult{event: ev, err: err}:
-			case <-runCtx.Done():
-				return
-			}
-			if err != nil {
-				return
-			}
-		}
-	}()
-
-	// 6. Streaming loop with 16ms coalescer + concurrent event handling.
-	ticker := time.NewTicker(FlushInterval)
-	defer ticker.Stop()
 
 	var (
-		cancelled  bool
-		fatalErr   error
-		finalDelta hermes.Event
-		gotFinal   bool
-		dirty      bool
+		cancelled          bool
+		fatalErr           error
+		finalDelta         hermes.Event
+		gotFinal           bool
+		replaceOnNextToken bool // set when re-entering after reconnect
+		latestSessionID    string
 	)
 
-streamLoop:
+	start := time.Now()
+	k.tm.StartTurn()
+
+retryLoop:
 	for {
-		select {
-		case <-ctx.Done():
-			cancelled = true
+		// Fresh per-attempt context so a cancelled stream doesn't poison the next attempt.
+		runCtx, cancelRun := context.WithCancel(ctx)
+
+		stream, err := k.client.OpenStream(runCtx, request)
+		if err != nil {
 			cancelRun()
-			break streamLoop
-
-		case e := <-k.events:
-			switch e.Kind {
-			case PlatformEventCancel:
-				cancelled = true
-				cancelRun()
-				// Drain continues below in the drain loop.
-			case PlatformEventSubmit:
-				// Reject — keep the current turn running; render a
-				// rejection frame so the user sees immediate feedback.
-				k.lastError = ErrTurnInFlight.Error()
-				k.emitFrame("still processing previous turn")
-			case PlatformEventQuit:
-				cancelled = true
-				cancelRun()
-				break streamLoop
-			}
-
-		case res, ok := <-deltaCh:
-			if !ok {
-				// Pump exited — stream over.
-				break streamLoop
-			}
-			if res.err != nil {
-				if res.err == io.EOF {
-					break streamLoop
-				}
-				if runCtx.Err() != nil {
-					// Cancelled mid-recv; not a real error.
+			if hermes.Classify(err) == hermes.ClassRetryable && !retryBudget.Exhausted() {
+				k.phase = PhaseReconnecting
+				k.lastError = "reconnecting: " + err.Error()
+				k.emitFrame("reconnecting")
+				delay := retryBudget.NextDelay()
+				if werr := Wait(ctx, delay); werr != nil {
 					cancelled = true
-					break streamLoop
+					break retryLoop
 				}
-				fatalErr = res.err
-				break streamLoop
+				replaceOnNextToken = true
+				continue retryLoop
 			}
-			ev := res.event
-			switch ev.Kind {
-			case hermes.EventToken:
-				k.draft += ev.Token
-				k.tm.Tick(ev.TokensOut)
-				dirty = true
-			case hermes.EventReasoning:
-				k.addSoul("reasoning: " + truncate(ev.Reasoning, 60))
-				dirty = true
-			case hermes.EventDone:
-				finalDelta = ev
-				gotFinal = true
-				break streamLoop
-			}
+			prov.ErrorClass = hermes.Classify(err).String()
+			prov.ErrorText = err.Error()
+			prov.LogError(k.log)
+			k.phase = PhaseFailed
+			k.lastError = err.Error()
+			k.emitFrame("open stream failed")
+			return
+		}
 
-		case <-ticker.C:
-			if dirty {
-				k.emitFrame("streaming")
-				dirty = false
+		k.phase = PhaseStreaming
+		k.emitFrame("streaming")
+
+		outcome := k.streamInner(ctx, runCtx, cancelRun, stream, &finalDelta, &gotFinal, &fatalErr, &cancelled, &replaceOnNextToken)
+		_ = stream.Close()
+		if sid := stream.SessionID(); sid != "" {
+			latestSessionID = sid
+		}
+		cancelRun()
+
+		switch outcome {
+		case streamOutcomeDone:
+			break retryLoop
+		case streamOutcomeCancelled:
+			break retryLoop
+		case streamOutcomeFatal:
+			// streamInner already set phase/lastError/emitted and populated fatalErr.
+			// Fall through to finalisation with fatalErr set so it logs and returns.
+			break retryLoop
+		case streamOutcomeRetryable:
+			if retryBudget.Exhausted() {
+				k.phase = PhaseFailed
+				k.lastError = "reconnect budget exhausted"
+				k.emitFrame("reconnect budget exhausted")
+				return
 			}
+			k.phase = PhaseReconnecting
+			k.emitFrame("reconnecting")
+			delay := retryBudget.NextDelay()
+			if werr := Wait(ctx, delay); werr != nil {
+				cancelled = true
+				break retryLoop
+			}
+			replaceOnNextToken = true
+			continue retryLoop
 		}
 	}
 
-	// 7. Drain deltaCh to ensure the pump goroutine exits. cancelRun() has
-	// been called if we cancelled; otherwise the pump is exiting on its own
-	// via Recv returning io.EOF or an error. Either way, closing happens.
-	cancelRun()
-	for range deltaCh {
-		// discard remaining results
-	}
-
-	// 8. Finalisation. At this point no other goroutine holds references to
-	// kernel state; all further mutations are safe on the Run goroutine.
+	// 5. Finalisation.
 	latency := time.Since(start)
 	k.tm.FinishTurn(latency)
 	prov.LatencyMs = int(latency / time.Millisecond)
@@ -310,9 +262,9 @@ streamLoop:
 		}
 	}
 
-	if sid := stream.SessionID(); sid != "" {
-		k.sessionID = sid
-		prov.ServerSessionID = sid
+	if latestSessionID != "" {
+		k.sessionID = latestSessionID
+		prov.ServerSessionID = latestSessionID
 		prov.LogSSEStart(k.log)
 	}
 
@@ -326,6 +278,163 @@ streamLoop:
 	prov.LogDone(k.log)
 	k.phase = PhaseIdle
 	k.emitFrame("idle")
+}
+
+type streamOutcome int
+
+const (
+	streamOutcomeDone streamOutcome = iota
+	streamOutcomeCancelled
+	streamOutcomeRetryable
+	streamOutcomeFatal
+)
+
+// streamInner runs one stream attempt. Pumps events from hermes.Stream.Recv
+// into a bounded channel, multiplexes over the kernel's platform events and
+// a 16ms flush ticker, and returns a classified outcome so the retry-loop
+// caller knows what to do next.
+//
+// The outer ctx (from runTurn) is used for ambient cancellation checks.
+// The runCtx (per-attempt) is what the pump goroutine uses for Recv; when
+// this stream ends (normal, cancel, or retryable error), runCtx is cancelled
+// by the caller.
+func (k *Kernel) streamInner(
+	ctx, runCtx context.Context,
+	cancelRun context.CancelFunc,
+	stream hermes.Stream,
+	finalDelta *hermes.Event,
+	gotFinal *bool,
+	fatalErr *error,
+	cancelled *bool,
+	replaceOnNextToken *bool,
+) streamOutcome {
+	type streamResult struct {
+		event hermes.Event
+		err   error
+	}
+	deltaCh := make(chan streamResult, 8)
+	go func() {
+		defer close(deltaCh)
+		for {
+			ev, err := stream.Recv(runCtx)
+			select {
+			case deltaCh <- streamResult{event: ev, err: err}:
+			case <-runCtx.Done():
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	ticker := time.NewTicker(FlushInterval)
+	defer ticker.Stop()
+
+	var (
+		dirty   bool
+		outcome streamOutcome
+	)
+	outcome = streamOutcomeFatal // default if something truly unexpected happens
+
+streamLoop:
+	for {
+		select {
+		case <-ctx.Done():
+			*cancelled = true
+			cancelRun()
+			outcome = streamOutcomeCancelled
+			break streamLoop
+
+		case e := <-k.events:
+			switch e.Kind {
+			case PlatformEventCancel:
+				*cancelled = true
+				cancelRun()
+				outcome = streamOutcomeCancelled
+				break streamLoop
+			case PlatformEventSubmit:
+				k.lastError = ErrTurnInFlight.Error()
+				k.emitFrame("still processing previous turn")
+			case PlatformEventQuit:
+				*cancelled = true
+				cancelRun()
+				outcome = streamOutcomeCancelled
+				break streamLoop
+			}
+
+		case res, ok := <-deltaCh:
+			if !ok {
+				// Pump exited on its own — treat as retryable (unexpected EOF).
+				// Only treat as Done if EventDone was already consumed (*gotFinal).
+				if *gotFinal {
+					outcome = streamOutcomeDone
+				} else {
+					outcome = streamOutcomeRetryable
+				}
+				break streamLoop
+			}
+			if res.err != nil {
+				if res.err == io.EOF {
+					if *gotFinal {
+						outcome = streamOutcomeDone
+					} else {
+						// Stream ended without EventDone — treat as retryable.
+						outcome = streamOutcomeRetryable
+					}
+					break streamLoop
+				}
+				if runCtx.Err() != nil {
+					*cancelled = true
+					outcome = streamOutcomeCancelled
+					break streamLoop
+				}
+				// Classify the error: Retryable → caller retries; otherwise fatal.
+				if hermes.Classify(res.err) == hermes.ClassRetryable {
+					outcome = streamOutcomeRetryable
+				} else {
+					*fatalErr = res.err
+					outcome = streamOutcomeFatal
+				}
+				break streamLoop
+			}
+			ev := res.event
+			switch ev.Kind {
+			case hermes.EventToken:
+				if *replaceOnNextToken {
+					k.draft = ""
+					*replaceOnNextToken = false
+				}
+				k.draft += ev.Token
+				k.tm.Tick(ev.TokensOut)
+				dirty = true
+			case hermes.EventReasoning:
+				if *replaceOnNextToken {
+					// Reasoning doesn't count as visible content; the NEXT EventToken
+					// still clears the draft. Do NOT flip replaceOnNextToken here.
+				}
+				k.addSoul("reasoning: " + truncate(ev.Reasoning, 60))
+				dirty = true
+			case hermes.EventDone:
+				*finalDelta = ev
+				*gotFinal = true
+				outcome = streamOutcomeDone
+				break streamLoop
+			}
+
+		case <-ticker.C:
+			if dirty {
+				k.emitFrame("streaming")
+				dirty = false
+			}
+		}
+	}
+
+	// Drain deltaCh so the pump goroutine exits before we return.
+	cancelRun()
+	for range deltaCh {
+	}
+	return outcome
 }
 
 // addSoul appends a Soul Monitor entry with a ring-buffer cap.
