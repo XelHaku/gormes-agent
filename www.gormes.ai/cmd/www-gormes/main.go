@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/XelHaku/golang-hermes-agent/www.gormes.io/internal/site"
+	"github.com/XelHaku/golang-hermes-agent/www.gormes.ai/internal/site"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("www.gormes.io listening", "addr", *listen)
+	slog.Info("www.gormes.ai listening", "addr", *listen)
 	if err := http.ListenAndServe(*listen, handler); err != nil {
 		slog.Error("serve", "err", err)
 		os.Exit(1)
