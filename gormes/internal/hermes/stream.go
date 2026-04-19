@@ -82,7 +82,7 @@ func (s *chatStream) Recv(ctx context.Context) (Event, error) {
 			s.pending = s.pending[1:]
 			return ev, nil
 		}
-		f, err := s.sse.Next()
+		f, err := s.sse.Next(ctx)
 		if err != nil {
 			return Event{}, err
 		}

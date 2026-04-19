@@ -5,6 +5,18 @@ package telemetry
 
 import "time"
 
+// Telemetry is the interface for per-session metrics collection.
+type Telemetry interface {
+	SetModel(m string)
+	StartTurn()
+	Tick(tokensOut int)
+	FinishTurn(latency time.Duration)
+	SetTokensIn(n int)
+	Snapshot() Snapshot
+}
+
+var _ Telemetry = (*telemetry)(nil)
+
 type Snapshot struct {
 	Model          string
 	TokensInTotal  int
@@ -13,30 +25,26 @@ type Snapshot struct {
 	TokensPerSec   float64
 }
 
-// Telemetry is NOT goroutine-safe. The kernel holds it on its single owner
+// telemetry is NOT goroutine-safe. The kernel holds it on its single owner
 // goroutine; no other goroutine touches it. If that invariant changes, add
 // a mutex or an atomic snapshot read.
-type Telemetry struct {
+type telemetry struct {
 	snap       Snapshot
 	turnStart  time.Time
 	turnTokens int
 	ema        float64
 }
 
-func New() *Telemetry { return &Telemetry{} }
+func New() Telemetry { return &telemetry{} }
 
-func (t *Telemetry) SetModel(m string) { t.snap.Model = m }
+func (t *telemetry) SetModel(m string) { t.snap.Model = m }
 
-// StartTurn resets the per-turn bookkeeping (tok/s denominator, etc.).
-func (t *Telemetry) StartTurn() {
+func (t *telemetry) StartTurn() {
 	t.turnStart = time.Now()
 	t.turnTokens = 0
 }
 
-// Tick records the running tokens-out counter reported by the latest delta.
-// It adds the delta from the last tick to the lifetime TokensOutTotal and
-// updates the EMA tokens/sec estimator.
-func (t *Telemetry) Tick(tokensOut int) {
+func (t *telemetry) Tick(tokensOut int) {
 	delta := tokensOut - t.turnTokens
 	if delta < 0 {
 		delta = 0
@@ -51,15 +59,10 @@ func (t *Telemetry) Tick(tokensOut int) {
 	}
 }
 
-// FinishTurn records the turn's latency.
-func (t *Telemetry) FinishTurn(latency time.Duration) {
+func (t *telemetry) FinishTurn(latency time.Duration) {
 	t.snap.LatencyMsLast = int(latency / time.Millisecond)
 }
 
-// SetTokensIn adds to the lifetime TokensInTotal. Called once per turn when
-// the server reports final usage.
-func (t *Telemetry) SetTokensIn(n int) { t.snap.TokensInTotal += n }
+func (t *telemetry) SetTokensIn(n int) { t.snap.TokensInTotal += n }
 
-// Snapshot returns the current counters. Safe to call at any time on the
-// owning goroutine.
-func (t *Telemetry) Snapshot() Snapshot { return t.snap }
+func (t *telemetry) Snapshot() Snapshot { return t.snap }

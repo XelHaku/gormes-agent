@@ -13,9 +13,11 @@
   <a href="https://gormes.ai"><img src="https://img.shields.io/badge/Built%20by-Trebuchet%20Dynamics-0A84FF?style=for-the-badge" alt="Built by Trebuchet Dynamics"></a>
 </p>
 
-**Built by Trebuchet Dynamics. A high-performance, 100% Go port of the original Nous Research Hermes agent.** A zero-entropy, single-binary, high-concurrency LLM gateway. Gormes takes the brilliant agentic loop of Hermes and rebuilds it in pure Go. No Python environments, no `pip install` hell, no GIL bottlenecks. Deploy a 20MB static binary that runs on a fraction of the memory footprint, from a $4 VPS to an Android phone.
+**Built by Trebuchet Dynamics. A high-performance, 100% Go port of the original Nous Research Hermes agent.** Gormes is the Zero-Entropy Agent Host: a single-binary, high-concurrency runtime for the era where models get smarter and operational friction becomes the bottleneck. No Python environments, no `pip install` hell, no GIL bottlenecks. Deploy a static binary that runs on a fraction of the memory footprint, from a $4 VPS to an Android phone.
 
 Gormes carries forward the MIT-licensed Hermes lineage with a cleaner operational model: one binary, fast cold starts, lower memory pressure, and concurrency that scales without ceremony. The command surface stays familiar, the feature set stays broad, and the runtime stops fighting you.
+
+As models improve, runtime quality matters more. Intelligence is getting cheaper and more abundant; deployment drift, crash recovery, startup tax, and always-on reliability are becoming the real constraints. Gormes is built for that future.
 
 Use any model you want — [Nous Portal](https://portal.nousresearch.com), [OpenRouter](https://openrouter.ai) (200+ models), [NVIDIA NIM](https://build.nvidia.com), [Xiaomi MiMo](https://platform.xiaomimimo.com), [z.ai/GLM](https://z.ai), [Kimi/Moonshot](https://platform.moonshot.ai), [MiniMax](https://www.minimax.io), [Hugging Face](https://huggingface.co), OpenAI, or your own endpoint. Switch with `gormes model` — no code changes, no lock-in.
 
@@ -30,6 +32,25 @@ Use any model you want — [Nous Portal](https://portal.nousresearch.com), [Open
 </table>
 
 ---
+
+## Why Gormes?
+
+We are moving out of the "magic" phase of AI and into the utility phase.
+
+The problem is no longer just whether an agent can think. The problem is whether it can stay alive 24/7 without being babysat through interpreter drift, broken virtual environments, and runtime coordination pain.
+
+Gormes exists because serious agents need a serious host:
+
+- **Dependency hell is not a feature.** Python packaging drift, environment mismatch, and activation rituals are operational tax.
+- **The GIL is not the future of always-on agent infrastructure.** High-fanout gateways, streams, cron jobs, MCP sessions, and long-lived conversations want a runtime built for concurrency.
+- **Environment fragility kills autonomy.** A smart agent that falls over because the host moved underneath it is not production-grade.
+- **Zero-dependency deployment changes adoption.** One binary that can be copied, restarted, and trusted is a different product from a fragile app stack.
+
+The long-term target state is simple:
+
+- **100% Go**
+- **100% static distribution**
+- **100% reliability as the engineering standard**
 
 ## Install
 
@@ -73,7 +94,7 @@ Gormes preserves the Hermes operator experience and replaces the engine room wit
 
 - Single-binary runtime: CLI, gateway, cron, and tool orchestration ship as one deployable artifact.
 - Go concurrency model: streaming turns, background jobs, gateway fan-out, and tool calls share one process without GIL contention.
-- Phase 1 Strangler Fig: gateways, memory, cron, MCP, skills, and the familiar surface area remain true while the Go core takes over subsystem by subsystem.
+- Phase 1 Strangler Fig: the current bridge provides immediate value for Hermes users, but it is a temporary tactical layer while the Go core takes over the full lifecycle subsystem by subsystem.
 - Drop-in command parity: `gormes setup`, `gormes doctor`, `gormes tools`, and the rest map 1:1 to the original Hermes workflows.
 
 ## CLI vs Messaging Quick Reference

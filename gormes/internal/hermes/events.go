@@ -52,7 +52,7 @@ func (s *runEventStream) Recv(ctx context.Context) (RunEvent, error) {
 			return RunEvent{}, ctx.Err()
 		default:
 		}
-		f, err := s.sse.Next()
+		f, err := s.sse.Next(ctx)
 		if err != nil {
 			return RunEvent{}, err
 		}

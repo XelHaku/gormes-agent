@@ -91,11 +91,12 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 	// Signal → shutdown-budget force-exit watcher.
 	go func() {
 		<-rootCtx.Done()
-		time.AfterFunc(kernel.ShutdownBudget, func() {
+		prog.Quit()
+		select {
+		case <-time.After(kernel.ShutdownBudget):
 			slog.Error("shutdown budget exceeded; forcing exit")
 			os.Exit(3)
-		})
-		prog.Quit()
+		}
 	}()
 
 	_, err = prog.Run()

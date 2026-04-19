@@ -6,6 +6,18 @@
 
 ---
 
+## 0. Operational Moat Thesis
+
+When intelligence becomes abundant, operational friction becomes the bottleneck.
+
+That is the reason Gormes exists.
+
+If models keep improving, the differentiator stops being whether an agent can produce a clever answer and starts being whether the system can stay alive, recover fast, deploy cleanly, and run everywhere without constant babysitting. Gormes is built for that era.
+
+The strategic target is not "a Go wrapper around Hermes." The strategic target is a pure Go binary that owns the full lifecycle of a serious always-on agent.
+
+---
+
 ## 1. Rosetta Stone Declaration
 
 The repository root is the **Reference Implementation** (Python, upstream `NousResearch/hermes-agent`). The `gormes/` directory is the **High-Performance Implementation** (Go). Neither replaces the other during Phases 1–4; they co-evolve as a translation pair until Phase 5's final purge completes the migration.
@@ -30,13 +42,15 @@ The hybrid is **temporary**. The long-term state is 100% Go.
 
 During Phases 1–4, Go is the chassis (orchestrator, state, persistence, platform I/O, agent cognition) and Python is the peripheral library (research tools, legacy skills, ML heavy lifting). Each phase shrinks Python's footprint. Phase 5 deletes the last Python dependency.
 
+Phase 1 should be read correctly: it is a tactical Strangler Fig bridge, not a philosophical compromise. It exists to deliver immediate value to existing Hermes users while preserving a clean migration path toward a pure Go runtime that owns the entire lifecycle end to end.
+
 ---
 
 ## 4. Milestone Status
 
 | Phase | Status | Deliverable |
 |---|---|---|
-| Phase 1 — The Dashboard (Face) | ✅ complete | Go TUI over Python's `api_server` HTTP+SSE boundary |
+| Phase 1 — The Dashboard (Face) | ✅ complete | Tactical bridge: Go TUI over Python's `api_server` HTTP+SSE boundary |
 | Phase 2 — The Wiring Harness (Gateway) | ⏳ planned | Multi-platform adapters in Go (Telegram, Discord, Slack, …) |
 | Phase 3 — The Black Box (Memory) | ⏳ planned | SQLite + FTS5 + ontological graph in Go |
 | Phase 4 — The Powertrain (Brain Transplant) | ⏳ planned | Native Go agent orchestrator + prompt builder |
@@ -50,12 +64,12 @@ Legend: 🔨 in progress · ✅ complete · ⏳ planned · ⏸ deferred.
 
 Hard rule: no Python file in this repository is modified. All Gormes work lives under `gormes/`. Upstream rebases against `NousResearch/hermes-agent` cannot conflict with Gormes because paths do not overlap.
 
-A one-time "Go Implementation Status" addition to the repository-root `README.md` is explicitly deferred until after Phase 1 ships.
+The bridge is allowed to exist. The bridge is not allowed to become the destination.
 
 ---
 
 ## 6. Documentation
 
-This `ARCH_PLAN.md` is the executive roadmap. Per-milestone specs live at `docs/superpowers/specs/YYYY-MM-DD-*.md`. Per-milestone implementation plans live at `docs/superpowers/plans/YYYY-MM-DD-*.md`.
+This `ARCH_PLAN.md` is the executive roadmap. It defines the strategic conquest of the operational bottleneck: first UI, then gateway, then memory and state, then cognition, then the final removal of Python from the runtime path. Per-milestone specs live at `docs/superpowers/specs/YYYY-MM-DD-*.md`. Per-milestone implementation plans live at `docs/superpowers/plans/YYYY-MM-DD-*.md`.
 
 Public-site (`gormes.io`) deployment is **Phase 1.5** work. The documentation is authored in CommonMark + GFM so every mainstream static-site generator (Hugo, MkDocs Material, Astro Starlight) can render it without rewrites. Phase 1 ships a Goldmark-based validation test — Goldmark is the exact renderer Hugo uses, so passing the test guarantees Hugo-renderability.

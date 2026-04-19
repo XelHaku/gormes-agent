@@ -190,6 +190,42 @@ Measure:
 - shutdown cleanliness
 - long-run stability under mixed workloads
 
+## Hypothesis 3.5: Deterministic Concurrency Should Improve UI and Kernel Reliability
+
+### Expected Advantage
+
+Gormes should be able to keep the UI responsive and the internal state machine coherent under load because it can centralize coordination around deterministic channel-driven pumps instead of hoping an async stack stays polite under pressure.
+
+### Why This Matters
+
+The failure mode users remember is not "the scheduler made a suboptimal choice." The failure mode users remember is:
+
+- the UI froze
+- the stream stuttered
+- cancellation arrived late
+- state transitions became ambiguous under load
+
+That is exactly the class of problem where runtime discipline matters more than raw intelligence.
+
+### Why Hermes Is Structurally Weaker Here
+
+Python's async model can work well, but it lives in a world where UI work, network work, and coordination logic can still become entangled around event-loop behavior and blocking boundaries. Under heavy computation or integration fanout, that can turn responsiveness into a policy problem rather than a hard structural guarantee.
+
+Gormes has a clearer theoretical path: select over channels, one owner for state transitions, and a 16ms kernel pump that makes coalescing and render cadence explicit instead of incidental.
+
+### What Would Disprove the Advantage
+
+This hypothesis fails if the kernel pump becomes ornamental instead of authoritative, or if mailbox swaps, stop signals, and render timing still create nondeterministic edge-case failures.
+
+### Proof Later
+
+Measure and test:
+
+- render latency during heavy stream traffic
+- cancellation timing under concurrent event bursts
+- coalescer correctness under mailbox swaps
+- absence of nil dereferences, deadlocks, and closed-channel sends in kernel red-team tests
+
 ## Hypothesis 4: Typed Boundaries Should Eliminate Some Failure Classes
 
 ### Expected Advantage

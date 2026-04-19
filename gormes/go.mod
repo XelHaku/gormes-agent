@@ -1,6 +1,6 @@
 module github.com/XelHaku/golang-hermes-agent/gormes
 
-go 1.22
+go 1.24.2
 
 toolchain go1.26.1
 

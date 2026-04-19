@@ -82,8 +82,10 @@ type SlowStore struct {
 func NewSlow(d time.Duration) *SlowStore { return &SlowStore{delay: d} }
 
 func (s *SlowStore) Exec(ctx context.Context, _ Command) (Ack, error) {
+	timer := time.NewTimer(s.delay)
+	defer timer.Stop()
 	select {
-	case <-time.After(s.delay):
+	case <-timer.C:
 		return Ack{TurnID: 1}, nil
 	case <-ctx.Done():
 		return Ack{}, ctx.Err()
