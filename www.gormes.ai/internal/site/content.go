@@ -52,7 +52,7 @@ type LandingPage struct {
 
 func DefaultPage() LandingPage {
 	return LandingPage{
-		Title:       "Gormes.io | The Agent That GOes With You.",
+		Title:       "Gormes.ai | The Agent That GOes With You.",
 		Description: "Gormes is the Phase 1 Go frontend for Hermes Agent: a faster terminal today and a public path to a pure-Go stack tomorrow.",
 		Nav: []NavLink{
 			{Label: "Quick Start", Href: "#quickstart"},

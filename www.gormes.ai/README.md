@@ -1,8 +1,8 @@
-# Gormes.io
+# Gormes.ai
 
 Server-rendered landing page for the Gormes Phase 1 Go port.
 
-The site is built in Go and serves the public homepage at `/` plus embedded static assets at `/static/*`. The implementation lives under `www.gormes.io/internal/site` so the templates and CSS can be embedded with `//go:embed`.
+The site is built in Go and serves the public homepage at `/` plus embedded static assets at `/static/*`. The implementation lives under `www.gormes.ai/internal/site` so the templates and CSS can be embedded with `//go:embed`.
 
 ## Layout
 
@@ -16,7 +16,7 @@ The site is built in Go and serves the public homepage at `/` plus embedded stat
 ## Local Development
 
 ```bash
-cd www.gormes.io
+cd www.gormes.ai
 make build
 ./bin/www-gormes -listen :8080
 ```
