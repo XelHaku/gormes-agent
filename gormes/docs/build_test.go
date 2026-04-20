@@ -1,0 +1,97 @@
+package docs_test
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// TestHugoBuild runs `hugo --minify` in a temp directory and asserts
+// the full set of expected pages are emitted. Guards against:
+//   - Theme regressions (build fails silently)
+//   - Broken front-matter (page doesn't render)
+//   - Missing content files (section landing without children)
+func TestHugoBuild(t *testing.T) {
+	tmp := t.TempDir()
+	cmd := exec.Command("hugo", "--minify", "-d", tmp)
+	cmd.Dir = "."
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("hugo build failed: %v\noutput:\n%s", err, string(out))
+	}
+
+	wantPages := []string{
+		"index.html",
+		"using-gormes/index.html",
+		"using-gormes/quickstart/index.html",
+		"using-gormes/install/index.html",
+		"using-gormes/tui-mode/index.html",
+		"using-gormes/telegram-adapter/index.html",
+		"using-gormes/configuration/index.html",
+		"using-gormes/wire-doctor/index.html",
+		"using-gormes/faq/index.html",
+		"building-gormes/index.html",
+		"building-gormes/core-systems/index.html",
+		"building-gormes/core-systems/learning-loop/index.html",
+		"building-gormes/core-systems/memory/index.html",
+		"building-gormes/core-systems/tool-execution/index.html",
+		"building-gormes/core-systems/gateway/index.html",
+		"building-gormes/what-hermes-gets-wrong/index.html",
+		"building-gormes/porting-a-subsystem/index.html",
+		"building-gormes/testing/index.html",
+		"building-gormes/architecture_plan/index.html",
+		"building-gormes/architecture_plan/phase-1-dashboard/index.html",
+		"building-gormes/architecture_plan/phase-2-gateway/index.html",
+		"building-gormes/architecture_plan/phase-3-memory/index.html",
+		"building-gormes/architecture_plan/phase-4-brain-transplant/index.html",
+		"building-gormes/architecture_plan/phase-5-final-purge/index.html",
+		"building-gormes/architecture_plan/phase-6-learning-loop/index.html",
+		"building-gormes/architecture_plan/subsystem-inventory/index.html",
+		"building-gormes/architecture_plan/mirror-strategy/index.html",
+		"building-gormes/architecture_plan/technology-radar/index.html",
+		"building-gormes/architecture_plan/boundaries/index.html",
+		"building-gormes/architecture_plan/why-go/index.html",
+		"upstream-hermes/index.html",
+	}
+
+	for _, p := range wantPages {
+		full := filepath.Join(tmp, p)
+		if _, err := os.Stat(full); err != nil {
+			t.Errorf("expected built page missing: %s", p)
+		}
+	}
+}
+
+// TestHugoBuild_IndexHasSidebarSections asserts the rendered home
+// page contains all three colored sidebar group labels and the
+// expected root section links.
+func TestHugoBuild_IndexHasSidebarSections(t *testing.T) {
+	tmp := t.TempDir()
+	cmd := exec.Command("hugo", "--minify", "-d", tmp)
+	cmd.Dir = "."
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("hugo build failed: %v\n%s", err, string(out))
+	}
+	body, err := os.ReadFile(filepath.Join(tmp, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	for _, want := range []string{
+		"USING GORMES",
+		"BUILDING GORMES",
+		"UPSTREAM HERMES",
+		"docs-nav-group-label-shipped",
+		"docs-nav-group-label-progress",
+		"docs-nav-group-label-next",
+		`href="/using-gormes/"`,
+		`href="/building-gormes/"`,
+		`href="/upstream-hermes/"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("built index.html missing %q", want)
+		}
+	}
+}
