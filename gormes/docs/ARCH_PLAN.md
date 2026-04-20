@@ -413,6 +413,69 @@ These upstream paths exist but are not part of the runtime that Gormes must abso
 - `plans/` (upstream plans directory), `package.json`, `package-lock.json`, `flake.lock`, `flake.nix` — build/packaging metadata; partially mirrored at Phase 5.P.
 - `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `GOOD-PRACTICES.md`, `hermes-already-has-routines.md` — upstream contributor docs; not runtime.
 
+### Runtime contracts (config schema, env var surface, on-disk state)
+
+Equally important as the code inventory above is the **runtime contract surface** — the shape of configuration, environment, and on-disk state that a Hermes user has built muscle memory around. A Gormes binary that ignores these contracts is technically a port but operationally a foreign object.
+
+#### Configuration files
+
+| Path (upstream default) | Format | Upstream source | Gormes equivalent |
+|---|---|---|---|
+| `~/.hermes/config.yaml` | YAML | `hermes_cli/config.py` (`DEFAULT_CONFIG`, 117 top-level keys; `_config_version` for migrations) | `~/.config/gormes/config.toml` (TOML, simpler schema; `internal/config/config.go`) |
+| `~/.hermes/.env` | `KEY=value` pairs | `hermes_cli/env_loader.py` (read on startup) | `GORMES_*` env vars + stdlib `os.Getenv` (no dotenv by default) |
+| `~/.hermes/auth.json` | JSON | `hermes_cli/auth.py` + `agent/credential_pool.py` | Planned 4.G — token vault |
+| `~/.hermes/.anthropic_oauth.json` | JSON | `hermes_cli/auth.py` | Planned 4.G — per-provider token files |
+| `~/.hermes/context_length_cache.yaml` | YAML | `agent/model_metadata.py` | Planned 4.D — replace YAML with embedded `models_dev_cache.go` |
+| `~/.hermes/models_dev_cache.json` | JSON | `agent/models_dev.py` | Planned 4.D |
+| `~/.hermes/ollama_cloud_models_cache.json` | JSON | `agent/models_dev.py` / Ollama adapter | Planned 4.D |
+| `~/.hermes/.skills_prompt_snapshot.json` | JSON | `agent/skill_commands.py` | Planned 5.F |
+
+#### Environment variable surface
+
+Upstream honors **~170 environment variables** across three layers. Gormes must re-expose the operator-facing ones without breaking muscle memory.
+
+| Layer | Env var count | Representative examples | Target phase |
+|---|---|---|---|
+| **Hermes runtime toggles** (`HERMES_*`) | ~47 | `HERMES_HOME` (state root override), `HERMES_MAX_ITERATIONS`, `HERMES_QUIET`, `HERMES_HEADLESS`, `HERMES_MANAGED`, `HERMES_YOLO_MODE`, `HERMES_TIMEZONE`, `HERMES_REDACT_SECRETS`, `HERMES_TOOL_PROGRESS`, `HERMES_CA_BUNDLE`, `HERMES_INTERACTIVE`, `HERMES_DEV`, `HERMES_EPHEMERAL_SYSTEM_PROMPT`, `HERMES_PREFILL_MESSAGES_FILE`, `HERMES_OAUTH_TRACE`, `HERMES_RESTART_DRAIN_TIMEOUT`, `HERMES_SESSION_PLATFORM`, `HERMES_SESSION_SOURCE`, `HERMES_CODEX_BASE_URL`, `HERMES_GEMINI_CLIENT_ID`/`_SECRET`/`_PROJECT_ID`, `HERMES_QWEN_BASE_URL`, `HERMES_PORTAL_BASE_URL`, `HERMES_INFERENCE_PROVIDER`, `HERMES_ENABLE_PROJECT_PLUGINS`, `HERMES_COPILOT_ACP_COMMAND`/`_ARGS`, `HERMES_NOUS_MIN_KEY_TTL_SECONDS`, `HERMES_NOUS_TIMEOUT_SECONDS`, `HERMES_TUI`, `HERMES_TUI_DIR`, `HERMES_TUI_RESUME`, `HERMES_WEB_DIST`, `HERMES_NODE`, `HERMES_PYTHON`, `HERMES_CWD`, `HERMES_CONTAINER`, `HERMES_PLATFORM`, `HERMES_SKIP_CHMOD`, `HERMES_SKIP_NODE_BOOTSTRAP`, `HERMES_SPINNER_PAUSE`, `HERMES_TOOL_PROGRESS_MODE`, `HERMES_HOME_MODE`, `HERMES_PYTHON_SRC_ROOT` | 5.O (config port) |
+| **Provider API keys + base URLs** | ~50 | `ANTHROPIC_API_KEY` / `ANTHROPIC_TOKEN`, `OPENAI_API_KEY` / `OPENAI_BASE_URL`, `GEMINI_API_KEY` / `GEMINI_BASE_URL`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` / `_BASE_URL`, `GLM_API_KEY` / `_BASE_URL`, `DASHSCOPE_API_KEY` / `_BASE_URL`, `ARCEEAI_API_KEY` / `ARCEE_BASE_URL`, `AWS_PROFILE` / `AWS_REGION` (Bedrock), `EXA_API_KEY`, `FIRECRAWL_API_KEY` / `_API_URL` / `_GATEWAY_URL` / `_BROWSER_TTL`, `BROWSERBASE_API_KEY` / `_PROJECT_ID`, `BROWSER_USE_API_KEY`, `CAMOFOX_URL`, `FAL_KEY`, `ELEVENLABS_API_KEY`, `GITHUB_TOKEN` | 4.A (per-adapter) |
+| **Per-platform credentials** (listed in `_EXTRA_ENV_KEYS`) | ~70 | `DISCORD_BOT_TOKEN` / `DISCORD_ALLOWED_USERS` / `DISCORD_HOME_CHANNEL` / `DISCORD_REPLY_TO_MODE`, `TELEGRAM_HOME_CHANNEL`, `SIGNAL_ACCOUNT` / `_HTTP_URL` / `_ALLOWED_USERS` / `_GROUP_ALLOWED_USERS`, `DINGTALK_CLIENT_ID` / `_SECRET`, `FEISHU_APP_ID` / `_APP_SECRET` / `_ENCRYPT_KEY` / `_VERIFICATION_TOKEN`, `WECOM_BOT_ID` / `_SECRET` + 8 `WECOM_CALLBACK_*` keys, 14 `WEIXIN_*` keys, `BLUEBUBBLES_SERVER_URL` / `_PASSWORD` / `_ALLOW_ALL_USERS` / `_ALLOWED_USERS`, `QQ_APP_ID` / `_CLIENT_SECRET` / `QQBOT_HOME_CHANNEL` / `QQBOT_HOME_CHANNEL_NAME` + legacy `QQ_HOME_CHANNEL` aliases | 2.B.2+ (per platform) |
+| **Gateway-level** | ~4 | `GATEWAY_ALLOW_ALL_USERS`, `GATEWAY_PROXY_URL`, `GATEWAY_PROXY_KEY`, plus `API_SERVER_{ENABLED,HOST,PORT,KEY,MODEL_NAME}` | 2.F |
+
+#### On-disk state layout
+
+Upstream uses `~/.hermes/` as the state root (overridable via `HERMES_HOME`). Gormes uses `${XDG_DATA_HOME}/gormes/` (default `~/.local/share/gormes/`) and `${XDG_CONFIG_HOME}/gormes/` (default `~/.config/gormes/`).
+
+| Upstream path | Contents | Target phase | Gormes equivalent |
+|---|---|---|---|
+| `~/.hermes/state.db` | SessionDB (SQLite + FTS5 for session history) | 3.A (partial ✅), 3.E.8 | `~/.local/share/gormes/memory/memory.db` (turns + entities) + `~/.local/share/gormes/sessions.db` (bbolt) |
+| `~/.hermes/sessions/` | Per-session exports + transcripts (JSONL) | 3.E.3 | Planned — Transcript Export Command |
+| `~/.hermes/auth/` | Per-provider OAuth tokens | 4.G | Planned — token vault |
+| `~/.hermes/memories/` | Per-backend memory plugin storage (8 backends) | 5.I | Planned — plugin directories |
+| `~/.hermes/skills/` | Installed skills (26 upstream categories) | 5.F | Planned — `~/.local/share/gormes/skills/` |
+| `~/.hermes/optional-skills/` | Optional skill packs (10+ categories) | 5.F | Planned |
+| `~/.hermes/plugins/` | Plugin installs (context_engine, memory/*, example-dashboard) | 5.I | Planned |
+| `~/.hermes/hooks/` | User hook scripts (per-event `HOOK.yaml` + scripts) | 2.F | Planned |
+| `~/.hermes/cron/` | Cron job output Markdown files (one per job run) | 2.D | Planned — directly mirrors cron job output to filesystem |
+| `~/.hermes/logs/` | Agent run logs (per-session, rotated) | 2.F / 5.O | Planned — `${XDG_STATE_HOME}/gormes/logs/` |
+| `~/.hermes/images/` | Generated images from image-generation tool | 5.D | Planned |
+| `~/.hermes/pastes/` | Paste cache (large clipboard content spill-over) | 2.F | Planned |
+| `~/.hermes/skins/` | CLI skin definition files | 5.Q | Planned |
+| `~/.hermes/dashboard-themes/` | Example-dashboard plugin themes | 5.I | Planned |
+| `~/.hermes/whatsapp/` | WhatsApp platform session state | 2.B.4 | Planned |
+| `~/.hermes/channel_directory.json` | Cached channel/contact mappings | 2.F | Planned — existing `channel_directory.py` row |
+| `~/.hermes/sticker_cache.json` | Telegram sticker lookup cache | 2.F | Planned |
+| `~/.hermes/.container-mode` | Sentinel: "running inside container" | 2.F | Planned — Gormes can detect `/.dockerenv` or use its own sentinel |
+| `~/.hermes/.managed` | Sentinel: "managed by external orchestrator" | 2.F | Planned |
+| `~/.hermes/.update_exit_code` | Last update attempt's exit code | 5.O | Planned — auto-update subsystem |
+
+#### Runtime contract implications for Gormes
+
+1. **`HERMES_HOME` vs `XDG_DATA_HOME`**: Gormes MUST respect XDG by default, but should honor `HERMES_HOME` as a migration alias so operators switching over don't lose state.
+2. **`.env` dotenv support**: Gormes currently expects env vars in the shell. Operators who have a working `~/.hermes/.env` will not want to re-key ~170 variables. Phase 5.O should add a dotenv loader that reads `~/.hermes/.env` and `~/.config/gormes/.env` at startup.
+3. **Config migration**: Upstream `_config_version` key + migration helpers. Gormes must add a similar versioning scheme before the config schema stabilizes — otherwise TOML-key renames break users.
+4. **`$EDITOR` for `hermes config edit`**: operator UX affordance; parity expected at 5.O.
+5. **Platform-specific home channel pattern**: EVERY platform supports `<PLATFORM>_HOME_CHANNEL` + `<PLATFORM>_HOME_CHANNEL_NAME`. Gormes should generalize rather than re-implement per-platform.
+
 ### Inventory cadence
 
 Re-run the upstream survey when a major Hermes release lands, when a new platform connector is added upstream, or when a Gormes phase ships and we need to mark its rows ✅. The survey is mechanical:
@@ -424,8 +487,19 @@ Re-run the upstream survey when a major Hermes release lands, when a new platfor
 5. `ls hermes_cli/*.py` for new CLI subcommands (currently 49)
 6. `ls environments/tool_call_parsers/*.py` for new per-model parsers (currently 9)
 7. `wc -l run_agent.py cli.py tui_gateway/server.py` to track orchestrator size growth
+8. `grep -oE '^class ' agent/*.py tools/*.py gateway/*.py | sort -u | wc -l` — class count drift signals new subsystem surface (round-3 audit found 30 classes not previously mapped)
+9. `grep -oE '"[A-Z_]{4,}":' hermes_cli/config.py | sort -u | wc -l` — current: 117 top-level config keys
+10. `grep -oE 'HERMES_[A-Z_]+' hermes_cli/*.py agent/*.py | sort -u | wc -l` — current: ~47 `HERMES_*` env vars
+11. `grep -oE 'get_hermes_home\(\) / "[a-z_./\-]+"' agent/*.py hermes_cli/*.py gateway/*.py | sort -u` — current: 28 known paths/files under `~/.hermes/` (round-4 audit)
 
-The survey from 2026-04-20 caught 12 subsystems previously under-specified: `run_agent.py` (the 12,113-line orchestrator), `cli.py` (10,570 lines), `tui_gateway/server.py` (2,931 lines), per-model tool-call parsers (9 variants), 8 third-party memory plugins (byterover/hindsight/holographic/honcho/mem0/openviking/retaindb/supermemory), SSH sandbox backend, and the hermes_cli/ expansion from ~15 files to 49. Next survey: when upstream tags a new release.
+The survey from 2026-04-20 caught **42 items** previously under-specified:
+
+- **Round 1 (spec-level):** Phase 3.D semantic fusion ship criterion, Phase 3.E ledger (7 subphases).
+- **Round 2 (file-level, 12 finds):** `run_agent.py` (12,113 lines), `cli.py` (10,570 lines), `tui_gateway/server.py` (2,931 lines), 9 per-model tool-call parsers, 8 third-party memory plugins, SSH sandbox, SkillSources, TUI skin engine, install scripts, `hermes_cli/` expansion from ~15 to 49 files.
+- **Round 3 (class-level, 30 finds):** Slash command registry cross-cutting concern, tool registry orchestrator, toolset definitions, `HomeChannel` / `DeliveryRouter` / `GatewayStreamConsumer` / `SessionStore`, webhook subscription system, iteration budget, 3 new `AuxiliaryClient` classes (Anthropic + Codex, not just xAI), billing / cost / failover / metadata types, 7 `SkillSource` subclasses, `AudioRecorder` + `TermuxAudioRecorder`, 15+ file-operation classes, MCP OAuth / Sampling / FAL sync, `GitHubAuth` + `HermesTokenStorage`.
+- **Round 4 (contract-level, this pass):** 117 config keys, ~170 env vars across 4 layers (HERMES_*, provider keys, platform credentials, gateway-level), 28 state-directory entries under `~/.hermes/`, config migration system (`_config_version`), XDG vs `HERMES_HOME` reconciliation, dotenv support gap, cron output filesystem mirror (`~/.hermes/cron/`).
+
+Next survey: when upstream tags a new release, OR when any single round's find count exceeds 5 new subsystems.
 
 ---
 
