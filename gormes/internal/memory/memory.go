@@ -153,12 +153,3 @@ func (s *SqliteStore) Close(ctx context.Context) error {
 	})
 	return err
 }
-
-// run is Task 5's scope — stub for Task 3: drain the queue (drop everything)
-// so Close can return cleanly.
-func (s *SqliteStore) run() {
-	defer close(s.done)
-	for range s.queue {
-		// Task 5 replaces with real handleCommand dispatch.
-	}
-}

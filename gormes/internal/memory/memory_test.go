@@ -142,3 +142,119 @@ func TestSqliteStore_ExecHonorsCtxCancel(t *testing.T) {
 		t.Error("Exec with canceled ctx should return ctx.Err()")
 	}
 }
+
+func TestSqliteStore_WorkerPersistsAppendUserTurn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	payload, _ := json.Marshal(map[string]any{
+		"session_id": "sess-abc",
+		"content":    "hello from user",
+		"ts_unix":    1745000000,
+	})
+	_, _ = s.Exec(context.Background(), store.Command{
+		Kind:    store.AppendUserTurn,
+		Payload: payload,
+	})
+
+	// Worker is async. Wait until Accepted > 0 AND the row is visible.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if s.Stats().Accepted > 0 {
+			// Also wait for the row to appear on disk.
+			var n int
+			_ = s.db.QueryRow("SELECT COUNT(*) FROM turns").Scan(&n)
+			if n > 0 {
+				break
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	var (
+		sessionID, role, content string
+		ts                       int64
+	)
+	row := s.db.QueryRow("SELECT session_id, role, content, ts_unix FROM turns LIMIT 1")
+	if err := row.Scan(&sessionID, &role, &content, &ts); err != nil {
+		t.Fatalf("scan: %v (Accepted=%d)", err, s.Stats().Accepted)
+	}
+	if sessionID != "sess-abc" {
+		t.Errorf("session_id = %q", sessionID)
+	}
+	if role != "user" {
+		t.Errorf("role = %q, want user", role)
+	}
+	if content != "hello from user" {
+		t.Errorf("content = %q", content)
+	}
+	if ts != 1745000000 {
+		t.Errorf("ts = %d", ts)
+	}
+}
+
+func TestSqliteStore_WorkerPersistsFinalizeAssistantTurn(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	payload, _ := json.Marshal(map[string]any{
+		"session_id": "sess-abc",
+		"content":    "hello from assistant",
+		"ts_unix":    1745000001,
+	})
+	_, _ = s.Exec(context.Background(), store.Command{
+		Kind:    store.FinalizeAssistantTurn,
+		Payload: payload,
+	})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		var n int
+		_ = s.db.QueryRow("SELECT COUNT(*) FROM turns").Scan(&n)
+		if n > 0 {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	var role string
+	if err := s.db.QueryRow("SELECT role FROM turns LIMIT 1").Scan(&role); err != nil {
+		t.Fatal(err)
+	}
+	if role != "assistant" {
+		t.Errorf("role = %q, want assistant", role)
+	}
+}
+
+func TestSqliteStore_WorkerHandlesMalformedPayload(t *testing.T) {
+	// Bad JSON should be logged + dropped, not crash the worker.
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	_, _ = s.Exec(context.Background(), store.Command{
+		Kind:    store.AppendUserTurn,
+		Payload: []byte("not json"),
+	})
+
+	// Follow-up valid command must still succeed.
+	good, _ := json.Marshal(map[string]any{
+		"session_id": "s", "content": "ok", "ts_unix": 1,
+	})
+	_, _ = s.Exec(context.Background(), store.Command{
+		Kind: store.AppendUserTurn, Payload: good,
+	})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		var n int
+		_ = s.db.QueryRow("SELECT COUNT(*) FROM turns").Scan(&n)
+		if n == 1 {
+			return // good: one row, malformed was dropped
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Error("worker never wrote the follow-up valid command (or crashed)")
+}
