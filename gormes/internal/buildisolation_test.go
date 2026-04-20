@@ -55,3 +55,47 @@ func TestKernelHasNoSessionDep(t *testing.T) {
 		}
 	}
 }
+
+// TestKernelHasNoMemoryDep guards the Phase 3.A boundary: internal/kernel
+// must never transitively import internal/memory or github.com/ncruces/go-sqlite3.
+// If either appears in the kernel's dep graph, persistence has leaked into
+// the turn loop and the 250ms StoreAckDeadline is structurally at risk.
+func TestKernelHasNoMemoryDep(t *testing.T) {
+	cmd := exec.Command("go", "list", "-deps", "./internal/kernel")
+	cmd.Dir = ".."
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("go list failed: %v\n%s", err, out.String())
+	}
+
+	for _, d := range strings.Split(out.String(), "\n") {
+		if strings.Contains(d, "ncruces/go-sqlite3") ||
+			strings.Contains(d, "/internal/memory") {
+			t.Errorf("internal/kernel transitively depends on %q — Phase 3.A isolation violated", d)
+		}
+	}
+}
+
+// TestTUIBinaryHasNoSqliteDep guards the Operational Moat: cmd/gormes
+// (the TUI) must never transitively depend on ncruces/go-sqlite3 or on
+// the internal/memory package. If either appears, the TUI's <10 MB
+// binary budget is at risk and the dual-store architecture is breached.
+func TestTUIBinaryHasNoSqliteDep(t *testing.T) {
+	cmd := exec.Command("go", "list", "-deps", "./cmd/gormes")
+	cmd.Dir = ".."
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("go list failed: %v\n%s", err, out.String())
+	}
+
+	for _, d := range strings.Split(out.String(), "\n") {
+		if strings.Contains(d, "ncruces/go-sqlite3") ||
+			strings.Contains(d, "/internal/memory") {
+			t.Errorf("cmd/gormes transitively depends on %q — Dual-Store Architecture violated", d)
+		}
+	}
+}
