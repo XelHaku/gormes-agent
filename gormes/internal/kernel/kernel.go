@@ -149,7 +149,20 @@ func (k *Kernel) Run(ctx context.Context) error {
 					k.emitFrame("still processing previous turn")
 					continue
 				}
-				k.runTurn(ctx, e.Text)
+				// Phase 2.D — per-event sessionID override. Save current, swap in,
+				// restore after. If e.SessionID is empty this is a no-op.
+				prevSessionID := k.sessionID
+				if e.SessionID != "" {
+					k.sessionID = e.SessionID
+				}
+				k.runTurn(ctx, e.Text, e.CronJobID)
+				if e.SessionID != "" {
+					// Restore resident sessionID so the cron override doesn't
+					// leak into subsequent non-cron events. For normal events
+					// (SessionID == ""), runTurn may have updated k.sessionID via
+					// the server's response — we leave that alone.
+					k.sessionID = prevSessionID
+				}
 			case PlatformEventCancel:
 				// No active turn; ignore (cancel during a turn is handled
 				// inside runTurn's select on k.events).
@@ -179,7 +192,9 @@ func (k *Kernel) Run(ctx context.Context) error {
 // PhaseIdle; on exit it is PhaseIdle (or PhaseFailed on a fatal error).
 // All state mutations happen on the calling goroutine, which is the Run
 // goroutine — this is part of the single-owner invariant.
-func (k *Kernel) runTurn(ctx context.Context, text string) {
+// cronJobID is non-empty for Phase 2.D cron-fired turns; it is passed through
+// to the store.Command payload and is otherwise opaque to the kernel.
+func (k *Kernel) runTurn(ctx context.Context, text, cronJobID string) {
 	prov := newProvenance(k.cfg.Endpoint)
 
 	// 1. Admission. Reject locally before any HTTP.
@@ -193,10 +208,12 @@ func (k *Kernel) runTurn(ctx context.Context, text string) {
 	// 2. Persist user turn with hard 250ms ack deadline (spec §7.8 store row).
 	storeCtx, storeCancel := context.WithTimeout(ctx, StoreAckDeadline)
 	userPayload, _ := json.Marshal(map[string]any{
-		"session_id": k.sessionID,
-		"content":    text,
-		"ts_unix":    time.Now().Unix(),
-		"chat_id":    k.cfg.ChatKey,
+		"session_id":  k.sessionID,
+		"content":     text,
+		"ts_unix":     time.Now().Unix(),
+		"chat_id":     k.cfg.ChatKey,
+		"cron":        cronFlag(cronJobID),
+		"cron_job_id": cronJobID,
 	})
 	_, err := k.store.Exec(storeCtx, store.Command{Kind: store.AppendUserTurn, Payload: userPayload})
 	storeCancel()
@@ -647,6 +664,18 @@ func (k *Kernel) emitFrame(status string) {
 	default:
 		// Should be unreachable after the drain above.
 	}
+}
+
+// cronFlag returns 1 when the turn carries a cron_job_id (Phase 2.D),
+// 0 otherwise. Keeps json.Marshal output consistent: cron is always
+// present as an integer (even for non-cron turns, where it's 0). The
+// memory worker's payload decoder defaults cron=0 when the field is
+// absent, so either encoding works — explicit is less surprising.
+func cronFlag(cronJobID string) int {
+	if cronJobID == "" {
+		return 0
+	}
+	return 1
 }
 
 // truncate returns s clamped to n runes with an ellipsis suffix. Safe on

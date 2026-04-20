@@ -81,6 +81,19 @@ const (
 type PlatformEvent struct {
 	Kind PlatformEventKind
 	Text string
+	// SessionID, when non-empty, overrides k.sessionID for this turn
+	// only. Used by the Phase 2.D cron executor so each cron fire has
+	// an isolated "cron:<job_id>:<unix_ts>" session. A non-cron event
+	// leaves this empty and inherits k.sessionID as before. The
+	// override is per-event — the kernel's resident sessionID is NOT
+	// mutated; after the turn completes, the next non-cron event uses
+	// whatever k.sessionID was before.
+	SessionID string
+	// CronJobID, when non-empty, flags the persisted turn row as
+	// cron=1 and populates turns.cron_job_id. The extractor (T3) uses
+	// this to skip cron turns during entity extraction. Opaque to the
+	// kernel — just passed through to the store.Command payload.
+	CronJobID string
 	// ack is an unexported synchronous result channel used by
 	// ResetSession. External callers constructing PlatformEvents for
 	// Submit() cannot set this field, which is the desired API — the
