@@ -85,6 +85,39 @@ The redesign must not imply:
 - that all future roadmap work is already shipped;
 - fake telemetry, fake runtime state, or fake live metrics.
 
+### 2.6 Proof-claim lock
+
+Numeric proof claims must be current.
+
+This is an explicit correction to stale copy such as:
+
+- `7.9 MB static binary`
+
+when the current build no longer matches it.
+
+For this page, any claim about binary size, shipped surface, or phase status must come from current local reality, not inherited marketing copy. If a binary-size number is shown, it must be sourced from a fresh local build artifact and updated when that artifact changes.
+
+Current local reference point as of 2026-04-20:
+
+- `bin/gormes` built via `make build` is approximately `8.2M`
+- `bin/gormes-telegram` in the current local tree is approximately `15M`
+
+The redesign may use these figures if they are still verified at implementation time, but it must not freeze them as timeless claims. Hardcoded legacy size lines are explicitly disallowed.
+
+### 2.7 Mobile lock
+
+The redesign must work on mobile as a first-class surface, not as a desktop page that merely collapses.
+
+That means:
+
+- the hero must remain readable and forceful on narrow screens;
+- the primary run-now action must stay visible without layout breakage;
+- command blocks must remain legible without horizontal chaos where avoidable;
+- proof rails and status panels must stack cleanly;
+- the nav must stay usable without overlapping, clipping, or creating fake-app chrome.
+
+The operator-console aesthetic must survive down to mobile widths instead of degrading into a pile of broken panels.
+
 ---
 
 ## 3. Positioning
@@ -189,6 +222,20 @@ The page should gain structural texture:
 - tactical dividers.
 
 These elements should make the page feel engineered, not ornamental.
+
+### 4.6 Mobile behavior
+
+On mobile, the visual system should simplify rather than collapse.
+
+Expected behavior:
+
+- the command-deck hero becomes a strong single-column stack;
+- proof items compress into compact status rows or tiles;
+- chrome density is reduced where needed to protect readability;
+- commands and labels stay crisp and scannable;
+- CTA hierarchy remains obvious.
+
+The page should feel like a mobile field console, not a shrunk desktop mockup.
 
 ---
 
@@ -300,7 +347,7 @@ Immediately below or beside the hero, the page should show a compact strip of pr
 The proof rail should include facts like:
 
 - zero-CGO;
-- binary size;
+- current measured binary size, if shown;
 - Go-native tools;
 - Telegram split binary;
 - current phase status.
@@ -315,6 +362,8 @@ These should appear as:
 - deployment state labels.
 
 They should not appear as soft marketing cards.
+
+If a binary-size number is shown, it must be validated against a current local build during implementation. Using stale historical numbers is a design failure, not just a copy nit.
 
 ---
 
@@ -340,6 +389,8 @@ The activation block should include:
 The commands must look like a real operator sequence, not decorative code.
 
 The current quick-start stack can be reorganized, merged, or reframed as a single run-path if that improves urgency and clarity.
+
+On mobile, this block must remain the strongest conversion surface on the page. The commands may reflow, annotate differently, or condense, but they must still feel executable and immediate.
 
 ---
 
@@ -444,6 +495,8 @@ The redesign should keep or extend page-level verification so that:
 - the stylesheet link still exists;
 - the exported static site still includes `index.html` and `static/site.css`;
 - the page remains script-free unless a later spec changes that constraint.
+- mobile layouts at narrow widths preserve CTA visibility, readable commands, and non-broken panel stacking;
+- truth-bearing numeric claims are updated to current verified values or removed if they cannot be kept current.
 
 If copy is rewritten heavily, tests should assert the new truth-bearing phrases rather than cling to obsolete phrasing.
 
@@ -459,6 +512,8 @@ The redesign is successful when:
 - existing Hermes users can understand what is shipped now in seconds;
 - the roadmap reads as honest shipping state;
 - the implementation stays static-export friendly for Pages;
+- the page remains usable and convincing on mobile widths;
+- stale proof claims such as the old `7.9 MB` line are replaced with current verified claims or removed;
 - the visual system is aggressive without becoming fake or noisy.
 
 ---
