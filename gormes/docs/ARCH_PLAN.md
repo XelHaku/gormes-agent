@@ -42,7 +42,7 @@ The hybrid is **temporary**. The long-term state is 100% Go.
 
 During Phases 1–4, Go is the chassis (orchestrator, state, persistence, platform I/O, agent cognition) and Python is the peripheral library (research tools, legacy skills, ML heavy lifting). Each phase shrinks Python's footprint. Phase 5 deletes the last Python dependency.
 
-Phase 3 (The Black Box) is substantially delivered as of 2026-04-20: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), and the operator-facing memory mirror (3.D.5) are all implemented. The only remaining Phase 3 work is semantic fusion via Ollama embeddings (3.D).
+Phase 3 (The Black Box) is substantially delivered as of 2026-04-20: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. Remaining Phase 3 work is 3.E — decay, cross-chat synthesis, and the operational-visibility mirrors (session index, insights audit, tool audit, transcript export).
 
 Phase 1 should be read correctly: it is a tactical Strangler Fig bridge, not a philosophical compromise. It exists to deliver immediate value to existing Hermes users while preserving a clean migration path toward a pure Go runtime that owns the entire lifecycle end to end.
 
@@ -54,18 +54,19 @@ Phase 1 should be read correctly: it is a tactical Strangler Fig bridge, not a p
 |---|---|---|
 | Phase 1 — The Dashboard (Face) | ✅ complete | Tactical bridge: Go TUI over Python's `api_server` HTTP+SSE boundary |
 | Phase 2 — The Wiring Harness (Gateway) | 🔨 in progress | Go-native wiring harness: tools, Telegram, and thin session resume land before the wider gateway surface |
-| Phase 3 — The Black Box (Memory) | 🔨 substantially complete | SQLite + FTS5 + ontological graph in Go; Phase 2.C's bbolt layer is not transcript memory ownership |
+| Phase 3 — The Black Box (Memory) | 🔨 3.A–3.D shipped; 3.E planned | SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E adds decay, cross-chat synthesis, and operational-visibility mirrors |
 | Phase 4 — The Powertrain (Brain Transplant) | ⏳ planned | Native Go agent orchestrator + prompt builder |
 | Phase 5 — The Final Purge (100% Go) | ⏳ planned | Python tool scripts ported to Go or WASM |
 
 Legend: 🔨 in progress · ✅ complete · ⏳ planned · ⏸ deferred.
 
 **Phase 3 sub-status (as of 2026-04-20):**
-- **3.A — SQLite + FTS5 Lattice** — ✅ implemented (`internal/memory`, `SqliteStore`, FTS5 triggers, fire-and-forget worker, schema v3a→v3c migrations)
+- **3.A — SQLite + FTS5 Lattice** — ✅ implemented (`internal/memory`, `SqliteStore`, FTS5 triggers, fire-and-forget worker, schema v3a→v3d migrations)
 - **3.B — Ontological Graph + LLM Extractor** — ✅ implemented (`Extractor`, entity/relationship upsert, dead-letter queue, validator with weight-floor patch)
 - **3.C — Neural Recall + Context Injection** — ✅ implemented (`RecallProvider`, 2-layer seed selection, CTE traversal, `<memory-context>` fence matching Python's `build_memory_context_block`)
-- **3.D — Semantic Fusion + Local Embeddings** — ⏳ planned (spec + implementation plan at [`docs/superpowers/specs/2026-04-20-gormes-phase3d-semantic-design.md`](docs/superpowers/specs/2026-04-20-gormes-phase3d-semantic-design.md); Ollama `/v1/embeddings` endpoint [OpenAI-compatible](https://ollama.readthedocs.io/en/openai/); evaluated vector libraries: [chromem-go](https://github.com/TIANLI0/chromem-go) (zero deps, HNSW/IVF/BM25), [veclite](https://github.com/abdul-hamid-achik/veclite) (single-file, HNSW), [vecgo](https://github.com/hupe1980/vecgo) (HNSW+DiskANN), [govector](https://github.com/DotNetAge/govector) (bbolt-based); adds in-memory vector cache, cosine similarity scan, 3-layer recall)
+- **3.D — Semantic Fusion + Local Embeddings** — ✅ implemented (`entity_embeddings` table with L2-normalized float32 LE BLOBs; `Embedder` background worker calls Ollama `/v1/embeddings` with labeled template `Entity: {Name}. Type: {Type}. Context: {Description}`; in-memory vector cache with monotonic graph-version counter; `semanticSeeds` flat cosine scan (dot product on normalized vectors); hybrid fusion in `Provider.GetContext` chains lexical → FTS5 → semantic with dedup + MaxSeeds cap; opt-in via `semantic_enabled=true` + `semantic_model="<tag>"`; empty model is a complete no-op — zero HTTP calls, zero goroutine, zero cache RAM. Ship criterion proven live against Ollama: query `"tell me about my projects"` (no lexical match) surfaces `AzulVigia` via cosine in 7s.)
 - **3.D.5 — Memory Mirror (USER.md sync)** — ✅ implemented (async background goroutine exports SQLite entities/rels → Markdown every 30s; configurable path; atomic writes; SQLite remains source of truth; zero impact on 250ms latency moat)
+- **3.E — Decay + Cross-Chat + Operational Mirrors** — ⏳ planned (see §7 Phase 3.E Ledger below)
 
 ### Phase 2 Ledger
 
@@ -81,7 +82,23 @@ Legend: 🔨 in progress · ✅ complete · ⏳ planned · ⏸ deferred.
 
 Phase 2.C is intentionally not Phase 3. It stores only session handles in bbolt. Python still owns transcript memory, transcript search, and prompt assembly; the SQLite + FTS5 memory lattice is Phase 3 (now substantially implemented).
 
-> **Note on binary size:** The static CGO-free binary currently builds at **~17 MB** (measured: `bin/gormes` from `make build` with `-trimpath -ldflags="-s -w"`). This reflects Phase 3 additions (extractor, recall, mirror) atop the original TUI + Telegram base. Remains well within the 25 MB hard moat with 8 MB headroom. Phase 3.D semantic embeddings add <250 KB — binary will stay under 20 MB.
+> **Note on binary size:** The static CGO-free binary currently builds at **~17 MB** (measured: `bin/gormes` from `make build` with `-trimpath -ldflags="-s -w"` at commit `4a25542c`, post-3.D). This reflects all Phase 3 additions (extractor, recall, mirror, Embedder, semantic fusion) atop the original TUI + Telegram base. Remains well within the 25 MB hard moat with 8 MB headroom.
+
+### Phase 3.E Ledger
+
+Phase 3.E is the final Black Box milestone. It closes three orthogonal gaps: **memory decay** (old facts fade), **cross-chat synthesis** (one user, multiple chats, one graph), and **operational-visibility mirrors** (session index, insights audit, tool audit, transcript export). Each row is a separable spec.
+
+| Subphase | Status | Upstream reference | Deliverable |
+|---|---|---|---|
+| 3.E.1 — Session Index Mirror | ⏳ planned | None (Gormes-original) | Read-only YAML mirror of bbolt `sessions.db` at `~/.local/share/gormes/sessions/index.yaml`; closes the bbolt opacity gap |
+| 3.E.2 — Tool Execution Audit Log | ⏳ planned | None (exceeds Hermes) | Append-only JSONL at `~/.local/share/gormes/tools/audit.jsonl`; persistent record of every tool call with timing + outcome |
+| 3.E.3 — Transcript Export Command | ⏳ planned | Exceeds Hermes (no upstream equivalent) | `gormes session export <id> --format=markdown` renders SQLite turns as human-readable Markdown; snapshot for sharing/backup |
+| 3.E.4 — Extraction State Visibility | ⏳ planned | None (debug only) | Optional dead-letter footer in USER.md OR `gormes memory status` command showing extraction queue depth + recent errors |
+| 3.E.5 — Insights Audit Log | ⏳ planned | `agent/insights.py` (preview) | Lightweight append-only JSONL at `~/.local/share/gormes/insights/usage.jsonl`; accumulates session counts, token totals, cost estimates per day. Full `InsightsEngine` port lands in 4.E |
+| 3.E.6 — Memory Decay | ⏳ planned | None (Gormes-original) | Weight attenuation on relationships + `last_seen` tracking; stale facts age out of recall without deletion (reversible, audit-preserving) |
+| 3.E.7 — Cross-Chat Synthesis | ⏳ planned | `agent/memory_manager.py` (cross-session) | Graph unification across `chat_id` boundaries for a single operator; query "what is Juan working on?" returns facts from Telegram, Discord, Slack in one fence. Requires a `user_id` concept above `chat_id` |
+
+The 3.E ship criterion: the operator runs `cat ~/.local/share/gormes/sessions/index.yaml` and sees every active chat/session mapping in plain YAML; runs `cat ~/.local/share/gormes/tools/audit.jsonl` and sees a full history of tool invocations; a fact mentioned once six months ago and never again no longer dominates recall results; and asking the same question across two different chats surfaces the same entity graph.
 
 ### Phase 4 Sub-phase Outline
 
@@ -147,8 +164,9 @@ Public-site (`gormes.io`) deployment is **Phase 1.5** work. The documentation is
 - Phase 3.A: [`superpowers/specs/2026-04-20-gormes-phase3a-memory-design.md`](superpowers/specs/2026-04-20-gormes-phase3a-memory-design.md) — ✅ shipped
 - Phase 3.B: [`superpowers/specs/2026-04-20-gormes-phase3b-graph.md`](superpowers/specs/2026-04-20-gormes-phase3b-graph.md) — ✅ shipped
 - Phase 3.C: [`superpowers/specs/2026-04-20-gormes-phase3c-recall-design.md`](superpowers/specs/2026-04-20-gormes-phase3c-recall-design.md) — ✅ shipped
-- Phase 3.D: [`superpowers/specs/2026-04-20-gormes-phase3d-semantic-design.md`](superpowers/specs/2026-04-20-gormes-phase3d-semantic-design.md) — ⏳ spec approved, implementation pending
+- Phase 3.D: [`superpowers/specs/2026-04-20-gormes-phase3d-semantic-design.md`](superpowers/specs/2026-04-20-gormes-phase3d-semantic-design.md) + [`superpowers/plans/2026-04-20-gormes-phase3d-semantic.md`](superpowers/plans/2026-04-20-gormes-phase3d-semantic.md) — ✅ shipped (10 TDD tasks across commits `1c859ea6`…`4a25542c`)
 - Phase 3.D.5: [`superpowers/specs/2026-04-20-gormes-phase3d5-mirror-design.md`](superpowers/specs/2026-04-20-gormes-phase3d5-mirror-design.md) — ✅ shipped
+- Phase 3.E: spec pending — see §4 Phase 3.E Ledger for scope
 
 ---
 
@@ -188,15 +206,22 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Mirror / sticker cache | `gateway/{mirror,sticker_cache}.py` | 2.F | ⏳ planned |
 | Display config | `gateway/display_config.py`, `agent/display.py` | 2.F | ⏳ planned |
 
-### Memory + state (Phase 3 — mostly shipped)
+### Memory + state (Phase 3 — 3.A–3.D shipped; 3.E pending)
 
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
 | SQLite + FTS5 lattice | `agent/memory_provider.py` (lexical half) | 3.A | ✅ shipped |
 | Ontological graph + extractor | `agent/memory_manager.py` | 3.B | ✅ shipped |
 | Recall + context injection | `agent/memory_provider.py` (recall half) | 3.C | ✅ shipped |
+| Semantic / embeddings | (not in upstream; Gormes-original) | 3.D | ✅ shipped |
 | USER.md mirror | `agent/memory_manager.py` (mirror writer) | 3.D.5 | ✅ shipped |
-| Semantic / embeddings | (not in upstream; net-new in Gormes) | 3.D | ⏳ spec ready |
+| Session index mirror | None (closes bbolt opacity gap) | 3.E.1 | ⏳ planned |
+| Tool execution audit log | None (exceeds Hermes) | 3.E.2 | ⏳ planned |
+| Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ⏳ planned |
+| Extraction state visibility | None (debug visibility) | 3.E.4 | ⏳ planned |
+| Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | ⏳ planned |
+| Memory decay | None (Gormes-original) | 3.E.6 | ⏳ planned |
+| Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | ⏳ planned |
 
 ### Brain (Phase 4 — sub-phases 4.A–4.H)
 
@@ -375,21 +400,59 @@ updated_at: 2026-04-20T09:30:00Z
 
 **Rationale**: This is debugging/operational visibility. Can be deferred until extraction issues become painful.
 
-### 8.3 Hermes Files Gormes Does Not Need to Mirror
+### 8.3 Hermes Files Gormes Does Not Need to Mirror (Yet)
 
-Based on the comprehensive Hermes file inventory, these Hermes files do not need Gormes mirrors:
+Based on the comprehensive Hermes file inventory, these Hermes files do not need Gormes mirrors today, but may become relevant as features land:
 
-| Hermes File | Why Not Mirrored in Gormes |
-|-------------|---------------------------|
-| `MEMORY.md` | Superseded by USER.md + entity graph (structured > flat) |
-| `sessions.json` | Legacy Hermes format; Gormes uses bbolt (better concurrency) |
-| `*.jsonl` transcripts | Machine-readable only; Gormes could add human-readable export (3.E.3) |
-| `jobs.json` + cron output | Cron not yet implemented in Gormes (Phase 4) |
-| `SKILL.md` files | Skills not yet implemented (Phase 5) |
-| `HOOK.yaml` | Hook system not yet implemented |
-| `BOOT.md` | Boot hooks not yet implemented |
-| `SOUL.md` | Personality system not yet implemented (Phase 4+) |
-| Platform JSON files | Platform adapters not yet implemented (Phase 2.B.2+) |
+| Hermes File | Why Not Mirrored in Gormes | Future Consideration |
+|-------------|---------------------------|-------------------|
+| `MEMORY.md` | Superseded by USER.md + entity graph (structured > flat) | N/A — entity graph is superior |
+| `sessions.json` | Legacy Hermes format; Gormes uses bbolt (better concurrency) | **Session Index Mirror (3.E.1)** closes bbolt opacity |
+| `*.jsonl` transcripts | Machine-readable only | **Transcript Export (3.E.3)** adds human-readable option |
+| `jobs.json` + cron output | Cron not yet implemented in Gormes (Phase 4) | Cron output mirroring when Phase 4 lands |
+| `SKILL.md` files | Skills not yet implemented (Phase 5) | Skill audit trail when Phase 5 lands |
+| `HOOK.yaml` | Hook system not yet implemented (Phase 2.F) | Hook activity log when hooks land |
+| `BOOT.md` | Boot hooks not yet implemented | Boot sequence audit when Phase 2.F lands |
+| `SOUL.md` | Personality system not yet implemented (Phase 4+) | Persona versioning when Phase 4 lands |
+| `gateway_voice_mode.json` | Voice mode not implemented (Phase 5.E) | Voice state mirroring if voice features land |
+| Platform state JSON files | Platform adapters not yet implemented (Phase 2.B.2+) | Per-platform state audit when platforms land |
+
+**Operational State Files Discovered in Additional Research:**
+
+| Hermes File | Purpose | Gormes Status |
+|-------------|---------|---------------|
+| `gateway_voice_mode.json` | Per-chat voice mode state (off/voice_only/all) | Not implemented (Phase 5.E) |
+| `display_config` (in config.yaml) | Per-platform display settings | Partial — TUI theme only |
+| `active_profile` | Currently active profile name | Not implemented |
+| `channel_directory.json` | Cached channel/contact mappings | Not implemented |
+| `pairing.json` | Device/pairing state per platform | Not implemented (Phase 2.F) |
+
+**Additional Subsystems with Audit Potential:**
+
+| Hermes Subsystem | Data Produced | Mirror Potential | Phase |
+|------------------|---------------|------------------|-------|
+| `agent/insights.py` | Usage analytics (tokens, costs, trends, tool patterns) | 🔴 **High** — Operators need visibility into spend and usage patterns | 4.E |
+| `agent/trajectory.py` | RL training trajectories (JSONL) | 🟡 Medium — Machine-readable; research use case | 4.E |
+| `agent/usage_pricing.py` | Per-request cost calculations | 🔴 **High** — Cost audit trail for operational monitoring | 4.E |
+
+**Insights Engine Gap**: Hermes has a comprehensive `InsightsEngine` (`agent/insights.py`, 768 lines) that analyzes historical session data to produce:
+- Token consumption reports
+- Cost estimates by model/provider
+- Tool usage patterns
+- Activity trends over time
+- Platform breakdowns
+- Session metrics (duration, turns, success rate)
+
+Gormes currently has only basic in-memory telemetry (`internal/telemetry/telemetry.go`) that does not persist. **This is a significant operational visibility gap** — operators cannot audit their usage, costs, or trends without reimplementing the insights analysis themselves.
+
+**Recommended Mirror Addition — Phase 3.E.5: Insights Audit Log**
+
+Export aggregated session metrics to `~/.local/share/gormes/insights/usage.jsonl`:
+```json
+{"date":"2026-04-20","session_count":5,"total_tokens_in":45000,"total_tokens_out":12000,"estimated_cost_usd":0.45,"model_breakdown":{"claude-opus":3,"gpt-4":2}}
+```
+
+This would provide a lightweight, append-only cost and usage audit trail that accumulates over time, even before the full InsightsEngine is ported in Phase 4.E.
 
 ### 8.4 Mirror Implementation Principles
 
@@ -460,3 +523,71 @@ Alternatives monitored:
 ---
 
 *Technology Radar v1.0 — Research synthesized from web searches and parallel codebase audit.*
+
+---
+
+## 10. Executive Summary — Mirror Implementation Status
+
+This section provides a quick-reference dashboard of all mirror-related work: what's shipped, what's planned, and what was researched.
+
+### Shipped Mirrors + Recall Layers (✅)
+
+| Phase | Name | What It Does | Where to Find It |
+|-------|------|--------------|------------------|
+| 3.A | **SQLite + FTS5 Lattice** | Transcript memory with full-text search | `internal/memory/{memory,schema,migrate}.go` |
+| 3.B | **Ontological Graph Extractor** | Async LLM-assisted entity/relationship extraction | `internal/memory/{extractor,graph,validator}.go` |
+| 3.C | **Neural Recall** | Lexical + FTS5 seeds → CTE neighborhood → `<memory-context>` fence | `internal/memory/{recall,recall_format,recall_sql}.go` |
+| 3.D | **Semantic Fusion** | Ollama embeddings + cosine similarity; closes the "my projects" gap | `internal/memory/{embed_client,cosine,semantic_sql,embedder}.go` |
+| 3.D.5 | **Memory Mirror** | Exports SQLite entities/relationships → `~/.local/share/gormes/memory/USER.md` | `internal/memory/mirror.go` |
+
+### Planned Mirrors + 3.E Roadmap (Ranked)
+
+| Priority | Phase | Name | Problem Solved | Effort |
+|----------|-------|------|----------------|--------|
+| 🔴 High | 3.E.1 | Session Index Mirror | bbolt session map is opaque; needs human-readable YAML index | ~150 lines |
+| 🔴 High | 3.E.5 | Insights Audit Log | No usage/cost analytics; operators cannot audit spend | ~100 lines |
+| 🔴 High | 3.E.6 | Memory Decay | Stale facts dominate recall; need weight attenuation + `last_seen` | ~200 lines |
+| 🟡 Medium | 3.E.2 | Tool Audit Log | No record of what tools the agent executed | ~100 lines |
+| 🟡 Medium | 3.E.3 | Transcript Export | No human-readable conversation export (exceeds Hermes) | ~200 lines |
+| 🟡 Medium | 3.E.7 | Cross-Chat Synthesis | One user with N chats has N disjoint graphs; needs `user_id` above `chat_id` | ~400 lines |
+| 🟢 Low | 3.E.4 | Extraction State | Dead-lettered turns invisible without SQLite query | ~50 lines |
+
+### Research Synthesized
+
+**Parallel Agent Research Conducted:**
+1. ✅ Hermes human-readable file inventory (complete — 13 categories of files)
+2. ✅ Gormes binary-only data audit (complete — 6 gaps identified)
+3. ✅ Hermes transcript handling analysis (complete — NO text export exists)
+4. ✅ Hermes skill storage research (complete — SKILL.md format, Hub lock file)
+5. ✅ **ADDITIONAL**: Hermes insights/telemetry systems discovered (`agent/insights.py` 768 lines, `agent/trajectory.py`, `agent/usage_pricing.py`)
+
+**Package Research Conducted:**
+1. ✅ Vector embedding libraries (5 evaluated — chromem-go/veclite recommended)
+2. ✅ Ollama integration (OpenAI-compatible `/v1/embeddings` confirmed)
+3. ✅ Go SQLite driver landscape (ncruces remains optimal)
+
+### Key Findings Documented
+
+**Critical Insight**: Hermes does **not** have human-readable transcript exports. All conversation history is in SQLite/JSONL. **Gormes already exceeds Hermes parity** with the Memory Mirror (3.D.5).
+
+**Insights Engine Discovery**: Hermes has a comprehensive `InsightsEngine` (`agent/insights.py`, 768 lines) that produces usage analytics, cost estimates, and trend reports. **Gormes currently lacks any persisted telemetry** — only in-memory counters that vanish on restart. This is a 🔴 **high-priority operational visibility gap**.
+
+**Binary Size**: Currently ~17 MB (CGO-free). 25 MB hard moat leaves 8 MB headroom. Phase 3.D semantic embeddings add <250 KB.
+
+**Vector Library Recommendation**: **chromem-go** or **veclite** for Phase 3.D — both pure Go, zero deps, HNSW+BM25 hybrid search.
+
+### Next Actions (Suggested)
+
+Phase 3.D shipped `4a25542c` on 2026-04-20. Remaining Phase 3 work:
+
+1. **3.E.6 Memory Decay** — weight attenuation + `last_seen` tracking; prevents stale-fact dominance in recall. Roughly ~200 lines in `internal/memory/decay.go` + a periodic goroutine.
+2. **3.E.1 Session Index Mirror** — ~150 lines in `internal/session/mirror.go`; closes bbolt opacity. Low-risk parity with 3.D.5 implementation pattern.
+3. **3.E.7 Cross-Chat Synthesis** — requires a `user_id` concept above `chat_id`; graph unification so one operator sees one unified memory across platforms. Biggest design spike remaining in Phase 3.
+4. **3.E.5 Insights Audit Log** — lightweight JSONL preview while the full `InsightsEngine` port waits for 4.E.
+5. **3.E.2 Tool Audit Log + 3.E.3 Transcript Export** — operational niceties; ship after the three above.
+
+After Phase 3.E is complete, the next strategic pivot is **Phase 4 — The Powertrain**: native Go provider adapters (4.A), context engine (4.B), prompt builder (4.C), smart routing (4.D), and the full InsightsEngine port (4.E). Phase 4 is when the Hermes `:8642` health check becomes optional.
+
+---
+
+*ARCH_PLAN.md is the living document. Update this summary as mirrors ship and research expands.*

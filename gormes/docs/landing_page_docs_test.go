@@ -203,7 +203,7 @@ func TestArchPlanTracksShippedPhase2Ledger(t *testing.T) {
 	wants := []string{
 		"**Public site:** https://gormes.ai",
 		"| Phase 2 — The Wiring Harness (Gateway) | 🔨 in progress |",
-		"| Phase 3 — The Black Box (Memory) | ⏳ planned |",
+		"| Phase 3 — The Black Box (Memory) | 🔨 3.A–3.D shipped; 3.E planned |",
 		"| Phase 2.A — Tool Registry | ✅ complete |",
 		"| Phase 2.B.1 — Telegram Scout | ✅ complete |",
 		"| Phase 2.C — Thin Mapping Persistence | ✅ complete |",
