@@ -74,6 +74,19 @@ func TestDocsHarnessAllowsNativeGormesManifestoPage(t *testing.T) {
 	}
 }
 
+func TestWhyGormesPageExistsAndKeepsManifestoMarker(t *testing.T) {
+	raw := readDoc(t, "content/why-gormes.md")
+	wants := []string{
+		"## Why Go-native matters",
+		"Operational Moat",
+	}
+	for _, want := range wants {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("why-gormes page is missing %q", want)
+		}
+	}
+}
+
 func TestAICutoverDocsExistAndCarryExpectedTitles(t *testing.T) {
 	spec := readDoc(t, "superpowers/specs/2026-04-19-gormes-ai-cutover-design.md")
 	if !strings.Contains(spec, "Gormes.ai Hard Cutover Design Spec") {
