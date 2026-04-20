@@ -334,3 +334,71 @@ func TestBot_NewCommandDuringTurn_RepliesCannotReset(t *testing.T) {
 	mc.closeUpdates()
 	time.Sleep(50 * time.Millisecond)
 }
+
+// TestBot_ToolCallHandshake_Echo_ViaTelegram proves Phase-2.A tool-call
+// semantics survive the Telegram adapter round-trip. A Hermes MockClient
+// scripts a 2-round tool-call turn (echo → final reply); a Telegram
+// mockClient records outbound edits. Final assertion: the last bot message
+// contains both "Tool said" and the echoed payload. No network, no API
+// credits.
+func TestBot_ToolCallHandshake_Echo_ViaTelegram(t *testing.T) {
+	mc := newMockClient()
+
+	hmc := hermes.NewMockClient()
+	hmc.Script([]hermes.Event{
+		{
+			Kind: hermes.EventDone, FinishReason: "tool_calls",
+			ToolCalls: []hermes.ToolCall{
+				{ID: "call_echo_telegram", Name: "echo", Arguments: []byte(`{"text":"hello from telegram"}`)},
+			},
+		},
+	}, "sess-tg-echo")
+	finalAnswer := "Tool said: hello from telegram."
+	events := make([]hermes.Event, 0, len(finalAnswer)+1)
+	for _, ch := range finalAnswer {
+		events = append(events, hermes.Event{Kind: hermes.EventToken, Token: string(ch), TokensOut: 1})
+	}
+	events = append(events, hermes.Event{Kind: hermes.EventDone, FinishReason: "stop", TokensIn: 20, TokensOut: len(finalAnswer)})
+	hmc.Script(events, "sess-tg-echo")
+
+	reg := tools.NewRegistry()
+	reg.MustRegister(&tools.EchoTool{})
+	k := kernel.New(kernel.Config{
+		Model:             "hermes-agent",
+		Endpoint:          "http://mock",
+		Admission:         kernel.Admission{MaxBytes: 200_000, MaxLines: 10_000},
+		Tools:             reg,
+		MaxToolIterations: 10,
+		MaxToolDuration:   5 * time.Second,
+	}, hmc, store.NewNoop(), telemetry.New(), nil)
+
+	b := New(Config{AllowedChatID: 42, CoalesceMs: 200}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushTextUpdate(42, "echo hello from telegram")
+
+	// Wait for a Send whose text contains "Tool said".
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(mc.lastSentText(), "Tool said") {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	last := mc.lastSentText()
+	if !strings.Contains(last, "Tool said") {
+		t.Errorf("final bot msg = %q, want 'Tool said'", last)
+	}
+	if !strings.Contains(last, "hello from telegram") {
+		t.Errorf("final bot msg = %q, want to reference tool output", last)
+	}
+
+	cancel()
+	mc.closeUpdates()
+	time.Sleep(50 * time.Millisecond)
+}
