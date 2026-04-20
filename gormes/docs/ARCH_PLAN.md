@@ -1,6 +1,6 @@
 # Gormes — Executive Roadmap (ARCH_PLAN)
 
-**Public site:** https://gormes.io
+**Public site:** https://gormes.ai
 **Source:** https://github.com/XelHaku/golang-hermes-agent
 **Upstream reference:** https://github.com/NousResearch/hermes-agent
 
@@ -51,12 +51,23 @@ Phase 1 should be read correctly: it is a tactical Strangler Fig bridge, not a p
 | Phase | Status | Deliverable |
 |---|---|---|
 | Phase 1 — The Dashboard (Face) | ✅ complete | Tactical bridge: Go TUI over Python's `api_server` HTTP+SSE boundary |
-| Phase 2 — The Wiring Harness (Gateway) | ⏳ planned | Multi-platform adapters in Go (Telegram, Discord, Slack, …) |
-| Phase 3 — The Black Box (Memory) | ⏳ planned | SQLite + FTS5 + ontological graph in Go |
+| Phase 2 — The Wiring Harness (Gateway) | 🔨 in progress | Go-native wiring harness: tools, Telegram, and thin session resume land before the wider gateway surface |
+| Phase 3 — The Black Box (Memory) | ⏳ planned | SQLite + FTS5 + ontological graph in Go; Phase 2.C's bbolt layer is not transcript memory ownership |
 | Phase 4 — The Powertrain (Brain Transplant) | ⏳ planned | Native Go agent orchestrator + prompt builder |
 | Phase 5 — The Final Purge (100% Go) | ⏳ planned | Python tool scripts ported to Go or WASM |
 
 Legend: 🔨 in progress · ✅ complete · ⏳ planned · ⏸ deferred.
+
+### Phase 2 Ledger
+
+| Subphase | Status | Deliverable |
+|---|---|---|
+| Phase 2.A — Tool Registry | ✅ complete | In-process Go tool registry, streamed `tool_calls` accumulation, kernel tool loop, and doctor verification |
+| Phase 2.B.1 — Telegram Scout | ✅ complete | Split-binary Telegram adapter over the existing kernel, long-poll ingress, and edit coalescing at the messaging edge |
+| Phase 2.C — Thin Mapping Persistence | ✅ complete | bbolt-backed `(platform, chat_id) -> session_id` resume only; no transcript ownership moved into Go |
+| Phase 2.B.2+ — Wider Gateway Surface | ⏳ planned | Additional platform hands such as Discord, Slack, and the broader gateway perimeter |
+
+Phase 2.C is intentionally not Phase 3. It stores only session handles in bbolt. Python still owns transcript memory, transcript search, and prompt assembly; the real SQLite + FTS5 memory lattice remains future work.
 
 ---
 

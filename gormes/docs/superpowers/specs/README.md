@@ -7,12 +7,14 @@ This directory is the design-proof set for the Go-native port. Public-facing man
 - [2026-04-19-gormes-doc-sync-manifesto-design.md](2026-04-19-gormes-doc-sync-manifesto-design.md) — public-surface plan for README, manifesto page, and proof indexing.
 - [2026-04-19-gormes-phase2-tools-design.md](2026-04-19-gormes-phase2-tools-design.md) — Phase 2.A Tool Registry design for Go-native tools.
 - [2026-04-19-gormes-phase2b-telegram.md](2026-04-19-gormes-phase2b-telegram.md) — Phase 2.B.1 Telegram Scout design for split-binary messaging.
+- [2026-04-19-gormes-phase2c-persistence-design.md](2026-04-19-gormes-phase2c-persistence-design.md) — Phase 2.C thin bbolt mapping for session-handle resume.
 
 ## Phase 2 Cross-Links
 
 - [Executive Roadmap](../../ARCH_PLAN.md)
 - [Phase 2.A — Tool Registry](2026-04-19-gormes-phase2-tools-design.md)
 - [Phase 2.B.1 — Telegram Scout](2026-04-19-gormes-phase2b-telegram.md)
+- [Phase 2.C — Thin Mapping Persistence](2026-04-19-gormes-phase2c-persistence-design.md)
 
 ## Chronological Index
 
@@ -25,3 +27,5 @@ This directory is the design-proof set for the Go-native port. Public-facing man
 - [2026-04-19-gormes-phase1-5-tdd-rig-design.md](2026-04-19-gormes-phase1-5-tdd-rig-design.md) — compatibility probe and discipline rig.
 - [2026-04-19-gormes-phase2-tools-design.md](2026-04-19-gormes-phase2-tools-design.md) — Go-native tool execution.
 - [2026-04-19-gormes-phase2b-telegram.md](2026-04-19-gormes-phase2b-telegram.md) — Telegram Scout binary.
+- [2026-04-19-gormes-phase2c-persistence-design.md](2026-04-19-gormes-phase2c-persistence-design.md) — Thin bbolt session-handle persistence.
+- [2026-04-20-gormes-phase3a-memory-design.md](2026-04-20-gormes-phase3a-memory-design.md) — Planned SQLite + FTS5 memory foundation for the Phase 3 lattice.

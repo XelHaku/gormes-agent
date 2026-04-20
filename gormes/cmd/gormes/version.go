@@ -6,9 +6,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version is the Phase-1 semantic marker. Bump when Phase-1 success criteria
-// are marked complete in ARCH_PLAN.md.
-const Version = "0.1.0-ignition"
+// Version marks the current operator-facing release line. The scout series
+// corresponds to the shipped Tool Registry + Telegram Scout + thin resume set.
+const Version = "0.2.0-scout"
 
 var versionCmd = &cobra.Command{
 	Use:   "version",

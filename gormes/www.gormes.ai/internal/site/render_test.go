@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestServer_RendersApprovedPhase1Story(t *testing.T) {
+func TestServer_RendersOperationalMoatStory(t *testing.T) {
 	handler, err := NewServer()
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
@@ -21,13 +21,15 @@ func TestServer_RendersApprovedPhase1Story(t *testing.T) {
 	wants := []string{
 		"Gormes.ai | The Agent That GOes With You.",
 		"The Agent That GOes With You.",
-		"Open Source • MIT License • Phase 1 Go Port",
+		"Open Source • MIT License • 7.9 MB Static Binary • Zero-CGO",
 		"API_SERVER_ENABLED=true hermes gateway start",
-		"./bin/gormes",
-		"Phase 1 uses your existing Hermes backend.",
+		"./bin/gormes doctor --offline",
+		"./bin/gormes-telegram",
+		"Phase 2 is live on trunk: 2.A Tool Registry, 2.B.1 Telegram Scout, and 2.C thin bbolt resume are shipped.",
 		"The Port Is Already Moving",
 		"Help Finish the Port",
-		"Same agent. Same memory. Same workflows.",
+		"Go-native tool registry",
+		"Telegram Scout",
 	}
 
 	for _, want := range wants {

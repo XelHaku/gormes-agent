@@ -68,6 +68,25 @@ func TestTargetsIncludeManifestoSyncDocs(t *testing.T) {
 	}
 }
 
+func TestTargetsIncludePhase2CPersistenceDocs(t *testing.T) {
+	want := map[string]bool{
+		"superpowers/specs/2026-04-19-gormes-phase2c-persistence-design.md": false,
+		"superpowers/plans/2026-04-19-gormes-phase2c-persistence.md":        false,
+	}
+
+	for _, target := range targets {
+		if _, ok := want[target]; ok {
+			want[target] = true
+		}
+	}
+
+	for rel, seen := range want {
+		if !seen {
+			t.Fatalf("docs target missing %s", rel)
+		}
+	}
+}
+
 func TestDocsHarnessAllowsNativeGormesManifestoPage(t *testing.T) {
 	if _, ok := nativeHugoPages["why-gormes.md"]; !ok {
 		t.Fatalf("nativeHugoPages should explicitly allow why-gormes.md")
@@ -148,6 +167,7 @@ func TestSpecIndexAndPhase2SpecsCrossLink(t *testing.T) {
 		"2026-04-19-gormes-doc-sync-manifesto-design.md",
 		"2026-04-19-gormes-phase2-tools-design.md",
 		"2026-04-19-gormes-phase2b-telegram.md",
+		"2026-04-19-gormes-phase2c-persistence-design.md",
 		"../../ARCH_PLAN.md",
 	}
 	for _, want := range indexWants {
@@ -175,6 +195,25 @@ func TestSpecIndexAndPhase2SpecsCrossLink(t *testing.T) {
 	}
 	if !strings.Contains(telegramRaw, "2026-04-19-gormes-phase2-tools-design.md") {
 		t.Fatalf("telegram spec should link to the tool registry spec")
+	}
+}
+
+func TestArchPlanTracksShippedPhase2Ledger(t *testing.T) {
+	raw := readDoc(t, "ARCH_PLAN.md")
+	wants := []string{
+		"**Public site:** https://gormes.ai",
+		"| Phase 2 — The Wiring Harness (Gateway) | 🔨 in progress |",
+		"| Phase 3 — The Black Box (Memory) | ⏳ planned |",
+		"| Phase 2.A — Tool Registry | ✅ complete |",
+		"| Phase 2.B.1 — Telegram Scout | ✅ complete |",
+		"| Phase 2.C — Thin Mapping Persistence | ✅ complete |",
+		"Phase 2.C is intentionally not Phase 3.",
+		"Python still owns transcript memory",
+	}
+	for _, want := range wants {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("ARCH_PLAN is missing %q", want)
+		}
 	}
 }
 
@@ -253,6 +292,7 @@ func TestReadmeDocumentsDoctorAndArchitecturalEdge(t *testing.T) {
 		"# Gormes",
 		"7.9 MB static binary",
 		"Go 1.22+",
+		"zero-CGO",
 		"Zero-dependencies inside the process boundary",
 		"./bin/gormes doctor --offline",
 		"Route-B reconnect",
@@ -260,6 +300,7 @@ func TestReadmeDocumentsDoctorAndArchitecturalEdge(t *testing.T) {
 		"[Why Gormes](docs/content/why-gormes.md)",
 		"[Phase 2.A — Tool Registry](docs/superpowers/specs/2026-04-19-gormes-phase2-tools-design.md)",
 		"[Phase 2.B.1 — Telegram Scout](docs/superpowers/specs/2026-04-19-gormes-phase2b-telegram.md)",
+		"[Phase 2.C — Thin Mapping Persistence](docs/superpowers/specs/2026-04-19-gormes-phase2c-persistence-design.md)",
 	}
 	for _, want := range wants {
 		if !strings.Contains(raw, want) {

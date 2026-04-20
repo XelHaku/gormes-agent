@@ -44,6 +44,8 @@ var targets = []string{
 	"superpowers/plans/2026-04-19-gormes-ai-cutover.md",
 	"superpowers/specs/2026-04-19-gormes-doc-sync-manifesto-design.md",
 	"superpowers/plans/2026-04-19-gormes-doc-sync-manifesto.md",
+	"superpowers/specs/2026-04-19-gormes-phase2c-persistence-design.md",
+	"superpowers/plans/2026-04-19-gormes-phase2c-persistence.md",
 }
 
 var nativeHugoPages = map[string]struct{}{
