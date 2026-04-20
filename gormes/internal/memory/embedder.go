@@ -214,6 +214,8 @@ func (e *Embedder) embedAndStore(ctx context.Context, row embedderRow) error {
 	input := buildEmbedInput(row)
 	vec, err := e.ec.Embed(callCtx, e.cfg.Model, input)
 	if err != nil {
+		// TODO(T8): differentiate errEmbedModelNotFound from transient errors for
+		// log throttling — both currently surface as WARN in loopOnce.
 		return fmt.Errorf("embed: %w", err)
 	}
 	if len(vec) == 0 {
@@ -225,6 +227,9 @@ func (e *Embedder) embedAndStore(ctx context.Context, row embedderRow) error {
 	l2Normalize(vec)
 	blob := encodeFloat32LE(vec)
 
+	// NOTE: uses parent ctx, not callCtx — the per-call timeout applies only
+	// to the HTTP embed round-trip. Once we've computed a vector, don't let
+	// a tight timeout strand it in memory.
 	_, err = e.store.db.ExecContext(ctx, `
 		INSERT INTO entity_embeddings(entity_id, model, dim, vec, updated_at)
 		VALUES(?, ?, ?, ?, strftime('%s','now'))

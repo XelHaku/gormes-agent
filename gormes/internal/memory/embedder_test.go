@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -243,6 +244,35 @@ func abs32(x float32) float32 {
 		return -x
 	}
 	return x
+}
+
+func TestBuildEmbedInput_WithDescription(t *testing.T) {
+	got := buildEmbedInput(embedderRow{
+		ID:          1,
+		Name:        "AzulVigia",
+		Type:        "PROJECT",
+		Description: "Solar monitoring system",
+	})
+	want := "Entity: AzulVigia. Type: PROJECT. Context: Solar monitoring system"
+	if got != want {
+		t.Errorf("got = %q, want %q", got, want)
+	}
+}
+
+func TestBuildEmbedInput_EmptyDescriptionOmitsContextClause(t *testing.T) {
+	got := buildEmbedInput(embedderRow{
+		ID:          1,
+		Name:        "Vania",
+		Type:        "PERSON",
+		Description: "",
+	})
+	// No trailing "Context: " — if sanitized description is empty, omit the clause.
+	if got != "Entity: Vania. Type: PERSON." {
+		t.Errorf("got = %q, want no Context clause", got)
+	}
+	if strings.Contains(got, "Context") {
+		t.Errorf("got = %q, must not contain 'Context' when description empty", got)
+	}
 }
 
 func TestEmbedder_CloseIdempotent(t *testing.T) {
