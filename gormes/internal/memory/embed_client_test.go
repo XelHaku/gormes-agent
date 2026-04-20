@@ -94,6 +94,9 @@ func TestEmbedClient_CtxTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected timeout error")
 	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("expected errors.Is(err, context.DeadlineExceeded); got %v", err)
+	}
 }
 
 func TestEmbedClient_AuthorizationHeader(t *testing.T) {

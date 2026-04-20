@@ -23,18 +23,22 @@ var errEmbedModelNotFound = errors.New("memory: embed model not loaded")
 // embedding concerns in would widen that surface for a feature only
 // the memory package uses.
 type embedClient struct {
-	baseURL string // e.g. "http://localhost:11434"
-	apiKey  string // optional — "Bearer <key>" if non-empty
-	http    *http.Client
+	baseURL    string // e.g. "http://localhost:11434"
+	apiKey     string // optional — "Bearer <key>" if non-empty
+	httpClient *http.Client
 }
 
 func newEmbedClient(baseURL, apiKey string) *embedClient {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	dt, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		dt = &http.Transport{}
+	}
+	transport := dt.Clone()
 	transport.ResponseHeaderTimeout = 10 * time.Second
 	return &embedClient{
-		baseURL: baseURL,
-		apiKey:  apiKey,
-		http:    &http.Client{Timeout: 0, Transport: transport},
+		baseURL:    baseURL,
+		apiKey:     apiKey,
+		httpClient: &http.Client{Timeout: 0, Transport: transport},
 	}
 }
 
@@ -60,7 +64,7 @@ func (c *embedClient) Embed(ctx context.Context, model, input string) ([]float32
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 
-	resp, err := c.http.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("memory: embed HTTP: %w", err)
 	}
