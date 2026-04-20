@@ -1,0 +1,12 @@
+name = "gormes-docs"
+compatibility_date = "2026-04-20"
+
+# Assets-only Worker: serves the Hugo static build from ./public.
+# Hugo is preinstalled on Cloudflare's build image; the build
+# command runs in this directory (gormes/docs) when the Worker
+# is configured with this folder as its root.
+[assets]
+directory = "./public"
+
+[build]
+command = "hugo --minify"

@@ -1,0 +1,10 @@
+name = "gormes-landing"
+compatibility_date = "2026-04-20"
+
+# Assets-only Worker: serves the static export produced by
+# `go run ./cmd/www-gormes-export` from this directory.
+[assets]
+directory = "./dist"
+
+[build]
+command = "go run ./cmd/www-gormes-export"
