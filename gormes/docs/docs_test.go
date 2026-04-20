@@ -47,7 +47,6 @@ var targets = []string{
 }
 
 var nativeHugoPages = map[string]struct{}{
-	"manifesto.md":   {},
 	"why-gormes.md": {},
 }
 
