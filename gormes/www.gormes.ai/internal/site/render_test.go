@@ -83,9 +83,11 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		"Delete the last Python dependency. Ship entirely in Go.",
 		"5.A–5.P",
 		"See ARCH_PLAN §7.",
-		// Footer
-		"Gormes v0.1.0 · TrebuchetDynamics",
+		// Footer — brand text + company anchor + license
+		`Gormes v0.1.0 · <a href="https://trebuchetdynamics.com/">TrebuchetDynamics</a>`,
 		"MIT License · 2026",
+		// Nav now includes Company link at the trebuchetdynamics.com URL
+		`<a href="https://trebuchetdynamics.com/">Company</a>`,
 		// CSS link
 		`href="/static/site.css"`,
 	}

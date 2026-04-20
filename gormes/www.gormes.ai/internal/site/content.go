@@ -68,8 +68,11 @@ type LandingPage struct {
 	RoadmapLabel        string
 	RoadmapHeadline     string
 	RoadmapPhases       []RoadmapPhase
-	FooterLeft          string
-	FooterRight         string
+	// FooterLeft is typed as template.HTML so it can carry the anchor
+	// tag linking to the TrebuchetDynamics company site. Must not
+	// carry user input; DefaultPage is the only writer.
+	FooterLeft  template.HTML
+	FooterRight string
 }
 
 func DefaultPage() LandingPage {
@@ -81,6 +84,7 @@ func DefaultPage() LandingPage {
 			{Label: "Features", Href: "#features"},
 			{Label: "Roadmap", Href: "#roadmap"},
 			{Label: "GitHub", Href: "https://github.com/TrebuchetDynamics/gormes-agent"},
+			{Label: "Company", Href: "https://trebuchetdynamics.com/"},
 		},
 		HeroKicker:   "§ 01 · OPEN SOURCE · MIT LICENSE",
 		HeroHeadline: "One Go Binary. Same Hermes Brain.",
@@ -170,7 +174,7 @@ func DefaultPage() LandingPage {
 				},
 			},
 		},
-		FooterLeft:  "Gormes v0.1.0 · TrebuchetDynamics",
+		FooterLeft:  `Gormes v0.1.0 · <a href="https://trebuchetdynamics.com/">TrebuchetDynamics</a>`,
 		FooterRight: "MIT License · 2026",
 	}
 }
