@@ -200,22 +200,34 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
-| Gateway runtime entry | `gateway/run.py` + `gateway/config.py` | 2.B/2.F | ⏳ planned |
-| Gateway session + context | `gateway/session.py`, `gateway/session_context.py` | 2.B/2.F | ⏳ planned |
-| Message delivery + stream consumer | `gateway/delivery.py`, `gateway/stream_consumer.py` | 2.B/2.F | ⏳ planned |
+| Gateway runtime entry (main loop + slash-command dispatch) | `gateway/run.py` + `gateway/config.py` | 2.B/2.F | ⏳ planned |
+| Gateway session store (conversation persistence across platforms) | `gateway/session.py` (`SessionStore`, `SessionEntry`, `SessionSource`, `SessionResetPolicy`) | 2.B/2.F | ⏳ planned |
+| Gateway session context | `gateway/session_context.py` (`SessionContext`) | 2.B/2.F | ⏳ planned |
+| Delivery router (`--deliver <platform>` abstraction) | `gateway/delivery.py` (`DeliveryRouter`, `DeliveryTarget`) | 2.B/2.F | ⏳ planned |
+| Stream consumer (SSE agent-event fan-out to gateway) | `gateway/stream_consumer.py` (`GatewayStreamConsumer`, `StreamConsumerConfig`, `StreamingConfig`) | 2.B/2.F | ⏳ planned |
+| Home channel (operator's primary notify-to chat) | `gateway/*` — `HomeChannel` class | 2.F | ⏳ planned |
 | Channel / contact directory | `gateway/channel_directory.py` | 2.F | ⏳ planned |
+| Platform enum + per-platform config | `gateway/*` — `Platform` (enum), `PlatformConfig` | 2.B | ⏳ planned |
 | Cron / scheduled automations | `cron/scheduler.py`, `cron/jobs.py`, `tools/cronjob_tools.py` | 2.D | ⏳ planned |
+| Webhook subscription system (GitHub events / API triggers → prompt → deliver) | `hermes_cli/webhook.py` + gateway routing | 2.D | ⏳ planned |
 | Subagent delegation | `tools/delegate_tool.py` | 2.E | ⏳ planned |
-| Hooks system | `gateway/hooks.py`, `gateway/builtin_hooks/{boot_md}.py` | 2.F | ⏳ planned |
-| Restart / pairing / lifecycle | `gateway/{restart,pairing,status}.py` | 2.F | ⏳ planned |
+| Hooks system (`HookRegistry`) | `gateway/hooks.py`, `gateway/builtin_hooks/{boot_md}.py` | 2.F | ⏳ planned |
+| Restart / pairing / lifecycle | `gateway/{restart,pairing,status}.py` + `PairingStore` | 2.F | ⏳ planned |
 | Mirror / sticker cache | `gateway/{mirror,sticker_cache}.py` | 2.F | ⏳ planned |
-| Display config | `gateway/display_config.py`, `agent/display.py` | 2.F | ⏳ planned |
+| Display config + KawaiiSpinner + tool preview formatting | `gateway/display_config.py`, `agent/display.py` (`KawaiiSpinner`) | 2.F / 5.Q | ⏳ planned |
+| Iteration budget tracker | `run_agent.py` (`iteration_budget`) — inline class | 4.C | ⏳ planned |
 
 ### Memory + state (Phase 3 — 3.A–3.D shipped; 3.E pending)
 
+Upstream splits memory across three stores that Gormes compresses into two:
+
+- **`hermes_state.py` — `SessionDB`** (SQLite + FTS5) holds every session's message history, model config, parent-session chains for compression splits, and source tagging (`cli`, `telegram`, etc.). Gormes Phase 2.C uses bbolt for (platform, chat_id) → session_id mapping; Phase 3.A's SqliteStore holds turns + FTS5. Together they cover SessionDB's responsibilities, but the parent-session chains and cross-source search need explicit 3.E work.
+- **`agent/memory_manager.py` — `MemoryManager`** owns the entity graph + USER.md mirror.
+- **`agent/memory_provider.py` — `MemoryProvider` (ABC)** owns recall-time seed selection + fence assembly.
+
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
-| SQLite + FTS5 lattice | `agent/memory_provider.py` (lexical half) | 3.A | ✅ shipped |
+| SQLite + FTS5 lattice | `agent/memory_provider.py` (lexical half) + `hermes_state.py` (SessionDB FTS5) | 3.A | ✅ shipped |
 | Ontological graph + extractor | `agent/memory_manager.py` | 3.B | ✅ shipped |
 | Recall + context injection | `agent/memory_provider.py` (recall half) | 3.C | ✅ shipped |
 | Semantic / embeddings | (not in upstream; Gormes-original) | 3.D | ✅ shipped |
@@ -227,6 +239,19 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | ⏳ planned |
 | Memory decay | None (Gormes-original) | 3.E.6 | ⏳ planned |
 | Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | ⏳ planned |
+| Parent-session chains (compression splits) | `hermes_state.py` (`SessionDB.parent_session_id`) | 3.E.8 | ⏳ planned (pairs with 4.B context compression) |
+| Cross-source session search | `hermes_state.py` (FTS5 across source-tagged messages) | 3.E.8 | ⏳ planned |
+
+### Cross-cutting registries (used by multiple phases)
+
+These are single source-of-truth registries that drive multiple downstream consumers. A Go port must preserve "one registry, many consumers" so that adding a slash command / tool / skill lights up everywhere automatically.
+
+| Subsystem | Upstream | Target phase | Status | Why it's cross-cutting |
+|---|---|---|---|---|
+| Slash command registry | `hermes_cli/commands.py` (`COMMAND_REGISTRY`, `CommandDef`, `resolve_command`, `gateway_help_lines`, `telegram_bot_commands`, `slack_subcommand_map`, `COMMANDS_BY_CATEGORY`, `SlashCommandCompleter`) | 2.F / 5.O | ⏳ planned | One `CommandDef` entry drives CLI dispatch, gateway dispatch, Telegram BotCommand menu, Slack `/hermes` subcommand map, autocomplete, and `/help` output |
+| Tool registry + dispatch orchestrator | `tools/registry.py` + `model_tools.py` (`get_tool_definitions`, `handle_function_call`, `TOOL_TO_TOOLSET_MAP`, `TOOLSET_REQUIREMENTS`, `check_toolset_requirements`) | 2.A (partial ✅) / 5.A | 🔨 Gormes `internal/tools` covers the core dispatch; toolset grouping + requirements check not ported | Every tool self-registers at import time; `model_tools` exposes the API consumed by run_agent, cli, batch_runner, RL environments, and doctor |
+| Toolset definitions (enabled/disabled groupings) | `toolsets.py` + `toolset_distributions.py` (`_HERMES_CORE_TOOLS` list) | 4.C / 5.A | ⏳ planned | Agent init accepts `enabled_toolsets` / `disabled_toolsets` lists — drives what tools the LLM sees per run |
+| Canonical OpenAI-format message schema | `run_agent.py` — `{role, content, tool_calls, reasoning}` | 4.C | 🔨 partial (kernel already uses this shape) | Every provider adapter in 4.A must translate to/from this shape |
 
 ### Agent orchestration core (Phase 4 — the thing Phase 4 ultimately replaces)
 
@@ -256,7 +281,13 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | OpenRouter client | `agent/openrouter_client.py` | 4.A | ⏳ planned |
 | Google Code Assist | `agent/google_code_assist.py` | 4.A | ⏳ planned |
 | Copilot ACP client | `agent/copilot_acp_client.py` | 4.A | ⏳ planned |
-| Auxiliary client (xAI etc.) | `agent/auxiliary_client.py` + `tools/xai_http.py` | 4.A | ⏳ planned |
+| Auxiliary client (multi-provider: Anthropic, Codex, xAI) | `agent/auxiliary_client.py` (`AnthropicAuxiliaryClient`, `AsyncAnthropicAuxiliaryClient`, `CodexAuxiliaryClient`, `AsyncCodexAuxiliaryClient`) + `tools/xai_http.py` | 4.A | ⏳ planned |
+| Auxiliary chat completion shims (ACP / Anthropic / Codex / Gemini) | `agent/*_adapter.py` internal `_*ChatShim`, `_*ChatCompletions`, `_*CompletionsAdapter`, `_*StreamChunk` classes | 4.A | ⏳ planned |
+| Billing + cost + usage types | `agent/*` — `BillingRoute`, `CanonicalUsage`, `CostResult` classes | 4.E / 4.H | ⏳ planned |
+| Provider failover | `agent/*` — `FailoverReason` enum + routing logic | 4.H | ⏳ planned |
+| Model metadata types | `agent/model_metadata.py` — `ModelCapabilities`, `ModelInfo` classes | 4.D | ⏳ planned |
+| Error classifier output type | `agent/error_classifier.py` — `ClassifiedError` class | 4.H | ⏳ planned |
+| Local edit snapshot | `agent/*` — `LocalEditSnapshot` (for checkpoint rewind) | 5.L | ⏳ planned |
 | Context engine | `agent/context_engine.py` | 4.B | ⏳ planned |
 | Context compressor | `agent/context_compressor.py` + `manual_compression_feedback.py` | 4.B | ⏳ planned |
 | Context references | `agent/context_references.py` | 4.B | ⏳ planned |
@@ -286,9 +317,20 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Vision | `tools/vision_tools.py` | 5.D | ⏳ planned |
 | Image generation | `tools/image_generation_tool.py` | 5.D | ⏳ planned |
 | TTS / voice / transcription | `tools/{tts_tool,voice_mode,transcription_tools,neutts_synth}.py` + `neutts_samples/` | 5.E | ⏳ planned |
-| Skills system | `tools/{skill_manager_tool,skills_hub,skills_sync,skills_tool,skills_guard}.py`; `skills/` (26 categories) | 5.F | ⏳ planned |
-| MCP integration | `tools/{mcp_tool,mcp_oauth,mcp_oauth_manager,managed_tool_gateway}.py` + `mcp_serve.py` | 5.G | ⏳ planned |
-| ACP integration | `acp_adapter/`, `acp_registry/` | 5.H | ⏳ planned |
+| Audio recorder (general + Termux) | `tools/*` — `AudioRecorder`, `TermuxAudioRecorder` | 5.E | ⏳ planned |
+| Skills system (core) | `tools/{skill_manager_tool,skills_hub,skills_sync,skills_tool,skills_guard}.py`; `skills/` (26 categories) + `optional-skills/` (10+ categories) | 5.F | ⏳ planned |
+| Skill metadata types | `tools/*` — `SkillMeta`, `SkillBundle`, `SkillReadinessStatus`, `HubLockFile` | 5.F | ⏳ planned |
+| Skill source: SkillSource (ABC) | `tools/*` — `SkillSource` base | 5.F | ⏳ planned |
+| Skill source: Claude Marketplace | `tools/*` — `ClaudeMarketplaceSource(SkillSource)` | 5.F | ⏳ planned |
+| Skill source: ClawHub | `tools/*` — `ClawHubSource(SkillSource)` | 5.F | ⏳ planned |
+| Skill source: GitHub | `tools/*` — `GitHubSource(SkillSource)` | 5.F | ⏳ planned |
+| Skill source: Hermes Index | `tools/*` — `HermesIndexSource(SkillSource)` | 5.F | ⏳ planned |
+| Skill source: LobeHub | `tools/*` — `LobeHubSource(SkillSource)` | 5.F | ⏳ planned |
+| Skill source: Optional skills | `tools/*` — `OptionalSkillSource(SkillSource)` + `optional-skills/` tree | 5.F | ⏳ planned |
+| Skill source: skills.sh | `tools/*` — `SkillsShSource(SkillSource)` | 5.F | ⏳ planned |
+| Taps manager (plugin-source management) | `tools/*` — `TapsManager` | 5.F / 5.I | ⏳ planned |
+| MCP integration | `tools/{mcp_tool,mcp_oauth,mcp_oauth_manager,managed_tool_gateway}.py` + `mcp_serve.py` + `MCPOAuthManager`, `MCPServerTask`, `ManagedToolGatewayConfig`, `SamplingHandler`, `OAuthNonInteractiveError`, `_ManagedFalSyncClient` classes | 5.G | ⏳ planned |
+| ACP integration (IDE: VS Code / Zed / JetBrains) | `acp_adapter/{auth,entry,events,permissions,server,session,tools}.py` (runnable as `python -m acp_adapter`), `acp_registry/{agent.json,icon.svg}` | 5.H | ⏳ planned |
 | Plugins architecture | `plugins/context_engine/`, `plugins/example-dashboard/` + plugin SDK | 5.I | ⏳ planned |
 | Memory plugin: Byterover | `plugins/memory/byterover/` | 5.I | ⏳ planned |
 | Memory plugin: Hindsight | `plugins/memory/hindsight/` | 5.I | ⏳ planned |
@@ -299,12 +341,15 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Memory plugin: RetainDB | `plugins/memory/retaindb/` | 5.I | ⏳ planned |
 | Memory plugin: Supermemory | `plugins/memory/supermemory/` | 5.I | ⏳ planned |
 | Memory tool (plugin gateway) | `tools/memory_tool.py` | 5.I | ⏳ planned |
-| Approval / security | `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py` | 5.J | ⏳ planned |
-| Code execution | `tools/{code_execution_tool,process_registry}.py` | 5.K | ⏳ planned |
-| File operations | `tools/{file_operations,file_tools,fuzzy_match,checkpoint_manager,patch_parser,binary_extensions}.py` | 5.L | ⏳ planned |
+| Approval / security | `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py` + `_ApprovalEntry`, `ScanResult` classes | 5.J | ⏳ planned |
+| Code execution | `tools/{code_execution_tool,process_registry}.py` + `ProcessRegistry`, `ProcessSession`, `ExecuteResult`, `DebugSession`, `RunState` classes | 5.K | ⏳ planned |
+| File operations | `tools/{file_operations,file_tools,fuzzy_match,checkpoint_manager,patch_parser,binary_extensions}.py` + `FileOperations`/`ShellFileOperations`/`PatchOperation`/`PatchResult`/`CheckpointManager`/`Hunk`/`HunkLine`/`SearchMatch`/`SearchResult`/`ReadResult`/`LintResult`/`Finding`/`OperationType`/`EnvironmentInfo` classes | 5.L | ⏳ planned |
 | Mixture of agents | `tools/mixture_of_agents_tool.py` | 5.M | ⏳ planned |
-| Operator tools | `tools/{todo_tool,clarify_tool,session_search_tool,send_message_tool,debug_helpers,interrupt,ansi_strip}.py` | 5.N | ⏳ planned |
-| Web tools / search | `tools/web_tools.py` | 5.A | ⏳ planned |
+| Operator tools | `tools/{todo_tool,clarify_tool,session_search_tool,send_message_tool,debug_helpers,interrupt,ansi_strip}.py` + `TodoStore`, `_ThreadAwareEventProxy` classes | 5.N | ⏳ planned |
+| Auth storage (GitHub + Hermes token) | `tools/*` — `GitHubAuth`, `HermesTokenStorage` classes | 4.G / 5.O | ⏳ planned |
+| Budget config + provider entries | `tools/budget_config.py` — `BudgetConfig`, `_ProviderEntry` classes | 4.H / 5.A | ⏳ planned |
+| Tool entry metadata (registry row schema) | `tools/registry.py` — `ToolEntry` class | 5.A | ⏳ planned |
+| Web tools / search (Parallel + Firecrawl providers) | `tools/web_tools.py` | 5.A | ⏳ planned |
 | Terminal tool | `tools/terminal_tool.py` | 5.A | ⏳ planned |
 | Send message (cross-platform) | `tools/send_message_tool.py` | 5.N | ⏳ planned |
 | Feishu doc/drive tools | `tools/{feishu_doc_tool,feishu_drive_tool}.py` | 5.A | ⏳ planned |
