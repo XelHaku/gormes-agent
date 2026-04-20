@@ -7,6 +7,12 @@
 
 **Vocabulary decision:** there is no `internal/gateway` package in Phase 2. The "Gateway" remains a marketing term for the conceptual boundary between Gormes and external services. The Go-native artefact is `internal/tools` — a Tool interface, an in-process Registry, and a kernel extension that executes tool calls inside the turn loop.
 
+## Related Documents
+
+- [Executive Roadmap](../../ARCH_PLAN.md)
+- [Specs Index](README.md)
+- [Phase 2.B.1 — Telegram Scout](2026-04-19-gormes-phase2b-telegram.md)
+
 ---
 
 ## 1. Purpose

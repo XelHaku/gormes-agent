@@ -132,6 +132,43 @@ func TestAICutoverDocsExistAndCarryExpectedTitles(t *testing.T) {
 	}
 }
 
+func TestSpecIndexAndPhase2SpecsCrossLink(t *testing.T) {
+	indexRaw := readDoc(t, "superpowers/specs/README.md")
+	indexWants := []string{
+		"# Gormes Specs Index",
+		"2026-04-19-gormes-doc-sync-manifesto-design.md",
+		"2026-04-19-gormes-phase2-tools-design.md",
+		"2026-04-19-gormes-phase2b-telegram.md",
+		"../../ARCH_PLAN.md",
+	}
+	for _, want := range indexWants {
+		if !strings.Contains(indexRaw, want) {
+			t.Fatalf("spec index is missing %q", want)
+		}
+	}
+
+	toolsRaw := readDoc(t, "superpowers/specs/2026-04-19-gormes-phase2-tools-design.md")
+	telegramRaw := readDoc(t, "superpowers/specs/2026-04-19-gormes-phase2b-telegram.md")
+	for _, raw := range []string{toolsRaw, telegramRaw} {
+		for _, want := range []string{
+			"## Related Documents",
+			"../../ARCH_PLAN.md",
+			"README.md",
+		} {
+			if !strings.Contains(raw, want) {
+				t.Fatalf("phase-2 spec is missing %q", want)
+			}
+		}
+	}
+
+	if !strings.Contains(toolsRaw, "2026-04-19-gormes-phase2b-telegram.md") {
+		t.Fatalf("phase2 tools spec should link to the telegram spec")
+	}
+	if !strings.Contains(telegramRaw, "2026-04-19-gormes-phase2-tools-design.md") {
+		t.Fatalf("telegram spec should link to the tool registry spec")
+	}
+}
+
 func TestLandingPageDesignDocDescribesCurrentGormesAIModule(t *testing.T) {
 	raw := readDoc(t, "superpowers/specs/2026-04-19-gormes-landing-page-design.md")
 	wants := []string{

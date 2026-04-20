@@ -7,6 +7,12 @@
 
 **Vocabulary decision:** there is no `internal/gateway` package. The Telegram adapter lives at `internal/telegram/` as a sibling to `internal/tui/` — both consume the existing `PlatformEvent` / `RenderFrame` contracts. The kernel does not change a single line.
 
+## Related Documents
+
+- [Executive Roadmap](../../ARCH_PLAN.md)
+- [Specs Index](README.md)
+- [Phase 2.A — Tool Registry](2026-04-19-gormes-phase2-tools-design.md)
+
 ---
 
 ## 1. Purpose
