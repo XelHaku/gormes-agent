@@ -1,20 +1,21 @@
 {{ define "main" }}
-  <article class="page">
-    <header class="page-header">
-      <p class="eyebrow">Section</p>
-      <h1>{{ .Title }}</h1>
-      {{ with .Params.description }}<p class="lede">{{ . }}</p>{{ end }}
-    </header>
-
+<article class="docs-article">
+  {{ partial "breadcrumbs.html" . }}
+  <header class="docs-article-header">
+    <h1 class="docs-title">{{ .Title }}</h1>
+    {{ if .Description }}<p class="docs-lede">{{ .Description }}</p>{{ end }}
+  </header>
+  <div class="docs-content">
     {{ .Content }}
-
-    <div class="child-grid" aria-label="Pages in this section">
-      {{ range .Pages.ByWeight }}
-        <a class="card" href="{{ .RelPermalink }}">
-          <h2>{{ .Title }}</h2>
-          {{ with .Params.description }}<p>{{ . }}</p>{{ end }}
-        </a>
+    <h2>In this section</h2>
+    <ul class="docs-child-list">
+      {{ range (.Pages.ByWeight) }}
+      <li>
+        <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+        {{ if .Description }}<p>{{ .Description }}</p>{{ end }}
+      </li>
       {{ end }}
-    </div>
-  </article>
+    </ul>
+  </div>
+</article>
 {{ end }}

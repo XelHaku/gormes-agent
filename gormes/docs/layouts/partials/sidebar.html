@@ -1,0 +1,30 @@
+<nav class="docs-nav" aria-label="Documentation navigation">
+  {{ $sections := slice "using-gormes" "building-gormes" "upstream-hermes" }}
+  {{ $toneMap := dict "using-gormes" "shipped" "building-gormes" "progress" "upstream-hermes" "next" }}
+  {{ $labelMap := dict "using-gormes" "USING GORMES" "building-gormes" "BUILDING GORMES" "upstream-hermes" "UPSTREAM HERMES" }}
+  {{ range $sections }}
+    {{ $section := . }}
+    {{ $tone := index $toneMap $section }}
+    {{ $label := index $labelMap $section }}
+    {{ with site.GetPage (printf "/%s" $section) }}
+      <div class="docs-nav-group">
+        <p class="docs-nav-group-label docs-nav-group-label-{{ $tone }}">{{ $label }}</p>
+        <ul class="docs-nav-list">
+          <li><a href="{{ .RelPermalink }}"{{ if eq $.RelPermalink .RelPermalink }} aria-current="page"{{ end }}>Overview</a></li>
+          {{ range .Pages.ByWeight }}
+          <li>
+            <a href="{{ .RelPermalink }}"{{ if eq $.RelPermalink .RelPermalink }} aria-current="page"{{ end }}>{{ .Title }}</a>
+            {{ if .Pages }}
+            <ul class="docs-nav-sublist">
+              {{ range .Pages.ByWeight }}
+              <li><a href="{{ .RelPermalink }}"{{ if eq $.RelPermalink .RelPermalink }} aria-current="page"{{ end }}>{{ .Title }}</a></li>
+              {{ end }}
+            </ul>
+            {{ end }}
+          </li>
+          {{ end }}
+        </ul>
+      </div>
+    {{ end }}
+  {{ end }}
+</nav>

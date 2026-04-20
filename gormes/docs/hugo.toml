@@ -2,5 +2,26 @@ baseURL = "https://docs.gormes.ai/"
 languageCode = "en-us"
 title = "Gormes Docs"
 
-[markup.goldmark.renderer]
-unsafe = true
+# Pretty URLs for all sections
+[permalinks]
+  using-gormes = "/using-gormes/:slug/"
+  building-gormes = "/building-gormes/:slug/"
+  upstream-hermes = "/upstream-hermes/:slug/"
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 4
+    ordered = false
+  [markup.highlight]
+    style = "github-dark"
+    lineNos = false
+    noClasses = false
+
+[outputs]
+  home = ["HTML"]
+  section = ["HTML"]
+  page = ["HTML"]

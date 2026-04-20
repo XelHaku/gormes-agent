@@ -1,10 +1,17 @@
 {{ define "main" }}
-  <article class="page prose">
-    <header class="page-header">
-      <p class="eyebrow">Page</p>
-      <h1>{{ .Title }}</h1>
-      {{ with .Params.description }}<p class="lede">{{ . }}</p>{{ end }}
-    </header>
-    {{ .Content }}
-  </article>
+<article class="docs-article">
+  {{ partial "breadcrumbs.html" . }}
+  <header class="docs-article-header">
+    <h1 class="docs-title">{{ .Title }}</h1>
+    {{ if .Description }}<p class="docs-lede">{{ .Description }}</p>{{ end }}
+  </header>
+  <div class="docs-layout-with-toc">
+    <div class="docs-content">
+      {{ .Content }}
+    </div>
+    <aside class="docs-toc">
+      {{ partial "toc.html" . }}
+    </aside>
+  </div>
+</article>
 {{ end }}

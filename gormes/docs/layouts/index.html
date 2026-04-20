@@ -1,16 +1,26 @@
 {{ define "main" }}
-  <section class="hero">
-    <p class="eyebrow">Docs</p>
-    <h1>{{ .Title }}</h1>
-    {{ .Content }}
+<article class="docs-home">
+  <header>
+    <p class="kicker">GORMES · DOCUMENTATION</p>
+    <h1 class="docs-home-title">{{ site.Title }}</h1>
+    <p class="docs-lede">The Go operator shell for Hermes. Install it, run it, understand how it's built.</p>
+  </header>
+  <section class="docs-home-cards">
+    <a class="docs-home-card" href="/using-gormes/">
+      <p class="kicker" style="color:var(--status-shipped-fg)">USING GORMES</p>
+      <h2>For operators</h2>
+      <p>Install, run, configure. Wire up Telegram. Troubleshoot with the doctor.</p>
+    </a>
+    <a class="docs-home-card" href="/building-gormes/">
+      <p class="kicker" style="color:var(--status-progress-fg)">BUILDING GORMES</p>
+      <h2>For contributors</h2>
+      <p>Architecture, roadmap, how to port a subsystem from upstream.</p>
+    </a>
+    <a class="docs-home-card" href="/upstream-hermes/">
+      <p class="kicker" style="color:var(--status-next-fg)">UPSTREAM HERMES</p>
+      <h2>For reference</h2>
+      <p>Inherited Hermes guides. What the Python upstream does that Gormes is porting.</p>
+    </a>
   </section>
-
-  <section class="section-grid" aria-label="Top-level sections">
-    {{ range site.Sections.ByWeight }}
-      <a class="card" href="{{ .RelPermalink }}">
-        <h2>{{ .Title }}</h2>
-        {{ with .Params.description }}<p>{{ . }}</p>{{ end }}
-      </a>
-    {{ end }}
-  </section>
+</article>
 {{ end }}

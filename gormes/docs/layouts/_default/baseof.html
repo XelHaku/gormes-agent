@@ -1,24 +1,50 @@
 <!doctype html>
-<html lang="{{ site.Language.LanguageCode | default "en" }}">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} | {{ site.Title }}{{ end }}</title>
-    {{ with .Params.description }}<meta name="description" content="{{ . }}">{{ end }}
-    <link rel="stylesheet" href="{{ "site.css" | relURL }}">
-  </head>
-  <body>
-    <header class="site-header">
-      <a class="brand" href="{{ "/" | relURL }}">{{ site.Title }}</a>
-      <nav class="site-nav" aria-label="Sections">
-        <a href="{{ "/getting-started/" | relURL }}">Getting Started</a>
-        <a href="{{ "/user-guide/" | relURL }}">User Guide</a>
-        <a href="{{ "/guides/" | relURL }}">Guides</a>
-        <a href="{{ "/reference/" | relURL }}">Reference</a>
-      </nav>
-    </header>
-    <main class="site-main">
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+  <meta name="description" content="{{ if .Description }}{{ .Description }}{{ else }}{{ site.Params.description | default "Gormes documentation." }}{{ end }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="{{ "site.css" | relURL }}">
+  <link rel="stylesheet" href="/pagefind/pagefind-ui.css">
+  <script src="/pagefind/pagefind-ui.js" defer></script>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <input type="checkbox" id="drawer-toggle" class="drawer-toggle">
+  {{ partial "topbar.html" . }}
+  <div class="docs-shell">
+    <aside class="docs-sidebar">
+      {{ partial "sidebar.html" . }}
+    </aside>
+    <label for="drawer-toggle" class="drawer-backdrop" aria-hidden="true"></label>
+    <main class="docs-main">
       {{ block "main" . }}{{ end }}
     </main>
-  </body>
+  </div>
+  {{ partial "footer.html" . }}
+  <script>
+    function gormesCopy(b) {
+      var code = b.parentElement.querySelector('code').innerText;
+      navigator.clipboard.writeText(code).then(function () {
+        var label = b.querySelector('.copy-label');
+        var orig = label.textContent;
+        label.textContent = 'Copied';
+        b.classList.add('copied');
+        setTimeout(function () {
+          label.textContent = orig;
+          b.classList.remove('copied');
+        }, 1500);
+      });
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.PagefindUI) {
+        new PagefindUI({ element: "#search", showSubResults: true });
+      }
+    });
+  </script>
+</body>
 </html>
