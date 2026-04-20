@@ -1,0 +1,31 @@
+{
+  "binary": {
+    "name": "gormes",
+    "path": "bin/gormes",
+    "size_bytes": 17825792,
+    "size_mb": "17.0",
+    "build_flags": "CGO_ENABLED=0 -trimpath -ldflags=\"-s -w\"",
+    "linker": "static",
+    "stripped": true,
+    "go_version": "1.25+",
+    "last_measured": "2026-04-20"
+  },
+  "properties": {
+    "cgo": false,
+    "dependencies": "zero (no dynamic library deps)",
+    "platforms": ["linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"]
+  },
+  "history": [
+    {
+      "date": "2026-04-20",
+      "size_mb": 17.0,
+      "phase": "Phase 2 (Gateway + Tools + bbolt persistence)"
+    },
+    {
+      "date": "2026-04-19",
+      "size_mb": 7.9,
+      "phase": "Phase 1 (TUI only)",
+      "commit": "4a25542c"
+    }
+  ]
+}

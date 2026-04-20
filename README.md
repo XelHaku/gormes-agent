@@ -40,7 +40,7 @@ Gormes is a complete Go rewrite of [Hermes Agent](https://github.com/NousResearc
 
 | Problem | How Go Solves It |
 |---------|------------------|
-| **Deployment friction** | Single ~8 MB static binary. `scp` it anywhere, it runs. |
+| **Deployment friction** | Single ~17 MB static binary. `scp` it anywhere, it runs. |
 | **Runtime reliability** | No Python GIL. Goroutines handle concurrent streams without contention. |
 | **Local validation** | `gormes doctor --offline` validates tool schemas before burning tokens. |
 | **Stream resilience** | Route-B reconnect treats dropped SSE as recoverable, not fatal. |
@@ -65,7 +65,7 @@ Each phase ships standalone value while moving the full stack toward pure Go.
 
 ## Core Features
 
-- **Single Static Binary** — Zero CGO. ~8 MB. Deploy to Termux, Alpine, a fresh VPS — it runs.
+- **Single Static Binary** — Zero CGO. ~17 MB. Deploy to Termux, Alpine, a fresh VPS — it runs.
 - **Always-On Runtime** — Survives restarts, reconnects dropped streams, runs for months unattended.
 - **Multi-Platform Gateway** — Telegram, Discord, Slack, WhatsApp, Signal from one runtime.
 - **In-Process Tool Loop** — Streamed tool calls execute against a Go-native registry.
