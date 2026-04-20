@@ -5,6 +5,10 @@ weight: 10
 
 # Gormes — Executive Roadmap
 
+**Public site:** https://gormes.ai
+**Source:** https://github.com/TrebuchetDynamics/gormes-agent
+**Upstream reference:** https://github.com/NousResearch/hermes-agent
+
 **Single source of truth:** [`progress.json`](progress.json) — machine-readable, auto-updated on build
 
 **Linked surfaces:**

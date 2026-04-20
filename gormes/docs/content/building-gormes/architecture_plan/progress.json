@@ -77,11 +77,18 @@
           ]
         },
         "2.D": {
-          "status": "planned",
+          "status": "complete",
           "name": "Cron / Scheduled Automations",
           "items": [
-            "Go ticker + bbolt job store",
-            "Natural-language cron parsing (Phase 4)"
+            "robfig/cron/v3 scheduler",
+            "bbolt cron_jobs bucket",
+            "SQLite cron_runs audit table (schema v3e)",
+            "CRON.md mirror (3.D.5 atomic-write pattern)",
+            "Heartbeat [SYSTEM:] prefix (verbatim upstream port)",
+            "Exact-match [SILENT] suppression protocol",
+            "Kernel PlatformEvent.SessionID + CronJobID per-event override",
+            "Generic DeliverySink interface (kernel-agnostic)",
+            "Ollama E2E heartbeat crucible proven live"
           ]
         },
         "2.B.2": {

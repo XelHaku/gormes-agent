@@ -40,7 +40,7 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Home channel (operator's primary notify-to chat) | `gateway/*` — `HomeChannel` class | 2.F | ⏳ planned |
 | Channel / contact directory | `gateway/channel_directory.py` | 2.F | ⏳ planned |
 | Platform enum + per-platform config | `gateway/*` — `Platform` (enum), `PlatformConfig` | 2.B | ⏳ planned |
-| Cron / scheduled automations | `cron/scheduler.py`, `cron/jobs.py`, `tools/cronjob_tools.py` | 2.D | ⏳ planned |
+| Cron / scheduled automations | `cron/scheduler.py`, `cron/jobs.py`, `tools/cronjob_tools.py` | 2.D | ✅ shipped (scheduler + bbolt `cron_jobs` bucket + SQLite `cron_runs` audit + CRON.md mirror + Heartbeat prefix + exact-match `[SILENT]` suppression + kernel `PlatformEvent.SessionID/CronJobID` per-event override; upstream's file tick lock not needed — single-process) |
 | Webhook subscription system (GitHub events / API triggers → prompt → deliver) | `hermes_cli/webhook.py` + gateway routing | 2.D | ⏳ planned |
 | Subagent delegation | `tools/delegate_tool.py` | 2.E | ⏳ planned |
 | Hooks system (`HookRegistry`) | `gateway/hooks.py`, `gateway/builtin_hooks/{boot_md}.py` | 2.F | ⏳ planned |
@@ -287,7 +287,7 @@ Upstream uses `~/.hermes/` as the state root (overridable via `HERMES_HOME`). Go
 | `~/.hermes/optional-skills/` | Optional skill packs (10+ categories) | 5.F | Planned |
 | `~/.hermes/plugins/` | Plugin installs (context_engine, memory/*, example-dashboard) | 5.I | Planned |
 | `~/.hermes/hooks/` | User hook scripts (per-event `HOOK.yaml` + scripts) | 2.F | Planned |
-| `~/.hermes/cron/` | Cron job output Markdown files (one per job run) | 2.D | Planned — directly mirrors cron job output to filesystem |
+| `~/.hermes/cron/` | Cron job output Markdown files (one per job run) | 2.D | ✅ Shipped as Gormes equivalent: per-run audit in SQLite `cron_runs` table (not per-file) + aggregated `${XDG_DATA_HOME}/gormes/cron/CRON.md` mirror (3.D.5 pattern — atomic temp-file + rename; refreshed every 30s). Structured table is source of truth; Markdown is derived |
 | `~/.hermes/logs/` | Agent run logs (per-session, rotated) | 2.F / 5.O | Planned — `${XDG_STATE_HOME}/gormes/logs/` |
 | `~/.hermes/images/` | Generated images from image-generation tool | 5.D | Planned |
 | `~/.hermes/pastes/` | Paste cache (large clipboard content spill-over) | 2.F | Planned |
