@@ -24,16 +24,19 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		"curl -fsSL https://gormes.ai/install.sh | sh",
 		"Why a Go layer matters.",
 		"What ships now, what doesn&#39;t.",
-		"Phase 3.A–C — SQLite + FTS5 lattice, ontological graph, neural recall.",
+		"Phase 3.A–C + 3.D.5 — SQLite + FTS5 lattice, ontological graph, neural recall, USER.md mirror.",
 		"Phase 3.D — Ollama embeddings + semantic fusion.",
-		"Phase 4 — Native prompt building + agent orchestration.",
+		"Phase 4 — Brain transplant. Hermes backend becomes optional.",
+		"Phase 5 — 100% Go. Python tool scripts ported. Hermes-off.",
 	}
 	rejects := []string{
 		"Run Hermes Through a Go Operator Console.",
 		"Hermes, In a Single Static Binary.",
 		"No Python runtime on the host",
 		"~8 MB",
+		"~12 MB",
 		"Phase 3 — SQLite + FTS5 transcript memory.",
+		"Phase 4 — Native prompt building + agent orchestration.",
 		"Boot Sequence",
 		"Proof Rail",
 	}
