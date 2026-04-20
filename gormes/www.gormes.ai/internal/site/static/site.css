@@ -42,7 +42,12 @@ a:focus-visible,
   outline-offset: 2px;
 }
 
-.page { max-width: var(--max-width); margin: 0 auto; }
+.page {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
 
 /* Topbar */
 .topbar { border-bottom: 1px solid var(--border); }
@@ -67,13 +72,20 @@ a:focus-visible,
 
 /* Hero */
 .hero-inner { padding: 60px var(--pad) 50px; }
-.hero-title { font-size: 40px; font-weight: 700; line-height: 1.1; margin: 0 0 16px; }
+.hero-title {
+  font-size: clamp(26px, 6vw, 40px);
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0 0 16px;
+  overflow-wrap: break-word;
+}
 .hero-subhead {
   font-size: 15px;
   color: var(--muted-strong);
   max-width: 640px;
   margin: 0 0 24px;
   line-height: 1.55;
+  overflow-wrap: break-word;
 }
 .hero-ctas { display: flex; gap: 10px; flex-wrap: wrap; }
 
@@ -99,9 +111,14 @@ a:focus-visible,
 .install { border-top: 1px solid var(--border); }
 .install-inner { padding: 32px var(--pad); }
 .install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.install-step { display: flex; flex-direction: column; gap: 6px; }
+.install-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
 .install-step .kicker { margin: 0; }
-.cmd-wrap { position: relative; }
+.cmd-wrap { position: relative; min-width: 0; }
 .cmd {
   background: var(--bg-1);
   padding: 14px 84px 14px 14px;
@@ -109,6 +126,8 @@ a:focus-visible,
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 12px;
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
 }
 .cmd code { color: var(--text); }
@@ -128,6 +147,7 @@ a:focus-visible,
   padding: 5px 9px;
   border-radius: 4px;
   cursor: pointer;
+  min-height: 32px;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .copy-btn:hover { color: var(--text); border-color: var(--muted); }
@@ -142,6 +162,7 @@ a:focus-visible,
   font-size: 11px;
   color: var(--label);
   margin: 14px 0 0;
+  overflow-wrap: break-word;
 }
 .install-footnote a { color: var(--accent); }
 
@@ -150,9 +171,9 @@ a:focus-visible,
 .features-inner { padding: 50px var(--pad); }
 .section-title { font-size: 24px; font-weight: 700; margin: 0 0 24px; }
 .features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.feature-card { background: var(--bg-1); padding: 22px; border-radius: 6px; }
-.feature-card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
-.feature-card p { margin: 0; font-size: 12px; color: var(--muted-strong); line-height: 1.55; }
+.feature-card { background: var(--bg-1); padding: 22px; border-radius: 6px; min-width: 0; }
+.feature-card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 700; overflow-wrap: break-word; }
+.feature-card p { margin: 0; font-size: 12px; color: var(--muted-strong); line-height: 1.55; overflow-wrap: break-word; }
 
 /* Shipping ledger */
 .ledger { border-top: 1px solid var(--border); }
@@ -183,7 +204,13 @@ a:focus-visible,
 .status-shipped { background: var(--status-shipped-bg); color: var(--status-shipped-fg); }
 .status-next    { background: var(--status-next-bg);    color: var(--status-next-fg); }
 .status-later   { background: var(--status-later-bg);   color: var(--status-later-fg); }
-.ledger-text { font-size: 13px; color: var(--muted-strong); }
+.ledger-text {
+  font-size: 13px;
+  color: var(--muted-strong);
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
 
 /* Footer */
 .footer { border-top: 1px solid var(--border); }
@@ -196,9 +223,36 @@ a:focus-visible,
 
 /* Responsive */
 @media (max-width: 640px) {
-  .hero-title { font-size: 28px; }
   .install-grid { grid-template-columns: 1fr; }
   .features-grid { grid-template-columns: 1fr; }
   .topnav a { margin-left: 12px; }
   .footer-inner { flex-direction: column; gap: 8px; }
+}
+
+/* Tight viewports (iPhone SE, small Android, Termux narrow).
+   Keeps the ledger readable, the topnav un-cramped, and the
+   install code block tight enough to show the copy button. */
+@media (max-width: 480px) {
+  .ledger-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .topbar-inner {
+    flex-wrap: wrap;
+    gap: 8px 0;
+  }
+  .topnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .topnav a { margin-left: 0; }
+  .cmd { padding-right: 74px; }
+  .hero-ctas .btn { flex: 1 1 auto; text-align: center; }
+}
+
+/* Respect user preference — kill all transitions for motion-sensitive readers. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
 }

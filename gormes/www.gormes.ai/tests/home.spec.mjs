@@ -15,15 +15,56 @@ test('homepage renders the redesigned landing', async ({ page }) => {
   await expect(page.locator('button.copy-btn')).toHaveCount(2);
 });
 
-test('mobile keeps the install command readable', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/');
+// Long-term bulletproof: the page must stay readable as content
+// grows (longer phase names, more ledger rows, more feature cards).
+// Parametrize over multiple mobile widths so narrow viewports catch
+// regressions from future copy/inventory expansion.
+const MOBILE_VIEWPORTS = [
+  { label: 'iPhone SE', width: 320, height: 568 },
+  { label: 'small Android', width: 360, height: 760 },
+  { label: 'iPhone 15', width: 390, height: 844 },
+  { label: 'iPhone Plus', width: 430, height: 932 },
+];
 
-  await expect(page.getByRole('heading', { name: 'One Go Binary. Same Hermes Brain.' })).toBeVisible();
-  await expect(page.getByText('curl -fsSL https://gormes.ai/install.sh | sh')).toBeVisible();
+for (const vp of MOBILE_VIEWPORTS) {
+  test(`mobile (${vp.label} ${vp.width}×${vp.height}) has no horizontal overflow`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto('/');
 
-  const hasOverflow = await page.evaluate(() =>
-    document.documentElement.scrollWidth > window.innerWidth
-  );
-  expect(hasOverflow).toBeFalsy();
-});
+    await expect(page.getByRole('heading', { name: 'One Go Binary. Same Hermes Brain.' })).toBeVisible();
+    await expect(page.getByText('curl -fsSL https://gormes.ai/install.sh | sh')).toBeVisible();
+
+    // The page itself must never generate a horizontal scrollbar. Long code
+    // blocks get their own scroll inside .cmd via overflow-x: auto.
+    const pageOverflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(pageOverflow, `page body overflows at ${vp.width}px`).toBeFalsy();
+
+    // Copy buttons stay visible + tappable on every supported viewport.
+    const copyButtons = page.locator('button.copy-btn');
+    await expect(copyButtons).toHaveCount(2);
+    for (let i = 0; i < 2; i++) {
+      const btn = copyButtons.nth(i);
+      await expect(btn).toBeVisible();
+      const box = await btn.boundingBox();
+      expect(box, `copy button ${i} has no bounding box`).not.toBeNull();
+      // iOS HIG minimum touch target is 44×44; we pass with 32 min-height +
+      // padding, but enforce at least 28×28 so future CSS tweaks can't
+      // silently shrink the button below usability.
+      expect(box.height, `copy button ${i} too short at ${vp.width}px`).toBeGreaterThanOrEqual(28);
+      expect(box.width, `copy button ${i} too narrow at ${vp.width}px`).toBeGreaterThanOrEqual(28);
+    }
+
+    // The longest ledger row today is Phase 3 (~140 chars). It must not
+    // overflow its row; the long string should wrap. Verify by reading
+    // each .ledger-row's scrollWidth vs clientWidth.
+    const overflowingRows = await page.evaluate(() => {
+      const rows = Array.from(document.querySelectorAll('.ledger-row'));
+      return rows
+        .filter((r) => r.scrollWidth > r.clientWidth + 1)
+        .map((r) => r.textContent.trim().slice(0, 60));
+    });
+    expect(overflowingRows, 'ledger rows overflow their container').toHaveLength(0);
+  });
+}
