@@ -341,3 +341,26 @@ func TestMigrate_3dTo3e_SuppressionReasonCheckConstraint(t *testing.T) {
 		t.Error("suppression_reason='bogus' should trip CHECK")
 	}
 }
+
+func TestMigrate_3dTo3e_DeliveredCheckConstraint(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	// Valid delivered values.
+	for _, d := range []int{0, 1} {
+		_, err := s.db.Exec(
+			`INSERT INTO cron_runs(job_id, started_at, prompt_hash, status, delivered)
+			 VALUES('j', 1, 'h', 'success', ?)`, d)
+		if err != nil {
+			t.Errorf("delivered=%d rejected: %v", d, err)
+		}
+	}
+	// Invalid delivered value must trip CHECK.
+	_, err := s.db.Exec(
+		`INSERT INTO cron_runs(job_id, started_at, prompt_hash, status, delivered)
+		 VALUES('j', 1, 'h', 'success', 2)`)
+	if err == nil {
+		t.Error("delivered=2 should trip CHECK constraint")
+	}
+}
