@@ -1,5 +1,6 @@
 /venv/
 /_pycache/
+.superpowers/
 *.pyc*
 __pycache__/
 .venv/
