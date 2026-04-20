@@ -89,6 +89,30 @@ func (k *Kernel) Submit(e PlatformEvent) error {
 	}
 }
 
+// ResetSession clears the conversation history, server-assigned session id,
+// and last error. Valid only from PhaseIdle or PhaseFailed; returns
+// ErrResetDuringTurn if called during an in-flight turn. The Zero-Leak
+// Invariant: never truncates streaming; callers must /stop first if they
+// want to abandon an active turn.
+//
+// Implementation: enqueues a PlatformEventResetSession with a synchronous
+// ack channel; the Run loop performs the mutation on its own goroutine,
+// preserving the single-owner invariant. 500 ms ack timeout.
+func (k *Kernel) ResetSession() error {
+	ack := make(chan error, 1)
+	select {
+	case k.events <- PlatformEvent{Kind: PlatformEventResetSession, ack: ack}:
+	default:
+		return ErrEventMailboxFull
+	}
+	select {
+	case err := <-ack:
+		return err
+	case <-time.After(500 * time.Millisecond):
+		return errors.New("kernel: ResetSession ack timeout")
+	}
+}
+
 // Run is the kernel loop. MUST be called from exactly one goroutine. Exits
 // when ctx is cancelled or a PlatformEventQuit is received. Closes the
 // render channel on exit.
@@ -111,6 +135,21 @@ func (k *Kernel) Run(ctx context.Context) error {
 			case PlatformEventCancel:
 				// No active turn; ignore (cancel during a turn is handled
 				// inside runTurn's select on k.events).
+			case PlatformEventResetSession:
+				if k.phase != PhaseIdle && k.phase != PhaseFailed {
+					if e.ack != nil {
+						e.ack <- ErrResetDuringTurn
+					}
+					continue
+				}
+				k.history = nil
+				k.sessionID = ""
+				k.lastError = ""
+				k.phase = PhaseIdle
+				k.emitFrame("session reset")
+				if e.ack != nil {
+					e.ack <- nil
+				}
 			case PlatformEventQuit:
 				return nil
 			}
@@ -429,6 +468,13 @@ streamLoop:
 			case PlatformEventSubmit:
 				k.lastError = ErrTurnInFlight.Error()
 				k.emitFrame("still processing previous turn")
+			case PlatformEventResetSession:
+				// Zero-Leak Invariant: never truncate an active turn. Reject
+				// the reset without mutating state; the caller must /stop
+				// first if they want to abandon this stream.
+				if e.ack != nil {
+					e.ack <- ErrResetDuringTurn
+				}
 			case PlatformEventQuit:
 				*cancelled = true
 				cancelRun()

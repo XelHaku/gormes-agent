@@ -1,11 +1,17 @@
 package kernel
 
 import (
+	"errors"
 	"time"
 
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/hermes"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/telemetry"
 )
+
+// ErrResetDuringTurn is returned by Kernel.ResetSession when the kernel is
+// not in a resettable phase (PhaseIdle or PhaseFailed). Preserves the
+// Zero-Leak Invariant: in-flight turns are never truncated by reset.
+var ErrResetDuringTurn = errors.New("kernel: cannot reset session during active turn")
 
 // Phase is the kernel state-machine phase. Transitions happen only on the
 // Run goroutine, serialised by the select loop.
@@ -66,9 +72,18 @@ const (
 	PlatformEventSubmit PlatformEventKind = iota
 	PlatformEventCancel
 	PlatformEventQuit
+	// PlatformEventResetSession clears k.history, k.sessionID, and
+	// k.lastError. Valid from PhaseIdle and PhaseFailed; rejected with
+	// ErrResetDuringTurn via the event's ack channel otherwise.
+	PlatformEventResetSession
 )
 
 type PlatformEvent struct {
 	Kind PlatformEventKind
 	Text string
+	// ack is an unexported synchronous result channel used by
+	// ResetSession. External callers constructing PlatformEvents for
+	// Submit() cannot set this field, which is the desired API — the
+	// synchronous ResetSession path is the only one that needs it.
+	ack chan error
 }
