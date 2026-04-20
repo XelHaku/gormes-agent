@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-//go:embed templates/*.tmpl templates/partials/*.tmpl static/*
+//go:embed templates/*.tmpl templates/partials/*.tmpl static/* install.sh
 var siteFS embed.FS
 var templateFS = siteFS
 
@@ -17,6 +17,7 @@ type Site struct {
 	page      LandingPage
 	templates *template.Template
 	static    fs.FS
+	install   []byte
 }
 
 func parseTemplates() (*template.Template, error) {
@@ -42,11 +43,22 @@ func loadSite() (*Site, error) {
 		return nil, err
 	}
 
+	install, err := siteFS.ReadFile("install.sh")
+	if err != nil {
+		return nil, err
+	}
+
 	return &Site{
 		page:      DefaultPage(),
 		templates: templates,
 		static:    files,
+		install:   install,
 	}, nil
+}
+
+// InstallScript returns the embedded install.sh bytes served at /install.sh.
+func (s *Site) InstallScript() []byte {
+	return s.install
 }
 
 func (s *Site) RenderIndex() ([]byte, error) {
@@ -78,6 +90,10 @@ func (s *Site) ExportDir(root string) error {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(root, "index.html"), index, 0o644); err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "install.sh"), s.install, 0o755); err != nil {
 		return err
 	}
 

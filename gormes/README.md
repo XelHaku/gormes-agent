@@ -1,22 +1,40 @@
 # Gormes
 
-Gormes is the operational moat strategy for Hermes: a tool-capable Go-native agent host for the era where runtime quality matters more than demo quality. The current `cmd/gormes` build fits in a 7.9 MB static binary built with Go 1.22+, using a zero-CGO, Zero-dependencies inside the process boundary stack: no Python runtime, no Node runtime, and no per-host dependency stack once the binary is built.
+Gormes is the Go operator console for Hermes — a single static binary that boots fast, runs tools in-process, and treats dropped SSE streams as a resilience problem instead of a happy-path omission. No Python runtime, no Node runtime, no per-host dependency stack once the binary is built.
 
-Today Gormes is more than a Phase-1 shell. The tree ships a Go-native tool registry, Route-B reconnect, a split-binary Telegram Scout alongside the TUI, and thin bbolt-backed session resume while still interoperating with Python's OpenAI-compatible `api_server` on port 8642. Python still owns transcript memory and prompt assembly until the later roadmap phases land.
+The current `cmd/gormes` build is a zero-CGO static binary (~8 MB) built with Go 1.25+. A single binary ships the TUI, the Telegram bot adapter (`gormes telegram`), and the Wire Doctor (`gormes doctor`). Gormes still interoperates with Hermes' OpenAI-compatible `api_server` on port 8642 — transcript memory and prompt assembly stay upstream until the later roadmap phases land.
 
-## Quick Start
+## Install
 
-Start the existing Hermes backend:
+Prebuilt binary (Linux / macOS / WSL2):
 
 ```bash
-API_SERVER_ENABLED=true hermes gateway start
+curl -fsSL https://gormes.ai/install.sh | sh
 ```
 
-Build the Go binaries:
+Or install from source with Go 1.25+ (module lives in the `/gormes` subdirectory of the fork):
+
+```bash
+go install github.com/TrebuchetDynamics/gormes-agent/gormes@latest
+```
+
+Native Windows is not supported — install WSL2 and run inside it.
+
+## Build From Source
 
 ```bash
 cd gormes
 make build
+```
+
+This produces a single static binary at `./bin/gormes` (CGO disabled, trimpath, stripped).
+
+## Quick Start
+
+Start the Hermes backend (upstream Python, separate repo):
+
+```bash
+API_SERVER_ENABLED=true hermes gateway start
 ```
 
 Validate the local tool wiring before spending a cent on API traffic:
@@ -31,10 +49,10 @@ Run the TUI:
 ./bin/gormes
 ```
 
-Run the Telegram Scout:
+Run the Telegram bot adapter:
 
 ```bash
-GORMES_TELEGRAM_TOKEN=... GORMES_TELEGRAM_CHAT_ID=123456789 ./bin/gormes-telegram
+GORMES_TELEGRAM_TOKEN=... GORMES_TELEGRAM_CHAT_ID=123456789 ./bin/gormes telegram
 ```
 
 ## Architectural Edge
@@ -43,7 +61,19 @@ GORMES_TELEGRAM_TOKEN=... GORMES_TELEGRAM_CHAT_ID=123456789 ./bin/gormes-telegra
 - **Go-native tool loop** — streamed `tool_calls` are accumulated in Go, executed against the in-process registry, and fed back into the turn loop without bouncing tool execution through Python.
 - **Route-B reconnect** — dropped SSE streams are treated as a resilience problem to solve, not a happy-path omission to ignore.
 - **16 ms coalescing mailbox** — the kernel uses a replace-latest render mailbox so stalled consumers do not trigger a thundering herd of stale frames.
-- **Split-binary Telegram Scout** — the messaging edge stays isolated from the 7.9 MB TUI binary, with a 1-second Telegram edit coalescer and thin bbolt-backed session resume.
+- **Unified binary with isolated adapters** — TUI, Telegram adapter, and doctor all ship in one `gormes` binary with a subcommand per edge, so deployment stays simple while each adapter keeps its own dependency surface.
+- **Thin bbolt session resume** — `gormes` persists the active `session_id` through a bbolt map so a crash or reboot reattaches to the same Hermes session instead of starting a new one.
+
+## Landing Page
+
+The public site at `gormes.ai` is a Go-rendered landing page living under `www.gormes.ai/`. To hack on it:
+
+```bash
+cd www.gormes.ai
+make run
+```
+
+The install script served at `https://gormes.ai/install.sh` is embedded from `www.gormes.ai/internal/site/install.sh`.
 
 ## Further Reading
 

@@ -20,8 +20,15 @@ func NewServer() (http.Handler, error) {
 
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServerFS(site.static)))
+	mux.HandleFunc("/install.sh", srv.handleInstall)
 	mux.HandleFunc("/", srv.handleIndex)
 	return mux, nil
+}
+
+func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	_, _ = w.Write(s.site.InstallScript())
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {

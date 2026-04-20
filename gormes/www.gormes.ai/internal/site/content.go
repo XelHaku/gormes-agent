@@ -113,8 +113,14 @@ func DefaultPage() LandingPage {
 			},
 			{
 				Label: "03 / BOOT GORMES",
-				Note:  "Once Hermes is alive, move into the Go operator console, build it, verify the local surface, and launch it.",
-				Lines: []string{"cd gormes", "make build", "./bin/gormes doctor --offline", "./bin/gormes"},
+				Note:  "Once Hermes is alive, pull the static Go binary (Linux, macOS, WSL2) or build it from source, then verify the local surface and launch it.",
+				Lines: []string{
+					"curl -fsSL https://gormes.ai/install.sh | sh",
+					"# or build from source:",
+					"cd gormes && make build",
+					"./bin/gormes doctor --offline",
+					"./bin/gormes",
+				},
 			},
 		},
 		OpsTitle: "Why Hermes users switch",
