@@ -15,7 +15,9 @@ type scoredID struct {
 }
 
 // l2Normalize rescales v in-place to unit magnitude. A zero vector
-// stays zero (defensive — avoids NaN from 0/0).
+// stays zero (defensive — avoids NaN from 0/0). Callers must ensure
+// no element is NaN or ±Inf before calling; those values propagate
+// silently (no guard in this function).
 func l2Normalize(v []float32) {
 	var sumSq float32
 	for _, x := range v {
@@ -46,7 +48,7 @@ func dotProduct(a, b []float32) float32 {
 
 // topK returns the K highest-scoring entries, sorted score-descending.
 // For K >= len(scored), returns all entries. For K <= 0, returns empty.
-// Runs in O(n log k) via a simple sort — for Gormes scale (≤10k entities,
+// Runs in O(n log n) via a simple sort — for Gormes scale (≤10k entities,
 // K=3), the dedicated min-heap optimization would save microseconds at
 // the cost of code complexity.
 func topK(scored []scoredID, k int) []scoredID {

@@ -135,3 +135,18 @@ func TestEncodeFloat32LE_LittleEndianOrder(t *testing.T) {
 		t.Errorf("encoded != binary.LittleEndian write")
 	}
 }
+
+func TestTopK_EmptyInput(t *testing.T) {
+	got := topK([]scoredID{}, 3)
+	if len(got) != 0 {
+		t.Errorf("len = %d, want 0 (empty input)", len(got))
+	}
+}
+
+func TestTopK_KNegativeReturnsEmpty(t *testing.T) {
+	scored := []scoredID{{ID: 1, Score: 0.5}}
+	got := topK(scored, -1)
+	if len(got) != 0 {
+		t.Errorf("len = %d, want 0 (K<0)", len(got))
+	}
+}
