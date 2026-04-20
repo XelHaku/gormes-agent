@@ -109,6 +109,22 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 		InitialSessionID:  initialSID,
 	}, hc, mstore, tm, slog.Default())
 
+	// Phase 3.B — async LLM-assisted entity/relationship extractor.
+	// Polls turns WHERE extracted=0 on a background goroutine; completely
+	// decoupled from the kernel's hot path.
+	ext := memory.NewExtractor(mstore, hc, memory.ExtractorConfig{
+		Model:        cfg.Hermes.Model,
+		BatchSize:    cfg.Telegram.ExtractorBatchSize,
+		PollInterval: cfg.Telegram.ExtractorPollInterval,
+	}, slog.Default())
+	defer func() {
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), kernel.ShutdownBudget)
+		defer cancelShutdown()
+		if err := ext.Close(shutdownCtx); err != nil {
+			slog.Warn("extractor close", "err", err)
+		}
+	}()
+
 	tc, err := telegram.NewRealClient(cfg.Telegram.BotToken)
 	if err != nil {
 		return err
@@ -126,6 +142,7 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 	defer cancel()
 
 	go k.Run(rootCtx)
+	go ext.Run(rootCtx)
 	go func() {
 		<-rootCtx.Done()
 		time.AfterFunc(kernel.ShutdownBudget, func() {
@@ -139,6 +156,8 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 		"allowed_chat_id", cfg.Telegram.AllowedChatID,
 		"discovery", cfg.Telegram.FirstRunDiscovery,
 		"sessions_db", config.SessionDBPath(),
-		"memory_db", config.MemoryDBPath())
+		"memory_db", config.MemoryDBPath(),
+		"extractor_batch_size", cfg.Telegram.ExtractorBatchSize,
+		"extractor_poll_interval", cfg.Telegram.ExtractorPollInterval)
 	return bot.Run(rootCtx)
 }
