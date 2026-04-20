@@ -11,6 +11,9 @@ import (
 
 //go:embed templates/*.tmpl templates/partials/*.tmpl static/* install.sh
 var siteFS embed.FS
+
+//go:embed data/benchmarks.json
+var benchmarksJSON []byte
 var templateFS = siteFS
 
 type Site struct {

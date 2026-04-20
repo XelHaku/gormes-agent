@@ -1,6 +1,41 @@
 package site
 
-import "html/template"
+import (
+	"encoding/json"
+	"html/template"
+	"strconv"
+)
+
+func binarySizeMB() string {
+	if len(benchmarksJSON) == 0 {
+		return "17"
+	}
+	var data struct {
+		Binary struct {
+			SizeMB string `json:"size_mb"`
+		} `json:"binary"`
+	}
+	if err := json.Unmarshal(benchmarksJSON, &data); err != nil {
+		return "17"
+	}
+	return data.Binary.SizeMB
+}
+
+func binarySizeMBFloat() float64 {
+	if len(benchmarksJSON) == 0 {
+		return 17.0
+	}
+	var data struct {
+		Binary struct {
+			SizeMB string `json:"size_mb"`
+		} `json:"binary"`
+	}
+	if err := json.Unmarshal(benchmarksJSON, &data); err != nil {
+		return 17.0
+	}
+	size, _ := strconv.ParseFloat(data.Binary.SizeMB, 64)
+	return size
+}
 
 type NavLink struct {
 	Label string
@@ -110,7 +145,7 @@ func DefaultPage() LandingPage {
 		FeaturesLabel:       "§ 02 · FEATURES",
 		FeaturesHeadline:    "Why a Go layer matters.",
 		FeatureCards: []FeatureCard{
-			{Title: "Single Static Binary", Body: "Zero CGO. ~17 MB. scp it to Termux, Alpine, a fresh VPS — it runs."},
+			{Title: "Single Static Binary", Body: "Zero CGO. ~" + binarySizeMB() + " MB. scp it to Termux, Alpine, a fresh VPS — it runs."},
 			{Title: "Boots Like a Tool", Body: "No Python warmup. 16 ms render mailbox keeps the TUI responsive under load."},
 			{Title: "In-Process Tool Loop", Body: "Streamed tool_calls execute against a Go-native registry. No bounce through Python."},
 			{Title: "Survives Dropped Streams", Body: "Route-B reconnect treats SSE drops as a resilience problem, not a happy-path omission."},

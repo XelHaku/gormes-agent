@@ -1,9 +1,27 @@
-.PHONY: build run test test-live lint fmt clean
+.PHONY: build run test test-live lint fmt clean update-readme
 
-# Strict static build: CGO disabled so the binary has zero C-library
-# dependencies and runs on Termux, Alpine, minimal Ubuntu LTS, etc.
-build:
-	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o bin/gormes ./cmd/gormes
+BUILD_FLAGS := -trimpath -ldflags="-s -w"
+BINARY_PATH := bin/gormes
+
+build: $(BINARY_PATH)
+	@$(call record-benchmark)
+	@$(call update-readme)
+
+$(BINARY_PATH):
+	CGO_ENABLED=0 go build $(BUILD_FLAGS) -o $(BINARY_PATH) ./cmd/gormes
+
+define record-benchmark
+	@echo "Recording benchmark..."
+	@bash scripts/record-benchmark.sh
+endef
+
+define update-readme
+	@echo "Updating README.md..."
+	@bash scripts/update-readme.sh
+endef
+
+update-readme:
+	@$(call update-readme)
 
 run: build
 	./bin/gormes
