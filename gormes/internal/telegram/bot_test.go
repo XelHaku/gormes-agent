@@ -2,12 +2,14 @@ package telegram
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/hermes"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/kernel"
+	"github.com/XelHaku/golang-hermes-agent/gormes/internal/memory"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/session"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/store"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/telemetry"
@@ -550,5 +552,106 @@ func TestBot_ResumesSessionIDAcrossRestart(t *testing.T) {
 		if !waitForMockRequestWithSession("sess-cycle-1", 2*time.Second) {
 			t.Errorf("cycle 2: first request did not carry persisted session_id sess-cycle-1")
 		}
+	}
+}
+
+// TestBot_TurnPersistsToSqlite proves the full Phase 3.A flow:
+// Telegram message -> kernel -> SqliteStore -> turns table. Uses a real
+// (on-disk) memory.db in t.TempDir() + mock Telegram client + scripted
+// hermes.MockClient. No network, no api_server.
+func TestBot_TurnPersistsToSqlite(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "memory.db")
+	mstore, err := memory.OpenSqlite(dbPath, 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+
+	mc := newMockClient()
+
+	hmc := hermes.NewMockClient()
+	reply := "pong"
+	events := make([]hermes.Event, 0, len(reply)+1)
+	for _, ch := range reply {
+		events = append(events, hermes.Event{Kind: hermes.EventToken, Token: string(ch), TokensOut: 1})
+	}
+	events = append(events, hermes.Event{Kind: hermes.EventDone, FinishReason: "stop"})
+	hmc.Script(events, "sess-phase3a-e2e")
+
+	k := kernel.New(kernel.Config{
+		Model: "hermes-agent", Endpoint: "http://mock",
+		Admission: kernel.Admission{MaxBytes: 200_000, MaxLines: 10_000},
+	}, hmc, mstore, telemetry.New(), nil)
+
+	b := New(Config{AllowedChatID: 42, CoalesceMs: 100}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushTextUpdate(42, "ping")
+
+	// Wait for both commands to be accepted AND flushed to disk.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if int(mstore.Stats().Accepted) >= 2 {
+			var n int
+			_ = mstore.DB().QueryRow("SELECT COUNT(*) FROM turns").Scan(&n)
+			if n >= 2 {
+				break
+			}
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+
+	cancel()
+	mc.closeUpdates()
+	time.Sleep(150 * time.Millisecond)
+
+	// Drain + close before reopening for a clean read.
+	if err := mstore.Close(context.Background()); err != nil {
+		t.Fatalf("mstore close: %v", err)
+	}
+
+	verify, err := memory.OpenSqlite(dbPath, 0, nil)
+	if err != nil {
+		t.Fatalf("verify open: %v", err)
+	}
+	defer verify.Close(context.Background())
+
+	type turn struct {
+		Role, Content string
+	}
+	var turns []turn
+	rows, err := verify.DB().Query("SELECT role, content FROM turns ORDER BY id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var tt turn
+		if err := rows.Scan(&tt.Role, &tt.Content); err != nil {
+			rows.Close()
+			break
+		}
+		turns = append(turns, tt)
+	}
+	rows.Close()
+
+	if len(turns) < 2 {
+		t.Fatalf("len(turns) = %d, want >= 2", len(turns))
+	}
+	if turns[0].Role != "user" || turns[0].Content != "ping" {
+		t.Errorf("turns[0] = %+v, want {user, ping}", turns[0])
+	}
+	var foundAsst bool
+	for _, tt := range turns {
+		if tt.Role == "assistant" && strings.Contains(tt.Content, "pong") {
+			foundAsst = true
+			break
+		}
+	}
+	if !foundAsst {
+		t.Errorf("no assistant turn with 'pong'; rows = %+v", turns)
 	}
 }

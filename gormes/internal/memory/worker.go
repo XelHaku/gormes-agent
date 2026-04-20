@@ -30,8 +30,8 @@ func (s *SqliteStore) handleCommand(cmd store.Command) {
 			"kind", cmd.Kind.String(), "err", err)
 		return
 	}
-	if p.SessionID == "" || p.Content == "" {
-		s.log.Warn("memory: empty session_id or content, dropping",
+	if p.Content == "" {
+		s.log.Warn("memory: empty content, dropping",
 			"kind", cmd.Kind.String())
 		return
 	}
