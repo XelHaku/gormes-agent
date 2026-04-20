@@ -245,7 +245,7 @@ func TestTraverse_EmptySeedsReturnsEmpty(t *testing.T) {
 func TestEnumerateRelationships_ByName(t *testing.T) {
 	s, ids := openGraphWithEdges(t)
 	rels, err := enumerateRelationships(context.Background(), s.db,
-		[]int64{ids["A"], ids["B"], ids["C"]}, 1.0, 10)
+		[]int64{ids["A"], ids["B"], ids["C"]}, 1.0, 10, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +262,7 @@ func TestEnumerateRelationships_WeightThreshold(t *testing.T) {
 	s, ids := openGraphWithEdges(t)
 	// Include A and E; A-LIKES-E has weight 0.5; threshold 1.0 should drop it.
 	rels, _ := enumerateRelationships(context.Background(), s.db,
-		[]int64{ids["A"], ids["E"]}, 1.0, 10)
+		[]int64{ids["A"], ids["E"]}, 1.0, 10, 0)
 	for _, r := range rels {
 		if r.Source == "A" && r.Target == "E" {
 			t.Errorf("weight=0.5 rel A-LIKES-E should have been filtered")
@@ -273,7 +273,7 @@ func TestEnumerateRelationships_WeightThreshold(t *testing.T) {
 func TestEnumerateRelationships_LimitCap(t *testing.T) {
 	s, ids := openGraphWithEdges(t)
 	rels, _ := enumerateRelationships(context.Background(), s.db,
-		[]int64{ids["A"], ids["B"], ids["C"], ids["D"], ids["E"]}, 0.0, 2)
+		[]int64{ids["A"], ids["B"], ids["C"], ids["D"], ids["E"]}, 0.0, 2, 0)
 	if len(rels) > 2 {
 		t.Errorf("len = %d, want <= 2", len(rels))
 	}
@@ -281,7 +281,7 @@ func TestEnumerateRelationships_LimitCap(t *testing.T) {
 
 func TestEnumerateRelationships_EmptyNeighborhoodReturnsEmpty(t *testing.T) {
 	s, _ := openGraphWithEdges(t)
-	rels, err := enumerateRelationships(context.Background(), s.db, nil, 1.0, 10)
+	rels, err := enumerateRelationships(context.Background(), s.db, nil, 1.0, 10, 0)
 	if err != nil {
 		t.Errorf("err = %v, want nil on empty input", err)
 	}
@@ -425,5 +425,66 @@ func TestRecall_DecayDisabledWhenHorizonNegative(t *testing.T) {
 	}
 	if !foundY {
 		t.Error("with horizon=-1 (disabled), stale but high-weight edge must pass filter")
+	}
+}
+
+func TestEnumerateRelationships_DecayOrdersByEffectiveWeight(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	now := time.Now().Unix()
+
+	// Two edges on the same entity pair:
+	//   X -> Y weight=5, age=300d → effective = 5 * (1 - 300/180) = negative → clamped to 0
+	//   X -> Z weight=2, age=30d  → effective = 2 * (1 - 30/180) ≈ 1.67
+	// With horizon=180, threshold=0.5: only X->Z must appear.
+	stale := now - 300*86400
+	fresh := now - 30*86400
+	xID, yID := seedDecayGraph(t, s, "X", "KNOWS", "Y", 5.0, stale)
+	_, zID := seedDecayGraph(t, s, "X2", "KNOWS", "Z", 2.0, fresh)
+
+	var x2ID int64
+	_ = s.db.QueryRow(`SELECT id FROM entities WHERE name='X2'`).Scan(&x2ID)
+
+	neighborhoodIDs := []int64{xID, yID, x2ID, zID}
+
+	rels, err := enumerateRelationships(context.Background(), s.db,
+		neighborhoodIDs, 0.5, 10, 180)
+	if err != nil {
+		t.Fatalf("enumerateRelationships: %v", err)
+	}
+
+	if len(rels) != 1 {
+		t.Fatalf("got %d rels, want 1 (only fresh X2->Z should pass decay filter)", len(rels))
+	}
+	if rels[0].Source != "X2" || rels[0].Target != "Z" {
+		t.Errorf("got %s -> %s, want X2 -> Z", rels[0].Source, rels[0].Target)
+	}
+}
+
+func TestRecall_DecayRawWeightInFenceUnchanged(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	now := time.Now().Unix()
+	// Mid-age edge: 30 days old, weight=5.0.
+	// With horizon=180: effective = 5 * (1 - 30/180) ≈ 4.17.
+	// The returned row's .Weight field must be 5.0 (RAW), not 4.17.
+	srcID, tgtID := seedDecayGraph(t, s, "Src", "KNOWS", "Tgt", 5.0, now-30*86400)
+
+	rels, err := enumerateRelationships(context.Background(), s.db,
+		[]int64{srcID, tgtID}, 0.5, 10, 180)
+	if err != nil {
+		t.Fatalf("enumerateRelationships: %v", err)
+	}
+	if len(rels) != 1 {
+		t.Fatalf("got %d rels, want 1", len(rels))
+	}
+	// Absolute equality: raw weight is an exact 5.0 float.
+	if rels[0].Weight != 5.0 {
+		t.Errorf("fence Weight = %v, want 5.0 (raw); decay must not leak into the displayed value",
+			rels[0].Weight)
 	}
 }

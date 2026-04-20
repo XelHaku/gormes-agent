@@ -199,7 +199,8 @@ func (p *Provider) GetContext(ctx context.Context, in RecallInput) string {
 		return ""
 	}
 	rels, err := enumerateRelationships(ctx, p.store.db,
-		neighborhoodIDs, p.cfg.WeightThreshold, p.cfg.MaxFacts)
+		neighborhoodIDs, p.cfg.WeightThreshold, p.cfg.MaxFacts,
+		p.cfg.DecayHorizonDays)
 	if err != nil {
 		p.log.Warn("recall: relationship enumeration failed", "err", err)
 		return ""

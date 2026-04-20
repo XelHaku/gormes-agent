@@ -221,21 +221,25 @@ func traverseNeighborhood(
 }
 
 // enumerateRelationships fetches all relationships where BOTH source_id
-// and target_id are inside the given entity ID set, filtered by weight
-// >= threshold, sorted by weight DESC then source-name ASC then target-
-// name ASC, capped at limit. Returns joined rows (source name, predicate,
-// target name, weight) ready for formatting into the fenced block.
+// and target_id are inside the given entity ID set, filtered by effective
+// weight (decay-aware) >= threshold, sorted by effective weight DESC
+// then source-name ASC then target-name ASC, capped at limit. Returns
+// joined rows (source name, predicate, target name, RAW weight) ready
+// for formatting into the fenced block.
+//
+// horizonDays controls Phase 3.E.6 decay (<= 0 disables). The SELECT
+// returns r.weight (raw) so the fence shows honest pre-decay numbers
+// to the operator; decay only affects ranking + filtering.
 //
 // AND (not OR) on the IN clauses: we want relationships WITHIN the
-// neighborhood, not ones that merely touch it. An edge hanging off the
-// neighborhood toward an unknown entity is not useful context for the
-// LLM.
+// neighborhood, not ones that merely touch it.
 func enumerateRelationships(
 	ctx context.Context,
 	db *sql.DB,
 	neighborhoodIDs []int64,
 	threshold float64,
 	limit int,
+	horizonDays int,
 ) ([]recalledRel, error) {
 	if len(neighborhoodIDs) == 0 {
 		return nil, nil
@@ -243,18 +247,31 @@ func enumerateRelationships(
 
 	placeholders := strings.Repeat("?,", len(neighborhoodIDs))
 	placeholders = placeholders[:len(placeholders)-1]
-	// Args layout: [source IN list], [target IN list], threshold, limit.
-	// Duplicated because SQLite doesn't allow reusing one parameter in
-	// two IN clauses via positional placeholders.
-	args := make([]any, 0, 2*len(neighborhoodIDs)+2)
-	for _, id := range neighborhoodIDs {
-		args = append(args, id)
-	}
-	for _, id := range neighborhoodIDs {
-		args = append(args, id)
-	}
-	args = append(args, threshold, limit)
 
+	// Args layout:
+	//   disabled: [source IN], [target IN], threshold, limit
+	//   enabled:  [source IN], [target IN], horizonSec_WHERE, threshold,
+	//             horizonSec_ORDER, limit
+	// Two horizon binds because SQLite positional placeholders don't share
+	// across clauses.
+	args := make([]any, 0, 2*len(neighborhoodIDs)+4)
+	for _, id := range neighborhoodIDs {
+		args = append(args, id)
+	}
+	for _, id := range neighborhoodIDs {
+		args = append(args, id)
+	}
+	horizonSec := int64(horizonDays) * 86400
+	if horizonDays > 0 {
+		args = append(args, horizonSec)
+	}
+	args = append(args, threshold)
+	if horizonDays > 0 {
+		args = append(args, horizonSec)
+	}
+	args = append(args, limit)
+
+	expr := weightExpr(horizonDays)
 	q := fmt.Sprintf(`
 		SELECT e1.name, r.predicate, e2.name, r.weight
 		FROM relationships r
@@ -262,9 +279,9 @@ func enumerateRelationships(
 		JOIN entities e2 ON r.target_id = e2.id
 		WHERE r.source_id IN (%s)
 		  AND r.target_id IN (%s)
-		  AND r.weight >= ?
-		ORDER BY r.weight DESC, e1.name ASC, e2.name ASC
-		LIMIT ?`, placeholders, placeholders)
+		  AND %s >= ?
+		ORDER BY %s DESC, e1.name ASC, e2.name ASC
+		LIMIT ?`, placeholders, placeholders, expr, expr)
 
 	rows, err := db.QueryContext(ctx, q, args...)
 	if err != nil {
