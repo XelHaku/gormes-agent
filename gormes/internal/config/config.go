@@ -28,6 +28,7 @@ type Config struct {
 	TUI      TUICfg      `toml:"tui"`
 	Input    InputCfg    `toml:"input"`
 	Telegram TelegramCfg `toml:"telegram"`
+	Cron     CronCfg     `toml:"cron"`
 	// Resume is set only via the --resume CLI flag; intentionally not
 	// a TOML field. Empty means "use whatever internal/session had
 	// persisted for this binary's default key."
@@ -66,6 +67,13 @@ type TelegramCfg struct {
 	EmbedderBatchSize     int           `toml:"embedder_batch_size"`
 	EmbedderCallTimeout   time.Duration `toml:"embedder_call_timeout"`
 	QueryEmbedTimeout     time.Duration `toml:"query_embed_timeout"`
+}
+
+type CronCfg struct {
+	Enabled        bool          `toml:"enabled"`
+	CallTimeout    time.Duration `toml:"call_timeout"`
+	MirrorInterval time.Duration `toml:"mirror_interval"`
+	MirrorPath     string        `toml:"mirror_path"`
 }
 
 type HermesCfg struct {
@@ -136,6 +144,12 @@ func defaults() Config {
 			EmbedderBatchSize:     10,
 			EmbedderCallTimeout:   10 * time.Second,
 			QueryEmbedTimeout:     60 * time.Millisecond,
+		},
+		Cron: CronCfg{
+			Enabled:        false,
+			CallTimeout:    60 * time.Second,
+			MirrorInterval: 30 * time.Second,
+			MirrorPath:     "",
 		},
 	}
 }
@@ -262,6 +276,16 @@ func SessionDBPath() string {
 // ~/.local/share/gormes/memory.db.
 func MemoryDBPath() string {
 	return filepath.Join(xdgDataHome(), "gormes", "memory.db")
+}
+
+// CronMirrorPath returns the resolved CRON.md path — either
+// cfg.Cron.MirrorPath (explicit override) or the XDG default
+// $XDG_DATA_HOME/gormes/cron/CRON.md.
+func (c *Config) CronMirrorPath() string {
+	if c.Cron.MirrorPath != "" {
+		return c.Cron.MirrorPath
+	}
+	return filepath.Join(xdgDataHome(), "gormes", "cron", "CRON.md")
 }
 
 // LegacyHermesHome reports an upstream Hermes state directory if one is

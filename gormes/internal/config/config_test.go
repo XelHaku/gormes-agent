@@ -339,3 +339,23 @@ func TestLoad_ConfigVersionFromFutureBinaryErrors(t *testing.T) {
 		t.Errorf("err = %v, want mention of version 9999", err)
 	}
 }
+
+func TestLoad_CronDefaults(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Cron.Enabled {
+		t.Errorf("Cron.Enabled default = true, want false (opt-in)")
+	}
+	if cfg.Cron.CallTimeout != 60*time.Second {
+		t.Errorf("Cron.CallTimeout default = %v, want 60s", cfg.Cron.CallTimeout)
+	}
+	if cfg.Cron.MirrorInterval != 30*time.Second {
+		t.Errorf("Cron.MirrorInterval default = %v, want 30s", cfg.Cron.MirrorInterval)
+	}
+	if cfg.Cron.MirrorPath != "" {
+		t.Errorf("Cron.MirrorPath default = %q, want empty (caller resolves XDG)", cfg.Cron.MirrorPath)
+	}
+}
