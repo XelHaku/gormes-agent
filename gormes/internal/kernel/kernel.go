@@ -31,6 +31,10 @@ type Config struct {
 	Tools             *tools.Registry // nil → tool_calls are treated as fatal
 	MaxToolIterations int             // default 10 when zero
 	MaxToolDuration   time.Duration   // default 30s when zero
+	// InitialSessionID primes k.sessionID at New() — used by adapters that
+	// load a persisted session handle from internal/session before starting
+	// the kernel. Zero value preserves pre-Phase-2.C behavior (fresh session).
+	InitialSessionID string
 }
 
 type Kernel struct {
@@ -63,13 +67,14 @@ func New(cfg Config, c hermes.Client, s store.Store, tm telemetry.Telemetry, log
 	}
 	tm.SetModel(cfg.Model)
 	return &Kernel{
-		cfg:    cfg,
-		client: c,
-		store:  s,
-		tm:     tm,
-		log:    log,
-		render: make(chan RenderFrame, RenderMailboxCap),
-		events: make(chan PlatformEvent, PlatformEventMailboxCap),
+		cfg:       cfg,
+		client:    c,
+		store:     s,
+		tm:        tm,
+		log:       log,
+		render:    make(chan RenderFrame, RenderMailboxCap),
+		events:    make(chan PlatformEvent, PlatformEventMailboxCap),
+		sessionID: cfg.InitialSessionID,
 	}
 }
 

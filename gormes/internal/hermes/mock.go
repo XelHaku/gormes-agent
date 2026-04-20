@@ -23,6 +23,7 @@ type MockClient struct {
 	streams     []*MockStream
 	runStreams  []*MockRunEventStream
 	healthErr   error
+	requests    []ChatRequest
 }
 
 func NewMockClient() *MockClient { return &MockClient{} }
@@ -55,9 +56,10 @@ func (m *MockClient) Health(ctx context.Context) error {
 	return m.healthErr
 }
 
-func (m *MockClient) OpenStream(ctx context.Context, _ ChatRequest) (Stream, error) {
+func (m *MockClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.requests = append(m.requests, req)
 	if len(m.streams) == 0 {
 		// Return an already-exhausted stream so callers see a clean EOF.
 		return &MockStream{}, nil
@@ -65,6 +67,16 @@ func (m *MockClient) OpenStream(ctx context.Context, _ ChatRequest) (Stream, err
 	s := m.streams[0]
 	m.streams = m.streams[1:]
 	return s, nil
+}
+
+// Requests returns a snapshot of every ChatRequest passed to OpenStream
+// since this MockClient was constructed. Safe to call from any goroutine.
+func (m *MockClient) Requests() []ChatRequest {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]ChatRequest, len(m.requests))
+	copy(out, m.requests)
+	return out
 }
 
 func (m *MockClient) OpenRunEvents(ctx context.Context, _ string) (RunEventStream, error) {
