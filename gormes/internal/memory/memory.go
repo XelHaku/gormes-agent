@@ -15,7 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/ncruces/go-sqlite3/driver"
 
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/store"
 )
@@ -63,11 +63,13 @@ func OpenSqlite(path string, queueCap int, log *slog.Logger) (*SqliteStore, erro
 		return nil, fmt.Errorf("memory: create parent dir for %s: %w", path, err)
 	}
 
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, fmt.Errorf("memory: open %s: %w", path, err)
 	}
-	// database/sql with modernc works best with a single writer connection.
+	// Single writer connection (ncruces/go-sqlite3 WASM: each connection owns
+	// its own WASM memory; one connection keeps the footprint minimal and
+	// matches our single-owner worker goroutine anyway).
 	db.SetMaxOpenConns(1)
 
 	if err := applyPragmas(db); err != nil {
