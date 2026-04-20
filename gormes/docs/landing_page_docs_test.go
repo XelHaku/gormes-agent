@@ -204,13 +204,13 @@ func TestLandingPagePlanDocDocumentsCurrentAICutoverImplementation(t *testing.T)
 	raw := readDoc(t, "superpowers/plans/2026-04-19-gormes-landing-page.md")
 	wants := []string{
 		"# Gormes.ai Landing Page Implementation Plan",
-		"www.gormes.ai/internal/site/assets.go",
-		"www.gormes.ai/internal/site/content.go",
-		"www.gormes.ai/internal/site/server.go",
-		"www.gormes.ai/internal/site/templates/*.tmpl",
-		"www.gormes.ai/internal/site/static/*",
-		"www.gormes.ai/README.md",
-		"www.gormes.ai/tests/home.spec.mjs",
+		"gormes/www.gormes.ai/internal/site/assets.go",
+		"gormes/www.gormes.ai/internal/site/content.go",
+		"gormes/www.gormes.ai/internal/site/server.go",
+		"gormes/www.gormes.ai/internal/site/templates/*.tmpl",
+		"gormes/www.gormes.ai/internal/site/static/*",
+		"gormes/www.gormes.ai/README.md",
+		"gormes/www.gormes.ai/tests/home.spec.mjs",
 		"cd gormes && go test ./docs",
 		"npm run test:e2e",
 	}
@@ -225,23 +225,23 @@ func TestLandingPagePlanDocDocumentsCurrentAICutoverImplementation(t *testing.T)
 	}
 
 	for _, rel := range []string{
-		"../../www.gormes.ai/internal/site/assets.go",
-		"../../www.gormes.ai/internal/site/content.go",
-		"../../www.gormes.ai/internal/site/server.go",
-		"../../www.gormes.ai/internal/site/templates/index.tmpl",
-		"../../www.gormes.ai/internal/site/templates/layout.tmpl",
-		"../../www.gormes.ai/internal/site/templates/partials/code_block.tmpl",
-		"../../www.gormes.ai/internal/site/templates/partials/feature_card.tmpl",
-		"../../www.gormes.ai/internal/site/templates/partials/phase_item.tmpl",
-		"../../www.gormes.ai/internal/site/static/site.css",
-		"../../www.gormes.ai/tests/home.spec.mjs",
+		"../www.gormes.ai/internal/site/assets.go",
+		"../www.gormes.ai/internal/site/content.go",
+		"../www.gormes.ai/internal/site/server.go",
+		"../www.gormes.ai/internal/site/templates/index.tmpl",
+		"../www.gormes.ai/internal/site/templates/layout.tmpl",
+		"../www.gormes.ai/internal/site/templates/partials/code_block.tmpl",
+		"../www.gormes.ai/internal/site/templates/partials/feature_card.tmpl",
+		"../www.gormes.ai/internal/site/templates/partials/phase_item.tmpl",
+		"../www.gormes.ai/internal/site/static/site.css",
+		"../www.gormes.ai/tests/home.spec.mjs",
 	} {
 		if _, err := os.Stat(filepath.Join(".", rel)); err != nil {
 			t.Fatalf("expected implementation file %s to exist: %v", rel, err)
 		}
 	}
 
-	script := readPlaywrightE2EScript(t, "../../www.gormes.ai/package.json")
+	script := readPlaywrightE2EScript(t, "../www.gormes.ai/package.json")
 	if !strings.Contains(script, "playwright") {
 		t.Fatalf("www.gormes.ai package.json test:e2e script should reference Playwright")
 	}
