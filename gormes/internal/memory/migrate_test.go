@@ -19,8 +19,8 @@ func TestOpenSqlite_FreshDBIsV3b(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3d" {
-		t.Errorf("schema version = %q, want 3d", v)
+	if v != "3e" {
+		t.Errorf("schema version = %q, want 3e", v)
 	}
 }
 
@@ -61,7 +61,7 @@ func TestMigrate_Idempotent(t *testing.T) {
 	}
 	s.Close(context.Background())
 
-	// Re-open — migration runs against v3d, should no-op.
+	// Re-open — migration runs against v3e, should no-op.
 	s2, err := OpenSqlite(path, 0, nil)
 	if err != nil {
 		t.Fatalf("re-open failed: %v", err)
@@ -70,8 +70,8 @@ func TestMigrate_Idempotent(t *testing.T) {
 
 	var v string
 	_ = s2.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3d" {
-		t.Errorf("version = %q after re-open, want 3d", v)
+	if v != "3e" {
+		t.Errorf("version = %q after re-open, want 3e", v)
 	}
 }
 
@@ -94,8 +94,8 @@ func TestOpenSqlite_FreshDBIsV3c(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3d" {
-		t.Errorf("schema version = %q, want 3d", v)
+	if v != "3e" {
+		t.Errorf("schema version = %q, want 3e", v)
 	}
 }
 
@@ -160,8 +160,8 @@ func TestOpenSqlite_FreshDBIsV3d(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3d" {
-		t.Errorf("schema version = %q, want 3d", v)
+	if v != "3e" {
+		t.Errorf("schema version = %q, want 3e", v)
 	}
 }
 
@@ -241,5 +241,103 @@ func TestMigrate_3cTo3d_FKCascadeOnEntityDelete(t *testing.T) {
 	_ = s.db.QueryRow(`SELECT COUNT(*) FROM entity_embeddings WHERE entity_id = ?`, id).Scan(&n)
 	if n != 0 {
 		t.Errorf("entity_embeddings not cascaded on entity delete; found %d rows", n)
+	}
+}
+
+func TestOpenSqlite_FreshDBIsV3e(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	var v string
+	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
+	if v != "3e" {
+		t.Errorf("schema version = %q, want 3e", v)
+	}
+}
+
+func TestMigrate_3dTo3e_AddsCronColumnsToTurns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	rows, err := s.db.Query(`PRAGMA table_info(turns)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	has := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		_ = rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk)
+		has[name] = true
+	}
+	if !has["cron"] {
+		t.Error("turns is missing 'cron' column")
+	}
+	if !has["cron_job_id"] {
+		t.Error("turns is missing 'cron_job_id' column")
+	}
+}
+
+func TestMigrate_3dTo3e_AddsCronRunsTable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM cron_runs`).Scan(&n)
+	if err != nil {
+		t.Errorf("cron_runs table missing: %v", err)
+	}
+}
+
+func TestMigrate_3dTo3e_StatusCheckConstraint(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	for _, status := range []string{"success", "timeout", "error", "suppressed"} {
+		_, err := s.db.Exec(
+			`INSERT INTO cron_runs(job_id, started_at, prompt_hash, status) VALUES(?, ?, ?, ?)`,
+			"j", 1, "h", status)
+		if err != nil {
+			t.Errorf("status=%q rejected: %v", status, err)
+		}
+	}
+	_, err := s.db.Exec(
+		`INSERT INTO cron_runs(job_id, started_at, prompt_hash, status) VALUES('j', 1, 'h', 'nope')`)
+	if err == nil {
+		t.Error("status='nope' should trip CHECK constraint")
+	}
+}
+
+func TestMigrate_3dTo3e_SuppressionReasonCheckConstraint(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	_, err := s.db.Exec(
+		`INSERT INTO cron_runs(job_id, started_at, prompt_hash, status, suppression_reason)
+		 VALUES('j', 1, 'h', 'success', NULL)`)
+	if err != nil {
+		t.Errorf("suppression_reason NULL rejected: %v", err)
+	}
+	for _, r := range []string{"silent", "empty"} {
+		_, err := s.db.Exec(
+			`INSERT INTO cron_runs(job_id, started_at, prompt_hash, status, suppression_reason)
+			 VALUES('j', 1, 'h', 'suppressed', ?)`, r)
+		if err != nil {
+			t.Errorf("suppression_reason=%q rejected: %v", r, err)
+		}
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO cron_runs(job_id, started_at, prompt_hash, status, suppression_reason)
+		 VALUES('j', 1, 'h', 'suppressed', 'bogus')`)
+	if err == nil {
+		t.Error("suppression_reason='bogus' should trip CHECK")
 	}
 }

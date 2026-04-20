@@ -3,7 +3,7 @@ package memory
 // schemaVersion is the canonical target version for this binary. OpenSqlite
 // migrates any earlier supported version up to this value, and refuses to
 // open DBs with an unknown version (future schemas).
-const schemaVersion = "3d"
+const schemaVersion = "3e"
 
 // schemaV3a is the baseline schema installed on a fresh DB. It matches
 // exactly what Phase 3.A shipped — any change to this string is a schema
@@ -119,4 +119,36 @@ CREATE INDEX IF NOT EXISTS idx_entity_embeddings_model
 	ON entity_embeddings(model);
 
 UPDATE schema_meta SET v = '3d' WHERE k = 'version' AND v = '3c';
+`
+
+// migration3dTo3e extends v3d with Phase 2.D cron fields:
+//   - turns gains cron / cron_job_id columns; default 0/NULL so
+//     existing rows (non-cron) are unaffected.
+//   - cron_runs table is the per-run audit trail: one row per
+//     scheduled fire, capturing outcome + delivery decision.
+//   - CHECK constraints lock the allowed status / suppression_reason
+//     values so garbage data can't enter the audit log.
+const migration3dTo3e = `
+ALTER TABLE turns ADD COLUMN cron INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE turns ADD COLUMN cron_job_id TEXT;
+
+CREATE TABLE IF NOT EXISTS cron_runs (
+	id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+	job_id              TEXT    NOT NULL,
+	started_at          INTEGER NOT NULL,
+	finished_at         INTEGER,
+	prompt_hash         TEXT    NOT NULL,
+	status              TEXT    NOT NULL CHECK(status IN (
+	                        'success','timeout','error','suppressed'
+	                    )),
+	delivered           INTEGER NOT NULL DEFAULT 0 CHECK(delivered IN (0,1)),
+	suppression_reason  TEXT    CHECK(suppression_reason IS NULL OR
+	                                  suppression_reason IN ('silent','empty')),
+	output_preview      TEXT,
+	error_msg           TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_cron_runs_job_started
+	ON cron_runs(job_id, started_at DESC);
+
+UPDATE schema_meta SET v = '3e' WHERE k = 'version' AND v = '3d';
 `
