@@ -23,7 +23,6 @@ type CommandKind int
 
 const (
 	AppendUserTurn CommandKind = iota
-	AppendAssistantDraft
 	FinalizeAssistantTurn
 )
 
@@ -31,8 +30,6 @@ func (c CommandKind) String() string {
 	switch c {
 	case AppendUserTurn:
 		return "append_user_turn"
-	case AppendAssistantDraft:
-		return "append_assistant_draft"
 	case FinalizeAssistantTurn:
 		return "finalize_assistant_turn"
 	}
