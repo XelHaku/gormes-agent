@@ -72,6 +72,15 @@ func TestDocsHarnessAllowsNativeGormesManifestoPage(t *testing.T) {
 	if _, ok := nativeHugoPages["why-gormes.md"]; !ok {
 		t.Fatalf("nativeHugoPages should explicitly allow why-gormes.md")
 	}
+	if len(nativeHugoPages) != 1 {
+		extras := make([]string, 0, len(nativeHugoPages)-1)
+		for page := range nativeHugoPages {
+			if page != "why-gormes.md" {
+				extras = append(extras, page)
+			}
+		}
+		t.Fatalf("nativeHugoPages must contain only why-gormes.md; got %d entries with extras: %v", len(nativeHugoPages), extras)
+	}
 }
 
 func TestDocsHomePageIsGormesBranded(t *testing.T) {
