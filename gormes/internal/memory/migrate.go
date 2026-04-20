@@ -42,7 +42,7 @@ func migrate(db *sql.DB) error {
 		if err := runMigrationTx(db, migration3cTo3d); err != nil {
 			return fmt.Errorf("memory: migrate 3c->3d: %w", err)
 		}
-		return nil
+		return migrate(db)
 	case "3d":
 		return nil // already at target
 	default:

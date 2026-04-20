@@ -229,7 +229,13 @@ func TestMigrate_3cTo3d_FKCascadeOnEntityDelete(t *testing.T) {
 		`INSERT INTO entity_embeddings(entity_id, model, dim, vec, updated_at) VALUES(?, 'm', 4, x'00000000', 1)`,
 		id)
 
-	_, _ = s.db.Exec(`DELETE FROM entities WHERE id = ?`, id)
+	res, err := s.db.Exec(`DELETE FROM entities WHERE id = ?`, id)
+	if err != nil {
+		t.Fatalf("DELETE entity: %v", err)
+	}
+	if affected, _ := res.RowsAffected(); affected != 1 {
+		t.Fatalf("DELETE affected %d rows, want 1", affected)
+	}
 
 	var n int
 	_ = s.db.QueryRow(`SELECT COUNT(*) FROM entity_embeddings WHERE entity_id = ?`, id).Scan(&n)
