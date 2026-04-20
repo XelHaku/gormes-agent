@@ -1,5 +1,5 @@
 // Command gormes-telegram is the Phase-2.B.1 Telegram adapter binary.
-// Wires config → hermes client → kernel (with tools) → telegram adapter.
+// Phase 2.C adds persistent session-id resume via internal/session.
 package main
 
 import (
@@ -14,6 +14,7 @@ import (
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/config"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/hermes"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/kernel"
+	"github.com/XelHaku/golang-hermes-agent/gormes/internal/session"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/store"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/telegram"
 	"github.com/XelHaku/golang-hermes-agent/gormes/internal/telemetry"
@@ -28,7 +29,7 @@ func main() {
 }
 
 func run() error {
-	cfg, err := config.Load(nil)
+	cfg, err := config.Load(os.Args[1:])
 	if err != nil {
 		return fmt.Errorf("config: %w", err)
 	}
@@ -41,6 +42,35 @@ func run() error {
 	}
 	if os.Getenv("GORMES_TELEGRAM_TOKEN") == "" {
 		slog.Warn("bot_token read from config.toml; prefer GORMES_TELEGRAM_TOKEN env var for secrets")
+	}
+
+	// Phase 2.C — open the session map before the kernel so we can prime it.
+	smap, err := session.OpenBolt(config.SessionDBPath())
+	if err != nil {
+		return fmt.Errorf("session map: %w", err)
+	}
+	defer smap.Close()
+
+	ctx := context.Background()
+	var key string
+	if cfg.Telegram.AllowedChatID != 0 {
+		key = session.TelegramKey(cfg.Telegram.AllowedChatID)
+		if cfg.Resume != "" {
+			if err := smap.Put(ctx, key, cfg.Resume); err != nil {
+				slog.Warn("failed to apply --resume override", "err", err)
+			}
+		}
+	}
+	var initialSID string
+	if key != "" {
+		if sid, err := smap.Get(ctx, key); err != nil {
+			slog.Warn("could not load initial session_id", "key", key, "err", err)
+		} else {
+			initialSID = sid
+			if sid != "" {
+				slog.Info("resuming persisted session", "key", key, "session_id", sid)
+			}
+		}
 	}
 
 	hc := hermes.NewHTTPClient(cfg.Hermes.Endpoint, cfg.Hermes.APIKey)
@@ -58,6 +88,7 @@ func run() error {
 		Tools:             reg,
 		MaxToolIterations: 10,
 		MaxToolDuration:   30 * time.Second,
+		InitialSessionID:  initialSID,
 	}, hc, store.NewNoop(), tm, slog.Default())
 
 	tc, err := telegram.NewRealClient(cfg.Telegram.BotToken)
@@ -69,6 +100,8 @@ func run() error {
 		AllowedChatID:     cfg.Telegram.AllowedChatID,
 		CoalesceMs:        cfg.Telegram.CoalesceMs,
 		FirstRunDiscovery: cfg.Telegram.FirstRunDiscovery,
+		SessionMap:        smap,
+		SessionKey:        key,
 	}, tc, k, slog.Default())
 
 	rootCtx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -86,6 +119,7 @@ func run() error {
 	slog.Info("gormes-telegram starting",
 		"endpoint", cfg.Hermes.Endpoint,
 		"allowed_chat_id", cfg.Telegram.AllowedChatID,
-		"discovery", cfg.Telegram.FirstRunDiscovery)
+		"discovery", cfg.Telegram.FirstRunDiscovery,
+		"sessions_db", config.SessionDBPath())
 	return bot.Run(rootCtx)
 }
