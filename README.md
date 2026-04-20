@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="gormes/assets/gormes-agent-logo.png" alt="GORMES-AGENT" width="600">
+</p>
+
+<p align="center">
   <img src="gormes/assets/go-gopher-bear-lowpoly.png" alt="Gormes Agent" width="100%">
 </p>
 
