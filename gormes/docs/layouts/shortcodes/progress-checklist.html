@@ -1,0 +1,39 @@
+{{/*
+  progress-checklist shortcode
+  Generates a checklist table from Site.Data.progress
+  Usage: {{< progress-checklist >}}
+*/}}
+{{ $data := index .Site.Data "progress" }}
+{{ if not $data }}
+<p><em>Progress data not available. Run <code>make build</code> to generate.</em></p>
+{{ else }}
+{{ range $phaseNum, $phase := $data.phases }}
+<h2 id="phase-{{ $phaseNum }}">{{ $phase.name }}
+  {{ if eq $phase.status "complete" }}✅{{ else if eq $phase.status "in_progress" }}🔨{{ else }}⏳{{ end }}
+</h2>
+{{ if $phase.deliverable }}<p><em>{{ $phase.deliverable }}</em></p>{{ end }}
+{{ if $phase.dependency_note }}<p>{{ $phase.dependency_note }}</p>{{ end }}
+<table>
+  <thead><tr><th>Subphase</th><th>Status</th><th>Deliverable</th></tr></thead>
+  <tbody>
+    {{ range $subNum, $sub := $phase.subphases }}
+    <tr>
+      <td><strong>{{ $subNum }}</strong></td>
+      <td>{{ if eq $sub.status "complete" }}✅{{ else if eq $sub.status "in_progress" }}🔨{{ else }}⏳{{ end }}</td>
+      <td>{{ $sub.name }}{{ if $sub.priority }} ({{ $sub.priority }}){{ end }}</td>
+    </tr>
+    {{ if $sub.items }}
+    <tr><td colspan="3"><ul>
+      {{ range $sub.items }}
+      <li>{{ . }}</li>
+      {{ end }}
+    </ul></td></tr>
+    {{ end }}
+    {{ end }}
+  </tbody>
+</table>
+{{ end }}
+<p><strong>Overall:</strong> {{ $data.stats.complete }}/{{ $data.stats.total_subphases }} shipped
+ · {{ $data.stats.in_progress }} in progress</p>
+<p><em>Last updated: {{ $data.meta.last_updated }}</em></p>
+{{ end }}

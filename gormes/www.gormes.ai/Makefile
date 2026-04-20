@@ -1,7 +1,7 @@
 .PHONY: build run test fmt clean
 
 BENCHMARKS_SRC := ../benchmarks.json
-PROGRESS_SRC := ../docs/content/building-gormes/architecture_plan/progress.json
+PROGRESS_SRC := ../docs/data/progress.json
 DATA_DIR := internal/site/data
 
 build: $(DATA_DIR)/benchmarks.json $(DATA_DIR)/progress.json
