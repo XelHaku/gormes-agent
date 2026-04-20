@@ -88,6 +88,10 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		"MIT License · 2026",
 		// Nav now includes Company link at the trebuchetdynamics.com URL
 		`<a href="https://trebuchetdynamics.com/">Company</a>`,
+		// Nav link + in-page note pointing at the Hugo docs site
+		`<a href="https://docs.gormes.ai/">Docs</a>`,
+		"Deeper reference material lives at",
+		`<a href="https://docs.gormes.ai/">docs.gormes.ai →</a>`,
 		// CSS link
 		`href="/static/site.css"`,
 	}

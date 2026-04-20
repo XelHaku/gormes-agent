@@ -62,6 +62,9 @@ type LandingPage struct {
 	InstallFootnote     string
 	InstallFootnoteLink string
 	InstallFootnoteHref string
+	DocsNote            string
+	DocsLinkLabel       string
+	DocsLinkHref        string
 	FeaturesLabel       string
 	FeaturesHeadline    string
 	FeatureCards        []FeatureCard
@@ -82,6 +85,7 @@ func DefaultPage() LandingPage {
 		Nav: []NavLink{
 			{Label: "Install", Href: "#install"},
 			{Label: "Features", Href: "#features"},
+			{Label: "Docs", Href: "https://docs.gormes.ai/"},
 			{Label: "Roadmap", Href: "#roadmap"},
 			{Label: "GitHub", Href: "https://github.com/TrebuchetDynamics/gormes-agent"},
 			{Label: "Company", Href: "https://trebuchetdynamics.com/"},
@@ -98,6 +102,9 @@ func DefaultPage() LandingPage {
 		InstallFootnote:     "Requires Hermes backend at localhost:8642.",
 		InstallFootnoteLink: "Install Hermes →",
 		InstallFootnoteHref: "https://github.com/NousResearch/hermes-agent#quickstart",
+		DocsNote:            "Deeper reference material lives at",
+		DocsLinkLabel:       "docs.gormes.ai →",
+		DocsLinkHref:        "https://docs.gormes.ai/",
 		FeaturesLabel:       "§ 02 · FEATURES",
 		FeaturesHeadline:    "Why a Go layer matters.",
 		FeatureCards: []FeatureCard{
