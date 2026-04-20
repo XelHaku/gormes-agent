@@ -30,13 +30,13 @@
   </div>
 </section>
 
-<section id="roadmap" class="ledger">
-  <div class="ledger-inner">
-    <p class="kicker">{{.LedgerLabel}}</p>
-    <h2 class="section-title">{{.LedgerHeadline}}</h2>
-    <ul class="ledger-list">
-      {{range .ShippingStates}}{{template "ship_state" .}}{{end}}
-    </ul>
+<section id="roadmap" class="roadmap">
+  <div class="roadmap-inner">
+    <p class="kicker">{{.RoadmapLabel}}</p>
+    <h2 class="section-title">{{.RoadmapHeadline}}</h2>
+    <div class="roadmap-phases">
+      {{range .RoadmapPhases}}{{template "roadmap_phase" .}}{{end}}
+    </div>
   </div>
 </section>
 {{end}}

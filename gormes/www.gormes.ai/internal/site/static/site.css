@@ -12,6 +12,8 @@
   --accent-hover: #6878ff;
   --status-shipped-bg: #0e3b21;
   --status-shipped-fg: #5be79a;
+  --status-progress-bg: #0e2b3b;
+  --status-progress-fg: #5bc7e7;
   --status-next-bg: #3b2c0e;
   --status-next-fg: #e7c25b;
   --status-later-bg: #1f2434;
@@ -175,38 +177,80 @@ a:focus-visible,
 .feature-card h3 { margin: 0 0 8px; font-size: 14px; font-weight: 700; overflow-wrap: break-word; }
 .feature-card p { margin: 0; font-size: 12px; color: var(--muted-strong); line-height: 1.55; overflow-wrap: break-word; }
 
-/* Shipping ledger */
-.ledger { border-top: 1px solid var(--border); }
-.ledger-inner { padding: 40px var(--pad); }
-.ledger-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* Roadmap (grouped per phase with expanded sub-items) */
+.roadmap { border-top: 1px solid var(--border); }
+.roadmap-inner { padding: 40px var(--pad); }
+.roadmap-phases {
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
-.ledger-row {
+.roadmap-phase {
   background: var(--bg-1);
-  padding: 14px 16px;
-  border-radius: 5px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  border-radius: 6px;
+  padding: 18px 20px;
+  min-width: 0;
 }
-.status {
+.roadmap-phase-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 12px;
+  margin-bottom: 14px;
+}
+.roadmap-status {
   font-size: 10px;
   font-weight: 700;
   padding: 4px 9px;
   border-radius: 3px;
   letter-spacing: 1px;
   flex-shrink: 0;
+  white-space: nowrap;
 }
-.status-shipped { background: var(--status-shipped-bg); color: var(--status-shipped-fg); }
-.status-next    { background: var(--status-next-bg);    color: var(--status-next-fg); }
-.status-later   { background: var(--status-later-bg);   color: var(--status-later-fg); }
-.ledger-text {
-  font-size: 13px;
+.roadmap-status-shipped  { background: var(--status-shipped-bg);  color: var(--status-shipped-fg); }
+.roadmap-status-progress { background: var(--status-progress-bg); color: var(--status-progress-fg); }
+.roadmap-status-planned  { background: var(--status-next-bg);    color: var(--status-next-fg); }
+.roadmap-status-later    { background: var(--status-later-bg);   color: var(--status-later-fg); }
+.roadmap-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+.roadmap-subtitle {
+  flex-basis: 100%;
+  font-size: 12px;
   color: var(--muted-strong);
+  margin: 0;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+.roadmap-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.roadmap-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted-strong);
+  line-height: 1.55;
+  min-width: 0;
+}
+.roadmap-icon {
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+.roadmap-item-shipped .roadmap-icon { color: var(--status-shipped-fg); }
+.roadmap-item-pending .roadmap-icon { color: var(--muted); }
+.roadmap-item-ongoing .roadmap-icon { color: var(--status-next-fg); }
+.roadmap-label {
   min-width: 0;
   flex: 1;
   overflow-wrap: anywhere;

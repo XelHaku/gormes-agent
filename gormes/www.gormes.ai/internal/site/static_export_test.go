@@ -24,10 +24,18 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		"curl -fsSL https://gormes.ai/install.sh | sh",
 		"Why a Go layer matters.",
 		"What ships now, what doesn&#39;t.",
-		"Phase 3.A–C + 3.D.5 — SQLite + FTS5 lattice, ontological graph, neural recall, USER.md mirror (Gormes-original, no upstream equivalent).",
-		"Phase 3.D — Ollama embeddings + semantic fusion.",
-		"Phase 4 — Brain transplant. Hermes backend becomes optional.",
-		"Phase 5 — 100% Go. Python tool scripts ported. Hermes-off.",
+		// Roadmap group headers — confirms the new nested structure shipped
+		"SHIPPED · EVOLVING",
+		"IN PROGRESS · 3/7",
+		"IN PROGRESS · 4/5",
+		"PLANNED · 0/8",
+		"LATER · 0/16",
+		// At least one sub-item per phase proves the grouping renders
+		"Bubble Tea TUI shell",
+		"2.A Go-native tool registry + kernel tool loop",
+		"3.D.5 USER.md mirror — Gormes-original, no upstream equivalent",
+		"4.A Provider adapters",
+		"5.A–5.P",
 	}
 	rejects := []string{
 		"Run Hermes Through a Go Operator Console.",
@@ -36,7 +44,11 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		"~8 MB",
 		"~12 MB",
 		"Phase 3 — SQLite + FTS5 transcript memory.",
+		// Old single-row ledger copy must not survive the grouped rewrite
 		"Phase 4 — Native prompt building + agent orchestration.",
+		"Phase 4 — Brain transplant. Hermes backend becomes optional.",
+		"Phase 5 — 100% Go. Python tool scripts ported. Hermes-off.",
+		"Phase 3.A–C + 3.D.5 — SQLite + FTS5 lattice, ontological graph, neural recall, USER.md mirror",
 		"Boot Sequence",
 		"Proof Rail",
 	}

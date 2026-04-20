@@ -56,15 +56,21 @@ for (const vp of MOBILE_VIEWPORTS) {
       expect(box.width, `copy button ${i} too narrow at ${vp.width}px`).toBeGreaterThanOrEqual(28);
     }
 
-    // The longest ledger row today is Phase 3 (~140 chars). It must not
-    // overflow its row; the long string should wrap. Verify by reading
-    // each .ledger-row's scrollWidth vs clientWidth.
-    const overflowingRows = await page.evaluate(() => {
-      const rows = Array.from(document.querySelectorAll('.ledger-row'));
-      return rows
-        .filter((r) => r.scrollWidth > r.clientWidth + 1)
-        .map((r) => r.textContent.trim().slice(0, 60));
+    // The roadmap has 5 phase groups with expanded sub-items. No phase
+    // card or roadmap item should overflow its container on any mobile
+    // viewport — long sub-item labels (4.A Provider adapters has ~100
+    // chars, Phase 5 collapsed row has ~200 chars) must wrap cleanly.
+    const overflowingNodes = await page.evaluate(() => {
+      const nodes = Array.from(
+        document.querySelectorAll('.roadmap-phase, .roadmap-item, .roadmap-label'),
+      );
+      return nodes
+        .filter((n) => n.scrollWidth > n.clientWidth + 1)
+        .map((n) => `${n.className}: ${n.textContent.trim().slice(0, 60)}`);
     });
-    expect(overflowingRows, 'ledger rows overflow their container').toHaveLength(0);
+    expect(overflowingNodes, 'roadmap nodes overflow their container').toHaveLength(0);
+
+    // All five phase groups must be visible.
+    await expect(page.locator('.roadmap-phase')).toHaveCount(5);
   });
 }

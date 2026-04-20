@@ -1,0 +1,17 @@
+{{define "roadmap_phase"}}
+<article class="roadmap-phase">
+  <header class="roadmap-phase-header">
+    <span class="roadmap-status roadmap-status-{{.StatusTone}}">{{.StatusLabel}}</span>
+    <h3 class="roadmap-title">{{.Title}}</h3>
+    {{if .Subtitle}}<p class="roadmap-subtitle">{{.Subtitle}}</p>{{end}}
+  </header>
+  <ul class="roadmap-items">
+    {{range .Items}}
+    <li class="roadmap-item roadmap-item-{{.Tone}}">
+      <span class="roadmap-icon" aria-hidden="true">{{.Icon}}</span>
+      <span class="roadmap-label">{{.Label}}</span>
+    </li>
+    {{end}}
+  </ul>
+</article>
+{{end}}
