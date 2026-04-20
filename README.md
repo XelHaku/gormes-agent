@@ -116,17 +116,4 @@ make build
 
 ---
 
-## Community
-
-- 🌐 [Website](https://gormes.ai)
-- 📖 [Documentation](https://docs.gormes.ai/)
-- 🐛 [Issues](https://github.com/TrebuchetDynamics/gormes/issues)
-- 💡 [Discussions](https://github.com/TrebuchetDynamics/gormes/discussions)
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
-
-Built by [Trebuchet Dynamics](https://gormes.ai). Original Hermes Agent lineage by [Nous Research](https://nousresearch.com), carried forward under the MIT License.
+Built by [Trebuchet Dynamics](https://trebuchetdynamics.com/). Original Hermes Agent lineage by [Nous Research](https://nousresearch.com). MIT License.
