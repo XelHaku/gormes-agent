@@ -89,7 +89,10 @@ CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
 CREATE TABLE IF NOT EXISTS relationships (
     source_id   INTEGER NOT NULL,
     target_id   INTEGER NOT NULL,
-    predicate   TEXT    NOT NULL,
+    predicate   TEXT    NOT NULL CHECK(predicate IN (
+                    'WORKS_ON','KNOWS','LIKES','DISLIKES',
+                    'HAS_SKILL','LOCATED_IN','PART_OF','RELATED_TO'
+                )),
     weight      REAL    NOT NULL DEFAULT 1.0,
     updated_at  INTEGER NOT NULL,
     PRIMARY KEY(source_id, target_id, predicate),
@@ -102,8 +105,10 @@ CREATE INDEX IF NOT EXISTS idx_relationships_predicate ON relationships(predicat
 
 - **Composite primary key** `(source_id, target_id, predicate)` — the same predicate between the same two entities cannot be duplicated; instead weight is incremented on re-extraction (see §7).
 - **Foreign keys with `ON DELETE CASCADE`**: if an entity is deleted, dangling relationships are cleaned up. SQLite FK enforcement is already enabled by the `PRAGMA foreign_keys = ON` set in Phase 3.A.
-- **`predicate`** free text — we don't constrain the vocabulary. The LLM is instructed to emit verb-phrase predicates in SCREAMING_SNAKE_CASE (`WORKS_ON`, `DISLIKES`, `USES`). Free-text lets us grow without schema bumps.
+- **`predicate`** constrained to an 8-item whitelist via column-level CHECK. Same defensive pattern as `entities.type`. **Free-text predicates were explicitly rejected** during design review: LLMs drift across synonymous verbs (`BUILT` / `IS_DEVELOPING` / `WORKS_ON`) which splinters the graph and breaks recursive-CTE traversals in Phase 3.C. The whitelist forces semantic dedup. `RELATED_TO` is the catch-all fallback for anything the LLM produces outside the list — the validation layer (§6.4) coerces unknown predicates rather than dropping the edge.
 - **`weight`** REAL — starts at 1.0, accumulates on re-extraction. Phase 3.C recall can rank by weight.
+
+**Extending the whitelist** requires a `3c` schema bump (because the CHECK constraint is baked into the DDL). This is deliberate friction: the vocabulary should evolve through considered phase transitions, not ad-hoc LLM output.
 
 ### 4.4 `schema_meta` bump + idempotent migration
 
@@ -206,12 +211,22 @@ Rules:
    ["PERSON","PROJECT","CONCEPT","PLACE","ORGANIZATION","TOOL","OTHER"],
    "description": string (<= 512 chars, optional, empty string if absent)}.
 4. Each relationship is {"source": string (entity name), "target": string
-   (entity name), "predicate": string (SCREAMING_SNAKE_CASE verb phrase),
+   (entity name), "predicate": one of the 8 values listed in rule 6,
    "weight": number between 0.0 and 1.0}.
 5. Relationship source/target names MUST match entity names in this
    same response exactly. Do not reference entities not in entities[].
-6. Predicates are in present tense, factual, and in the form of a verb
-   or verb phrase: "WORKS_ON", "USES", "DISLIKES", "IS_PART_OF", etc.
+6. "predicate" MUST be EXACTLY one of these 8 uppercase strings:
+   WORKS_ON     — an agent produces or contributes to a project/tool
+   KNOWS        — an agent is aware of another agent or concept
+   LIKES        — an agent expresses positive sentiment
+   DISLIKES     — an agent expresses negative sentiment
+   HAS_SKILL    — an agent possesses a concept/tool as a capability
+   LOCATED_IN   — an entity is geographically or structurally inside another
+   PART_OF      — an entity is a structural component of another
+   RELATED_TO   — a generic fallback when no other predicate fits
+   If none of the specific predicates fits, use RELATED_TO. Do NOT
+   invent new predicates. Any response containing a predicate outside
+   this list will be corrected to RELATED_TO by the validation layer.
 7. Deduplicate within the response: do not emit the same entity twice
    or the same (source, target, predicate) triple twice.
 8. If no entities are present, emit {"entities": [], "relationships": []}.
@@ -258,7 +273,7 @@ After `json.Unmarshal` into `extractorOutput`:
 2. Every entity `Name` must be non-empty, ≤255 chars after trimming. Empty names: drop the entity.
 3. Every relationship's `Source` and `Target` must refer to names present in `Entities`. Orphan relationships: drop.
 4. `Weight` clamped to `[0.0, 1.0]`. NaN or negative: replace with `1.0`.
-5. `Predicate` normalized: uppercase, non-alphanumerics → `_`, trimmed. Empty after normalization: drop the relationship.
+5. `Predicate` is validated against the 8-item whitelist `{WORKS_ON, KNOWS, LIKES, DISLIKES, HAS_SKILL, LOCATED_IN, PART_OF, RELATED_TO}`. The validator first uppercases and replaces non-alphanumerics with `_` (normalizing `works on` → `WORKS_ON`). If the normalized value exactly matches a whitelist member, keep it. Otherwise **coerce to `RELATED_TO`** — never drop an otherwise-valid relationship just because the LLM invented a predicate. Log at DEBUG the original predicate for observability. The CHECK constraint on `relationships.predicate` (§4.3) is the final safety net: a coercion bug would trip it loudly at INSERT time rather than silently corrupt the graph.
 
 Dropped items are logged at DEBUG but do not fail the batch. A batch with **any** valid entity counts as a successful extraction. A batch that yields zero valid entities AND zero valid relationships is still marked `extracted=1` — we saw the turns, we extracted nothing. No retry.
 
@@ -420,7 +435,9 @@ type TelegramCfg struct {
 - `TestValidate_CoercesInvalidType` — `"type": "BUILDING"` demotes to `OTHER`.
 - `TestValidate_DropsOrphanRelationships` — relationship whose source doesn't match any entity name is dropped.
 - `TestValidate_ClampsWeight` — `weight: 1.5` clamped to `1.0`; `weight: -0.3` clamped to `1.0`; `weight: NaN` replaced with `1.0`.
-- `TestValidate_NormalizesPredicate` — `"works on"` → `WORKS_ON`.
+- `TestValidate_NormalizesPredicate` — `"works on"` → `WORKS_ON` (whitelisted, kept).
+- `TestValidate_CoercesUnknownPredicateToRelatedTo` — `"BUILT"` (not whitelisted) → `RELATED_TO`; original logged at DEBUG. Relationship is kept, not dropped.
+- `TestUpsert_CheckConstraintRejectsBadPredicate` — directly INSERT a row with `predicate='NOT_WHITELISTED'` via raw SQL and assert the CHECK fires. Proves the schema guard is intact.
 
 ### 10.3 Unit tests — upsert
 
