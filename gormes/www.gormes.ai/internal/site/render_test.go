@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestRenderIndex_RendersOperationalMoatStory(t *testing.T) {
+func TestRenderIndex_RendersOperatorConsoleTruth(t *testing.T) {
 	body, err := RenderIndex()
 	if err != nil {
 		t.Fatalf("RenderIndex: %v", err)
@@ -15,23 +15,25 @@ func TestRenderIndex_RendersOperationalMoatStory(t *testing.T) {
 
 	text := string(body)
 	wants := []string{
-		"Gormes.ai | The Agent That GOes With You.",
-		"The Agent That GOes With You.",
-		"Open Source • MIT License • 7.9 MB Static Binary • Zero-CGO",
-		"API_SERVER_ENABLED=true hermes gateway start",
-		"./bin/gormes doctor --offline",
-		"./bin/gormes-telegram",
-		"Phase 2 is live on trunk: 2.A Tool Registry, 2.B.1 Telegram Scout, and 2.C thin bbolt resume are shipped.",
-		"The Port Is Already Moving",
-		"Help Finish the Port",
-		"Go-native tool registry",
-		"Telegram Scout",
-		"https://github.com/XelHaku/gormes-agent",
+		"Run Hermes Through a Go Operator Console.",
+		"Boot Gormes",
+		"Current boundary: the Go shell ships now. Transcript memory stays on the later cutover path.",
+		"Go Shell Shipping Now",
+	}
+	rejects := []string{
+		"7.9 MB Static Binary",
+		"7.9 MB zero-CGO TUI",
 	}
 
 	for _, want := range wants {
 		if !strings.Contains(text, want) {
 			t.Fatalf("rendered page missing %q\nbody:\n%s", want, text)
+		}
+	}
+
+	for _, reject := range rejects {
+		if strings.Contains(text, reject) {
+			t.Fatalf("rendered page still contains stale claim %q\nbody:\n%s", reject, text)
 		}
 	}
 

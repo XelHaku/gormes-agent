@@ -52,24 +52,24 @@ type LandingPage struct {
 
 func DefaultPage() LandingPage {
 	return LandingPage{
-		Title:       "Gormes.ai | The Agent That GOes With You.",
-		Description: "Gormes is the operational moat for Hermes: a 7.9 MB zero-CGO TUI, Go-native tools, Telegram Scout, and Route-B resilience.",
+		Title:       "Gormes.ai | Run Hermes Through a Go Operator Console",
+		Description: "Gormes is the Go operator shell for Hermes users: zero-CGO, Go-native tools, split Telegram edge, and honest shipping state.",
 		Nav: []NavLink{
-			{Label: "Quick Start", Href: "#quickstart"},
-			{Label: "Roadmap", Href: "#roadmap"},
-			{Label: "Contribute", Href: "#contribute"},
+			{Label: "Run Now", Href: "#quickstart"},
+			{Label: "Shipping State", Href: "#roadmap"},
+			{Label: "Source", Href: "#contribute"},
 			{Label: "GitHub", Href: "https://github.com/XelHaku/gormes-agent"},
 		},
-		HeroBadge:    "Open Source • MIT License • 7.9 MB Static Binary • Zero-CGO",
-		HeroHeadline: "The Agent That GOes With You.",
+		HeroBadge:    "Open Source • MIT License • Zero-CGO • Go Shell Shipping Now",
+		HeroHeadline: "Run Hermes Through a Go Operator Console.",
 		HeroCopy: []string{
-			"You already love Hermes. Now run it through a surgical Go host that cuts startup tax, isolates platform adapters, and keeps the hot path typed.",
-			"Today's trunk ships a Go-native tool registry, Route-B reconnect, a 16 ms replace-latest kernel mailbox, and a split-binary Telegram Scout. Phase 2.C adds thin bbolt session resume without pretending the SQLite memory lattice has already landed.",
+			"Stop waiting for the clean-room rewrite. Gormes already ships a Go shell, a Go-native tool loop, Route-B resilience, and a split Telegram edge.",
+			"Boot it locally. Judge the surface yourself. Keep the promises honest.",
 		},
-		PrimaryCTA:   Link{Label: "Run Gormes", Href: "#quickstart"},
-		SecondaryCTA: Link{Label: "Read the Roadmap", Href: "#roadmap"},
-		TertiaryCTA:  Link{Label: "View on GitHub", Href: "https://github.com/XelHaku/gormes-agent"},
-		PhaseNote:    "Phase 2 is live on trunk: 2.A Tool Registry, 2.B.1 Telegram Scout, and 2.C thin bbolt resume are shipped. Python still owns transcript memory until Phase 3.",
+		PrimaryCTA:   Link{Label: "Boot Gormes", Href: "#quickstart"},
+		SecondaryCTA: Link{Label: "See Shipping State", Href: "#roadmap"},
+		TertiaryCTA:  Link{Label: "Inspect Source", Href: "https://github.com/XelHaku/gormes-agent"},
+		PhaseNote:    "Current boundary: the Go shell ships now. Transcript memory stays on the later cutover path.",
 		QuickStart: []CodeBlock{
 			{
 				Title: "1. Start your Hermes backend",
@@ -99,9 +99,9 @@ func DefaultPage() LandingPage {
 		},
 		FeatureCards: []FeatureCard{
 			{
-				Kicker: "Operational Moat",
-				Title:  "7.9 MB zero-CGO TUI",
-				Body:   "The terminal binary stays small, static, and isolated from platform SDK drift while the hot path remains Go-native.",
+				Kicker: "Operator Shell",
+				Title:  "Go Shell Shipping Now",
+				Body:   "The terminal shell is live, Go-native, and honest about the current boundary while the later memory cutover stays separate.",
 			},
 			{
 				Kicker: "Tool Registry",
