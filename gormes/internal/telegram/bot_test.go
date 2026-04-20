@@ -457,3 +457,98 @@ func TestBot_ToolCallHandshake_Echo_ViaTelegram(t *testing.T) {
 	mc.closeUpdates()
 	time.Sleep(50 * time.Millisecond)
 }
+
+// TestBot_ResumesSessionIDAcrossRestart proves the cross-phase invariant:
+// a single session.MemMap carried across two bot+kernel lifecycles causes
+// the second cycle's kernel to start with the first cycle's final
+// session_id. Uses MemMap so there's no disk dependency.
+func TestBot_ResumesSessionIDAcrossRestart(t *testing.T) {
+	smap := session.NewMemMap()
+	key := session.TelegramKey(42)
+
+	// ── Cycle 1: run a turn that assigns session_id "sess-cycle-1"
+	{
+		mc := newMockClient()
+		hmc := hermes.NewMockClient()
+		hmc.Script([]hermes.Event{
+			{Kind: hermes.EventToken, Token: "hi", TokensOut: 1},
+			{Kind: hermes.EventDone, FinishReason: "stop"},
+		}, "sess-cycle-1")
+
+		k := kernel.New(kernel.Config{
+			Model: "hermes-agent", Endpoint: "http://mock",
+			Admission: kernel.Admission{MaxBytes: 200_000, MaxLines: 10_000},
+		}, hmc, store.NewNoop(), telemetry.New(), nil)
+
+		b := New(Config{
+			AllowedChatID: 42, CoalesceMs: 100,
+			SessionMap: smap, SessionKey: key,
+		}, mc, k, nil)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		go k.Run(ctx)
+		<-k.Render()
+		go func() { _ = b.Run(ctx) }()
+
+		mc.pushTextUpdate(42, "hi")
+
+		deadline := time.Now().Add(2 * time.Second)
+		for time.Now().Before(deadline) {
+			if got, _ := smap.Get(context.Background(), key); got == "sess-cycle-1" {
+				break
+			}
+			time.Sleep(25 * time.Millisecond)
+		}
+		if got, _ := smap.Get(context.Background(), key); got != "sess-cycle-1" {
+			t.Fatalf("cycle 1: map[%q] = %q, want sess-cycle-1", key, got)
+		}
+		cancel()
+		mc.closeUpdates()
+		time.Sleep(100 * time.Millisecond) // drain
+	}
+
+	// ── Cycle 2: new kernel, same map — InitialSessionID must be populated.
+	{
+		persistedSID, _ := smap.Get(context.Background(), key)
+		if persistedSID != "sess-cycle-1" {
+			t.Fatalf("cycle 2 precondition: persistedSID = %q, want sess-cycle-1", persistedSID)
+		}
+
+		hmc := hermes.NewMockClient()
+		hmc.Script([]hermes.Event{
+			{Kind: hermes.EventDone, FinishReason: "stop"},
+		}, "sess-cycle-2")
+
+		k := kernel.New(kernel.Config{
+			Model: "hermes-agent", Endpoint: "http://mock",
+			Admission:        kernel.Admission{MaxBytes: 200_000, MaxLines: 10_000},
+			InitialSessionID: persistedSID,
+		}, hmc, store.NewNoop(), telemetry.New(), nil)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		go k.Run(ctx)
+		<-k.Render()
+
+		if err := k.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventSubmit, Text: "again"}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify the first outbound request carried the persisted session_id.
+		waitForMockRequestWithSession := func(want string, d time.Duration) bool {
+			deadline := time.Now().Add(d)
+			for time.Now().Before(deadline) {
+				for _, r := range hmc.Requests() {
+					if r.SessionID == want {
+						return true
+					}
+				}
+				time.Sleep(25 * time.Millisecond)
+			}
+			return false
+		}
+		if !waitForMockRequestWithSession("sess-cycle-1", 2*time.Second) {
+			t.Errorf("cycle 2: first request did not carry persisted session_id sess-cycle-1")
+		}
+	}
+}
