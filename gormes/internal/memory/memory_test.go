@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -257,4 +258,65 @@ func TestSqliteStore_WorkerHandlesMalformedPayload(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	t.Error("worker never wrote the follow-up valid command (or crashed)")
+}
+
+func TestAppendUserTurn_WritesCronColumnsWhenProvided(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 4, nil)
+	defer s.Close(context.Background())
+
+	payload := []byte(`{
+		"session_id": "cron:job-1:1700000000",
+		"content":    "hello from cron",
+		"ts_unix":    1700000000,
+		"chat_id":    "telegram:42",
+		"cron":       1,
+		"cron_job_id":"job-1"
+	}`)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := s.Exec(ctx, store.Command{Kind: store.AppendUserTurn, Payload: payload}); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+
+	// The worker is async; poll until the row lands.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		var n int
+		_ = s.db.QueryRow(`SELECT COUNT(*) FROM turns WHERE cron = 1 AND cron_job_id = 'job-1'`).Scan(&n)
+		if n == 1 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("turn with cron=1 was not persisted within 2s")
+}
+
+func TestAppendUserTurn_NoncronTurnLeavesColumnsAtDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 4, nil)
+	defer s.Close(context.Background())
+
+	payload := []byte(`{"session_id":"s","content":"hi","ts_unix":1,"chat_id":"c"}`)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, _ = s.Exec(ctx, store.Command{Kind: store.AppendUserTurn, Payload: payload})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		var cron int
+		var cjid sql.NullString
+		err := s.db.QueryRow(`SELECT cron, cron_job_id FROM turns WHERE content = 'hi'`).Scan(&cron, &cjid)
+		if err == nil {
+			if cron != 0 {
+				t.Errorf("default cron = %d, want 0", cron)
+			}
+			if cjid.Valid {
+				t.Errorf("default cron_job_id = %q, want NULL", cjid.String)
+			}
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("non-cron turn was not persisted within 2s")
 }

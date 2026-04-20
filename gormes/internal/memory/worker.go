@@ -13,7 +13,9 @@ type turnPayload struct {
 	SessionID string `json:"session_id"`
 	Content   string `json:"content"`
 	TsUnix    int64  `json:"ts_unix"`
-	ChatID    string `json:"chat_id"` // new in 3.C; empty string for non-scoped turns
+	ChatID    string `json:"chat_id"`   // new in 3.C; empty string for non-scoped turns
+	Cron      int    `json:"cron"`      // 0 when absent = non-cron turn
+	CronJobID string `json:"cron_job_id"` // "" when absent -> NULL via nullIfEmpty
 }
 
 // run is the worker loop. Exactly one goroutine owns s.db.
@@ -47,9 +49,21 @@ func (s *SqliteStore) handleCommand(cmd store.Command) {
 		return
 	}
 	_, err := s.db.ExecContext(context.Background(),
-		"INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES(?, ?, ?, ?, ?)",
-		p.SessionID, role, p.Content, p.TsUnix, p.ChatID)
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id, cron, cron_job_id)
+		 VALUES(?, ?, ?, ?, ?, ?, ?)`,
+		p.SessionID, role, p.Content, p.TsUnix, p.ChatID, p.Cron, nullIfEmpty(p.CronJobID))
 	if err != nil {
 		s.log.Warn("memory: INSERT failed", "kind", cmd.Kind.String(), "err", err)
 	}
+}
+
+// nullIfEmpty returns nil for empty strings so the database sees a
+// SQL NULL. Used by AppendUserTurn's cron_job_id column write — non-
+// cron turns omit the field; writing "" instead of NULL would violate
+// the idiomatic "NULL means unset" expectation for downstream readers.
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
