@@ -23,7 +23,8 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 	wants := []string{
 		"Gormes.ai | Run Hermes Through a Go Operator Console",
 		"Run Hermes Through a Go Operator Console.",
-		"Shipping State, Not Wishcasting",
+		"curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
+		"source ~/.bashrc    # reload shell (or: source ~/.zshrc)",
 		`class="hero hero-deck"`,
 		`class="activation-grid"`,
 		`class="shipping-ledger"`,
@@ -50,7 +51,7 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read %s: %v", cssPath, err)
 	}
-	if !strings.Contains(string(css), "--page-bg") {
+	if !strings.Contains(string(css), "--bg-0") {
 		t.Fatalf("site.css missing expected variable")
 	}
 }

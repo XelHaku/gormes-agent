@@ -16,12 +16,15 @@ func TestRenderIndex_RendersOperatorConsoleTruth(t *testing.T) {
 	text := string(body)
 	wants := []string{
 		"Run Hermes Through a Go Operator Console.",
-		"Run the shell. Judge it yourself.",
+		"Install Hermes fast. Then boot Gormes.",
 		"Why Hermes users switch",
 		"Shipping State, Not Wishcasting",
 		"Inspect the Machine",
-		"8.2M shell",
-		"15M telegram edge",
+		"curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash",
+		"Works on Linux, macOS, WSL2, and Android via Termux.",
+		"Windows: Native Windows is not supported. Please install WSL2",
+		"source ~/.bashrc    # reload shell (or: source ~/.zshrc)",
+		"./bin/gormes doctor --offline",
 		`class="hero hero-deck"`,
 		`id="proof"`,
 		`class="activation-grid"`,
