@@ -49,6 +49,31 @@ func TestTargetsIncludeAICutoverDocs(t *testing.T) {
 	}
 }
 
+func TestTargetsIncludeManifestoSyncDocs(t *testing.T) {
+	want := map[string]bool{
+		"superpowers/specs/2026-04-19-gormes-doc-sync-manifesto-design.md": false,
+		"superpowers/plans/2026-04-19-gormes-doc-sync-manifesto.md":        false,
+	}
+
+	for _, target := range targets {
+		if _, ok := want[target]; ok {
+			want[target] = true
+		}
+	}
+
+	for rel, seen := range want {
+		if !seen {
+			t.Fatalf("docs target missing %s", rel)
+		}
+	}
+}
+
+func TestDocsHarnessAllowsNativeGormesManifestoPage(t *testing.T) {
+	if _, ok := nativeHugoPages["why-gormes.md"]; !ok {
+		t.Fatalf("nativeHugoPages should explicitly allow why-gormes.md")
+	}
+}
+
 func TestAICutoverDocsExistAndCarryExpectedTitles(t *testing.T) {
 	spec := readDoc(t, "superpowers/specs/2026-04-19-gormes-ai-cutover-design.md")
 	if !strings.Contains(spec, "Gormes.ai Hard Cutover Design Spec") {

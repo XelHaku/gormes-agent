@@ -42,6 +42,13 @@ var targets = []string{
 	"superpowers/plans/2026-04-19-gormes-landing-page.md",
 	"superpowers/specs/2026-04-19-gormes-ai-cutover-design.md",
 	"superpowers/plans/2026-04-19-gormes-ai-cutover.md",
+	"superpowers/specs/2026-04-19-gormes-doc-sync-manifesto-design.md",
+	"superpowers/plans/2026-04-19-gormes-doc-sync-manifesto.md",
+}
+
+var nativeHugoPages = map[string]struct{}{
+	"manifesto.md":   {},
+	"why-gormes.md": {},
 }
 
 func TestMirroredDocsCoverage(t *testing.T) {
@@ -64,9 +71,13 @@ func TestMirroredDocsCoverage(t *testing.T) {
 		}
 	}
 	for rel := range seen {
-		if _, ok := expected[rel]; !ok {
-			t.Fatalf("unexpected content file %s", rel)
+		if _, ok := expected[rel]; ok {
+			continue
 		}
+		if _, ok := nativeHugoPages[rel]; ok {
+			continue
+		}
+		t.Fatalf("unexpected content file %s", rel)
 	}
 }
 
