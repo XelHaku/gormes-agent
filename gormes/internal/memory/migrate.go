@@ -32,15 +32,18 @@ func migrate(db *sql.DB) error {
 		if err := runMigrationTx(db, migration3aTo3b); err != nil {
 			return fmt.Errorf("memory: migrate 3a->3b: %w", err)
 		}
-		// Fall through to 3b->3c by recursing; migrate() re-reads the
-		// now-updated schema_meta.v.
 		return migrate(db)
 	case "3b":
 		if err := runMigrationTx(db, migration3bTo3c); err != nil {
 			return fmt.Errorf("memory: migrate 3b->3c: %w", err)
 		}
-		return nil
+		return migrate(db)
 	case "3c":
+		if err := runMigrationTx(db, migration3cTo3d); err != nil {
+			return fmt.Errorf("memory: migrate 3c->3d: %w", err)
+		}
+		return nil
+	case "3d":
 		return nil // already at target
 	default:
 		return fmt.Errorf("%w: got %q, want %q", ErrSchemaUnknown, v, schemaVersion)

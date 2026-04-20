@@ -3,7 +3,7 @@ package memory
 // schemaVersion is the canonical target version for this binary. OpenSqlite
 // migrates any earlier supported version up to this value, and refuses to
 // open DBs with an unknown version (future schemas).
-const schemaVersion = "3c"
+const schemaVersion = "3d"
 
 // schemaV3a is the baseline schema installed on a fresh DB. It matches
 // exactly what Phase 3.A shipped — any change to this string is a schema
@@ -99,4 +99,24 @@ ALTER TABLE turns ADD COLUMN chat_id TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_turns_chat_id ON turns(chat_id, id);
 
 UPDATE schema_meta SET v = '3c' WHERE k = 'version' AND v = '3b';
+`
+
+// migration3cTo3d extends v3c with Phase 3.D semantic fusion:
+//   - entity_embeddings table holds L2-normalized float32 vectors
+//     (little-endian BLOB) alongside model name + dim for mismatch
+//     detection. FK cascade cleans up if the entity is deleted.
+//   - idx_entity_embeddings_model makes model-filtered scans cheap.
+const migration3cTo3d = `
+CREATE TABLE IF NOT EXISTS entity_embeddings (
+	entity_id   INTEGER PRIMARY KEY,
+	model       TEXT    NOT NULL,
+	dim         INTEGER NOT NULL CHECK(dim > 0 AND dim <= 4096),
+	vec         BLOB    NOT NULL,
+	updated_at  INTEGER NOT NULL,
+	FOREIGN KEY(entity_id) REFERENCES entities(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_entity_embeddings_model
+	ON entity_embeddings(model);
+
+UPDATE schema_meta SET v = '3d' WHERE k = 'version' AND v = '3c';
 `

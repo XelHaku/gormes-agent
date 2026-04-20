@@ -19,8 +19,8 @@ func TestOpenSqlite_FreshDBIsV3b(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3c" {
-		t.Errorf("schema version = %q, want 3c", v)
+	if v != "3d" {
+		t.Errorf("schema version = %q, want 3d", v)
 	}
 }
 
@@ -61,7 +61,7 @@ func TestMigrate_Idempotent(t *testing.T) {
 	}
 	s.Close(context.Background())
 
-	// Re-open — migration runs against v3c, should no-op.
+	// Re-open — migration runs against v3d, should no-op.
 	s2, err := OpenSqlite(path, 0, nil)
 	if err != nil {
 		t.Fatalf("re-open failed: %v", err)
@@ -70,8 +70,8 @@ func TestMigrate_Idempotent(t *testing.T) {
 
 	var v string
 	_ = s2.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3c" {
-		t.Errorf("version = %q after re-open, want 3c", v)
+	if v != "3d" {
+		t.Errorf("version = %q after re-open, want 3d", v)
 	}
 }
 
@@ -94,8 +94,8 @@ func TestOpenSqlite_FreshDBIsV3c(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3c" {
-		t.Errorf("schema version = %q, want 3c", v)
+	if v != "3d" {
+		t.Errorf("schema version = %q, want 3d", v)
 	}
 }
 
@@ -150,5 +150,90 @@ func TestMigrate_3cHasIndexOnChatID(t *testing.T) {
 	).Scan(&name)
 	if err != nil {
 		t.Errorf("idx_turns_chat_id missing: %v", err)
+	}
+}
+
+func TestOpenSqlite_FreshDBIsV3d(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	var v string
+	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
+	if v != "3d" {
+		t.Errorf("schema version = %q, want 3d", v)
+	}
+}
+
+func TestMigrate_3cTo3d_AddsEntityEmbeddingsTable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM entity_embeddings`).Scan(&n)
+	if err != nil {
+		t.Errorf("entity_embeddings table missing: %v", err)
+	}
+}
+
+func TestMigrate_3cTo3d_HasModelIndex(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	var name string
+	err := s.db.QueryRow(
+		`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_entity_embeddings_model'`,
+	).Scan(&name)
+	if err != nil {
+		t.Errorf("idx_entity_embeddings_model missing: %v", err)
+	}
+}
+
+func TestMigrate_3cTo3d_DimCheckConstraint(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	// Must reject dim=0 and dim>4096 per the CHECK constraint.
+	_, _ = s.db.Exec(`INSERT INTO entities(name, type, updated_at) VALUES('X','PERSON',1)`)
+	var id int64
+	_ = s.db.QueryRow(`SELECT id FROM entities WHERE name='X'`).Scan(&id)
+
+	_, err := s.db.Exec(
+		`INSERT INTO entity_embeddings(entity_id, model, dim, vec, updated_at) VALUES(?, 'm', 0, x'00', 1)`,
+		id)
+	if err == nil {
+		t.Error("dim=0 should trip CHECK constraint")
+	}
+
+	_, err = s.db.Exec(
+		`INSERT INTO entity_embeddings(entity_id, model, dim, vec, updated_at) VALUES(?, 'm', 5000, x'00', 1)`,
+		id)
+	if err == nil {
+		t.Error("dim=5000 should trip CHECK(dim <= 4096)")
+	}
+}
+
+func TestMigrate_3cTo3d_FKCascadeOnEntityDelete(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	_, _ = s.db.Exec(`INSERT INTO entities(name, type, updated_at) VALUES('Y','PERSON',1)`)
+	var id int64
+	_ = s.db.QueryRow(`SELECT id FROM entities WHERE name='Y'`).Scan(&id)
+
+	_, _ = s.db.Exec(
+		`INSERT INTO entity_embeddings(entity_id, model, dim, vec, updated_at) VALUES(?, 'm', 4, x'00000000', 1)`,
+		id)
+
+	_, _ = s.db.Exec(`DELETE FROM entities WHERE id = ?`, id)
+
+	var n int
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM entity_embeddings WHERE entity_id = ?`, id).Scan(&n)
+	if n != 0 {
+		t.Errorf("entity_embeddings not cascaded on entity delete; found %d rows", n)
 	}
 }
