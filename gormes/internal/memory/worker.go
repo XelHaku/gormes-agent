@@ -13,6 +13,7 @@ type turnPayload struct {
 	SessionID string `json:"session_id"`
 	Content   string `json:"content"`
 	TsUnix    int64  `json:"ts_unix"`
+	ChatID    string `json:"chat_id"` // new in 3.C; empty string for non-scoped turns
 }
 
 // run is the worker loop. Exactly one goroutine owns s.db.
@@ -46,8 +47,8 @@ func (s *SqliteStore) handleCommand(cmd store.Command) {
 		return
 	}
 	_, err := s.db.ExecContext(context.Background(),
-		"INSERT INTO turns(session_id, role, content, ts_unix) VALUES(?, ?, ?, ?)",
-		p.SessionID, role, p.Content, p.TsUnix)
+		"INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES(?, ?, ?, ?, ?)",
+		p.SessionID, role, p.Content, p.TsUnix, p.ChatID)
 	if err != nil {
 		s.log.Warn("memory: INSERT failed", "kind", cmd.Kind.String(), "err", err)
 	}

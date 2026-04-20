@@ -36,6 +36,9 @@ type Config struct {
 	// load a persisted session handle from internal/session before starting
 	// the kernel. Zero value preserves pre-Phase-2.C behavior (fresh session).
 	InitialSessionID string
+	// ChatKey (Phase 3.C): "<platform>:<chat_id>" scope for memory recall.
+	// Empty string = no scoping; recall queries skip chat filtering.
+	ChatKey string
 }
 
 type Kernel struct {
@@ -184,6 +187,7 @@ func (k *Kernel) runTurn(ctx context.Context, text string) {
 		"session_id": k.sessionID,
 		"content":    text,
 		"ts_unix":    time.Now().Unix(),
+		"chat_id":    k.cfg.ChatKey,
 	})
 	_, err := k.store.Exec(storeCtx, store.Command{Kind: store.AppendUserTurn, Payload: userPayload})
 	storeCancel()
@@ -402,6 +406,7 @@ toolLoop:
 			"session_id": k.sessionID,
 			"content":    k.draft,
 			"ts_unix":    time.Now().Unix(),
+			"chat_id":    k.cfg.ChatKey,
 		})
 		finalCtx, finalCancel := context.WithTimeout(ctx, StoreAckDeadline)
 		_, _ = k.store.Exec(finalCtx, store.Command{Kind: store.FinalizeAssistantTurn, Payload: finalPayload})

@@ -3,7 +3,7 @@ package memory
 // schemaVersion is the canonical target version for this binary. OpenSqlite
 // migrates any earlier supported version up to this value, and refuses to
 // open DBs with an unknown version (future schemas).
-const schemaVersion = "3b"
+const schemaVersion = "3c"
 
 // schemaV3a is the baseline schema installed on a fresh DB. It matches
 // exactly what Phase 3.A shipped — any change to this string is a schema
@@ -89,4 +89,14 @@ CREATE INDEX IF NOT EXISTS idx_relationships_target ON relationships(target_id);
 CREATE INDEX IF NOT EXISTS idx_relationships_predicate ON relationships(predicate);
 
 UPDATE schema_meta SET v = '3b' WHERE k = 'version' AND v = '3a';
+`
+
+// migration3bTo3c extends v3b with Phase 3.C seed-scoping:
+//   - turns gains chat_id column for per-chat seed selection
+//   - idx_turns_chat_id makes the scoped-seed FTS5 join cheap
+const migration3bTo3c = `
+ALTER TABLE turns ADD COLUMN chat_id TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_turns_chat_id ON turns(chat_id, id);
+
+UPDATE schema_meta SET v = '3c' WHERE k = 'version' AND v = '3b';
 `
