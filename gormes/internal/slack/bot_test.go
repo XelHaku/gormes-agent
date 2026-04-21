@@ -342,6 +342,62 @@ func TestBot_DoesNotHandleEventWhenAckFails(t *testing.T) {
 	}
 }
 
+func TestBot_NewCommandRejectsReservedTurnWithoutKernelReset(t *testing.T) {
+	mc := newMockClient()
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+	}, mc, newIdleSlackKernel(), nil)
+
+	if ticket := b.reserveTurn("C123", "1711111111.000392"); ticket == 0 {
+		t.Fatal("reserveTurn returned 0, want non-zero ticket")
+	}
+
+	b.handleEvent(context.Background(), Event{
+		RequestID: "req-new-reserved",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "/new",
+		Timestamp: "1711111111.000392",
+		ThreadTS:  "1711111111.000392",
+	})
+
+	if got := mc.lastOutputText(); !strings.Contains(got, "Cannot reset during active turn") {
+		t.Fatalf("last output = %q, want deterministic busy reset reply", got)
+	}
+	if got := mc.lastOutputText(); strings.Contains(got, "ack timeout") {
+		t.Fatalf("last output = %q, want no queued reset ack-timeout path", got)
+	}
+}
+
+func TestBot_NewCommandRejectsCurrentTurnWithoutKernelReset(t *testing.T) {
+	mc := newMockClient()
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+	}, mc, newIdleSlackKernel(), nil)
+	b.current = &turnBinding{
+		channelID: "C123",
+		threadTS:  "1711111111.000393",
+	}
+
+	b.handleEvent(context.Background(), Event{
+		RequestID: "req-new-current",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "/new",
+		Timestamp: "1711111111.000393",
+		ThreadTS:  "1711111111.000393",
+	})
+
+	if got := mc.lastOutputText(); !strings.Contains(got, "Cannot reset during active turn") {
+		t.Fatalf("last output = %q, want deterministic busy reset reply", got)
+	}
+	if got := mc.lastOutputText(); strings.Contains(got, "ack timeout") {
+		t.Fatalf("last output = %q, want no queued reset ack-timeout path", got)
+	}
+}
+
 func TestBot_RunReturnsPromptlyWhenClientRunFails(t *testing.T) {
 	mc := newMockClient()
 	runErr := errors.New("socket mode failed")

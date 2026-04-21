@@ -115,6 +115,11 @@ func (b *Bot) handleEvent(ctx context.Context, e Event) {
 	case text == "/stop":
 		_ = b.kernel.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventCancel})
 	case text == "/new":
+		if b.hasTurnInFlight() {
+			_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
+				"Cannot reset during active turn - send /stop first.")
+			return
+		}
 		if err := b.kernel.ResetSession(); err != nil {
 			if errors.Is(err, kernel.ErrResetDuringTurn) {
 				_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
@@ -219,6 +224,12 @@ func (b *Bot) replyThreadTS(e Event) string {
 
 func ignoreSubtype(subtype string) bool {
 	return subtype != "" && subtype != "file_share"
+}
+
+func (b *Bot) hasTurnInFlight() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.reserved != nil || b.current != nil
 }
 
 func (b *Bot) reserveTurn(channelID, threadTS string) uint64 {
