@@ -9,6 +9,8 @@ type Event struct {
 	Text      string
 	Timestamp string
 	ThreadTS  string
+	SubType   string
+	BotID     string
 }
 
 type Client interface {

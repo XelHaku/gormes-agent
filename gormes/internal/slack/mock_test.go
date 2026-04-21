@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 )
@@ -19,8 +20,12 @@ type mockClient struct {
 	events     chan Event
 	nextTS     int
 	acked      map[string]bool
+	callLog    []string
 	outputLog  []outputCall
 	threadByTS map[string]string
+
+	PostErr   error
+	UpdateErr error
 }
 
 var _ Client = (*mockClient)(nil)
@@ -54,15 +59,20 @@ func (m *mockClient) Ack(requestID string) {
 	defer m.mu.Unlock()
 	if requestID != "" {
 		m.acked[requestID] = true
+		m.callLog = append(m.callLog, "ack:"+requestID)
 	}
 }
 
 func (m *mockClient) PostMessage(_ context.Context, channelID, threadTS, text string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.PostErr != nil {
+		return "", m.PostErr
+	}
 	ts := fmt.Sprintf("1711111111.%06d", m.nextTS)
 	m.nextTS++
 	m.threadByTS[ts] = threadTS
+	m.callLog = append(m.callLog, "post:"+ts)
 	m.outputLog = append(m.outputLog, outputCall{
 		channelID: channelID,
 		threadTS:  threadTS,
@@ -75,6 +85,10 @@ func (m *mockClient) PostMessage(_ context.Context, channelID, threadTS, text st
 func (m *mockClient) UpdateMessage(_ context.Context, channelID, ts, text string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.UpdateErr != nil {
+		return m.UpdateErr
+	}
+	m.callLog = append(m.callLog, "update:"+ts)
 	m.outputLog = append(m.outputLog, outputCall{
 		channelID: channelID,
 		threadTS:  m.threadByTS[ts],
@@ -119,4 +133,22 @@ func (m *mockClient) lastThreadTS() string {
 		return ""
 	}
 	return m.outputLog[len(m.outputLog)-1].threadTS
+}
+
+func (m *mockClient) calls() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make([]string, len(m.callLog))
+	copy(out, m.callLog)
+	return out
+}
+
+func (m *mockClient) rememberThread(ts, threadTS string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.threadByTS[ts] = threadTS
+}
+
+func errUpdateFailed() error {
+	return errors.New("update failed")
 }

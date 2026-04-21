@@ -12,6 +12,9 @@ import (
 type realClient struct {
 	api    *slackapi.Client
 	socket *socketmode.Client
+	events <-chan socketmode.Event
+	runFn  func(context.Context) error
+	ackFn  func(socketmode.Request) error
 
 	mu      sync.Mutex
 	pending map[string]socketmode.Request
@@ -21,9 +24,13 @@ var _ Client = (*realClient)(nil)
 
 func NewRealClient(botToken, appToken string) Client {
 	api := slackapi.New(botToken, slackapi.OptionAppLevelToken(appToken))
+	socket := socketmode.New(api)
 	return &realClient{
 		api:     api,
-		socket:  socketmode.New(api),
+		socket:  socket,
+		events:  socket.Events,
+		runFn:   socket.RunContext,
+		ackFn:   func(req socketmode.Request) error { return socket.Ack(req) },
 		pending: make(map[string]socketmode.Request),
 	}
 }
@@ -39,7 +46,7 @@ func (c *realClient) AuthTest(ctx context.Context) (string, error) {
 func (c *realClient) Run(ctx context.Context, fn func(Event)) error {
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- c.socket.RunContext(ctx)
+		errCh <- c.runFn(ctx)
 	}()
 
 	for {
@@ -55,7 +62,7 @@ func (c *realClient) Run(ctx context.Context, fn func(Event)) error {
 				return nil
 			}
 			return err
-		case evt, ok := <-c.socket.Events:
+		case evt, ok := <-c.events:
 			if !ok {
 				err := <-errCh
 				if ctx.Err() != nil {
@@ -80,7 +87,7 @@ func (c *realClient) Ack(requestID string) {
 	}
 	c.mu.Unlock()
 	if ok {
-		_ = c.socket.Ack(req)
+		_ = c.ackFn(req)
 	}
 }
 
@@ -145,5 +152,7 @@ func (c *realClient) handleEventsAPI(evt socketmode.Event, fn func(Event)) {
 		Text:      msg.Text,
 		Timestamp: msg.TimeStamp,
 		ThreadTS:  msg.ThreadTimeStamp,
+		SubType:   msg.SubType,
+		BotID:     msg.BotID,
 	})
 }

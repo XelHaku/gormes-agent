@@ -80,6 +80,9 @@ func (b *Bot) handleEvent(ctx context.Context, e Event) {
 	if e.UserID == "" || e.UserID == b.selfUserID {
 		return
 	}
+	if e.SubType != "" {
+		return
+	}
 	if b.cfg.AllowedChannelID != "" && e.ChannelID != b.cfg.AllowedChannelID {
 		return
 	}
@@ -272,7 +275,9 @@ func (b *Bot) deliverCurrent(ctx context.Context, text string) error {
 		return nil
 	}
 	if binding.placeholderTS != "" {
-		return b.client.UpdateMessage(ctx, binding.channelID, binding.placeholderTS, text)
+		if err := b.client.UpdateMessage(ctx, binding.channelID, binding.placeholderTS, text); err == nil {
+			return nil
+		}
 	}
 	_, err := b.client.PostMessage(ctx, binding.channelID, binding.threadTS, text)
 	return err

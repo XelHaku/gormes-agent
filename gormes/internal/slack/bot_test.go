@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +12,8 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/store"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
+	slackevents "github.com/slack-go/slack/slackevents"
+	"github.com/slack-go/slack/socketmode"
 )
 
 func newSlackKernel(reply, sid string) *kernel.Kernel {
@@ -30,9 +33,49 @@ func newSlackKernel(reply, sid string) *kernel.Kernel {
 	}, hc, store.NewNoop(), telemetry.New(), nil)
 }
 
+func newIdleSlackKernel() *kernel.Kernel {
+	return kernel.New(kernel.Config{
+		Model:             "hermes-agent",
+		Endpoint:          "http://mock",
+		Admission:         kernel.Admission{MaxBytes: 200_000, MaxLines: 10_000},
+		MaxToolIterations: 10,
+		MaxToolDuration:   5 * time.Second,
+	}, hermes.NewMockClient(), store.NewNoop(), telemetry.New(), nil)
+}
+
+type failingStore struct {
+	err error
+}
+
+func (s failingStore) Exec(context.Context, store.Command) (store.Ack, error) {
+	return store.Ack{}, s.err
+}
+
+func newFailingSlackKernel(err error) *kernel.Kernel {
+	return kernel.New(kernel.Config{
+		Model:             "hermes-agent",
+		Endpoint:          "http://mock",
+		Admission:         kernel.Admission{MaxBytes: 200_000, MaxLines: 10_000},
+		MaxToolIterations: 10,
+		MaxToolDuration:   5 * time.Second,
+	}, hermes.NewMockClient(), failingStore{err: err}, telemetry.New(), nil)
+}
+
+func waitForSlackOutput(t *testing.T, mc *mockClient, needle string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(mc.lastOutputText(), needle) {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatalf("last output = %q, want to contain %q", mc.lastOutputText(), needle)
+}
+
 func TestBot_AcksEventsBeforeHandling(t *testing.T) {
 	mc := newMockClient()
-	k := newSlackKernel("roger", "sess-slack")
+	k := newIdleSlackKernel()
 	b := New(Config{
 		AllowedChannelID: "C123",
 		ReplyInThread:    true,
@@ -49,14 +92,21 @@ func TestBot_AcksEventsBeforeHandling(t *testing.T) {
 		RequestID: "req-1",
 		ChannelID: "C123",
 		UserID:    "U1",
-		Text:      "hello",
+		Text:      "/start",
 		Timestamp: "1711111111.000100",
 		ThreadTS:  "1711111111.000100",
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	waitForSlackOutput(t, mc, "Gormes is online")
 	if !mc.wasAcked("req-1") {
 		t.Fatal("expected request req-1 to be acked")
+	}
+	calls := mc.calls()
+	if len(calls) < 2 {
+		t.Fatalf("calls = %v, want ack and reply call", calls)
+	}
+	if calls[0] != "ack:req-1" {
+		t.Fatalf("first call = %q, want ack:req-1", calls[0])
 	}
 }
 
@@ -86,13 +136,7 @@ func TestBot_UsesThreadTSForReplies(t *testing.T) {
 		ThreadTS:  "1711111111.000200",
 	})
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if strings.Contains(mc.lastOutputText(), "thread ok") {
-			break
-		}
-		time.Sleep(25 * time.Millisecond)
-	}
+	waitForSlackOutput(t, mc, "thread ok")
 
 	if mc.lastThreadTS() != "1711111111.000200" {
 		t.Fatalf("thread_ts = %q, want 1711111111.000200", mc.lastThreadTS())
@@ -103,6 +147,35 @@ func TestBot_UsesThreadTSForReplies(t *testing.T) {
 	}
 	if gotSID != "sess-thread" {
 		t.Fatalf("persisted sid = %q, want sess-thread", gotSID)
+	}
+}
+
+func TestBot_UsesTimestampFallbackForRepliesWhenThreadMissing(t *testing.T) {
+	mc := newMockClient()
+	k := newSlackKernel("timestamp ok", "sess-ts")
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+		CoalesceMs:       50,
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-ts",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "hello timestamp",
+		Timestamp: "1711111111.000250",
+	})
+
+	waitForSlackOutput(t, mc, "timestamp ok")
+	if mc.lastThreadTS() != "1711111111.000250" {
+		t.Fatalf("thread_ts = %q, want 1711111111.000250", mc.lastThreadTS())
 	}
 }
 
@@ -128,5 +201,288 @@ func TestBot_RejectsOtherChannels(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	if got := len(mc.outputs()); got != 0 {
 		t.Fatalf("outputs = %d, want 0", got)
+	}
+}
+
+func TestBot_IgnoresThreadBroadcastSubtype(t *testing.T) {
+	mc := newMockClient()
+	k := newSlackKernel("unused", "sess-unused")
+	b := New(Config{AllowedChannelID: "C123", ReplyInThread: true}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-subtype",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "broadcast copy",
+		Timestamp: "1711111111.000350",
+		SubType:   "thread_broadcast",
+	})
+
+	time.Sleep(100 * time.Millisecond)
+	if !mc.wasAcked("req-subtype") {
+		t.Fatal("expected subtype event to be acked")
+	}
+	if got := len(mc.outputs()); got != 0 {
+		t.Fatalf("outputs = %d, want 0 for ignored subtype", got)
+	}
+}
+
+func TestBot_RunOutbound_EmitsPendingStreamAndFinal(t *testing.T) {
+	mc := newMockClient()
+	k := newSlackKernel("roger", "sess-slack")
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+		CoalesceMs:       1,
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-stream",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "hello stream",
+		Timestamp: "1711111111.000400",
+		ThreadTS:  "1711111111.000400",
+	})
+
+	waitForSlackOutput(t, mc, "roger")
+	outputs := mc.outputs()
+	if len(outputs) < 3 {
+		t.Fatalf("outputs = %d, want at least pending + stream + final", len(outputs))
+	}
+	if outputs[0].text != "⏳" || outputs[0].updated {
+		t.Fatalf("first output = %+v, want pending placeholder post", outputs[0])
+	}
+	foundStream := false
+	foundFinal := false
+	for _, out := range outputs[1:] {
+		if out.updated && strings.Contains(out.text, "rog") {
+			foundStream = true
+		}
+		if strings.Contains(out.text, "roger") {
+			foundFinal = true
+		}
+	}
+	if !foundStream {
+		t.Fatalf("outputs = %+v, want streamed update containing partial draft", outputs)
+	}
+	if !foundFinal {
+		t.Fatalf("outputs = %+v, want final reply containing roger", outputs)
+	}
+}
+
+func TestBot_RunOutbound_EmitsErrorReply(t *testing.T) {
+	mc := newMockClient()
+	k := newFailingSlackKernel(errors.New("store broke"))
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+		CoalesceMs:       1,
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-fail",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "hello fail",
+		Timestamp: "1711111111.000500",
+		ThreadTS:  "1711111111.000500",
+	})
+
+	waitForSlackOutput(t, mc, "❌")
+	if !strings.Contains(mc.lastOutputText(), "store ack timeout") {
+		t.Fatalf("last output = %q, want store ack timeout error", mc.lastOutputText())
+	}
+}
+
+func TestBot_DeliverCurrent_FallsBackToPostWhenFinalEditFails(t *testing.T) {
+	mc := newMockClient()
+	b := New(Config{ReplyInThread: true}, mc, newIdleSlackKernel(), nil)
+	b.current = &turnBinding{
+		channelID:     "C123",
+		threadTS:      "1711111111.000600",
+		placeholderTS: "1711111111.999999",
+	}
+	mc.rememberThread("1711111111.999999", "1711111111.000600")
+	mc.UpdateErr = errUpdateFailed()
+
+	if err := b.deliverCurrent(context.Background(), "final fallback"); err != nil {
+		t.Fatalf("deliverCurrent returned err = %v, want nil via post fallback", err)
+	}
+	outputs := mc.outputs()
+	if len(outputs) != 1 {
+		t.Fatalf("outputs = %d, want exactly one fallback post", len(outputs))
+	}
+	if outputs[0].updated {
+		t.Fatalf("output = %+v, want fallback post not edit", outputs[0])
+	}
+	if outputs[0].threadTS != "1711111111.000600" {
+		t.Fatalf("thread_ts = %q, want 1711111111.000600", outputs[0].threadTS)
+	}
+}
+
+func TestBot_DeliverCurrent_FallsBackToPostWhenErrorEditFails(t *testing.T) {
+	mc := newMockClient()
+	b := New(Config{ReplyInThread: true}, mc, newIdleSlackKernel(), nil)
+	b.current = &turnBinding{
+		channelID:     "C123",
+		threadTS:      "1711111111.000700",
+		placeholderTS: "1711111111.999998",
+	}
+	mc.rememberThread("1711111111.999998", "1711111111.000700")
+	mc.UpdateErr = errUpdateFailed()
+
+	if err := b.deliverCurrent(context.Background(), formatError(kernel.RenderFrame{LastError: "boom"})); err != nil {
+		t.Fatalf("deliverCurrent returned err = %v, want nil via post fallback", err)
+	}
+	outputs := mc.outputs()
+	if len(outputs) != 1 {
+		t.Fatalf("outputs = %d, want exactly one fallback post", len(outputs))
+	}
+	if outputs[0].updated {
+		t.Fatalf("output = %+v, want fallback post not edit", outputs[0])
+	}
+	if !strings.Contains(outputs[0].text, "boom") {
+		t.Fatalf("output text = %q, want boom", outputs[0].text)
+	}
+}
+
+func TestBot_BindTurnForFrame_ClaimsReservedThreadBeforeFastTurnFrames(t *testing.T) {
+	b := New(Config{}, newMockClient(), newIdleSlackKernel(), nil)
+
+	ticket := b.reserveTurn("C123", "1711111111.000800")
+	if ticket == 0 {
+		t.Fatal("reserveTurn returned 0, want non-zero ticket")
+	}
+
+	binding, ok := b.bindTurnForFrame()
+	if !ok {
+		t.Fatal("bindTurnForFrame returned ok=false, want true")
+	}
+	if binding.channelID != "C123" {
+		t.Fatalf("binding.channelID = %q, want C123", binding.channelID)
+	}
+	if binding.threadTS != "1711111111.000800" {
+		t.Fatalf("binding.threadTS = %q, want 1711111111.000800", binding.threadTS)
+	}
+}
+
+func TestBot_PersistIfChanged_RebindsSameChannelAcrossThreads(t *testing.T) {
+	smap := session.NewMemMap()
+	b := New(Config{SessionMap: smap}, newMockClient(), newIdleSlackKernel(), nil)
+
+	if ticket := b.reserveTurn("C123", "thread-1"); ticket == 0 {
+		t.Fatal("first reserveTurn returned 0")
+	}
+	binding, ok := b.bindTurnForFrame()
+	if !ok {
+		t.Fatal("first bindTurnForFrame returned ok=false")
+	}
+	if binding.threadTS != "thread-1" {
+		t.Fatalf("first binding.threadTS = %q, want thread-1", binding.threadTS)
+	}
+	b.persistIfChanged(context.Background(), "C123", kernel.RenderFrame{SessionID: "sess-1"})
+
+	b.finishTurn()
+
+	if ticket := b.reserveTurn("C123", "thread-2"); ticket == 0 {
+		t.Fatal("second reserveTurn returned 0")
+	}
+	binding, ok = b.bindTurnForFrame()
+	if !ok {
+		t.Fatal("second bindTurnForFrame returned ok=false")
+	}
+	if binding.threadTS != "thread-2" {
+		t.Fatalf("second binding.threadTS = %q, want thread-2", binding.threadTS)
+	}
+	if binding.lastSID != "" || binding.placeholderTS != "" {
+		t.Fatalf("second binding = %+v, want fresh per-turn state", binding)
+	}
+	b.persistIfChanged(context.Background(), "C123", kernel.RenderFrame{SessionID: "sess-2"})
+
+	gotSID, err := smap.Get(context.Background(), SessionKey("C123"))
+	if err != nil {
+		t.Fatalf("Get persisted session: %v", err)
+	}
+	if gotSID != "sess-2" {
+		t.Fatalf("persisted sid = %q, want sess-2", gotSID)
+	}
+}
+
+func TestRealClient_HandleEventsAPI_PreservesSubtypeMetadata(t *testing.T) {
+	rc := &realClient{pending: make(map[string]socketmode.Request)}
+	var got Event
+
+	rc.handleEventsAPI(socketmode.Event{
+		Type: socketmode.EventTypeEventsAPI,
+		Request: &socketmode.Request{
+			EnvelopeID: "env-1",
+		},
+		Data: slackevents.EventsAPIEvent{
+			Type: slackevents.CallbackEvent,
+			InnerEvent: slackevents.EventsAPIInnerEvent{
+				Data: &slackevents.MessageEvent{
+					Channel:         "C123",
+					User:            "U1",
+					Text:            "hello",
+					TimeStamp:       "1711111111.001000",
+					ThreadTimeStamp: "1711111111.001000",
+					SubType:         "thread_broadcast",
+				},
+			},
+		},
+	}, func(e Event) {
+		got = e
+	})
+
+	if got.SubType != "thread_broadcast" {
+		t.Fatalf("SubType = %q, want thread_broadcast", got.SubType)
+	}
+	if _, ok := rc.pending["env-1"]; !ok {
+		t.Fatal("pending request env-1 not recorded")
+	}
+}
+
+func TestRealClient_AckIsIdempotentAndCleansPending(t *testing.T) {
+	ackCount := 0
+	rc := &realClient{
+		pending: map[string]socketmode.Request{
+			"env-1": {EnvelopeID: "env-1"},
+		},
+		ackFn: func(req socketmode.Request) error {
+			ackCount++
+			if req.EnvelopeID != "env-1" {
+				t.Fatalf("EnvelopeID = %q, want env-1", req.EnvelopeID)
+			}
+			return nil
+		},
+	}
+
+	rc.Ack("env-1")
+	rc.Ack("env-1")
+
+	if ackCount != 1 {
+		t.Fatalf("ackCount = %d, want 1", ackCount)
+	}
+	if got := len(rc.pending); got != 0 {
+		t.Fatalf("pending len = %d, want 0", got)
 	}
 }
