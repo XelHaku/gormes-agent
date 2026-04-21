@@ -67,7 +67,7 @@ func (b *Bot) Run(ctx context.Context) error {
 	runCtx, cancel := context.WithCancel(ctx)
 
 	var wg sync.WaitGroup
-	ready := make(chan struct{})
+	ready := make(chan struct{}, 1)
 	wg.Add(1)
 	go b.runOutbound(runCtx, &wg, ready)
 
