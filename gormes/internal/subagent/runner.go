@@ -230,11 +230,22 @@ func (r *ChatRunner) execTool(ctx context.Context, spec Spec, call hermes.ToolCa
 	toolCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	out, err := tool.Execute(toolCtx, call.Arguments)
+	out, err := safeExecute(toolCtx, tool, call.Arguments)
 	if err != nil {
 		return jsonError(err.Error())
 	}
 	return out
+}
+
+func safeExecute(ctx context.Context, tool tools.Tool, args json.RawMessage) (result json.RawMessage, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("tool panicked: %v", r)
+			result = nil
+		}
+	}()
+
+	return tool.Execute(ctx, args)
 }
 
 func jsonError(message string) json.RawMessage {

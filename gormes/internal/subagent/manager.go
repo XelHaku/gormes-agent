@@ -72,7 +72,7 @@ func (m *Manager) Start(parent context.Context, spec Spec) (*Handle, error) {
 	handle := &Handle{
 		RunID:  runID,
 		Events: events,
-		done:   make(chan struct{}),
+		done:   make(chan struct{}, 1),
 		cancel: cancel,
 		events: events,
 	}
@@ -129,15 +129,7 @@ func (m *Manager) run(handle *Handle, runCtx context.Context, spec Spec) {
 		}
 	}()
 
-	result, err := m.runner.Run(runCtx, spec, func(ev Event) {
-		if handle.events == nil {
-			return
-		}
-		select {
-		case handle.events <- ev:
-		default:
-		}
-	})
+	result, err := m.runSafely(runCtx, spec, handle)
 	finishedAt := time.Now().UTC()
 
 	result.RunID = handle.RunID
@@ -166,6 +158,25 @@ func (m *Manager) run(handle *Handle, runCtx context.Context, spec Spec) {
 	handle.result = result
 	handle.err = nil
 	handle.mu.Unlock()
+}
+
+func (m *Manager) runSafely(runCtx context.Context, spec Spec, handle *Handle) (result Result, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("subagent: runner panicked: %v", r)
+			result = Result{Status: StatusFailed, Error: err.Error()}
+		}
+	}()
+
+	return m.runner.Run(runCtx, spec, func(ev Event) {
+		if handle.events == nil {
+			return
+		}
+		select {
+		case handle.events <- ev:
+		default:
+		}
+	})
 }
 
 func (m *Manager) nextRunID() string {

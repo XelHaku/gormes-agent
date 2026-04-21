@@ -14,8 +14,8 @@ func registerDelegation(cfg config.Config, reg *tools.Registry, hc hermes.Client
 	if reg == nil || !cfg.Delegation.Enabled {
 		return nil
 	}
-	if err := subagent.ValidateDelegateTimeout(cfg.Delegation.DefaultTimeout, "delegation default timeout"); err != nil {
-		slog.Warn("delegate_task registration skipped: default timeout is outside the budget", "err", err, "default_timeout", cfg.Delegation.DefaultTimeout, "budget", 2*time.Minute-10*time.Second)
+	if err := subagent.ValidateDelegationConfig(cfg.Delegation); err != nil {
+		slog.Warn("delegate_task registration skipped: delegation config is invalid", "err", err, "default_timeout", cfg.Delegation.DefaultTimeout, "default_max_iterations", cfg.Delegation.DefaultMaxIterations, "max_child_depth", cfg.Delegation.MaxChildDepth, "budget", 2*time.Minute-10*time.Second)
 		return nil
 	}
 

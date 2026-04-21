@@ -80,6 +80,43 @@ func TestChatRunner_ToolCallExecutesAllowedTool(t *testing.T) {
 	}
 }
 
+func TestChatRunner_ToolPanicReturnsErrorInsteadOfCrashing(t *testing.T) {
+	cli := hermes.NewMockClient()
+	cli.Script([]hermes.Event{
+		{Kind: hermes.EventDone, FinishReason: "tool_calls", ToolCalls: []hermes.ToolCall{
+			{ID: "call-1", Name: "explode", Arguments: json.RawMessage(`{}`)},
+		}},
+	}, "sess-child")
+	cli.Script([]hermes.Event{
+		{Kind: hermes.EventToken, Token: "recovered", TokensOut: 2},
+		{Kind: hermes.EventDone, FinishReason: "stop", TokensIn: 9, TokensOut: 2},
+	}, "sess-child")
+
+	reg := tools.NewRegistry()
+	reg.MustRegister(&tools.MockTool{
+		NameStr: "explode",
+		ExecuteFn: func(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
+			panic("boom")
+		},
+	})
+
+	runner := NewChatRunner(cli, reg, ChatRunnerConfig{Model: "hermes-agent", MaxToolDuration: 2 * time.Second})
+	res, err := runner.Run(context.Background(), Spec{
+		Goal:          "panic containment",
+		MaxIterations: 4,
+		AllowedTools:  []string{"explode"},
+	}, func(Event) {})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Status != StatusCompleted {
+		t.Fatalf("Status = %q, want completed", res.Status)
+	}
+	if len(cli.Requests()) != 2 {
+		t.Fatalf("OpenStream requests = %d, want 2", len(cli.Requests()))
+	}
+}
+
 func TestChatRunner_BlockedToolReturnsPolicyError(t *testing.T) {
 	cli := hermes.NewMockClient()
 	cli.Script([]hermes.Event{

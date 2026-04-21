@@ -62,6 +62,9 @@ func TestManager_Start_WaitsAndStreamsEvents(t *testing.T) {
 	if cap(handle.Events) == 0 {
 		t.Fatal("Handle.Events must be buffered")
 	}
+	if cap(handle.done) != 1 {
+		t.Fatalf("Handle.done capacity = %d, want 1", cap(handle.done))
+	}
 
 	select {
 	case <-started:
@@ -221,6 +224,34 @@ func TestManager_LogAppendFailure_PreservesResultError(t *testing.T) {
 	}
 	if res.Error == "" {
 		t.Fatal("Result.Error must contain the logging failure")
+	}
+}
+
+func TestManager_Run_RecoversRunnerPanics(t *testing.T) {
+	cfg := config.DelegationCfg{
+		DefaultMaxIterations: 4,
+		DefaultTimeout:       time.Second,
+		MaxChildDepth:        1,
+	}
+
+	mgr := NewManager(cfg, runnerFunc(func(ctx context.Context, spec Spec, emit func(Event)) (Result, error) {
+		panic("runner boom")
+	}), "")
+
+	handle, err := mgr.Start(context.Background(), Spec{Goal: "panic me"})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	res, err := handle.Wait(context.Background())
+	if err != nil {
+		t.Fatalf("Wait error = %v, want nil", err)
+	}
+	if res.Status != StatusFailed {
+		t.Fatalf("Status = %q, want failed", res.Status)
+	}
+	if res.Error == "" {
+		t.Fatal("Error must be populated when runner panics")
 	}
 }
 

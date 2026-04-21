@@ -65,6 +65,9 @@ func TestDelegateTool_ExecuteReturnsChildResult(t *testing.T) {
 		if spec.Timeout != 7*time.Second {
 			t.Fatalf("Timeout = %v, want 7s", spec.Timeout)
 		}
+		if spec.Depth != 1 {
+			t.Fatalf("Depth = %d, want 1", spec.Depth)
+		}
 		if len(spec.AllowedTools) != 2 || spec.AllowedTools[0] != "echo" || spec.AllowedTools[1] != "now" {
 			t.Fatalf("AllowedTools = %#v, want [echo now]", spec.AllowedTools)
 		}
@@ -109,6 +112,24 @@ func TestDelegateTool_ExecuteReturnsChildResult(t *testing.T) {
 	}
 	if got.Error != "" {
 		t.Fatalf("Error = %q, want empty", got.Error)
+	}
+}
+
+func TestDelegateTool_RejectsTopLevelChildWhenDepthLimitIsZero(t *testing.T) {
+	mgr := NewManager(config.DelegationCfg{
+		DefaultMaxIterations: 8,
+		DefaultTimeout:       45 * time.Second,
+		MaxChildDepth:        0,
+	}, runnerFunc(func(ctx context.Context, spec Spec, emit func(Event)) (Result, error) {
+		t.Fatal("runner should not be called when max child depth blocks delegation")
+		return Result{}, nil
+	}), t.TempDir()+"/runs.jsonl")
+
+	tool := NewDelegateTool(mgr)
+
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"goal":" investigate "}`))
+	if err == nil {
+		t.Fatal("Execute error = nil, want depth-limit rejection")
 	}
 }
 

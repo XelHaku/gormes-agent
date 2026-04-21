@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/config"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
@@ -61,6 +62,7 @@ func (t *DelegateTool) Execute(ctx context.Context, args json.RawMessage) (json.
 		Model:         in.Model,
 		AllowedTools:  append([]string(nil), in.AllowedTools...),
 		MaxIterations: in.MaxIterations,
+		Depth:         1,
 	}
 	timeoutSource := "delegation default timeout"
 	if in.TimeoutSeconds != nil {
@@ -119,4 +121,14 @@ func ValidateDelegateTimeout(timeout time.Duration, source string) error {
 		return fmt.Errorf("subagent: %s %s exceeds delegate_task budget of %s", source, timeout, delegateToolMaxChildTimeout)
 	}
 	return nil
+}
+
+func ValidateDelegationConfig(cfg config.DelegationCfg) error {
+	if cfg.DefaultMaxIterations <= 0 {
+		return fmt.Errorf("subagent: delegation default max_iterations must be positive")
+	}
+	if cfg.MaxChildDepth < 1 {
+		return fmt.Errorf("subagent: delegation max_child_depth must be at least 1")
+	}
+	return ValidateDelegateTimeout(cfg.DefaultTimeout, "delegation default timeout")
 }
