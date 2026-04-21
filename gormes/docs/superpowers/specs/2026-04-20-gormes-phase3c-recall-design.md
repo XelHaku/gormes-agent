@@ -284,15 +284,15 @@ say "according to my memory", "based on what I know", "I recall",
 if you always knew these facts.]
 
 ## Entities (5)
-- AzulVigia (PROJECT) — My agentic sports-analytics platform
-- Cadereyta (PLACE)
+- Acme (PROJECT) — My agentic sports-analytics platform
+- Springfield (PLACE)
 - Juan (PERSON) — The user himself
 - Vania (PERSON) — Juan's partner; also a developer
 - Go (TOOL)
 
 ## Relationships (4)
-- Juan WORKS_ON AzulVigia [weight=3.0]
-- AzulVigia LOCATED_IN Cadereyta [weight=2.0]
+- Juan WORKS_ON Acme [weight=3.0]
+- Acme LOCATED_IN Springfield [weight=2.0]
 - Vania KNOWS Juan [weight=5.0]
 - Juan HAS_SKILL Go [weight=4.0]
 </memory-context>
@@ -494,11 +494,11 @@ The kernel **never** returns a turn error because of recall. Memory is best-effo
 ### 13.6 End-to-end with Ollama (integration test, skip-if-no-ollama)
 
 - `TestRecall_Integration_Ollama_SecondTurnSeesFirstTurnEntities` —
-  1. Seed 3 turns mentioning AzulVigia/Cadereyta/Juan/Vania.
+  1. Seed 3 turns mentioning Acme/Springfield/Juan/Vania.
   2. Run the 3.B extractor against live Ollama to populate entities/relationships.
   3. Construct `memory.NewRecall`.
-  4. Query `GetContext(ctx, RecallParams{UserMessage: "tell me about AzulVigia"})`.
-  5. Assert the returned block contains "AzulVigia", "Cadereyta", and (with weight-floor patch) "Vania".
+  4. Query `GetContext(ctx, RecallParams{UserMessage: "tell me about Acme"})`.
+  5. Assert the returned block contains "Acme", "Springfield", and (with weight-floor patch) "Vania".
 
 ### 13.7 Build-isolation
 

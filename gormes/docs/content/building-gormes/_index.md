@@ -22,4 +22,5 @@ Contributor-facing documentation. If you're reading because you want to **use** 
 - [What Hermes Gets Wrong](./what-hermes-gets-wrong/) — the opportunities that justify Gormes's existence
 - [Architecture Plan](./architecture_plan/) — full roadmap, phase-by-phase, with subsystem inventory
 - [Porting a Subsystem](./porting-a-subsystem/) — the contribution path: pick from §7, write spec + plan, open PR
+- [Gateway Donor Map](./gateway-donor-map/) — prescriptive PicoClaw-to-Gormes channel reuse dossiers
 - [Testing](./testing/) — Go test suite, Playwright smoke, Hugo build rig

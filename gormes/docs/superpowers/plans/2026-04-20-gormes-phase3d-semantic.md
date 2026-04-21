@@ -45,7 +45,7 @@
 | `gormes/internal/config/config.go` | Modify | `TelegramCfg` gains semantic_* + embedder_* knobs |
 | `gormes/internal/config/config_test.go` | Modify | Append `TestLoad_SemanticDefaults` |
 | `gormes/cmd/gormes/telegram.go` | Modify | Construct `Embedder`, thread semantic config through `memory.NewRecall` |
-| `gormes/internal/memory/semantic_integration_test.go` | Create | Ollama E2E: "tell me about my projects" → fence contains "AzulVigia" |
+| `gormes/internal/memory/semantic_integration_test.go` | Create | Ollama E2E: "tell me about my projects" → fence contains "Acme" |
 
 ---
 
@@ -1869,7 +1869,7 @@ func TestProvider_SemanticDisabledIsLexicalOnly(t *testing.T) {
 	// sets a default RecallConfig with no semantic fields.
 
 	out := p.GetContext(context.Background(), RecallInput{
-		UserMessage: "tell me about AzulVigia",
+		UserMessage: "tell me about Acme",
 		ChatKey:     "telegram:42",
 	})
 	if out == "" {
@@ -1933,11 +1933,11 @@ func TestProvider_SemanticFallsThroughOnEmbedFailure(t *testing.T) {
 	p.cfg.QueryEmbedTimeout = 200 * time.Millisecond
 
 	out := p.GetContext(context.Background(), RecallInput{
-		UserMessage: "tell me about AzulVigia",
+		UserMessage: "tell me about Acme",
 		ChatKey:     "telegram:42",
 	})
-	// Lexical still works — the fence includes AzulVigia.
-	if !strings.Contains(out, "AzulVigia") {
+	// Lexical still works — the fence includes Acme.
+	if !strings.Contains(out, "Acme") {
 		t.Errorf("lexical fallback failed when embed endpoint is unreachable: %q", out)
 	}
 }
@@ -2444,7 +2444,7 @@ Create `gormes/internal/memory/semantic_integration_test.go`:
 //
 // Gated by the same skipIfNoOllama helper from extractor_integration_test.go.
 // Proves the gap closure: a query that lexically matches nothing
-// ("tell me about my projects") nevertheless surfaces AzulVigia via
+// ("tell me about my projects") nevertheless surfaces Acme via
 // the semantic seed layer.
 //
 // Skips cleanly if Ollama or the chosen embedding model aren't available.
@@ -2489,7 +2489,7 @@ func skipIfNoEmbeddingModel(t *testing.T) {
 	}
 }
 
-func TestRecall_Integration_Ollama_MyProjectsFindsAzulVigia(t *testing.T) {
+func TestRecall_Integration_Ollama_MyProjectsFindsAcme(t *testing.T) {
 	skipIfNoEmbeddingModel(t)
 
 	endpoint := integrationEndpoint()
@@ -2507,9 +2507,9 @@ func TestRecall_Integration_Ollama_MyProjectsFindsAzulVigia(t *testing.T) {
 
 	// ── Seed 3 entity-rich turns ──────────────────────────────────────
 	turns := []string{
-		"I am setting up the AzulVigia project in Cadereyta.",
+		"I am setting up the Acme project in Springfield.",
 		"Vania is helping me test the Neovim configuration.",
-		"Juan works on the Go backend of AzulVigia every day.",
+		"Juan works on the Go backend of Acme every day.",
 	}
 	for i, content := range turns {
 		_, err := store.db.Exec(
@@ -2611,13 +2611,13 @@ func TestRecall_Integration_Ollama_MyProjectsFindsAzulVigia(t *testing.T) {
 	fmt.Printf("[3.D] chat_model=%s embed_model=%s entities=%d embeddings=%d\n\n",
 		chatModel, embedModel, entCount, embCount)
 
-	// Core assertion: the fence for the non-lexical query contains AzulVigia.
+	// Core assertion: the fence for the non-lexical query contains Acme.
 	// This is the Phase 3.D ship criterion.
 	if block == "" {
 		t.Errorf("block empty for non-lexical query — semantic layer didn't fire")
 	}
-	if !strings.Contains(block, "AzulVigia") {
-		t.Errorf("fence missing AzulVigia on non-lexical query; got %q", block)
+	if !strings.Contains(block, "Acme") {
+		t.Errorf("fence missing Acme on non-lexical query; got %q", block)
 	}
 }
 ```
@@ -2640,10 +2640,10 @@ git add gormes/internal/memory/semantic_integration_test.go
 git commit -m "$(cat <<'EOF'
 test(gormes/memory): Phase-3.D semantic recall crucible against Ollama
 
-TestRecall_Integration_Ollama_MyProjectsFindsAzulVigia is
+TestRecall_Integration_Ollama_MyProjectsFindsAcme is
 the ship criterion for Phase 3.D. Flow:
 
-  Phase A: seed 3 entity-rich turns (AzulVigia/Cadereyta/
+  Phase A: seed 3 entity-rich turns (Acme/Springfield/
            Vania/Juan/Go) and run the real 3.B extractor
            against Ollama until all turns are extracted.
   Phase B: run the 3.D Embedder with GORMES_SEMANTIC_MODEL
@@ -2652,10 +2652,10 @@ the ship criterion for Phase 3.D. Flow:
   Phase C: call Provider.GetContext("tell me about my
            projects") — a query that lexically matches NO
            entity name.
-  Assert: the fence contains "AzulVigia".
+  Assert: the fence contains "Acme".
 
 This is the gap 3.C could NOT close: exact-name + FTS5 both
-return empty for "my projects" → "AzulVigia". Semantic
+return empty for "my projects" → "Acme". Semantic
 cosine similarity bridges that distance.
 
 skipIfNoEmbeddingModel reuses skipIfNoOllama and adds an
@@ -2751,7 +2751,7 @@ GORMES_SEMANTIC_MODEL="nomic-embed-text" \
   go test ./internal/memory/... -run TestRecall_Integration_Ollama_MyProjects -v -timeout 10m
 ```
 
-Expected: test PASSES with telemetry showing the fence contains "AzulVigia" from a non-lexical query.
+Expected: test PASSES with telemetry showing the fence contains "Acme" from a non-lexical query.
 
 - [ ] **Step 7: No commit**
 
@@ -2797,4 +2797,4 @@ If any check fails, STOP and report.
 
 **Execution order:** linear — T1 (schema) → T2 (client) → T3 (math) → T4 (scan) → T5 (worker) → T6 (Provider integration) → T7 (config) → T8 (cmd) → T9 (crucible) → T10 (verification).
 
-**Checkpoint suggestions:** halt after **T6** (Provider hybrid fusion verified via unit tests, semantic layer provably optional) and after **T9** (Ollama run proves "my projects" → AzulVigia closure) before T10's final sweep.
+**Checkpoint suggestions:** halt after **T6** (Provider hybrid fusion verified via unit tests, semantic layer provably optional) and after **T9** (Ollama run proves "my projects" → Acme closure) before T10's final sweep.

@@ -21,3 +21,4 @@ One runtime, multiple interfaces. The agent lives in the kernel; each gateway is
 Agents that only live in a terminal are academic. Agents that live where the operator lives — on their phone, in their team chat — are infrastructure. Gormes's split-binary-then-unified design lets each adapter ship independently without dragging the TUI's deps.
 
 See [Phase 2](../architecture_plan/phase-2-gateway/) for the Gateway ledger.
+For donor-code reconnaissance against PicoClaw's Go adapters, see [Gateway Donor Map](../gateway-donor-map/).

@@ -136,7 +136,7 @@ LIMIT ?
 
 Two substitutions of the same expression — once in WHERE, once in ORDER BY. When decay is active, **two** new `horizonSec` binds are needed (SQLite positional placeholders don't share across clauses unless named). The Go code builds the argument slice to match.
 
-**Note:** the SELECT column `r.weight` is the **raw** weight, not the decayed one. The fence presents raw weight to the operator (they asked for the data). The filter uses decayed weight (for ranking). This is deliberate: the operator sees `AzulVigia LOCATED_IN Cadereyta [weight=1.0]` with the real weight, not a time-dependent number that changes hour-to-hour.
+**Note:** the SELECT column `r.weight` is the **raw** weight, not the decayed one. The fence presents raw weight to the operator (they asked for the data). The filter uses decayed weight (for ranking). This is deliberate: the operator sees `Acme LOCATED_IN Springfield [weight=1.0]` with the real weight, not a time-dependent number that changes hour-to-hour.
 
 ## 6. Config
 

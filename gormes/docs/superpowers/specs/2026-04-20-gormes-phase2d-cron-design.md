@@ -179,7 +179,7 @@ _Last refreshed: 2026-04-20T08:15:00Z_
 
 ### morning-report — `0 8 * * *`
 - **ID:** `01JXXX...`
-- **Prompt:** Give me a summary of RF anomalies in Cadereyta from the last 24h
+- **Prompt:** Give me a summary of RF anomalies in Springfield from the last 24h
 - **Next run:** 2026-04-21T08:00:00Z
 - **Last run:** 2026-04-20T08:00:00Z — success (delivered, 142 chars)
 

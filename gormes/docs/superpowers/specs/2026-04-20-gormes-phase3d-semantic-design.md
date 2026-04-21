@@ -13,7 +13,7 @@
 
 ## 1. Goal
 
-Bridge the lexical gap in Phase 3.C's recall. Today: "tell me about AzulVigia" populates the fence; "tell me about my projects" returns empty. After 3.D: the latter query embeds to a vector, cosine-scans `entity_embeddings`, finds `AzulVigia (PROJECT)` as top-K semantic match, feeds it into the existing Recursive CTE, and the fence comes back populated — with the same 100ms recall deadline respected.
+Bridge the lexical gap in Phase 3.C's recall. Today: "tell me about Acme" populates the fence; "tell me about my projects" returns empty. After 3.D: the latter query embeds to a vector, cosine-scans `entity_embeddings`, finds `Acme (PROJECT)` as top-K semantic match, feeds it into the existing Recursive CTE, and the fence comes back populated — with the same 100ms recall deadline respected.
 
 ## 2. Non-Goals
 
@@ -152,10 +152,10 @@ Entity: {Name}. Type: {Type}. Context: {Description}
 ```
 
 Examples:
-- `Entity: AzulVigia. Type: PROJECT. Context: sports analytics platform`
-- `Entity: Cadereyta. Type: PLACE.` (empty description → the `Context:` clause is omitted)
+- `Entity: Acme. Type: PROJECT. Context: sports analytics platform`
+- `Entity: Springfield. Type: PLACE.` (empty description → the `Context:` clause is omitted)
 
-The explicit `Entity:` / `Type:` / `Context:` labels help the embedding model keep the category signal (e.g. `PROJECT`) from overwhelming the identity signal (e.g. `AzulVigia`). Tests during Phase 3.D development observed that a raw `"X is a TYPE"` template caused distant-but-same-type entities to cluster too tightly (every PROJECT got a similar vector regardless of its actual meaning). The labeled template pushes the model's attention back onto the entity's specific meaning.
+The explicit `Entity:` / `Type:` / `Context:` labels help the embedding model keep the category signal (e.g. `PROJECT`) from overwhelming the identity signal (e.g. `Acme`). Tests during Phase 3.D development observed that a raw `"X is a TYPE"` template caused distant-but-same-type entities to cluster too tightly (every PROJECT got a similar vector regardless of its actual meaning). The labeled template pushes the model's attention back onto the entity's specific meaning.
 
 **Implementation rule:** if `Description` is empty after sanitization, the trailing `Context: ...` clause is omitted ENTIRELY — don't emit `Context: ` with nothing after the colon, which small models can interpret as a "fill in the blank" prompt.
 
@@ -244,7 +244,7 @@ Running the three seed sources in parallel goroutines would theoretically save ~
 
 ### 8.3 Semantic-only fallback path
 
-If lexical + FTS5 returned zero seeds but the user's message is non-trivial (length > 10 chars), still run semantic. This is the "tell me about my projects" case — zero lexical hits, but semantic can still surface AzulVigia.
+If lexical + FTS5 returned zero seeds but the user's message is non-trivial (length > 10 chars), still run semantic. This is the "tell me about my projects" case — zero lexical hits, but semantic can still surface Acme.
 
 ### 8.4 Deduplication
 
@@ -349,12 +349,12 @@ Each failure class is DISTINCT in logs so operators can diagnose. No failure blo
 
 Gated by `skipIfNoOllama` (reuse 3.B helper). Pull `nomic-embed-text` before running; test skips if not loaded.
 
-- `TestSemantic_Integration_Ollama_MyProjectsFindsAzulVigia`:
+- `TestSemantic_Integration_Ollama_MyProjectsFindsAcme`:
   1. Seed turns as in 3.C's test.
   2. Run extractor to populate entities.
   3. Run embedder to populate embeddings (wait for coverage == 100% with 2-minute budget).
   4. Call `Provider.GetContext` with "tell me about my projects".
-  5. Assert fence contains "AzulVigia".
+  5. Assert fence contains "Acme".
 
 If this passes, 3.D is functionally done.
 

@@ -537,7 +537,7 @@ func TestExtractCandidates_DropsStopwords(t *testing.T) {
 }
 
 func TestExtractCandidates_DropsShortTokens(t *testing.T) {
-	got := extractCandidates("I am on AzulVigia")
+	got := extractCandidates("I am on Acme")
 	for _, c := range got {
 		if len(c) < 3 {
 			t.Errorf("short token %q should be dropped: %v", c, got)
@@ -546,12 +546,12 @@ func TestExtractCandidates_DropsShortTokens(t *testing.T) {
 }
 
 func TestExtractCandidates_PreservesProperNouns(t *testing.T) {
-	got := extractCandidates("working on AzulVigia in Cadereyta with Vania")
+	got := extractCandidates("working on Acme in Springfield with Vania")
 	have := map[string]bool{}
 	for _, c := range got {
 		have[c] = true
 	}
-	for _, want := range []string{"AzulVigia", "Cadereyta", "Vania"} {
+	for _, want := range []string{"Acme", "Springfield", "Vania"} {
 		if !have[want] {
 			t.Errorf("candidate %q dropped; got %v", want, got)
 		}
@@ -610,10 +610,10 @@ func TestFormatContextBlock_EmptyReturnsEmptyString(t *testing.T) {
 
 func TestFormatContextBlock_IncludesAllHeaderMarkers(t *testing.T) {
 	ents := []recalledEntity{
-		{Name: "AzulVigia", Type: "PROJECT", Description: "my sports platform"},
+		{Name: "Acme", Type: "PROJECT", Description: "my sports platform"},
 	}
 	rels := []recalledRel{
-		{Source: "AzulVigia", Predicate: "LOCATED_IN", Target: "Cadereyta", Weight: 2.5},
+		{Source: "Acme", Predicate: "LOCATED_IN", Target: "Springfield", Weight: 2.5},
 	}
 	got := formatContextBlock(ents, rels)
 	for _, want := range []string{
@@ -622,7 +622,7 @@ func TestFormatContextBlock_IncludesAllHeaderMarkers(t *testing.T) {
 		"[System note:",
 		"## Entities (1)",
 		"## Relationships (1)",
-		"AzulVigia",
+		"Acme",
 		"LOCATED_IN",
 		"do not acknowledge",
 	} {
@@ -895,14 +895,14 @@ func openGraphWithSeeds(t *testing.T) *SqliteStore {
 	// Seed data: 4 entities across two chats.
 	_, _ = s.db.Exec(`
 		INSERT INTO entities(name, type, description, updated_at) VALUES
-			('AzulVigia','PROJECT','sports platform',1),
-			('Cadereyta','PLACE','',1),
+			('Acme','PROJECT','sports platform',1),
+			('Springfield','PLACE','',1),
 			('Vania','PERSON','',1),
 			('Neovim','TOOL','',1)
 	`)
 	_, _ = s.db.Exec(`
 		INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES
-			('s','user','working on AzulVigia',1,'telegram:42'),
+			('s','user','working on Acme',1,'telegram:42'),
 			('s','user','Vania uses Neovim',2,'telegram:42'),
 			('s','user','Neovim rocks',3,'telegram:99')
 	`)
@@ -912,7 +912,7 @@ func openGraphWithSeeds(t *testing.T) *SqliteStore {
 func TestSeedsExactName_MatchesCaseInsensitive(t *testing.T) {
 	s := openGraphWithSeeds(t)
 	ids, err := seedsExactName(context.Background(), s.db,
-		[]string{"azulvigia", "Vania"}, 5)
+		[]string{"acme", "Vania"}, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -944,15 +944,15 @@ func TestSeedsExactName_EmptyCandidateReturnsEmpty(t *testing.T) {
 
 func TestSeedsFTS5_MatchesByTurnContent(t *testing.T) {
 	s := openGraphWithSeeds(t)
-	// Msg mentions "AzulVigia" which appears in a chat-42 turn; FTS5
-	// should surface the AzulVigia entity.
+	// Msg mentions "Acme" which appears in a chat-42 turn; FTS5
+	// should surface the Acme entity.
 	ids, err := seedsFTS5(context.Background(), s.db,
-		"AzulVigia", "telegram:42", 5)
+		"Acme", "telegram:42", 5)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(ids) == 0 {
-		t.Error("FTS5 match returned zero seeds; AzulVigia should match turn content")
+		t.Error("FTS5 match returned zero seeds; Acme should match turn content")
 	}
 }
 
@@ -974,7 +974,7 @@ func TestSeedsFTS5_ScopesToChatID(t *testing.T) {
 func TestSeedsFTS5_EmptyChatIDMatchesGlobal(t *testing.T) {
 	s := openGraphWithSeeds(t)
 	// Empty chat_id means no scoping — global search across all turns.
-	ids, _ := seedsFTS5(context.Background(), s.db, "AzulVigia", "", 5)
+	ids, _ := seedsFTS5(context.Background(), s.db, "Acme", "", 5)
 	if len(ids) == 0 {
 		t.Error("empty chat_id should be global scope; got zero seeds")
 	}
@@ -1635,8 +1635,8 @@ func openProviderWithRichGraph(t *testing.T) (*SqliteStore, *Provider) {
 
 	// Entities.
 	for _, e := range []struct{ name, typ, desc string }{
-		{"AzulVigia", "PROJECT", "sports analytics"},
-		{"Cadereyta", "PLACE", ""},
+		{"Acme", "PROJECT", "sports analytics"},
+		{"Springfield", "PLACE", ""},
 		{"Juan", "PERSON", "the user"},
 		{"Vania", "PERSON", "partner"},
 		{"Go", "TOOL", ""},
@@ -1651,8 +1651,8 @@ func openProviderWithRichGraph(t *testing.T) (*SqliteStore, *Provider) {
 		w              float64
 	}
 	rels := []rel{
-		{"Juan", "AzulVigia", "WORKS_ON", 3.0},
-		{"AzulVigia", "Cadereyta", "LOCATED_IN", 2.0},
+		{"Juan", "Acme", "WORKS_ON", 3.0},
+		{"Acme", "Springfield", "LOCATED_IN", 2.0},
 		{"Vania", "Juan", "KNOWS", 5.0},
 		{"Juan", "Go", "HAS_SKILL", 4.0},
 	}
@@ -1667,7 +1667,7 @@ func openProviderWithRichGraph(t *testing.T) (*SqliteStore, *Provider) {
 	// Turn seeds for FTS5 fallback (not used in most tests).
 	_, _ = s.db.Exec(
 		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id)
-		 VALUES('s','user','Juan works on AzulVigia daily',1,'telegram:42')`)
+		 VALUES('s','user','Juan works on Acme daily',1,'telegram:42')`)
 
 	p := NewRecall(s, RecallConfig{
 		WeightThreshold: 1.0,
@@ -1681,7 +1681,7 @@ func openProviderWithRichGraph(t *testing.T) (*SqliteStore, *Provider) {
 func TestProvider_GetContext_HappyPath(t *testing.T) {
 	_, p := openProviderWithRichGraph(t)
 	out := p.GetContext(context.Background(), RecallInput{
-		UserMessage: "tell me about AzulVigia",
+		UserMessage: "tell me about Acme",
 		ChatKey:     "telegram:42",
 	})
 	if out == "" {
@@ -1691,8 +1691,8 @@ func TestProvider_GetContext_HappyPath(t *testing.T) {
 	for _, want := range []string{
 		"<memory-context>",
 		"</memory-context>",
-		"AzulVigia",
-		"Cadereyta",
+		"Acme",
+		"Springfield",
 		"## Entities",
 		"## Relationships",
 		"do not acknowledge",
@@ -1733,25 +1733,25 @@ func TestProvider_GetContext_RespectsContextDeadline(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // already-cancelled ctx
 
-	out := p.GetContext(ctx, RecallInput{UserMessage: "tell me about AzulVigia"})
+	out := p.GetContext(ctx, RecallInput{UserMessage: "tell me about Acme"})
 	if out != "" {
 		t.Errorf("GetContext on cancelled ctx = %q, want empty string", out)
 	}
 }
 
 func TestProvider_GetContext_ChatIDScopedToFTS5Fallback(t *testing.T) {
-	// Chat 42's only turn mentions AzulVigia. Query from chat 99 (which
-	// has no turns about AzulVigia). Layer-1 exact match still finds the
+	// Chat 42's only turn mentions Acme. Query from chat 99 (which
+	// has no turns about Acme). Layer-1 exact match still finds the
 	// entity (entities are global); Layer-2 FTS5 would NOT surface it
 	// from chat 99's empty turn history. Net: seed selection still works
-	// because "AzulVigia" is literally in the message.
+	// because "Acme" is literally in the message.
 	_, p := openProviderWithRichGraph(t)
 	out := p.GetContext(context.Background(), RecallInput{
-		UserMessage: "AzulVigia progress?",
+		UserMessage: "Acme progress?",
 		ChatKey:     "telegram:99",
 	})
-	if !strings.Contains(out, "AzulVigia") {
-		t.Errorf("Layer-1 exact match should still find AzulVigia regardless of chat; got %q", out)
+	if !strings.Contains(out, "Acme") {
+		t.Errorf("Layer-1 exact match should still find Acme regardless of chat; got %q", out)
 	}
 }
 ```
@@ -2056,7 +2056,7 @@ func TestKernel_InjectsMemoryContextWhenRecallNonNil(t *testing.T) {
 	defer cancel()
 	go k.Run(ctx)
 	<-k.Render()
-	_ = k.Submit(PlatformEvent{Kind: PlatformEventSubmit, Text: "tell me about AzulVigia"})
+	_ = k.Submit(PlatformEvent{Kind: PlatformEventSubmit, Text: "tell me about Acme"})
 
 	waitForFrameMatching(t, k.Render(), func(f RenderFrame) bool {
 		return f.Phase == PhaseIdle && f.SessionID != ""
@@ -2077,12 +2077,12 @@ func TestKernel_InjectsMemoryContextWhenRecallNonNil(t *testing.T) {
 	if !strings.Contains(req.Messages[0].Content, "MEMORY BLOCK HERE") {
 		t.Errorf("system message doesn't contain mock content: %q", req.Messages[0].Content)
 	}
-	if req.Messages[1].Role != "user" || req.Messages[1].Content != "tell me about AzulVigia" {
-		t.Errorf("Messages[1] = %+v, want user/'tell me about AzulVigia'", req.Messages[1])
+	if req.Messages[1].Role != "user" || req.Messages[1].Content != "tell me about Acme" {
+		t.Errorf("Messages[1] = %+v, want user/'tell me about Acme'", req.Messages[1])
 	}
 
 	// mockRecall received the right params.
-	if rec.lastInput.UserMessage != "tell me about AzulVigia" {
+	if rec.lastInput.UserMessage != "tell me about Acme" {
 		t.Errorf("recall received UserMessage = %q", rec.lastInput.UserMessage)
 	}
 	if rec.lastInput.ChatKey != "telegram:42" {
@@ -2585,7 +2585,7 @@ import (
 // 3. Run the real Phase-3.B extractor against Ollama to populate
 //    entities + relationships.
 // 4. Construct memory.NewRecall.
-// 5. Call GetContext with "tell me about AzulVigia"; assert the fence
+// 5. Call GetContext with "tell me about Acme"; assert the fence
 //    contains the extractor's output.
 //
 // Skips gracefully (not fails) if Ollama isn't running.
@@ -2605,9 +2605,9 @@ func TestRecall_Integration_Ollama_SecondTurnSeesFirstTurnEntities(t *testing.T)
 
 	// Direct-insert 3 entity-rich turns.
 	highDensityTurns := []string{
-		"I am setting up the AzulVigia project in Cadereyta.",
+		"I am setting up the Acme project in Springfield.",
 		"Vania is helping me test the Neovim configuration.",
-		"Juan Tamez works on the Go backend of AzulVigia every day.",
+		"Juan Tamez works on the Go backend of Acme every day.",
 	}
 	for i, content := range highDensityTurns {
 		_, err := store.db.Exec(
@@ -2662,19 +2662,19 @@ func TestRecall_Integration_Ollama_SecondTurnSeesFirstTurnEntities(t *testing.T)
 		MaxSeeds:        5,
 	}, nil)
 
-	// The "second turn" — ask about AzulVigia and expect the fence to
+	// The "second turn" — ask about Acme and expect the fence to
 	// contain it + its neighbors.
 	recallCtx, recallCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer recallCancel()
 	block := prov.GetContext(recallCtx, RecallInput{
-		UserMessage: "tell me about AzulVigia",
+		UserMessage: "tell me about Acme",
 		ChatKey:     "telegram:42",
 	})
 
 	// ── Telemetry dump ──────────────────────────────────────────────
 	t.Logf("=== RECALL BLOCK ===")
 	if block == "" {
-		t.Logf("  (empty — extractor may have dropped AzulVigia)")
+		t.Logf("  (empty — extractor may have dropped Acme)")
 	} else {
 		for _, line := range strings.Split(block, "\n") {
 			t.Logf("  %s", line)
@@ -2687,7 +2687,7 @@ func TestRecall_Integration_Ollama_SecondTurnSeesFirstTurnEntities(t *testing.T)
 
 	// ── Assertions ──────────────────────────────────────────────────
 	if block == "" {
-		t.Errorf("GetContext returned empty; AzulVigia should have been a seed hit")
+		t.Errorf("GetContext returned empty; Acme should have been a seed hit")
 		return
 	}
 	if !strings.Contains(block, "<memory-context>") {
@@ -2696,12 +2696,12 @@ func TestRecall_Integration_Ollama_SecondTurnSeesFirstTurnEntities(t *testing.T)
 	if !strings.Contains(block, "</memory-context>") {
 		t.Errorf("block missing fence closing")
 	}
-	if !strings.Contains(block, "AzulVigia") {
-		t.Errorf("block missing seed entity AzulVigia")
+	if !strings.Contains(block, "Acme") {
+		t.Errorf("block missing seed entity Acme")
 	}
 	// At least one of these neighbors should appear if the extractor
 	// populated relationships correctly.
-	neighbors := []string{"Cadereyta", "Juan", "Vania", "Go"}
+	neighbors := []string{"Springfield", "Juan", "Vania", "Go"}
 	var matched []string
 	for _, n := range neighbors {
 		if strings.Contains(block, n) {
@@ -2709,7 +2709,7 @@ func TestRecall_Integration_Ollama_SecondTurnSeesFirstTurnEntities(t *testing.T)
 		}
 	}
 	if len(matched) == 0 {
-		t.Errorf("block contained zero expected neighbors of AzulVigia; expected any of %v", neighbors)
+		t.Errorf("block contained zero expected neighbors of Acme; expected any of %v", neighbors)
 	}
 	t.Logf("neighbors surfaced in block: %v (out of expected %v)", matched, neighbors)
 }
@@ -2747,11 +2747,11 @@ Mirrors the Phase-3.B extractor integration test pattern:
 skip-if-no-Ollama, else run the real pipeline.
 
 Flow:
-  1. Seed 3 entity-rich turns (AzulVigia/Cadereyta/Vania/Juan/Go).
+  1. Seed 3 entity-rich turns (Acme/Springfield/Vania/Juan/Go).
   2. Run the real extractor against local Ollama to populate the
      graph (entities + relationships).
   3. Construct memory.NewRecall provider.
-  4. Query GetContext("tell me about AzulVigia", chat=telegram:42).
+  4. Query GetContext("tell me about Acme", chat=telegram:42).
   5. Assert the returned block contains the fence, the seed
      entity, and at least one expected neighbor.
 
@@ -2850,7 +2850,7 @@ GORMES_EXTRACTOR_MODEL="huggingface.co/r1r21nb/qwen2.5-3b-instruct.Q4_K_M.gguf:l
   -v -timeout 10m
 ```
 
-Expected: both tests PASS against a running Ollama. Recall block's log dump shows AzulVigia + at least one neighbor surfaced in the `<memory-context>` fence.
+Expected: both tests PASS against a running Ollama. Recall block's log dump shows Acme + at least one neighbor surfaced in the `<memory-context>` fence.
 
 - [ ] **Step 6: Offline doctor**
 
