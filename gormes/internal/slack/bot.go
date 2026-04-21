@@ -160,7 +160,6 @@ func (b *Bot) runOutbound(ctx context.Context, wg *sync.WaitGroup, ready chan<- 
 			b.finishTurn()
 			return
 		}
-	default:
 	}
 	close(ready)
 

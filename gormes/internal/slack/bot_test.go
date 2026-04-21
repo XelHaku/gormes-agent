@@ -85,7 +85,6 @@ func TestBot_AcksEventsBeforeHandling(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -124,7 +123,6 @@ func TestBot_UsesThreadTSForReplies(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -162,7 +160,6 @@ func TestBot_UsesTimestampFallbackForRepliesWhenThreadMissing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -187,7 +184,6 @@ func TestBot_RejectsOtherChannels(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -212,7 +208,6 @@ func TestBot_IgnoresThreadBroadcastSubtype(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -245,7 +240,6 @@ func TestBot_AllowsFileShareSubtype(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -272,7 +266,6 @@ func TestBot_RootMessageDoesNotThreadWhenReplyInThreadDisabled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -301,7 +294,6 @@ func TestBot_ThreadedInboundStillRepliesInThreadWhenReplyInThreadDisabled(t *tes
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -331,7 +323,6 @@ func TestBot_DoesNotHandleEventWhenAckFails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -421,7 +412,6 @@ func TestBot_RunOutbound_EmitsPendingStreamAndFinal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
@@ -480,7 +470,6 @@ func TestBot_RunOutbound_EmitsErrorReply(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	go k.Run(ctx)
-	<-k.Render()
 	go func() { _ = b.Run(ctx) }()
 
 	mc.pushEvent(Event{
