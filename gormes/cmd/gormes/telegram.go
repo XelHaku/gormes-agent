@@ -13,12 +13,10 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/config"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/cron"
-	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/kernel"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/memory"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telegram"
-	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
 )
 
 // telegramCmd runs Gormes as a Telegram bot — the adapter previously
@@ -52,125 +50,23 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 		slog.Warn("bot_token read from config.toml; prefer GORMES_TELEGRAM_TOKEN env var for secrets")
 	}
 
-	// Phase 2.C — open the session map before the kernel so we can prime it.
-	smap, err := session.OpenBolt(config.SessionDBPath())
-	if err != nil {
-		return fmt.Errorf("session map: %w", err)
-	}
-	defer smap.Close()
-
-	ctx := context.Background()
-	var key string
+	key := ""
 	if cfg.Telegram.AllowedChatID != 0 {
 		key = session.TelegramKey(cfg.Telegram.AllowedChatID)
-		if cfg.Resume != "" {
-			if err := smap.Put(ctx, key, cfg.Resume); err != nil {
-				slog.Warn("failed to apply --resume override", "err", err)
-			}
-		}
-	}
-	var initialSID string
-	if key != "" {
-		if sid, err := smap.Get(ctx, key); err != nil {
-			slog.Warn("could not load initial session_id", "key", key, "err", err)
-		} else {
-			initialSID = sid
-			if sid != "" {
-				slog.Info("resuming persisted session", "key", key, "session_id", sid)
-			}
-		}
 	}
 
-	// Phase 3.A — open the SQLite memory store; worker starts immediately.
-	mstore, err := memory.OpenSqlite(config.MemoryDBPath(), cfg.Telegram.MemoryQueueCap, slog.Default())
-	if err != nil {
-		return fmt.Errorf("memory store: %w", err)
-	}
-	defer func() {
-		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), kernel.ShutdownBudget)
-		defer cancelShutdown()
-		if err := mstore.Close(shutdownCtx); err != nil {
-			slog.Warn("memory store close", "err", err)
-		}
-	}()
-
-	// Phase 3.D.5 — start the Memory Mirror for operator auditability.
-	mstore.StartMirror(memory.MirrorConfig{
-		Enabled:  cfg.Telegram.MirrorEnabled,
-		Path:     cfg.Telegram.MirrorPath,
-		Interval: cfg.Telegram.MirrorInterval,
-		Logger:   slog.Default(),
-	})
-
-	hc := hermes.NewHTTPClient(cfg.Hermes.Endpoint, cfg.Hermes.APIKey)
-
-	reg := buildDefaultRegistry()
-	registerDelegation(cfg, reg, hc)
-
-	tm := telemetry.New()
-
-	var recallProv kernel.RecallProvider
-
-	recallActive := cfg.Telegram.RecallEnabled && cfg.Telegram.AllowedChatID != 0
-
-	// Phase 3.D — semantic fusion wiring. Activated only when recall is
-	// active AND the feature flag is set AND an embedding model is named.
-	// Falls back to Hermes.Endpoint when SemanticEndpoint is empty
-	// (Ollama often hosts both /v1/chat/completions and /v1/embeddings).
-	var semCache *memory.SemanticCache
-	var ec *memory.EmbedClient
-	if recallActive && cfg.Telegram.SemanticEnabled && cfg.Telegram.SemanticModel != "" {
-		endpoint := cfg.Telegram.SemanticEndpoint
-		if endpoint == "" {
-			endpoint = cfg.Hermes.Endpoint
-		}
-		ec = memory.NewEmbedClient(endpoint, cfg.Hermes.APIKey)
-		semCache = memory.NewSemanticCache()
-	}
-
-	if recallActive {
-		memProv := memory.NewRecall(mstore, memory.RecallConfig{
-			WeightThreshold:       cfg.Telegram.RecallWeightThreshold,
-			MaxFacts:              cfg.Telegram.RecallMaxFacts,
-			Depth:                 cfg.Telegram.RecallDepth,
-			DecayHorizonDays:      cfg.Telegram.RecallDecayHorizonDays,
-			SemanticModel:         cfg.Telegram.SemanticModel,
-			SemanticTopK:          cfg.Telegram.SemanticTopK,
-			SemanticMinSimilarity: cfg.Telegram.SemanticMinSimilarity,
-			QueryEmbedTimeout:     cfg.Telegram.QueryEmbedTimeout,
-		}, slog.Default())
-		if ec != nil {
-			memProv = memProv.WithEmbedClient(ec, semCache)
-		}
-		recallProv = &recallAdapter{p: memProv}
-	}
-
-	k := kernel.New(kernel.Config{
-		Model:             cfg.Hermes.Model,
-		Endpoint:          cfg.Hermes.Endpoint,
-		Admission:         kernel.Admission{MaxBytes: cfg.Input.MaxBytes, MaxLines: cfg.Input.MaxLines},
-		Tools:             reg,
-		MaxToolIterations: 10,
-		MaxToolDuration:   30 * time.Second,
-		InitialSessionID:  initialSID,
-		Recall:            recallProv,
-		ChatKey:           key,
-	}, hc, mstore, tm, slog.Default())
-
-	// Phase 3.B — async LLM-assisted entity/relationship extractor.
-	// Polls turns WHERE extracted=0 on a background goroutine; completely
-	// decoupled from the kernel's hot path.
-	ext := memory.NewExtractor(mstore, hc, memory.ExtractorConfig{
-		Model:        cfg.Hermes.Model,
-		BatchSize:    cfg.Telegram.ExtractorBatchSize,
-		PollInterval: cfg.Telegram.ExtractorPollInterval,
+	rt, err := openGatewayRuntime(cfg, gatewayRuntimeOptions{
+		ChatKey:        key,
+		ResumeOverride: cfg.Resume,
+		RecallEnabled:  cfg.Telegram.RecallEnabled,
 	}, slog.Default())
+	if err != nil {
+		return err
+	}
 	defer func() {
 		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), kernel.ShutdownBudget)
 		defer cancelShutdown()
-		if err := ext.Close(shutdownCtx); err != nil {
-			slog.Warn("extractor close", "err", err)
-		}
+		rt.Close(shutdownCtx)
 	}()
 
 	tc, err := telegram.NewRealClient(cfg.Telegram.BotToken)
@@ -182,49 +78,30 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 		AllowedChatID:     cfg.Telegram.AllowedChatID,
 		CoalesceMs:        cfg.Telegram.CoalesceMs,
 		FirstRunDiscovery: cfg.Telegram.FirstRunDiscovery,
-		SessionMap:        smap,
+		SessionMap:        rt.SessionMap,
 		SessionKey:        key,
-	}, tc, k, slog.Default())
+	}, tc, rt.Kernel, slog.Default())
 
 	rootCtx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	go k.Run(rootCtx)
-	go ext.Run(rootCtx)
-
-	// Phase 3.D — Embedder worker bounded to rootCtx. No-op when ec is nil.
-	if ec != nil {
-		embedder := memory.NewEmbedder(mstore, ec, memory.EmbedderConfig{
-			Model:        cfg.Telegram.SemanticModel,
-			PollInterval: cfg.Telegram.EmbedderPollInterval,
-			BatchSize:    cfg.Telegram.EmbedderBatchSize,
-			CallTimeout:  cfg.Telegram.EmbedderCallTimeout,
-		}, slog.Default(), semCache)
-		go embedder.Run(rootCtx)
-		defer func() {
-			shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), kernel.ShutdownBudget)
-			defer cancelShutdown()
-			if err := embedder.Close(shutdownCtx); err != nil {
-				slog.Warn("embedder close", "err", err)
-			}
-		}()
-	}
+	rt.Start(rootCtx)
 
 	// Phase 2.D — cron scheduler + executor + mirror (opt-in via
 	// cfg.Cron.Enabled). No-op when disabled — zero goroutines, zero
 	// bbolt bucket, zero RAM.
 	if cfg.Cron.Enabled && cfg.Telegram.AllowedChatID != 0 {
 		// Reuse the existing session.db for the cron_jobs bucket.
-		cronStore, err := cron.NewStore(smap.DB())
+		cronStore, err := cron.NewStore(rt.SessionMap.DB())
 		if err != nil {
 			return fmt.Errorf("cron: init store: %w", err)
 		}
-		cronRunStore := cron.NewRunStore(mstore.DB())
+		cronRunStore := cron.NewRunStore(rt.MemoryStore.DB())
 
 		sink := newTelegramDeliverySink(bot, cfg.Telegram.AllowedChatID)
 
 		cronExec := cron.NewExecutor(cron.ExecutorConfig{
-			Kernel:      k,
+			Kernel:      rt.Kernel,
 			JobStore:    cronStore,
 			RunStore:    cronRunStore,
 			Sink:        sink,
