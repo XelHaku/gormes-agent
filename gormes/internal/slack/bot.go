@@ -198,15 +198,15 @@ func (b *Bot) runOutbound(ctx context.Context, wg *sync.WaitGroup, ready chan<- 
 					b.log.Warn("slack placeholder update failed", "channel_id", binding.channelID, "ts", b.placeholderTS(), "err", err)
 				}
 			case kernel.PhaseIdle:
-				if err := b.deliverCurrent(ctx, formatFinal(f)); err != nil {
-					b.log.Warn("slack final delivery failed", "channel_id", binding.channelID, "err", err)
+				terminal := b.releaseCurrentBinding()
+				if err := b.deliverBinding(ctx, terminal, formatFinal(f)); err != nil {
+					b.log.Warn("slack final delivery failed", "channel_id", terminal.channelID, "err", err)
 				}
-				b.finishTurn()
 			case kernel.PhaseFailed, kernel.PhaseCancelling:
-				if err := b.deliverCurrent(ctx, formatError(f)); err != nil {
-					b.log.Warn("slack error delivery failed", "channel_id", binding.channelID, "err", err)
+				terminal := b.releaseCurrentBinding()
+				if err := b.deliverBinding(ctx, terminal, formatError(f)); err != nil {
+					b.log.Warn("slack error delivery failed", "channel_id", terminal.channelID, "err", err)
 				}
-				b.finishTurn()
 			}
 		}
 	}
@@ -319,6 +319,10 @@ func (b *Bot) deliverCurrent(ctx context.Context, text string) error {
 	}
 	b.mu.Unlock()
 
+	return b.deliverBinding(ctx, binding, text)
+}
+
+func (b *Bot) deliverBinding(ctx context.Context, binding turnBinding, text string) error {
 	if binding.channelID == "" {
 		return nil
 	}
@@ -387,4 +391,15 @@ func (b *Bot) finishTurn() {
 	b.mu.Lock()
 	b.current = nil
 	b.mu.Unlock()
+}
+
+func (b *Bot) releaseCurrentBinding() turnBinding {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.current == nil {
+		return turnBinding{}
+	}
+	binding := *b.current
+	b.current = nil
+	return binding
 }

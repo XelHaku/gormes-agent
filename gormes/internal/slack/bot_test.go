@@ -370,18 +370,32 @@ func TestBot_NewCommandRejectsReservedTurnWithoutKernelReset(t *testing.T) {
 	}
 }
 
-func TestBot_NewCommandRejectsCurrentTurnWithoutKernelReset(t *testing.T) {
+func TestBot_NewCommandAllowsResetAfterTerminalBindingRelease(t *testing.T) {
 	mc := newMockClient()
+	k := newIdleSlackKernel()
 	b := New(Config{
 		AllowedChannelID: "C123",
 		ReplyInThread:    true,
-	}, mc, newIdleSlackKernel(), nil)
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go k.Run(ctx)
+
 	b.current = &turnBinding{
 		channelID: "C123",
 		threadTS:  "1711111111.000393",
+		placeholderTS: "1711111111.999997",
+	}
+	released := b.releaseCurrentBinding()
+	if released.channelID != "C123" {
+		t.Fatalf("released.channelID = %q, want C123", released.channelID)
+	}
+	if b.hasTurnInFlight() {
+		t.Fatal("hasTurnInFlight = true after terminal binding release, want false")
 	}
 
-	b.handleEvent(context.Background(), Event{
+	b.handleEvent(ctx, Event{
 		RequestID: "req-new-current",
 		ChannelID: "C123",
 		UserID:    "U1",
@@ -390,8 +404,8 @@ func TestBot_NewCommandRejectsCurrentTurnWithoutKernelReset(t *testing.T) {
 		ThreadTS:  "1711111111.000393",
 	})
 
-	if got := mc.lastOutputText(); !strings.Contains(got, "Cannot reset during active turn") {
-		t.Fatalf("last output = %q, want deterministic busy reset reply", got)
+	if got := mc.lastOutputText(); !strings.Contains(got, "Session reset. Next message starts fresh.") {
+		t.Fatalf("last output = %q, want successful reset after terminal binding release", got)
 	}
 	if got := mc.lastOutputText(); strings.Contains(got, "ack timeout") {
 		t.Fatalf("last output = %q, want no queued reset ack-timeout path", got)
