@@ -31,3 +31,25 @@ func TestLoad_MinimalFixture(t *testing.T) {
 		t.Errorf("items[0] = %+v, want name=item one status=complete", sp.Items[0])
 	}
 }
+
+func TestLoad_RealFile(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := Validate(p); err != nil {
+		t.Fatalf("Validate() = %v, want nil", err)
+	}
+	// Phase 1 must derive as complete (all subphases complete).
+	if got := p.Phases["1"].DerivedStatus(); got != StatusComplete {
+		t.Errorf("Phase 1 = %q, want complete", got)
+	}
+	// Phase 2 has 2.A, 2.B.1, 2.C complete and more planned -> in_progress.
+	if got := p.Phases["2"].DerivedStatus(); got != StatusInProgress {
+		t.Errorf("Phase 2 = %q, want in_progress", got)
+	}
+	// Phase 4 is entirely planned.
+	if got := p.Phases["4"].DerivedStatus(); got != StatusPlanned {
+		t.Errorf("Phase 4 = %q, want planned", got)
+	}
+}
