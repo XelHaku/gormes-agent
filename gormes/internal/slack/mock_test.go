@@ -29,6 +29,8 @@ type mockClient struct {
 	PostErr   error
 	UpdateErr error
 	AckFn     func(string) error
+	RunErr    error
+	RunFn     func(context.Context, func(Event)) error
 }
 
 var _ Client = (*mockClient)(nil)
@@ -48,6 +50,12 @@ func (m *mockClient) AuthTest(context.Context) (string, error) {
 }
 
 func (m *mockClient) Run(ctx context.Context, fn func(Event)) error {
+	if m.RunFn != nil {
+		return m.RunFn(ctx, fn)
+	}
+	if m.RunErr != nil {
+		return m.RunErr
+	}
 	for {
 		select {
 		case <-ctx.Done():

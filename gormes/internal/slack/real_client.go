@@ -117,9 +117,7 @@ func (c *realClient) handleSocketEvent(evt socketmode.Event, fn func(Event)) {
 	case socketmode.EventTypeEventsAPI:
 		c.handleEventsAPI(evt, fn)
 	case socketmode.EventTypeInteractive, socketmode.EventTypeSlashCommand:
-		if evt.Request != nil {
-			_ = c.socket.Ack(*evt.Request)
-		}
+		_ = c.autoAck(evt.Request)
 	}
 }
 
@@ -130,17 +128,17 @@ func (c *realClient) handleEventsAPI(evt socketmode.Event, fn func(Event)) {
 
 	eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
 	if !ok {
-		_ = c.socket.Ack(*evt.Request)
+		_ = c.autoAck(evt.Request)
 		return
 	}
 	if eventsAPIEvent.Type != slackevents.CallbackEvent {
-		_ = c.socket.Ack(*evt.Request)
+		_ = c.autoAck(evt.Request)
 		return
 	}
 
 	msg, ok := eventsAPIEvent.InnerEvent.Data.(*slackevents.MessageEvent)
 	if !ok || msg == nil {
-		_ = c.socket.Ack(*evt.Request)
+		_ = c.autoAck(evt.Request)
 		return
 	}
 
@@ -159,4 +157,11 @@ func (c *realClient) handleEventsAPI(evt socketmode.Event, fn func(Event)) {
 		SubType:   msg.SubType,
 		BotID:     msg.BotID,
 	})
+}
+
+func (c *realClient) autoAck(req *socketmode.Request) error {
+	if req == nil {
+		return nil
+	}
+	return c.ackFn(*req)
 }

@@ -351,6 +351,30 @@ func TestBot_DoesNotHandleEventWhenAckFails(t *testing.T) {
 	}
 }
 
+func TestBot_RunReturnsPromptlyWhenClientRunFails(t *testing.T) {
+	mc := newMockClient()
+	runErr := errors.New("socket mode failed")
+	mc.RunErr = runErr
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+	}, mc, newIdleSlackKernel(), nil)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- b.Run(context.Background())
+	}()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, runErr) {
+			t.Fatalf("Run err = %v, want %v", err, runErr)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Bot.Run hung after client.Run failure")
+	}
+}
+
 func TestBot_RunOutbound_EmitsPendingStreamAndFinal(t *testing.T) {
 	mc := newMockClient()
 	k := newSlackKernel("roger", "sess-slack")
@@ -629,5 +653,50 @@ func TestRealClient_AckFailureRetainsPendingAndSuccessClearsIt(t *testing.T) {
 	}
 	if ackCount != 2 {
 		t.Fatalf("ackCount after idempotent ack = %d, want 2", ackCount)
+	}
+}
+
+func TestRealClient_HandleSocketEvent_AutoAckUsesInjectedSeam(t *testing.T) {
+	var acked []string
+	rc := &realClient{
+		pending: make(map[string]socketmode.Request),
+		ackFn: func(req socketmode.Request) error {
+			acked = append(acked, req.EnvelopeID)
+			return nil
+		},
+	}
+
+	rc.handleSocketEvent(socketmode.Event{
+		Type: socketmode.EventTypeInteractive,
+		Request: &socketmode.Request{
+			EnvelopeID: "interactive-1",
+		},
+	}, nil)
+	rc.handleSocketEvent(socketmode.Event{
+		Type: socketmode.EventTypeSlashCommand,
+		Request: &socketmode.Request{
+			EnvelopeID: "slash-1",
+		},
+	}, nil)
+	rc.handleEventsAPI(socketmode.Event{
+		Type: socketmode.EventTypeEventsAPI,
+		Request: &socketmode.Request{
+			EnvelopeID: "not-message-1",
+		},
+		Data: slackevents.EventsAPIEvent{
+			Type: slackevents.CallbackEvent,
+			InnerEvent: slackevents.EventsAPIInnerEvent{
+				Data: struct{}{},
+			},
+		},
+	}, func(Event) {
+		t.Fatal("unexpected message callback")
+	})
+
+	if len(acked) != 3 {
+		t.Fatalf("acked = %v, want 3 acked envelopes", acked)
+	}
+	if acked[0] != "interactive-1" || acked[1] != "slash-1" || acked[2] != "not-message-1" {
+		t.Fatalf("acked = %v, want injected ack order for interactive/slash/non-message events", acked)
 	}
 }

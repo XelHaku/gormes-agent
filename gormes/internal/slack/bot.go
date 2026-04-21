@@ -64,14 +64,18 @@ func (b *Bot) Run(ctx context.Context) error {
 	}
 	b.selfUserID = selfID
 
+	runCtx, cancel := context.WithCancel(ctx)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go b.runOutbound(ctx, &wg)
-	defer wg.Wait()
+	go b.runOutbound(runCtx, &wg)
 
-	return b.client.Run(ctx, func(e Event) {
+	err = b.client.Run(runCtx, func(e Event) {
 		b.handleEvent(ctx, e)
 	})
+	cancel()
+	wg.Wait()
+	return err
 }
 
 func (b *Bot) handleEvent(ctx context.Context, e Event) {
