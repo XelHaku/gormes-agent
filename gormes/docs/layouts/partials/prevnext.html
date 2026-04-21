@@ -1,0 +1,33 @@
+{{ with .Parent }}
+  {{ $siblings := .Pages.ByWeight }}
+  {{ $current := $ }}
+  {{ $idx := -1 }}
+  {{ range $i, $p := $siblings }}
+    {{ if eq $p.RelPermalink $current.RelPermalink }}
+      {{ $idx = $i }}
+    {{ end }}
+  {{ end }}
+  {{ if ge $idx 0 }}
+    {{ $prev := "" }}
+    {{ $next := "" }}
+    {{ if gt $idx 0 }}{{ $prev = index $siblings (sub $idx 1) }}{{ end }}
+    {{ $last := sub (len $siblings) 1 }}
+    {{ if lt $idx $last }}{{ $next = index $siblings (add $idx 1) }}{{ end }}
+    {{ if or $prev $next }}
+    <nav class="docs-prevnext" aria-label="Previous and next pages">
+      {{ with $prev }}
+      <a class="docs-prevnext-link docs-prevnext-link--prev" href="{{ .RelPermalink }}">
+        <span class="docs-prevnext-dir">← Previous</span>
+        <span class="docs-prevnext-title">{{ .Title }}</span>
+      </a>
+      {{ else }}<span></span>{{ end }}
+      {{ with $next }}
+      <a class="docs-prevnext-link docs-prevnext-link--next" href="{{ .RelPermalink }}">
+        <span class="docs-prevnext-dir">Next →</span>
+        <span class="docs-prevnext-title">{{ .Title }}</span>
+      </a>
+      {{ else }}<span></span>{{ end }}
+    </nav>
+    {{ end }}
+  {{ end }}
+{{ end }}

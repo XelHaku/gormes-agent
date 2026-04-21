@@ -8,6 +8,7 @@
   <div class="docs-layout-with-toc">
     <div class="docs-content">
       {{ .Content }}
+      {{ partial "prevnext.html" . }}
     </div>
     <aside class="docs-toc">
       {{ partial "toc.html" . }}
