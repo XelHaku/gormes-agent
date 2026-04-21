@@ -120,3 +120,46 @@ func Load(path string) (*Progress, error) {
 	}
 	return &p, nil
 }
+
+type Counts struct {
+	Total      int
+	Complete   int
+	InProgress int
+	Planned    int
+}
+
+type Stats struct {
+	Phases    Counts
+	Subphases Counts
+	Items     Counts
+}
+
+// Stats walks all phases/subphases/items and tallies derived status.
+// Computed on demand — never stored in progress.json.
+func (p *Progress) Stats() Stats {
+	var s Stats
+	for _, ph := range p.Phases {
+		s.Phases.Total++
+		tally(&s.Phases, ph.DerivedStatus())
+		for _, sp := range ph.Subphases {
+			s.Subphases.Total++
+			tally(&s.Subphases, sp.DerivedStatus())
+			for _, it := range sp.Items {
+				s.Items.Total++
+				tally(&s.Items, it.Status)
+			}
+		}
+	}
+	return s
+}
+
+func tally(c *Counts, st Status) {
+	switch st {
+	case StatusComplete:
+		c.Complete++
+	case StatusInProgress:
+		c.InProgress++
+	case StatusPlanned:
+		c.Planned++
+	}
+}
