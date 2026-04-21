@@ -54,6 +54,34 @@ type Progress struct {
 	Phases map[string]Phase `json:"phases"`
 }
 
+// DerivedStatus computes subphase status.
+// If explicit Status is set (and no items), returns it.
+// Otherwise: all items complete -> complete; any complete or in_progress -> in_progress; else planned.
+// Validate guarantees exactly one of Items or Status is set.
+func (s Subphase) DerivedStatus() Status {
+	if len(s.Items) == 0 {
+		return s.Status
+	}
+	allComplete := true
+	anyStarted := false
+	for _, it := range s.Items {
+		if it.Status != StatusComplete {
+			allComplete = false
+		}
+		if it.Status == StatusComplete || it.Status == StatusInProgress {
+			anyStarted = true
+		}
+	}
+	switch {
+	case allComplete:
+		return StatusComplete
+	case anyStarted:
+		return StatusInProgress
+	default:
+		return StatusPlanned
+	}
+}
+
 // Load reads and parses progress.json from the given path.
 func Load(path string) (*Progress, error) {
 	b, err := os.ReadFile(path)
