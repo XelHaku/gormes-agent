@@ -32,6 +32,7 @@ The donor is reusable because responsibilities are already separated in the way 
 - `token_cache.go` isolates a donor-specific workaround for stale tenant token caching in the upstream SDK.
 
 That file split makes Feishu useful not only as code, but also as a decomposition template for a future Gormes `internal/feishu` package.
+Only the inbound/runtime skeleton, media download path, and reply lookup logic are copy-worthy; send, edit, react, and card UX in `feishu_64.go` should be treated as pattern-only.
 
 ## Picoclaw Donor Files
 
@@ -39,6 +40,8 @@ That file split makes Feishu useful not only as code, but also as a decompositio
 - `picoclaw/pkg/channels/feishu/common.go`
 - `picoclaw/pkg/channels/feishu/feishu_32.go`
 - `picoclaw/pkg/channels/feishu/feishu_64.go`
+- `picoclaw/pkg/channels/feishu/common_test.go`
+- `picoclaw/pkg/channels/feishu/feishu_64_test.go`
 - `picoclaw/pkg/channels/feishu/feishu_reply.go`
 - `picoclaw/pkg/channels/feishu/token_cache.go`
 - `picoclaw/pkg/channels/feishu/feishu_reply_test.go`
@@ -59,12 +62,13 @@ Copy candidates:
 Rebuild in Gormes-native form:
 
 - Placeholder sending, reactions, and editing should be re-expressed through Gormes' own UX contracts, not copied blindly from PicoClaw interfaces.
+- `Send`, `EditMessage`, `SendPlaceholder`, `ReactToMessage`, and card-focused fallback behavior in `feishu_64.go` are donor patterns, not direct copy targets.
 - The exact message wrapper syntax in `formatReplyContext` should be reviewed against Gormes prompt conventions before reuse.
 - Config and setup semantics should follow the Hermes-facing Feishu docs, especially around WebSocket versus webhook mode, even though PicoClaw currently emphasizes websocket SDK mode.
 
 ## Gormes Mapping
 
-- `feishu_64.go` is the donor for a future `internal/feishu/runtime.go` style file: start SDK client, fetch bot identity, receive messages, send text/cards/media, and stop cleanly.
+- `feishu_64.go` is the donor for a future `internal/feishu/runtime.go` style file on the inbound side: start SDK client, fetch bot identity, receive messages, and download message resources cleanly.
 - `common.go` maps to adapter-local parsing helpers shared by inbound and outbound flows.
 - `feishu_reply.go` maps to Gormes thread/reply enrichment logic. It is especially useful because it handles both parent/root resolution and message fetch fallback.
 - `token_cache.go` should inform a very small adapter-local compatibility shim rather than a shared platform-agnostic cache abstraction.
@@ -93,17 +97,19 @@ Rebuild in Gormes-native form:
 4. Add send/edit/react/media polish after the basic adapter loop is stable.
 5. Only consider webhook parity if Phase 2 deployment requirements actually need it.
 
-Feishu looks like a reasonable Phase 2 target precisely because the donor already separates the stable transport pieces from the support and compatibility layers.
+Feishu still looks like a reasonable Phase 2 target, but the recommendation is narrow: copy the inbound/runtime skeleton, media download, and reply lookup pieces, then rebuild the send/edit/react/card UX around Gormes-native contracts.
 
 ## Code References
 
 - `picoclaw/pkg/channels/feishu/common.go`
 - `picoclaw/pkg/channels/feishu/feishu_32.go`
 - `picoclaw/pkg/channels/feishu/feishu_64.go`: `Start`, `Send`, `handleMessageReceive`, `fetchBotOpenID`, `isBotMentioned`, `downloadInboundMedia`, `downloadResource`.
+- `picoclaw/pkg/channels/feishu/common_test.go`
+- `picoclaw/pkg/channels/feishu/feishu_64_test.go`
 - `picoclaw/pkg/channels/feishu/feishu_reply.go`: `prependReplyContext`, `resolveReplyTargetMessageID`, `fetchMessageByID`, `formatReplyContext`.
 - `picoclaw/pkg/channels/feishu/token_cache.go`
 - `picoclaw/pkg/channels/feishu/feishu_reply_test.go`
 - `picoclaw/docs/channels/feishu/README.md`
 - `gormes/docs/content/upstream-hermes/user-guide/messaging/feishu.md`
 
-Recommendation: `copy candidate`.
+Recommendation: `adapt pattern only`.

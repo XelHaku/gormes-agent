@@ -23,13 +23,13 @@ Keep the boundary explicit: PicoClaw contributes the DingTalk edge. Gormes archi
 
 ## Why This Adapter Is Reusable
 
-This donor is reusable because it is small and transport-centered.
+This donor is reusable because it is small and transport-centered, but that does not make it a broad copy target.
 
 - `dingtalk.go` starts the official stream client, registers one callback, stores the `session_webhook` per chat, and replies through that webhook.
 - That means the donor already proves the key architectural fact: DingTalk inbound delivery does not require Gormes to stand up the shared webhook server for the first adapter version.
 - Group mention handling is localized in `onChatBotMessageReceived`, and the tests pin down the mention-strip and direct-chat fallback behavior.
 
-The donor does not yet show advanced DingTalk features from the upstream Hermes docs, but the basic shape is clean enough to copy forward.
+The donor does not yet show advanced DingTalk features from the upstream Hermes docs, and the outbound side is intentionally narrow because it depends on callback-scoped `session_webhook` state.
 
 ## Picoclaw Donor Files
 
@@ -42,11 +42,11 @@ The donor does not yet show advanced DingTalk features from the upstream Hermes 
 
 ## What To Copy vs What To Rebuild
 
-Copy candidates:
+Copy-worthy donor patterns:
 
 - Stream Mode startup from `Start`: credential setup, stream client creation, auto-reconnect, callback registration, and run loop.
 - `onChatBotMessageReceived` as the donor for inbound extraction, mention-only group gating, and per-chat `session_webhook` storage.
-- `Send` plus `SendDirectReply` as the basic outbound contract: no session webhook, no reply.
+- `Send` plus `SendDirectReply` as the narrow outbound contract for reply-only delivery: no session webhook, no reply.
 - Tests in `dingtalk_test.go`, especially the group mention stripping and direct-chat conversation-id fallback.
 
 Rebuild in Gormes-native form:
@@ -59,7 +59,7 @@ Rebuild in Gormes-native form:
 
 - `Start` maps directly to a future `internal/dingtalk` runtime entrypoint and is the main reason this donor matters.
 - `onChatBotMessageReceived` is the donor for DM/group distinction, mention gating, sender identity extraction, and session-webhook capture.
-- `Send` and `SendDirectReply` explain the outbound architecture: delivery is tied to the `session_webhook` from the inbound callback, not to a general API client with globally addressable chat IDs.
+- `Send` and `SendDirectReply` explain the outbound architecture boundary: delivery is tied to the `session_webhook` from the inbound callback, not to a general API client with globally addressable chat IDs.
 - The Hermes-facing doc should remain the product source of truth for user-visible behavior and optional DingTalk-specific enhancements.
 
 ## Implementation Notes
@@ -68,6 +68,7 @@ Rebuild in Gormes-native form:
 - Keep `session_webhook` as adapter-local ephemeral state keyed by the conversation identifier.
 - Port the mention-strip behavior early; group usability depends on it and the donor tests already specify the rule.
 - Expect the first Gormes version to be narrower than the Hermes docs. That is acceptable if text delivery and group/DM policy are correct first.
+- Treat this donor as a source of inbound and reply-path patterns, not as an end-to-end DingTalk adapter ready to transplant.
 
 ## Risks / Mismatches
 
@@ -82,7 +83,7 @@ Rebuild in Gormes-native form:
 3. Port text replies through session webhooks.
 4. Only then layer on richer DingTalk-specific UX from the Hermes docs.
 
-For the initial adapter, the donor looks close enough to copy because the important work is already in the transport path and not hidden behind a larger framework.
+For the initial adapter, the donor is best used to shape inbound handling and callback-bound replies, then rebuilt around Gormes' own broader outbound expectations.
 
 ## Code References
 
@@ -91,4 +92,4 @@ For the initial adapter, the donor looks close enough to copy because the import
 - `picoclaw/docs/channels/dingtalk/README.md`
 - `gormes/docs/content/upstream-hermes/user-guide/messaging/dingtalk.md`
 
-Recommendation: `copy candidate`.
+Recommendation: `adapt pattern only`.
