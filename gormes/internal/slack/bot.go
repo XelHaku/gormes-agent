@@ -102,7 +102,7 @@ func (b *Bot) handleEvent(ctx context.Context, e Event) {
 	if ignoreSubtype(e.SubType) {
 		return
 	}
-	if b.cfg.AllowedChannelID != "" && e.ChannelID != b.cfg.AllowedChannelID {
+	if b.cfg.AllowedChannelID == "" || e.ChannelID != b.cfg.AllowedChannelID {
 		return
 	}
 
@@ -130,9 +130,12 @@ func (b *Bot) handleEvent(ctx context.Context, e Event) {
 			}
 			return
 		}
-		b.clearSessionState(e.ChannelID)
-		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
-			"Session reset. Next message starts fresh.")
+		if err := b.clearSessionState(e.ChannelID); err != nil {
+			_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
+				"Session reset completed, but failed to clear persisted session: "+err.Error())
+			return
+		}
+		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "Session reset. Next message starts fresh.")
 	case strings.HasPrefix(text, "/"):
 		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "unknown command")
 	case text == "":
@@ -375,7 +378,7 @@ func (b *Bot) allowUpdate(phase kernel.Phase) bool {
 	return true
 }
 
-func (b *Bot) clearSessionState(channelID string) {
+func (b *Bot) clearSessionState(channelID string) error {
 	b.mu.Lock()
 	if b.current != nil && b.current.channelID == channelID {
 		b.current.lastSID = ""
@@ -383,8 +386,11 @@ func (b *Bot) clearSessionState(channelID string) {
 	b.mu.Unlock()
 
 	if b.cfg.SessionMap != nil {
-		_ = b.cfg.SessionMap.Put(context.Background(), SessionKey(channelID), "")
+		if err := b.cfg.SessionMap.Put(context.Background(), SessionKey(channelID), ""); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (b *Bot) finishTurn() {

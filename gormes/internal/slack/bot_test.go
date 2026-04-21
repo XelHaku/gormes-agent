@@ -16,6 +16,14 @@ import (
 	"github.com/slack-go/slack/socketmode"
 )
 
+type failingSessionMap struct {
+	putErr error
+}
+
+func (m failingSessionMap) Get(context.Context, string) (string, error) { return "", nil }
+func (m failingSessionMap) Put(context.Context, string, string) error   { return m.putErr }
+func (m failingSessionMap) Close() error                                { return nil }
+
 func newSlackKernel(reply, sid string) *kernel.Kernel {
 	hc := hermes.NewMockClient()
 	events := make([]hermes.Event, 0, len(reply)+1)
@@ -197,6 +205,33 @@ func TestBot_RejectsOtherChannels(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	if got := len(mc.outputs()); got != 0 {
 		t.Fatalf("outputs = %d, want 0", got)
+	}
+}
+
+func TestBot_RejectsAllChannelsWhenAllowedChannelUnset(t *testing.T) {
+	mc := newMockClient()
+	k := newSlackKernel("unused", "sess-unused")
+	b := New(Config{ReplyInThread: true}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-unset-channel",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "/start",
+		Timestamp: "1711111111.000301",
+	})
+
+	time.Sleep(100 * time.Millisecond)
+	if !mc.wasAcked("req-unset-channel") {
+		t.Fatal("expected request to be acked even when channel allowlist is unset")
+	}
+	if got := len(mc.outputs()); got != 0 {
+		t.Fatalf("outputs = %d, want 0 when AllowedChannelID is unset", got)
 	}
 }
 
@@ -409,6 +444,37 @@ func TestBot_NewCommandAllowsResetAfterTerminalBindingRelease(t *testing.T) {
 	}
 	if got := mc.lastOutputText(); strings.Contains(got, "ack timeout") {
 		t.Fatalf("last output = %q, want no queued reset ack-timeout path", got)
+	}
+}
+
+func TestBot_NewCommandReportsSessionCleanupFailure(t *testing.T) {
+	mc := newMockClient()
+	k := newIdleSlackKernel()
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+		SessionMap:       failingSessionMap{putErr: errors.New("persist down")},
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go k.Run(ctx)
+
+	b.handleEvent(ctx, Event{
+		RequestID: "req-new-persist-fail",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "/new",
+		Timestamp: "1711111111.000394",
+		ThreadTS:  "1711111111.000394",
+	})
+
+	got := mc.lastOutputText()
+	if !strings.Contains(got, "Session reset completed, but failed to clear persisted session") {
+		t.Fatalf("last output = %q, want honest cleanup failure reply", got)
+	}
+	if strings.Contains(got, "Next message starts fresh.") {
+		t.Fatalf("last output = %q, want no clean-reset success claim", got)
 	}
 }
 
