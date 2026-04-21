@@ -5,6 +5,10 @@ weight: 10
 
 # Gormes — Executive Roadmap
 
+**Public site:** https://gormes.ai
+**Source:** https://github.com/TrebuchetDynamics/gormes-agent
+**Upstream reference:** https://github.com/NousResearch/hermes-agent
+
 **Single source of truth:** [`progress.json`](https://github.com/TrebuchetDynamics/gormes-agent/blob/main/gormes/docs/data/progress.json) — machine-readable, auto-updated on build
 
 **Linked surfaces:**
@@ -12,6 +16,21 @@ weight: 10
 - [Landing page](https://gormes.ai) — Marketing + feature list
 - [docs.gormes.ai](https://docs.gormes.ai/building-gormes/architecture_plan/) — This page
 - [Source code](https://github.com/TrebuchetDynamics/gormes-agent) — Implementation
+
+---
+
+## Phase Ledger (narrative — progress.json is authoritative)
+
+| Phase | Focus |
+|---|---|
+| Phase 1 — The Dashboard | TUI + kernel foundation |
+| Phase 2 — The Gateway | Tools, Telegram, cron, subagents, hooks |
+| Phase 3 — The Black Box (Memory) | SQLite + FTS5 + graph + semantic + decay |
+| Phase 4 — The Brain Transplant | Native provider adapters; Hermes becomes optional |
+| Phase 5 — The Final Purge | Python disappears entirely from the runtime path |
+| Phase 6 — The Learning Loop | Skill extraction + retrieval (Gormes-original) |
+
+The detailed per-subphase checklist is rendered below from `progress.json` via the `progress-checklist` shortcode.
 
 ---
 

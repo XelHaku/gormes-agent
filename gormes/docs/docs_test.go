@@ -49,20 +49,37 @@ var targets = []string{
 }
 
 var nativeHugoPages = map[string]struct{}{
+	"_index.md":     {},
 	"why-gormes.md": {},
-	"building-gormes/_index.md":                                          {},
-	"building-gormes/architecture_plan/_index.md":                        {},
-	"building-gormes/architecture_plan/phase-1-dashboard.md":             {},
-	"building-gormes/architecture_plan/phase-2-gateway.md":               {},
-	"building-gormes/architecture_plan/phase-3-memory.md":                {},
-	"building-gormes/architecture_plan/phase-4-brain-transplant.md":      {},
-	"building-gormes/architecture_plan/phase-5-final-purge.md":           {},
-	"building-gormes/architecture_plan/phase-6-learning-loop.md":         {},
-	"building-gormes/architecture_plan/subsystem-inventory.md":           {},
-	"building-gormes/architecture_plan/mirror-strategy.md":               {},
-	"building-gormes/architecture_plan/technology-radar.md":              {},
-	"building-gormes/architecture_plan/boundaries.md":                    {},
-	"building-gormes/architecture_plan/why-go.md":                        {},
+	"building-gormes/_index.md":                                     {},
+	"building-gormes/porting-a-subsystem.md":                        {},
+	"building-gormes/testing.md":                                    {},
+	"building-gormes/what-hermes-gets-wrong.md":                     {},
+	"building-gormes/architecture_plan/_index.md":                   {},
+	"building-gormes/architecture_plan/phase-1-dashboard.md":        {},
+	"building-gormes/architecture_plan/phase-2-gateway.md":          {},
+	"building-gormes/architecture_plan/phase-3-memory.md":           {},
+	"building-gormes/architecture_plan/phase-4-brain-transplant.md": {},
+	"building-gormes/architecture_plan/phase-5-final-purge.md":      {},
+	"building-gormes/architecture_plan/phase-6-learning-loop.md":    {},
+	"building-gormes/architecture_plan/subsystem-inventory.md":      {},
+	"building-gormes/architecture_plan/mirror-strategy.md":          {},
+	"building-gormes/architecture_plan/technology-radar.md":         {},
+	"building-gormes/architecture_plan/boundaries.md":               {},
+	"building-gormes/architecture_plan/why-go.md":                   {},
+	"building-gormes/core-systems/_index.md":                        {},
+	"building-gormes/core-systems/gateway.md":                       {},
+	"building-gormes/core-systems/learning-loop.md":                 {},
+	"building-gormes/core-systems/memory.md":                        {},
+	"building-gormes/core-systems/tool-execution.md":                {},
+	"using-gormes/_index.md":                                        {},
+	"using-gormes/configuration.md":                                 {},
+	"using-gormes/faq.md":                                           {},
+	"using-gormes/install.md":                                       {},
+	"using-gormes/quickstart.md":                                    {},
+	"using-gormes/telegram-adapter.md":                              {},
+	"using-gormes/tui-mode.md":                                      {},
+	"using-gormes/wire-doctor.md":                                   {},
 }
 
 func TestMirroredDocsCoverage(t *testing.T) {
@@ -234,16 +251,18 @@ func isMirroredSourceFile(rel string) bool {
 
 func mapSourceToContent(rel string) string {
 	rel = filepath.ToSlash(rel)
+	// Upstream docs mirror lives under content/upstream-hermes/.
+	const mirrorPrefix = "upstream-hermes/"
 	if rel == "index.md" {
-		return "_index.md"
+		return mirrorPrefix + "_index.md"
 	}
 	if strings.HasSuffix(rel, "/index.md") {
-		return strings.TrimSuffix(rel, "index.md") + "_index.md"
+		return mirrorPrefix + strings.TrimSuffix(rel, "index.md") + "_index.md"
 	}
 	if strings.HasSuffix(rel, "/_category_.json") {
-		return strings.TrimSuffix(rel, "_category_.json") + "_index.md"
+		return mirrorPrefix + strings.TrimSuffix(rel, "_category_.json") + "_index.md"
 	}
-	return rel
+	return mirrorPrefix + rel
 }
 
 func scanForHazards(t *testing.T, rel, raw string) {
@@ -324,11 +343,17 @@ func TestHugoBuildProducesRenderedContent(t *testing.T) {
 		t.Fatalf("hugo build failed: %v\n%s", err, output)
 	}
 
+	// Hugo's default filename-based routing preserves section directories:
+	// content/upstream-hermes/user-guide/cli.md -> /upstream-hermes/user-guide/cli/.
+	// Tests previously expected the flattened (/upstream-hermes/:slug/)
+	// form from the old [permalinks] override; that override was removed
+	// because it clashed with the nested building-gormes/architecture_plan/
+	// routes asserted by TestHugoBuild.
 	checks := map[string][]string{
 		"index.html": {
-			"Gormes Documentation",
-			"Why Gormes",
-			"Quick Start on GitHub",
+			"USING GORMES",
+			"BUILDING GORMES",
+			"UPSTREAM HERMES",
 		},
 		filepath.Join("why-gormes", "index.html"): {
 			"Operational Moat",
@@ -336,11 +361,11 @@ func TestHugoBuildProducesRenderedContent(t *testing.T) {
 			"Chaos Resilience",
 			"Surgical Architecture",
 		},
-		filepath.Join("user-guide", "cli", "index.html"): {
+		filepath.Join("upstream-hermes", "user-guide", "cli", "index.html"): {
 			"Stylized preview of the Hermes CLI layout",
 			"The Hermes CLI banner, conversation stream, and fixed input prompt",
 		},
-		filepath.Join("user-guide", "sessions", "index.html"): {
+		filepath.Join("upstream-hermes", "user-guide", "sessions", "index.html"): {
 			"Stylized preview of the Previous Conversation recap panel",
 			"Resume mode shows a compact recap panel",
 		},

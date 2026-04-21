@@ -5,16 +5,16 @@ weight: 200
 
 # Building Gormes
 
-Contributor-facing documentation. If you're reading because you want to **use** Gormes, start at [Using Gormes](/using-gormes/).
+Contributor-facing documentation. If you're reading because you want to **use** Gormes, start at [Using Gormes](../using-gormes/).
 
 ## Gormes in one sentence
 
 **Gormes is the production runtime for self-improving agents.** Four core systems live inside the binary:
 
-1. **Learning Loop** — detect complex tasks, distill reusable skills, improve them over time ([Phase 6](/building-gormes/architecture_plan/phase-6-learning-loop/))
-2. **Memory** — SQLite + FTS5 + ontological graph, with a human-readable USER.md mirror ([Phase 3](/building-gormes/architecture_plan/phase-3-memory/))
-3. **Tool Execution** — typed Go interfaces, in-process registry, no Python bounce ([Phase 2.A](/building-gormes/architecture_plan/phase-2-gateway/))
-4. **Gateway** — one runtime, many interfaces: TUI, Telegram, (future) Discord/Slack ([Phase 2.B](/building-gormes/architecture_plan/phase-2-gateway/))
+1. **Learning Loop** — detect complex tasks, distill reusable skills, improve them over time ([Phase 6](./architecture_plan/phase-6-learning-loop/))
+2. **Memory** — SQLite + FTS5 + ontological graph, with a human-readable USER.md mirror ([Phase 3](./architecture_plan/phase-3-memory/))
+3. **Tool Execution** — typed Go interfaces, in-process registry, no Python bounce ([Phase 2.A](./architecture_plan/phase-2-gateway/))
+4. **Gateway** — one runtime, many interfaces: TUI, Telegram, (future) Discord/Slack ([Phase 2.B](./architecture_plan/phase-2-gateway/))
 
 ## Contents
 

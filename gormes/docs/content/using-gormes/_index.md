@@ -17,4 +17,4 @@ Operator-facing documentation. Run the binary, connect a Hermes backend, get wor
 - [Wire Doctor](./wire-doctor/) — `gormes doctor` validates the local stack before tokens burn
 - [FAQ](./faq/) — offline mode, memory location, log files
 
-If you want to contribute or understand how Gormes is built, see [Building Gormes](/building-gormes/).
+If you want to contribute or understand how Gormes is built, see [Building Gormes](../building-gormes/).

@@ -26,4 +26,4 @@ Every tool lives behind this interface. Schemas are Go structs — schema drift 
 
 ## Status
 
-✅ Shipped (Phase 2.A). The current registry has the minimal tool surface; porting the 61 upstream Python tools is Phase 5.A. See [Phase 2](/building-gormes/architecture_plan/phase-2-gateway/).
+✅ Shipped (Phase 2.A). The current registry has the minimal tool surface; porting the 61 upstream Python tools is Phase 5.A. See [Phase 2](../architecture_plan/phase-2-gateway/).

@@ -2,11 +2,11 @@ baseURL = "https://docs.gormes.ai/"
 languageCode = "en-us"
 title = "Gormes Docs"
 
-# Pretty URLs for all sections
-[permalinks]
-  using-gormes = "/using-gormes/:slug/"
-  building-gormes = "/building-gormes/:slug/"
-  upstream-hermes = "/upstream-hermes/:slug/"
+# URL structure: Hugo's default filename-based routing preserves
+# nested section directories (e.g. /building-gormes/architecture_plan/phase-1-dashboard/).
+# An explicit [permalinks] override with :slug would flatten nested
+# sections into the parent — the test suite asserts the non-flat
+# structure, so no override is used here.
 
 [markup]
   [markup.goldmark]

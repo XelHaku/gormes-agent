@@ -91,16 +91,17 @@ func TestDocsHarnessAllowsNativeGormesManifestoPage(t *testing.T) {
 	if _, ok := nativeHugoPages["why-gormes.md"]; !ok {
 		t.Fatalf("nativeHugoPages should explicitly allow why-gormes.md")
 	}
-	// Task 2 of the docs redesign added 13 native architecture_plan pages +
-	// the building-gormes section index. Entries beyond why-gormes.md must all
-	// be under building-gormes/ — no other paths are permitted as native pages.
+	// Native Gormes pages live under why-gormes.md OR the building-gormes/
+	// (contributor-facing) and using-gormes/ (operator-facing) sections.
+	// Everything else is a mirrored upstream doc under upstream-hermes/.
 	for page := range nativeHugoPages {
-		if page == "why-gormes.md" {
+		if page == "_index.md" || page == "why-gormes.md" {
 			continue
 		}
-		if !strings.HasPrefix(page, "building-gormes/") {
-			t.Fatalf("nativeHugoPages contains unexpected non-building-gormes entry: %q", page)
+		if strings.HasPrefix(page, "building-gormes/") || strings.HasPrefix(page, "using-gormes/") {
+			continue
 		}
+		t.Fatalf("nativeHugoPages contains unexpected entry (must be _index.md, why-gormes.md, or under building-gormes/ or using-gormes/): %q", page)
 	}
 }
 

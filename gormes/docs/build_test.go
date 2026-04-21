@@ -86,9 +86,9 @@ func TestHugoBuild_IndexHasSidebarSections(t *testing.T) {
 		"docs-nav-group-label-shipped",
 		"docs-nav-group-label-progress",
 		"docs-nav-group-label-next",
-		`href="/using-gormes/"`,
-		`href="/building-gormes/"`,
-		`href="/upstream-hermes/"`,
+		`href=/using-gormes/`,
+		`href=/building-gormes/`,
+		`href=/upstream-hermes/`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("built index.html missing %q", want)
