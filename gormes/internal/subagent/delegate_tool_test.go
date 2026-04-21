@@ -111,3 +111,45 @@ func TestDelegateTool_ExecuteReturnsChildResult(t *testing.T) {
 		t.Fatalf("Error = %q, want empty", got.Error)
 	}
 }
+
+func TestDelegateTool_TimeoutIsTwoMinutes(t *testing.T) {
+	if got := NewDelegateTool(nil).Timeout(); got != 2*time.Minute {
+		t.Fatalf("Timeout() = %v, want 2m", got)
+	}
+}
+
+func TestDelegateTool_ExecuteReturnsErrorWhenWaitFails(t *testing.T) {
+	mgr := NewManager(config.DelegationCfg{
+		DefaultMaxIterations: 8,
+		DefaultTimeout:       45 * time.Second,
+		MaxChildDepth:        1,
+	}, runnerFunc(func(ctx context.Context, spec Spec, emit func(Event)) (Result, error) {
+		return Result{Status: StatusCompleted, Summary: "child summary"}, nil
+	}), t.TempDir())
+
+	tool := NewDelegateTool(mgr)
+
+	out, err := tool.Execute(context.Background(), json.RawMessage(`{"goal":" investigate "}`))
+	if err == nil {
+		t.Fatal("Execute error = nil, want wait/log failure")
+	}
+
+	var got struct {
+		RunID   string `json:"run_id"`
+		Status  string `json:"status"`
+		Summary string `json:"summary,omitempty"`
+		Error   string `json:"error,omitempty"`
+	}
+	if jerr := json.Unmarshal(out, &got); jerr != nil {
+		t.Fatalf("unmarshal output: %v", jerr)
+	}
+	if got.RunID == "" {
+		t.Fatal("RunID must be populated")
+	}
+	if got.Status != string(StatusCompleted) {
+		t.Fatalf("Status = %q, want completed", got.Status)
+	}
+	if got.Error == "" {
+		t.Fatal("Error field must be populated when wait fails")
+	}
+}

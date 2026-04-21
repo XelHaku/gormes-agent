@@ -13,7 +13,9 @@ func TestRegisterDelegation_DisabledLeavesRegistryUnchanged(t *testing.T) {
 	reg := buildDefaultRegistry()
 	before := len(reg.Descriptors())
 
-	registerDelegation(config.Config{}, reg, hermes.NewMockClient())
+	if got := registerDelegation(config.Config{}, reg, hermes.NewMockClient()); got != nil {
+		t.Fatalf("registerDelegation() = %v, want nil", got)
+	}
 
 	after := len(reg.Descriptors())
 	if after != before {
@@ -38,7 +40,10 @@ func TestRegisterDelegation_EnabledRegistersTool(t *testing.T) {
 		},
 	}
 
-	registerDelegation(cfg, reg, hermes.NewMockClient())
+	got := registerDelegation(cfg, reg, hermes.NewMockClient())
+	if got == nil {
+		t.Fatal("registerDelegation() = nil, want manager")
+	}
 
 	tool, ok := reg.Get("delegate_task")
 	if !ok {

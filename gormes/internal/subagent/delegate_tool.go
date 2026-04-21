@@ -29,7 +29,7 @@ func (*DelegateTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"goal":{"type":"string","description":"task for the child subagent"},"context":{"type":"string","description":"scoped context for the child"},"model":{"type":"string","description":"optional model override"},"max_iterations":{"type":"integer","minimum":1,"description":"maximum child iterations"},"timeout_seconds":{"type":"integer","minimum":1,"description":"child timeout in seconds"},"allowed_tools":{"type":"array","items":{"type":"string"},"description":"tool names the child may use"}},"required":["goal"],"additionalProperties":false}`)
 }
 
-func (*DelegateTool) Timeout() time.Duration { return 0 }
+func (*DelegateTool) Timeout() time.Duration { return 2 * time.Minute }
 
 func (t *DelegateTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
 	if t == nil || t.mgr == nil {
@@ -94,5 +94,12 @@ func (t *DelegateTool) Execute(ctx context.Context, args json.RawMessage) (json.
 		out.Status = StatusFailed
 	}
 
-	return json.Marshal(out)
+	raw, marshalErr := json.Marshal(out)
+	if marshalErr != nil {
+		return nil, marshalErr
+	}
+	if waitErr != nil {
+		return raw, fmt.Errorf("subagent: wait child: %w", waitErr)
+	}
+	return raw, nil
 }

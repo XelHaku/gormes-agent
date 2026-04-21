@@ -9,9 +9,9 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
-func registerDelegation(cfg config.Config, reg *tools.Registry, hc hermes.Client) {
+func registerDelegation(cfg config.Config, reg *tools.Registry, hc hermes.Client) *subagent.Manager {
 	if reg == nil || !cfg.Delegation.Enabled {
-		return
+		return nil
 	}
 
 	runner := subagent.NewChatRunner(hc, reg, subagent.ChatRunnerConfig{
@@ -20,4 +20,5 @@ func registerDelegation(cfg config.Config, reg *tools.Registry, hc hermes.Client
 	})
 	mgr := subagent.NewManager(cfg.Delegation, runner, cfg.DelegationRunLogPath())
 	reg.MustRegister(subagent.NewDelegateTool(mgr))
+	return mgr
 }
