@@ -49,17 +49,20 @@ Gormes is a complete Go rewrite of [Hermes Agent](https://github.com/NousResearc
 
 ## Architecture
 
-Gormes is not a wrapper around Hermes. It is a **strangler fig rewrite**:
+Gormes is not a wrapper around Hermes. It is a **strangler fig rewrite** — each phase ships standalone value while moving the full stack toward pure Go.
 
-| Phase | Status | What Ships |
-|-------|--------|-----------|
-| **Phase 1** | ✓ SHIPPED | Bubble Tea TUI with 16ms coalescing mailbox |
-| **Phase 2** | 🚧 ACTIVE | Go-native tool registry + Telegram adapter + bbolt persistence |
-| **Phase 3** | 🔨 BUILDING | SQLite + FTS5 memory lattice |
-| **Phase 4** | 📋 PLANNED | Native prompt builder + provider adapters |
-| **Phase 5** | 📋 PLANNED | Final purge of Python dependencies |
+<!-- PROGRESS:START kind=readme-rollup -->
+| Phase | Status | Shipped |
+|-------|--------|---------|
+| Phase 1 — The Dashboard | ✅ | 2/2 subphases |
+| Phase 2 — The Gateway | 🔨 | 3/8 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 5/12 subphases |
+| Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
+| Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
+| Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
+<!-- PROGRESS:END -->
 
-Each phase ships standalone value while moving the full stack toward pure Go.
+Full item-level checklist and stats: **[docs.gormes.ai/building-gormes/architecture_plan](https://docs.gormes.ai/building-gormes/architecture_plan/)**
 
 ---
 
