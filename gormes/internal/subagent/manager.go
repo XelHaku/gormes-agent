@@ -136,17 +136,6 @@ func (m *manager) run(sa *Subagent) {
 		}
 	}()
 
-	interruptDone := make(chan struct{})
-	go func() {
-		defer close(interruptDone)
-		select {
-		case <-sa.ctx.Done():
-			msg, _ := sa.interruptMsg.Load().(string)
-			internalEvents <- SubagentEvent{Type: EventInterrupted, Message: msg}
-		case <-runnerDone:
-		}
-	}()
-
 	result := <-resultCh
 	if result == nil {
 		result = &SubagentResult{
@@ -161,7 +150,10 @@ func (m *manager) run(sa *Subagent) {
 	}
 
 	<-runnerDone
-	<-interruptDone
+	if sa.ctx.Err() != nil {
+		msg, _ := sa.interruptMsg.Load().(string)
+		internalEvents <- SubagentEvent{Type: EventInterrupted, Message: msg}
+	}
 	close(internalEvents)
 	<-forwarderDone
 
