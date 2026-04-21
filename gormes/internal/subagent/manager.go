@@ -136,14 +136,13 @@ func (m *manager) run(sa *Subagent) {
 		}
 	}()
 
+	interruptDone := make(chan struct{})
 	go func() {
+		defer close(interruptDone)
 		select {
 		case <-sa.ctx.Done():
 			msg, _ := sa.interruptMsg.Load().(string)
-			select {
-			case internalEvents <- SubagentEvent{Type: EventInterrupted, Message: msg}:
-			case <-runnerDone:
-			}
+			internalEvents <- SubagentEvent{Type: EventInterrupted, Message: msg}
 		case <-runnerDone:
 		}
 	}()
@@ -161,6 +160,8 @@ func (m *manager) run(sa *Subagent) {
 		result.Duration = time.Since(start)
 	}
 
+	<-runnerDone
+	<-interruptDone
 	close(internalEvents)
 	<-forwarderDone
 
@@ -182,8 +183,16 @@ func (m *manager) removeChild(id string) {
 }
 
 // Interrupt is implemented in a later task.
-func (m *manager) Interrupt(_ *Subagent, _ string) error {
-	return fmt.Errorf("subagent: Interrupt not implemented")
+func (m *manager) Interrupt(sa *Subagent, message string) error {
+	m.mu.RLock()
+	tracked, ok := m.children[sa.ID]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrSubagentNotFound, sa.ID)
+	}
+	tracked.interruptMsg.Store(message)
+	tracked.cancel()
+	return nil
 }
 
 // Collect is implemented in a later task.

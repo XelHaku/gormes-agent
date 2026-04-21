@@ -125,3 +125,119 @@ func TestManagerSpawnAppliesIterationDefault(t *testing.T) {
 		t.Fatalf("result status = %q, want %q", res.Status, StatusCompleted)
 	}
 }
+
+type blockingRunner struct{}
+
+func (blockingRunner) Run(ctx context.Context, cfg SubagentConfig, events chan<- SubagentEvent) *SubagentResult {
+	select {
+	case events <- SubagentEvent{Type: EventStarted, Message: cfg.Goal}:
+	case <-ctx.Done():
+	}
+	<-ctx.Done()
+	return &SubagentResult{
+		Status:     StatusInterrupted,
+		ExitReason: "ctx_cancelled",
+		Error:      ctx.Err().Error(),
+	}
+}
+
+func newBlockingManager(t *testing.T, depth int) (SubagentManager, context.CancelFunc) {
+	t.Helper()
+
+	parentCtx, cancel := context.WithCancel(context.Background())
+	return NewManager(ManagerOpts{
+		ParentCtx: parentCtx,
+		ParentID:  "parent_test",
+		Depth:     depth,
+		Registry:  NewRegistry(),
+		NewRunner: func() Runner { return blockingRunner{} },
+	}), cancel
+}
+
+func TestManagerInterruptDeliversMessage(t *testing.T) {
+	mgr, cancel := newBlockingManager(t, 0)
+	defer cancel()
+
+	sa, err := mgr.Spawn(context.Background(), SubagentConfig{Goal: "blocked"})
+	if err != nil {
+		t.Fatalf("Spawn: %v", err)
+	}
+
+	if err := mgr.Interrupt(sa, "user_stop"); err != nil {
+		t.Fatalf("Interrupt: %v", err)
+	}
+
+	result, err := sa.WaitForResult(context.Background())
+	if err != nil {
+		t.Fatalf("WaitForResult: %v", err)
+	}
+	if result.Status != StatusInterrupted {
+		t.Errorf("Status: want %q, got %q", StatusInterrupted, result.Status)
+	}
+
+	var sawInterrupt bool
+	var interruptMsg string
+	for ev := range sa.Events() {
+		if ev.Type == EventInterrupted {
+			sawInterrupt = true
+			interruptMsg = ev.Message
+		}
+	}
+	if !sawInterrupt {
+		t.Errorf("Events: want at least one EventInterrupted, got none")
+	}
+	if interruptMsg != "user_stop" {
+		t.Errorf("EventInterrupted.Message: want %q, got %q", "user_stop", interruptMsg)
+	}
+}
+
+func TestManagerInterruptUnknownReturnsErr(t *testing.T) {
+	mgr, _, cancel := newStubManager(t, 0)
+	defer cancel()
+
+	stranger := &Subagent{ID: "sa_stranger"}
+	err := mgr.Interrupt(stranger, "nope")
+	if err == nil || !errorsIs(err, ErrSubagentNotFound) {
+		t.Errorf("err: want ErrSubagentNotFound, got %v", err)
+	}
+}
+
+func errorsIs(err, target error) bool {
+	if err == nil {
+		return false
+	}
+	for {
+		if err == target {
+			return true
+		}
+		u, ok := err.(interface{ Unwrap() error })
+		if !ok {
+			return false
+		}
+		err = u.Unwrap()
+		if err == nil {
+			return false
+		}
+	}
+}
+
+func TestManagerInterruptIsIdempotent(t *testing.T) {
+	mgr, cancel := newBlockingManager(t, 0)
+	defer cancel()
+
+	sa, err := mgr.Spawn(context.Background(), SubagentConfig{Goal: "blocked"})
+	if err != nil {
+		t.Fatalf("Spawn: %v", err)
+	}
+	if err := mgr.Interrupt(sa, "first"); err != nil {
+		t.Fatalf("first Interrupt: %v", err)
+	}
+	if _, err := sa.WaitForResult(context.Background()); err != nil {
+		t.Fatalf("WaitForResult: %v", err)
+	}
+
+	err = mgr.Interrupt(sa, "second")
+	if err == nil || !errorsIs(err, ErrSubagentNotFound) {
+		t.Errorf("second Interrupt: want ErrSubagentNotFound, got %v", err)
+	}
+}
