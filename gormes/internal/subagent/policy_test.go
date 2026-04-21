@@ -14,6 +14,13 @@ func TestValidateSpec_RejectsEmptyGoal(t *testing.T) {
 	}
 }
 
+func TestValidateSpec_RejectsWhitespaceGoal(t *testing.T) {
+	err := ValidateSpec(Spec{Goal: "   ", MaxIterations: 1, Timeout: time.Second}, config.DelegationCfg{MaxChildDepth: 1})
+	if err == nil {
+		t.Fatal("ValidateSpec: want error for whitespace-only goal")
+	}
+}
+
 func TestValidateSpec_DefaultsIterationsAndTimeout(t *testing.T) {
 	spec, err := ApplyDefaults(Spec{Goal: "audit this"}, config.DelegationCfg{
 		DefaultMaxIterations: 8,
@@ -28,6 +35,17 @@ func TestValidateSpec_DefaultsIterationsAndTimeout(t *testing.T) {
 	}
 	if spec.Timeout != 45*time.Second {
 		t.Errorf("Timeout = %v, want 45s", spec.Timeout)
+	}
+}
+
+func TestApplyDefaults_RejectsNonPositiveTimeout(t *testing.T) {
+	_, err := ApplyDefaults(Spec{Goal: "audit this"}, config.DelegationCfg{
+		DefaultMaxIterations: 8,
+		DefaultTimeout:       0,
+		MaxChildDepth:        1,
+	})
+	if err == nil {
+		t.Fatal("ApplyDefaults: want timeout validation error")
 	}
 }
 

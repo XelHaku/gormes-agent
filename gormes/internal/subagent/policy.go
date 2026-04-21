@@ -30,11 +30,14 @@ func ApplyDefaults(spec Spec, cfg config.DelegationCfg) (Spec, error) {
 }
 
 func ValidateSpec(spec Spec, cfg config.DelegationCfg) error {
-	if spec.Goal == "" {
+	if strings.TrimSpace(spec.Goal) == "" {
 		return fmt.Errorf("subagent: empty goal")
 	}
 	if spec.MaxIterations <= 0 {
 		return fmt.Errorf("subagent: max_iterations must be > 0")
+	}
+	if spec.Timeout <= 0 {
+		return fmt.Errorf("subagent: timeout must be > 0")
 	}
 	if spec.Depth > cfg.MaxChildDepth {
 		return fmt.Errorf("subagent: depth %d exceeds max %d", spec.Depth, cfg.MaxChildDepth)
