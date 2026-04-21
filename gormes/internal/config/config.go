@@ -28,6 +28,8 @@ type Config struct {
 	TUI        TUICfg        `toml:"tui"`
 	Input      InputCfg      `toml:"input"`
 	Telegram   TelegramCfg   `toml:"telegram"`
+	Discord    DiscordCfg    `toml:"discord"`
+	Slack      SlackCfg      `toml:"slack"`
 	Cron       CronCfg       `toml:"cron"`
 	Delegation DelegationCfg `toml:"delegation"`
 	// Resume is set only via the --resume CLI flag; intentionally not
@@ -73,6 +75,23 @@ type TelegramCfg struct {
 	EmbedderBatchSize     int           `toml:"embedder_batch_size"`
 	EmbedderCallTimeout   time.Duration `toml:"embedder_call_timeout"`
 	QueryEmbedTimeout     time.Duration `toml:"query_embed_timeout"`
+}
+
+type DiscordCfg struct {
+	BotToken         string `toml:"bot_token"`
+	AllowedChannelID string `toml:"allowed_channel_id"`
+	AllowedGuildID   string `toml:"allowed_guild_id"`
+	MentionRequired  bool   `toml:"mention_required"`
+	CoalesceMs       int    `toml:"coalesce_ms"`
+}
+
+type SlackCfg struct {
+	BotToken         string `toml:"bot_token"`
+	AppToken         string `toml:"app_token"`
+	AllowedChannelID string `toml:"allowed_channel_id"`
+	SocketMode       bool   `toml:"socket_mode"`
+	CoalesceMs       int    `toml:"coalesce_ms"`
+	ReplyInThread    bool   `toml:"reply_in_thread"`
 }
 
 type CronCfg struct {
@@ -137,28 +156,37 @@ func defaults() Config {
 		TUI:   TUICfg{Theme: "dark"},
 		Input: InputCfg{MaxBytes: 200_000, MaxLines: 10_000},
 		Telegram: TelegramCfg{
-			CoalesceMs:            1000,
-			FirstRunDiscovery:     true,
-			MemoryQueueCap:        1024,
-			ExtractorBatchSize:    5,
-			ExtractorPollInterval: 10 * time.Second,
+			CoalesceMs:             1000,
+			FirstRunDiscovery:      true,
+			MemoryQueueCap:         1024,
+			ExtractorBatchSize:     5,
+			ExtractorPollInterval:  10 * time.Second,
 			RecallEnabled:          true,
 			RecallWeightThreshold:  1.0,
 			RecallMaxFacts:         10,
 			RecallDepth:            2,
 			RecallDecayHorizonDays: 180,
-			MirrorEnabled:         true,
-			MirrorPath:            filepath.Join(xdgDataHome(), "gormes", "memory", "USER.md"),
-			MirrorInterval:        30 * time.Second,
-			SemanticEnabled:       false,
-			SemanticEndpoint:      "",
-			SemanticModel:         "",
-			SemanticTopK:          3,
-			SemanticMinSimilarity: 0.35,
-			EmbedderPollInterval:  30 * time.Second,
-			EmbedderBatchSize:     10,
-			EmbedderCallTimeout:   10 * time.Second,
-			QueryEmbedTimeout:     60 * time.Millisecond,
+			MirrorEnabled:          true,
+			MirrorPath:             filepath.Join(xdgDataHome(), "gormes", "memory", "USER.md"),
+			MirrorInterval:         30 * time.Second,
+			SemanticEnabled:        false,
+			SemanticEndpoint:       "",
+			SemanticModel:          "",
+			SemanticTopK:           3,
+			SemanticMinSimilarity:  0.35,
+			EmbedderPollInterval:   30 * time.Second,
+			EmbedderBatchSize:      10,
+			EmbedderCallTimeout:    10 * time.Second,
+			QueryEmbedTimeout:      60 * time.Millisecond,
+		},
+		Discord: DiscordCfg{
+			MentionRequired: true,
+			CoalesceMs:      1000,
+		},
+		Slack: SlackCfg{
+			SocketMode:    true,
+			CoalesceMs:    1000,
+			ReplyInThread: true,
 		},
 		Cron: CronCfg{
 			Enabled:        false,
@@ -234,6 +262,24 @@ func loadEnv(cfg *Config) {
 		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
 			cfg.Telegram.AllowedChatID = id
 		}
+	}
+	if v := os.Getenv("GORMES_DISCORD_TOKEN"); v != "" {
+		cfg.Discord.BotToken = v
+	}
+	if v := os.Getenv("GORMES_DISCORD_CHANNEL_ID"); v != "" {
+		cfg.Discord.AllowedChannelID = v
+	}
+	if v := os.Getenv("GORMES_DISCORD_GUILD_ID"); v != "" {
+		cfg.Discord.AllowedGuildID = v
+	}
+	if v := os.Getenv("GORMES_SLACK_BOT_TOKEN"); v != "" {
+		cfg.Slack.BotToken = v
+	}
+	if v := os.Getenv("GORMES_SLACK_APP_TOKEN"); v != "" {
+		cfg.Slack.AppToken = v
+	}
+	if v := os.Getenv("GORMES_SLACK_CHANNEL_ID"); v != "" {
+		cfg.Slack.AllowedChannelID = v
 	}
 }
 

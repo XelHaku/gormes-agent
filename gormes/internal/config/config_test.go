@@ -407,3 +407,76 @@ func TestDelegationRunLogPath_DefaultsToXDG(t *testing.T) {
 		t.Errorf("DelegationRunLogPath() = %q, want %q", got, want)
 	}
 }
+
+func TestLoad_DiscordDefaults(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Discord.MentionRequired != true {
+		t.Errorf("Discord.MentionRequired default = %v, want true", cfg.Discord.MentionRequired)
+	}
+	if cfg.Discord.CoalesceMs != 1000 {
+		t.Errorf("Discord.CoalesceMs default = %d, want 1000", cfg.Discord.CoalesceMs)
+	}
+}
+
+func TestLoad_DiscordEnvOverride(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("GORMES_DISCORD_TOKEN", "discord-token")
+	t.Setenv("GORMES_DISCORD_CHANNEL_ID", "chan-1")
+	t.Setenv("GORMES_DISCORD_GUILD_ID", "guild-1")
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Discord.BotToken != "discord-token" {
+		t.Errorf("Discord.BotToken = %q, want discord-token", cfg.Discord.BotToken)
+	}
+	if cfg.Discord.AllowedChannelID != "chan-1" {
+		t.Errorf("Discord.AllowedChannelID = %q, want chan-1", cfg.Discord.AllowedChannelID)
+	}
+	if cfg.Discord.AllowedGuildID != "guild-1" {
+		t.Errorf("Discord.AllowedGuildID = %q, want guild-1", cfg.Discord.AllowedGuildID)
+	}
+}
+
+func TestLoad_SlackDefaults(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Slack.SocketMode {
+		t.Error("Slack.SocketMode default = false, want true")
+	}
+	if !cfg.Slack.ReplyInThread {
+		t.Error("Slack.ReplyInThread default = false, want true")
+	}
+	if cfg.Slack.CoalesceMs != 1000 {
+		t.Errorf("Slack.CoalesceMs default = %d, want 1000", cfg.Slack.CoalesceMs)
+	}
+}
+
+func TestLoad_SlackEnvOverride(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("GORMES_SLACK_BOT_TOKEN", "xoxb-test")
+	t.Setenv("GORMES_SLACK_APP_TOKEN", "xapp-test")
+	t.Setenv("GORMES_SLACK_CHANNEL_ID", "C12345")
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Slack.BotToken != "xoxb-test" {
+		t.Errorf("Slack.BotToken = %q, want xoxb-test", cfg.Slack.BotToken)
+	}
+	if cfg.Slack.AppToken != "xapp-test" {
+		t.Errorf("Slack.AppToken = %q, want xapp-test", cfg.Slack.AppToken)
+	}
+	if cfg.Slack.AllowedChannelID != "C12345" {
+		t.Errorf("Slack.AllowedChannelID = %q, want C12345", cfg.Slack.AllowedChannelID)
+	}
+}
