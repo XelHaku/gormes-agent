@@ -46,3 +46,26 @@ for (const vp of VIEWPORTS) {
     }
   });
 }
+
+test('collapsible sidebar group: current auto-opens, others closed, click toggles', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/using-gormes/quickstart/');
+
+  // Using Gormes contains Quickstart → that group is open.
+  const usingGroup = page.locator('details.docs-nav-group[data-section="using-gormes"]');
+  await expect(usingGroup).toHaveAttribute('open', '');
+
+  // Building is closed by default (not current).
+  const buildingGroup = page.locator('details.docs-nav-group[data-section="building-gormes"]');
+  const openAttr = await buildingGroup.getAttribute('open');
+  expect(openAttr).toBeNull();
+
+  // Clicking the building summary expands it.
+  await buildingGroup.locator('summary').click();
+  await page.waitForTimeout(100);
+  await expect(buildingGroup).toHaveAttribute('open', '');
+
+  // Reload — persisted via localStorage.
+  await page.reload();
+  await expect(page.locator('details.docs-nav-group[data-section="building-gormes"]')).toHaveAttribute('open', '');
+});

@@ -48,7 +48,50 @@
     });
   }
 
+
+  var STORAGE_KEY = 'docs-nav-groups';
+
+  function readGroupState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) { return {}; }
+  }
+
+  function writeGroupState(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
+  }
+
+  function initCollapsibleGroups() {
+    var groups = document.querySelectorAll('details.docs-nav-group');
+    if (!groups.length) return;
+    var state = readGroupState();
+
+    groups.forEach(function (g) {
+      var key = g.getAttribute('data-section');
+      if (!key) return;
+      // Current section always opens, regardless of stored preference.
+      if (g.hasAttribute('data-current')) {
+        g.setAttribute('open', '');
+        return;
+      }
+      if (state[key] === 'open') g.setAttribute('open', '');
+      else if (state[key] === 'closed') g.removeAttribute('open');
+    });
+
+    groups.forEach(function (g) {
+      var key = g.getAttribute('data-section');
+      if (!key) return;
+      g.addEventListener('toggle', function () {
+        var snapshot = readGroupState();
+        snapshot[key] = g.hasAttribute('open') ? 'open' : 'closed';
+        writeGroupState(snapshot);
+      });
+    });
+  }
+
   onReady(function () {
     initDrawer();
+    initCollapsibleGroups();
   });
 })();

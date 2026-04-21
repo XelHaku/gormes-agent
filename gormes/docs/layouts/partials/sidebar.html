@@ -18,8 +18,16 @@
     {{ $tone := index $toneMap $section }}
     {{ $label := index $labelMap $section }}
     {{ with site.GetPage (printf "/%s" $section) }}
-      <div class="docs-nav-group">
-        <p class="docs-nav-group-label docs-nav-group-label-{{ $tone }}">{{ $label }}</p>
+      {{ $isCurrentSection := or (eq $.RelPermalink .RelPermalink) (hasPrefix $.RelPermalink .RelPermalink) }}
+      <details class="docs-nav-group"
+               data-section="{{ $section }}"
+               {{ if $isCurrentSection }}data-current open{{ end }}>
+        <summary class="docs-nav-group-header">
+          <span class="docs-nav-chev" aria-hidden="true">▶</span>
+          <span class="docs-nav-dot docs-nav-dot--{{ $tone }}" aria-hidden="true"></span>
+          <span class="docs-nav-group-label docs-nav-group-label-{{ $tone }}">{{ $label }}</span>
+          <span class="docs-nav-group-count">{{ len .Pages }}</span>
+        </summary>
         <ul class="docs-nav-list">
           <li><a href="{{ .RelPermalink }}"{{ if eq $.RelPermalink .RelPermalink }} aria-current="page"{{ end }}>Overview</a></li>
           {{ range .Pages.ByWeight }}
@@ -35,7 +43,7 @@
           </li>
           {{ end }}
         </ul>
-      </div>
+      </details>
     {{ end }}
   {{ end }}
 </nav>

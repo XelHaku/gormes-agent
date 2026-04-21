@@ -139,11 +139,10 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  margin: 0 0 10px;
-  padding-left: 10px;
-  border-left: 2px solid currentColor;
+  margin: 0;
+  flex: 1;
 }
 .docs-nav-group-label-shipped { color: var(--status-shipped-fg); }
 .docs-nav-group-label-progress { color: var(--status-progress-fg); }
@@ -526,4 +525,41 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
     transition: none !important;
     animation-duration: 0.001ms !important;
   }
+}
+
+/* Collapsible sidebar groups */
+.docs-nav-group summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin: 0 0 4px;
+  border-radius: 4px;
+}
+.docs-nav-group summary::-webkit-details-marker,
+.docs-nav-group summary::marker { display: none; }
+.docs-nav-group[open] > summary .docs-nav-chev { transform: rotate(90deg); }
+.docs-nav-chev {
+  font-size: 9px;
+  color: var(--label);
+  transition: transform 0.12s;
+  width: 10px;
+  display: inline-block;
+}
+.docs-nav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.docs-nav-dot--shipped { background: var(--status-shipped-fg); }
+.docs-nav-dot--progress { background: var(--status-progress-fg); }
+.docs-nav-dot--next { background: var(--status-next-fg); }
+.docs-nav-group-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--label);
+  margin-left: auto;
 }
