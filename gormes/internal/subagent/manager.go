@@ -229,6 +229,6 @@ func (m *manager) Close() error {
 }
 
 // SpawnBatch is implemented in a later task.
-func (m *manager) SpawnBatch(_ context.Context, _ []SubagentConfig, _ int) ([]*SubagentResult, error) {
-	return nil, fmt.Errorf("subagent: SpawnBatch not implemented")
+func (m *manager) SpawnBatch(ctx context.Context, cfgs []SubagentConfig, maxConcurrent int) ([]*SubagentResult, error) {
+	return m.spawnBatch(ctx, cfgs, maxConcurrent)
 }
