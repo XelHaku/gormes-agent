@@ -53,7 +53,6 @@ func (r *ChatRunner) Run(ctx context.Context, spec Spec, emit func(Event)) (Resu
 	var (
 		sessionID string
 		result    Result
-		summary   strings.Builder
 		messages  = childMessages(spec)
 	)
 
@@ -82,6 +81,14 @@ func (r *ChatRunner) Run(ctx context.Context, spec Spec, emit func(Event)) (Resu
 			if err != nil {
 				_ = stream.Close()
 				if err == io.EOF {
+					if turnSummary.Len() > 0 {
+						result.Status = StatusCompleted
+						result.Summary = strings.TrimSpace(turnSummary.String())
+						if emit != nil {
+							emit(Event{Type: EventCompleted, Message: result.Summary, Iteration: iteration})
+						}
+						return result, nil
+					}
 					return r.failResult(ctx, result, fmt.Errorf("subagent: stream ended without final event"), emit)
 				}
 				return r.failResult(ctx, result, fmt.Errorf("subagent: recv event: %w", err), emit)
@@ -89,7 +96,6 @@ func (r *ChatRunner) Run(ctx context.Context, spec Spec, emit func(Event)) (Resu
 
 			switch ev.Kind {
 			case hermes.EventToken:
-				summary.WriteString(ev.Token)
 				turnSummary.WriteString(ev.Token)
 				if emit != nil {
 					emit(Event{Type: EventProgress, Message: ev.Token, Iteration: iteration})
@@ -109,7 +115,7 @@ func (r *ChatRunner) Run(ctx context.Context, spec Spec, emit func(Event)) (Resu
 		switch final.FinishReason {
 		case "stop":
 			result.Status = StatusCompleted
-			result.Summary = strings.TrimSpace(summary.String())
+			result.Summary = strings.TrimSpace(turnSummary.String())
 			if emit != nil {
 				emit(Event{Type: EventCompleted, Message: result.Summary, Iteration: iteration})
 			}

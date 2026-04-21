@@ -42,6 +42,7 @@ func TestChatRunner_StopFinishReturnsSummary(t *testing.T) {
 func TestChatRunner_ToolCallExecutesAllowedTool(t *testing.T) {
 	cli := hermes.NewMockClient()
 	cli.Script([]hermes.Event{
+		{Kind: hermes.EventToken, Token: "thinking aloud ", TokensOut: 2},
 		{Kind: hermes.EventDone, FinishReason: "tool_calls", ToolCalls: []hermes.ToolCall{
 			{ID: "call-1", Name: "echo", Arguments: json.RawMessage(`{"text":"hello"}`)},
 		}},
@@ -70,6 +71,9 @@ func TestChatRunner_ToolCallExecutesAllowedTool(t *testing.T) {
 	}
 	if len(res.ToolCalls) != 1 || res.ToolCalls[0] != "echo" {
 		t.Fatalf("ToolCalls = %v, want [echo]", res.ToolCalls)
+	}
+	if res.Summary != "tool ok" {
+		t.Fatalf("Summary = %q, want tool ok", res.Summary)
 	}
 	if len(cli.Requests()) != 2 {
 		t.Fatalf("OpenStream requests = %d, want 2", len(cli.Requests()))
@@ -100,5 +104,30 @@ func TestChatRunner_BlockedToolReturnsPolicyError(t *testing.T) {
 	}
 	if len(cli.Requests()) != 2 {
 		t.Fatalf("OpenStream requests = %d, want 2", len(cli.Requests()))
+	}
+}
+
+func TestChatRunner_EOFWithoutDoneReturnsBufferedSummary(t *testing.T) {
+	cli := hermes.NewMockClient()
+	cli.Script([]hermes.Event{
+		{Kind: hermes.EventToken, Token: "partial ", TokensOut: 1},
+		{Kind: hermes.EventToken, Token: "answer", TokensOut: 2},
+	}, "sess-child")
+
+	reg := tools.NewRegistry()
+	runner := NewChatRunner(cli, reg, ChatRunnerConfig{Model: "hermes-agent", MaxToolDuration: 2 * time.Second})
+
+	res, err := runner.Run(context.Background(), Spec{Goal: "finish via eof", MaxIterations: 2}, func(Event) {})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Status != StatusCompleted {
+		t.Fatalf("Status = %q, want completed", res.Status)
+	}
+	if res.Summary != "partial answer" {
+		t.Fatalf("Summary = %q, want partial answer", res.Summary)
+	}
+	if res.FinishReason != "" {
+		t.Fatalf("FinishReason = %q, want empty", res.FinishReason)
 	}
 }
