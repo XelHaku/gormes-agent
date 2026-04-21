@@ -5,7 +5,7 @@ weight: 45
 
 # Gateway Donor Map
 
-PicoClaw is a donor repo for Go channel-edge work, not the source of truth for Gormes architecture. Hermes/Gormes still owns the kernel, session model, and the Operative System AI product direction.
+PicoClaw is a donor repo for Go channel-edge work, not the source of truth for Gormes architecture. Gormes architecture remains authoritative, and Hermes stays the legacy reference for the older product direction and runtime model.
 
 ## What This Section Is For
 
