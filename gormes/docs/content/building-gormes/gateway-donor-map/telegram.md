@@ -11,6 +11,14 @@ Telegram is not a greenfield port for Gormes. `gormes/internal/telegram/` alread
 
 Gormes already shipped Telegram for Phase 2.B.1, with long-poll ingress, a single-chat allow/discovery model, streamed edit coalescing, session persistence, and MarkdownV2-safe rendering in `gormes/internal/telegram/`.
 
+Evidence level:
+
+- Donor code for this dossier was verified against the external sibling repo at `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
+- The upstream donor repo is `https://github.com/sipeed/picoclaw`.
+- Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
+- Current shipped Gormes behavior was verified in-tree against `gormes/internal/telegram/bot.go` and `gormes/internal/telegram/render.go`.
+
 PicoClaw's Telegram donor set is still useful, but only for gaps around richer transport behavior:
 
 - platform command menu registration
@@ -33,6 +41,7 @@ The donor is less useful for inbound runtime structure because `gormes/internal/
 
 ## Picoclaw Donor Files
 
+- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
 - `picoclaw/pkg/channels/telegram/telegram.go`
 - `picoclaw/pkg/channels/telegram/command_registration.go`
 - `picoclaw/pkg/channels/telegram/parse_markdown_to_md_v2.go`
@@ -42,7 +51,6 @@ The donor is less useful for inbound runtime structure because `gormes/internal/
 - `picoclaw/docs/channels/telegram/README.md`
 - `gormes/internal/telegram/bot.go`
 - `gormes/internal/telegram/render.go`
-- `gormes/docs/content/using-gormes/telegram-adapter.md`
 
 ## What To Copy vs What To Rebuild
 
@@ -55,13 +63,13 @@ Copy candidates:
 Rebuild in Gormes-native form:
 
 - Inbound lifecycle. `gormes/internal/telegram/bot.go` is built around `kernel.PlatformEvent`, render frames, and a coalescer; do not import PicoClaw's bus-oriented `HandleInboundContext` call graph.
-- Session ownership. PicoClaw keys behavior off adapter chat IDs and `BaseChannel`; Gormes already persists `(platform, chat_id) -> session_id` and should keep that model.
+- Session ownership and authorization. PicoClaw keys behavior off adapter chat IDs and `BaseChannel`; current Gormes behavior in `gormes/internal/telegram/bot.go` only accepts `Config.AllowedChatID`, or, when `AllowedChatID == 0` and `FirstRunDiscovery` is enabled, replies with a discovery message instead of processing the turn. Keep that model authoritative unless Gormes explicitly broadens Telegram scope.
 - Rendering pipeline. Gormes currently treats Telegram as plain escaped MarkdownV2 text with a tool-status tail. If richer formatting is needed, extend `gormes/internal/telegram/render.go` rather than porting PicoClaw's outbound path whole.
 
 ## Gormes Mapping
 
 - PicoClaw `Start` long-poll loop maps conceptually to `(*Bot).Run` in `gormes/internal/telegram/bot.go`.
-- PicoClaw `handleMessage` maps to `(*Bot).handleUpdate`, but Gormes intentionally narrows the problem to one allowed or discovered chat instead of general multi-chat group policy.
+- PicoClaw `handleMessage` maps to `(*Bot).handleUpdate`, but the current Gormes authority is narrower: if `AllowedChatID` is unset it only emits the first-run discovery reply when `FirstRunDiscovery` is true, otherwise it blocks the chat; if `AllowedChatID` is set it only processes that exact chat.
 - PicoClaw `parseContent` maps to `formatStream`, `formatFinal`, and `formatError` in `gormes/internal/telegram/render.go`, but Gormes currently uses escape-and-truncate rather than markdown transformation.
 - PicoClaw command registration has no direct Gormes equivalent yet. If Gormes later ports the shared slash-command registry from `hermes_cli/commands.py`, Telegram menu registration should hook in there.
 - PicoClaw topic handling via `MessageThreadID` has no current Gormes surface. That is a real delta if Gormes later wants forum topics or threaded operator chats.
@@ -93,7 +101,7 @@ Rebuild in Gormes-native form:
 
 - `gormes/internal/telegram/bot.go`: `Run`, `handleUpdate`, `runOutbound`, `handleFrame`, `SendToChat`.
 - `gormes/internal/telegram/render.go`: `formatStream`, `formatFinal`, `formatError`, `truncateForTelegram`.
-- `gormes/docs/content/using-gormes/telegram-adapter.md`
+- `gormes/docs/content/using-gormes/telegram-adapter.md`: stale high-level user doc; useful for operator-facing setup context, not as the authority for current shipped adapter behavior.
 - `picoclaw/pkg/channels/telegram/telegram.go`: `Start`, `Send`, `sendChunk`, `EditMessage`, `SendPlaceholder`, `SendMedia`, `handleMessage`, `parseContent`, `resolveTelegramOutboundTarget`, `isBotMentioned`.
 - `picoclaw/pkg/channels/telegram/command_registration.go`: `RegisterCommands`, `startCommandRegistration`, `commandRegistrationDelay`.
 - `picoclaw/pkg/channels/telegram/parse_markdown_to_md_v2.go`: `markdownToTelegramMarkdownV2`, `processText`, `escapeMarkdownV2`.

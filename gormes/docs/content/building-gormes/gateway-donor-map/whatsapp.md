@@ -11,6 +11,14 @@ WhatsApp is planned for Phase 2.B.4, but PicoClaw actually offers two distinct d
 
 Gormes does not yet ship WhatsApp. The upstream Hermes docs currently describe a built-in Baileys bridge flow, while PicoClaw supports:
 
+Evidence level:
+
+- Donor code for this dossier was verified against the external sibling repo at `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
+- The upstream donor repo is `https://github.com/sipeed/picoclaw`.
+- Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
+- Current Gormes status and operator-facing behavior were verified in-tree against `gormes/docs/content/upstream-hermes/user-guide/messaging/whatsapp.md`.
+
 - a thin bridge-based WebSocket adapter in `picoclaw/pkg/channels/whatsapp/whatsapp.go`
 - an optional in-process `whatsmeow` adapter in `picoclaw/pkg/channels/whatsapp_native/whatsapp_native.go`, compiled behind the `whatsapp_native` build tag
 
@@ -30,6 +38,7 @@ The donor becomes less reusable where it hardcodes bridge payload shapes or reli
 
 ## Picoclaw Donor Files
 
+- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
 - `picoclaw/pkg/channels/whatsapp/whatsapp.go`
 - `picoclaw/pkg/channels/whatsapp/whatsapp_command_test.go`
 - `picoclaw/pkg/channels/whatsapp_native/whatsapp_native.go`

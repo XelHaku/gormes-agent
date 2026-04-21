@@ -11,6 +11,14 @@ Discord is still unshipped in Gormes, so this donor page is about whether PicoCl
 
 `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` marks Discord as planned for Phase 2.B.2. Gormes has upstream Hermes user docs for Discord behavior, but no Go adapter yet.
 
+Evidence level:
+
+- Donor code for this dossier was verified against the external sibling repo at `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
+- The upstream donor repo is `https://github.com/sipeed/picoclaw`.
+- Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
+- Current Gormes status and target behavior were verified in-tree against `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` and `gormes/docs/content/upstream-hermes/user-guide/messaging/discord.md`.
+
 That makes Discord a real donor candidate. The PicoClaw implementation already covers:
 
 - session startup and shutdown around a live gateway connection
@@ -36,6 +44,7 @@ The voice and TTS surface in `picoclaw/pkg/channels/discord/voice.go` is broader
 
 ## Picoclaw Donor Files
 
+- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
 - `picoclaw/pkg/channels/discord/discord.go`
 - `picoclaw/pkg/channels/discord/voice.go`
 - `picoclaw/pkg/channels/discord/discord_test.go`
