@@ -7,26 +7,26 @@ weight: 80
 
 The complete picture of what Gormes must absorb to retire the Python `hermes-agent` runtime. Each row is one upstream module or capability, mapped to its target phase. This inventory is the source of truth for "what's left" — when a subsystem is shipped in Go, mark it ✅ and link the spec.
 
-### Gateway platforms (24 connectors — 23 unshipped)
+### Gateway platforms (24 connectors — 21 unshipped)
 
-| Platform | Upstream file | Target phase | Status |
-|---|---|---|---|
-| Telegram | `gateway/platforms/telegram.py` | 2.B.1 | ✅ shipped |
-| Discord | `gateway/platforms/discord.py` | 2.B.2 | ⏳ planned |
-| Slack | `gateway/platforms/slack.py` | 2.B.3 | ⏳ planned |
-| WhatsApp | `gateway/platforms/whatsapp.py` | 2.B.4 | ⏳ planned |
-| Signal | `gateway/platforms/signal.py` | 2.B.5 | ⏳ planned |
-| Email | `gateway/platforms/email.py` | 2.B.6 | ⏳ planned |
-| SMS | `gateway/platforms/sms.py` | 2.B.7 | ⏳ planned |
-| Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ⏳ planned |
-| Mattermost | `gateway/platforms/mattermost.py` | 2.B.9 | ⏳ planned |
-| Webhook | `gateway/platforms/webhook.py` | 2.B.10 | ⏳ planned |
-| BlueBubbles (iMessage) | `gateway/platforms/bluebubbles.py` | 2.B.11 | ⏳ planned |
-| HomeAssistant | `gateway/platforms/homeassistant.py` | 2.B.12 | ⏳ planned |
-| Feishu | `gateway/platforms/feishu*.py` | 2.B.13 | ⏳ planned |
-| WeChat (WeCom + WeiXin) | `gateway/platforms/wecom*.py`, `weixin.py` | 2.B.14 | ⏳ planned |
-| DingTalk | `gateway/platforms/dingtalk.py` | 2.B.15 | ⏳ planned |
-| QQ Bot | `gateway/platforms/qqbot/` | 2.B.16 | ⏳ planned |
+| Platform | Upstream file | Target phase | Status | Landed Go surface |
+|---|---|---|---|---|
+| Telegram | `gateway/platforms/telegram.py` | 2.B.1 | ✅ shipped | `gormes/internal/telegram/*`, `gormes/cmd/gormes/telegram.go` |
+| Discord | `gateway/platforms/discord.py` | 2.B.2 | ✅ shipped | `gormes/internal/discord/*`, `gormes/cmd/gormes/discord.go` |
+| Slack | `gateway/platforms/slack.py` | 2.B.3 | ✅ shipped | `gormes/internal/slack/*`, `gormes/cmd/gormes/slack.go` |
+| WhatsApp | `gateway/platforms/whatsapp.py` | 2.B.4 | ⏳ planned | |
+| Signal | `gateway/platforms/signal.py` | 2.B.5 | ⏳ planned | |
+| Email | `gateway/platforms/email.py` | 2.B.6 | ⏳ planned | |
+| SMS | `gateway/platforms/sms.py` | 2.B.7 | ⏳ planned | |
+| Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ⏳ planned | |
+| Mattermost | `gateway/platforms/mattermost.py` | 2.B.9 | ⏳ planned | |
+| Webhook | `gateway/platforms/webhook.py` | 2.B.10 | ⏳ planned | |
+| BlueBubbles (iMessage) | `gateway/platforms/bluebubbles.py` | 2.B.11 | ⏳ planned | |
+| HomeAssistant | `gateway/platforms/homeassistant.py` | 2.B.12 | ⏳ planned | |
+| Feishu | `gateway/platforms/feishu*.py` | 2.B.13 | ⏳ planned | |
+| WeChat (WeCom + WeiXin) | `gateway/platforms/wecom*.py`, `weixin.py` | 2.B.14 | ⏳ planned | |
+| DingTalk | `gateway/platforms/dingtalk.py` | 2.B.15 | ⏳ planned | |
+| QQ Bot | `gateway/platforms/qqbot/` | 2.B.16 | ⏳ planned | |
 
 ### Operational layer (cross-cutting, mostly Phase 2.D–2.F)
 

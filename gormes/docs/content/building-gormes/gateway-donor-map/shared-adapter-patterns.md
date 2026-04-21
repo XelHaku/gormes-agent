@@ -83,3 +83,21 @@ Do not pull these pieces over wholesale:
 - `picoclaw/pkg/channels/webhook.go`
 - `picoclaw/pkg/channels/media.go`
 - `picoclaw/pkg/channels/voice_capabilities.go`
+
+## Landed Gormes Mappings
+
+- PicoClaw Discord startup, mention-gate, and typing references:
+  `picoclaw/pkg/channels/discord/discord.go`
+  → `gormes/internal/discord/real_client.go`
+  → `gormes/internal/discord/bot.go`
+  → `gormes/cmd/gormes/discord.go`
+
+- PicoClaw Slack Socket Mode, ACK, and thread target references:
+  `picoclaw/pkg/channels/slack/slack.go`
+  → `gormes/internal/slack/real_client.go`
+  → `gormes/internal/slack/bot.go`
+  → `gormes/cmd/gormes/slack.go`
+
+- Gormes-only shared runtime extraction:
+  `gormes/cmd/gormes/telegram.go`
+  → `gormes/cmd/gormes/gateway_runtime.go`

@@ -50,3 +50,25 @@ func TestKernelHasNoMemoryDep(t *testing.T) {
 		}
 	}
 }
+
+// TestKernelHasNoMessagingSDKDeps guards the Phase 2.B boundary: internal/kernel
+// must never transitively import transport SDKs. Discord and Slack stay at the
+// adapter edge; if either SDK reaches kernel, channel runtime concerns leaked
+// into the shared turn loop.
+func TestKernelHasNoMessagingSDKDeps(t *testing.T) {
+	cmd := exec.Command("go", "list", "-deps", "./internal/kernel")
+	cmd.Dir = ".."
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("go list failed: %v\n%s", err, out.String())
+	}
+
+	for _, d := range strings.Split(out.String(), "\n") {
+		if strings.Contains(d, "bwmarrin/discordgo") ||
+			strings.Contains(d, "slack-go/slack") {
+			t.Errorf("internal/kernel transitively depends on %q — messaging SDK leaked into kernel", d)
+		}
+	}
+}
