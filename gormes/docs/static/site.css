@@ -61,8 +61,7 @@ a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
 a:hover { color: var(--accent-hover); }
 a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
 
-/* Drawer toggle (hidden checkbox + label pattern, pure CSS mobile drawer) */
-.drawer-toggle { display: none; }
+/* Drawer toggle button */
 .drawer-btn {
   display: none;
   font-size: 20px;
@@ -465,8 +464,8 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
     transition: transform 0.2s ease;
     z-index: 40;
   }
-  .drawer-toggle:checked ~ .docs-shell .docs-sidebar { transform: translateX(0); }
-  .drawer-toggle:checked ~ .docs-shell .drawer-backdrop {
+  .docs-sidebar[data-state="open"] { transform: translateX(0); }
+  .docs-sidebar[data-state="open"] ~ .drawer-backdrop {
     display: block;
     position: fixed;
     inset: var(--topbar-h) 0 0 0;

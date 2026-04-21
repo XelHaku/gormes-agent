@@ -1,5 +1,4 @@
 // docs.gormes.ai interactive behavior. Vanilla, no deps.
-// Loaded deferred from baseof.html. Runs on DOMContentLoaded.
 (function () {
   'use strict';
 
@@ -8,8 +7,27 @@
     else document.addEventListener('DOMContentLoaded', fn);
   }
 
-  // Populated by later tasks: drawer (Task 2/3), collapsibles (Task 4), scrollspy (Task 7).
+  function setDrawer(state) {
+    var sidebar = document.getElementById('docs-sidebar');
+    var btn = document.querySelector('[data-testid="drawer-open"]');
+    if (!sidebar) return;
+    sidebar.setAttribute('data-state', state);
+    if (btn) btn.setAttribute('aria-expanded', state === 'open' ? 'true' : 'false');
+  }
+
+  function initDrawer() {
+    var btn = document.querySelector('[data-testid="drawer-open"]');
+    var backdrop = document.querySelector('.drawer-backdrop');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var sidebar = document.getElementById('docs-sidebar');
+      var isOpen = sidebar && sidebar.getAttribute('data-state') === 'open';
+      setDrawer(isOpen ? 'closed' : 'open');
+    });
+    if (backdrop) backdrop.addEventListener('click', function () { setDrawer('closed'); });
+  }
+
   onReady(function () {
-    // intentionally empty — wiring lands in subsequent tasks
+    initDrawer();
   });
 })();

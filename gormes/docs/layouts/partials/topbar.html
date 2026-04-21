@@ -1,6 +1,15 @@
 <header class="docs-topbar">
   <div class="docs-topbar-inner">
-    <label for="drawer-toggle" class="drawer-btn" aria-label="Toggle navigation">☰</label>
+    <button type="button"
+            class="drawer-btn"
+            data-testid="drawer-open"
+            aria-label="Open navigation"
+            aria-controls="docs-sidebar"
+            aria-expanded="false">
+      <svg class="drawer-btn-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M3 6h18M3 12h18M3 18h18"/>
+      </svg>
+    </button>
     <a class="docs-brand" href="{{ "/" | relURL }}">Gormes</a>
     <div id="search" class="docs-search"></div>
     <nav class="docs-topnav">

@@ -11,16 +11,16 @@
   <link rel="stylesheet" href="{{ "site.css" | relURL }}">
   <link rel="stylesheet" href="/pagefind/pagefind-ui.css">
   <script src="/pagefind/pagefind-ui.js" defer></script>
+  <script src="{{ "site.js" | relURL }}" defer></script>
 </head>
 <body>
   <div class="grain" aria-hidden="true"></div>
-  <input type="checkbox" id="drawer-toggle" class="drawer-toggle">
   {{ partial "topbar.html" . }}
   <div class="docs-shell">
-    <aside class="docs-sidebar">
+    <aside class="docs-sidebar" id="docs-sidebar" data-state="closed">
       {{ partial "sidebar.html" . }}
     </aside>
-    <label for="drawer-toggle" class="drawer-backdrop" aria-hidden="true"></label>
+    <div class="drawer-backdrop" data-testid="drawer-backdrop" aria-hidden="true"></div>
     <main class="docs-main">
       {{ block "main" . }}{{ end }}
     </main>
