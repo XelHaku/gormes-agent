@@ -69,3 +69,33 @@ func TestValidate_RejectsNeither(t *testing.T) {
 		t.Errorf("Validate() = %v, want exactly-one error", err)
 	}
 }
+
+func TestValidate_AccumulatesMultipleErrors(t *testing.T) {
+	p := &Progress{
+		Meta: Meta{Version: "2.0"},
+		Phases: map[string]Phase{
+			"1": {Subphases: map[string]Subphase{
+				"1.A": {Items: []Item{{Name: "bad", Status: "nope"}}},
+				"1.B": {Items: []Item{{Name: "x", Status: StatusComplete}}, Status: StatusComplete}, // both
+			}},
+			"2": {Subphases: map[string]Subphase{
+				"2.A": {}, // neither
+			}},
+		},
+	}
+	err := Validate(p)
+	if err == nil {
+		t.Fatalf("Validate() = nil, want multiple errors")
+	}
+	// errors.Join formats as one error per line separated by \n.
+	msg := err.Error()
+	for _, want := range []string{
+		"phase 1 subphase 1.A", // bad item status
+		"phase 1 subphase 1.B", // both items and status
+		"phase 2 subphase 2.A", // neither
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error missing %q:\n%s", want, msg)
+		}
+	}
+}
