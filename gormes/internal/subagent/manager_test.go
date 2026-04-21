@@ -308,3 +308,61 @@ func TestManagerSpawnAtMaxDepthMinusOneAllowed(t *testing.T) {
 	}
 	_, _ = sa.WaitForResult(context.Background())
 }
+
+func TestManagerCollectBeforeAndAfterDone(t *testing.T) {
+	mgr, cancel := newBlockingManager(t, 0)
+	defer cancel()
+
+	sa, err := mgr.Spawn(context.Background(), SubagentConfig{Goal: "blocked"})
+	if err != nil {
+		t.Fatalf("Spawn: %v", err)
+	}
+
+	if got := mgr.Collect(sa); got != nil {
+		t.Errorf("Collect before done: want nil, got %+v", got)
+	}
+
+	if err := mgr.Interrupt(sa, "stop"); err != nil {
+		t.Fatalf("Interrupt: %v", err)
+	}
+	if _, err := sa.WaitForResult(context.Background()); err != nil {
+		t.Fatalf("WaitForResult: %v", err)
+	}
+
+	got := mgr.Collect(sa)
+	if got == nil {
+		t.Errorf("Collect after done: want non-nil, got nil")
+	}
+	if got != nil && got.Status != StatusInterrupted {
+		t.Errorf("Collect Status: want %q, got %q", StatusInterrupted, got.Status)
+	}
+}
+
+func TestManagerCloseCancelsAllAndIsIdempotent(t *testing.T) {
+	mgr, cancel := newBlockingManager(t, 0)
+	defer cancel()
+
+	subs := make([]*Subagent, 3)
+	for i := range subs {
+		sa, err := mgr.Spawn(context.Background(), SubagentConfig{Goal: "blocked"})
+		if err != nil {
+			t.Fatalf("Spawn[%d]: %v", i, err)
+		}
+		subs[i] = sa
+	}
+
+	if err := mgr.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if err := mgr.Close(); err != nil {
+		t.Fatalf("second Close: want nil, got %v", err)
+	}
+
+	for i, sa := range subs {
+		select {
+		case <-sa.done:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("subagent %d not finished after Close", i)
+		}
+	}
+}

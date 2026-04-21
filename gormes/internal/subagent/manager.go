@@ -196,12 +196,35 @@ func (m *manager) Interrupt(sa *Subagent, message string) error {
 }
 
 // Collect is implemented in a later task.
-func (m *manager) Collect(_ *Subagent) *SubagentResult {
-	return nil
+func (m *manager) Collect(sa *Subagent) *SubagentResult {
+	select {
+	case <-sa.done:
+		sa.mu.RLock()
+		defer sa.mu.RUnlock()
+		return sa.result
+	default:
+		return nil
+	}
 }
 
 // Close is implemented in a later task.
 func (m *manager) Close() error {
+	m.closeOnce.Do(func() {
+		m.mu.RLock()
+		snap := make([]*Subagent, 0, len(m.children))
+		for _, sa := range m.children {
+			snap = append(snap, sa)
+		}
+		m.mu.RUnlock()
+
+		for _, sa := range snap {
+			sa.cancel()
+		}
+		for _, sa := range snap {
+			<-sa.done
+		}
+		close(m.closed)
+	})
 	return nil
 }
 
