@@ -274,3 +274,37 @@ func TestManagerParentCtxCancellationCascades(t *testing.T) {
 		}
 	}
 }
+
+func TestManagerSpawnAtMaxDepthRejected(t *testing.T) {
+	mgr := NewManager(ManagerOpts{
+		ParentCtx: context.Background(),
+		ParentID:  "parent_test",
+		Depth:     MaxDepth,
+		Registry:  NewRegistry(),
+		NewRunner: func() Runner { return StubRunner{} },
+	})
+
+	_, err := mgr.Spawn(context.Background(), SubagentConfig{Goal: "x"})
+	if err == nil || !errorsIs(err, ErrMaxDepth) {
+		t.Errorf("err: want ErrMaxDepth, got %v", err)
+	}
+}
+
+func TestManagerSpawnAtMaxDepthMinusOneAllowed(t *testing.T) {
+	mgr := NewManager(ManagerOpts{
+		ParentCtx: context.Background(),
+		ParentID:  "parent_test",
+		Depth:     MaxDepth - 1,
+		Registry:  NewRegistry(),
+		NewRunner: func() Runner { return StubRunner{} },
+	})
+
+	sa, err := mgr.Spawn(context.Background(), SubagentConfig{Goal: "x"})
+	if err != nil {
+		t.Fatalf("Spawn at MaxDepth-1: want OK, got %v", err)
+	}
+	if sa.Depth != MaxDepth {
+		t.Errorf("Depth: want %d, got %d", MaxDepth, sa.Depth)
+	}
+	_, _ = sa.WaitForResult(context.Background())
+}
