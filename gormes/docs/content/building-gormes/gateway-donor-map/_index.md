@@ -19,22 +19,22 @@ PicoClaw is a donor repo for Go channel-edge work, not the source of truth for G
 2. Open the relevant channel dossier.
 3. Use the donor files and Gormes mapping notes to draft the implementation spec or PR.
 
-## Channel Dossiers
+## Triage View
 
-| Channel | Dossier |
-|---|---|
-| Telegram | [Telegram](./telegram/) |
-| Discord | [Discord](./discord/) |
-| Slack | [Slack](./slack/) |
-| WhatsApp | [WhatsApp](./whatsapp/) |
-| Matrix | [Matrix](./matrix/) |
-| IRC | [IRC](./irc/) |
-| LINE | [LINE](./line/) |
-| OneBot | [OneBot](./onebot/) |
-| QQ | [QQ](./qq/) |
-| WeCom | [WeCom](./wecom/) |
-| WeiXin | [WeiXin](./weixin/) |
-| Feishu | [Feishu](./feishu/) |
-| DingTalk | [DingTalk](./dingtalk/) |
-| VK | [VK](./vk/) |
-| Webhook | [Webhook](./webhook/) |
+| Channel | Recommendation | Donor Surface | Dossier |
+|---|---|---|---|
+| Telegram | `adapt pattern only` | `pkg/channels/telegram/` | [Telegram](./telegram/) |
+| Discord | `copy candidate` | `pkg/channels/discord/` | [Discord](./discord/) |
+| Slack | `copy candidate` | `pkg/channels/slack/` | [Slack](./slack/) |
+| WhatsApp | `adapt pattern only` | `pkg/channels/whatsapp/`, `pkg/channels/whatsapp_native/` | [WhatsApp](./whatsapp/) |
+| Matrix | `adapt pattern only` | `pkg/channels/matrix/` | [Matrix](./matrix/) |
+| IRC | `adapt pattern only` | `pkg/channels/irc/` | [IRC](./irc/) |
+| LINE | `adapt pattern only` | `pkg/channels/line/` | [LINE](./line/) |
+| OneBot | `adapt pattern only` | `pkg/channels/onebot/` | [OneBot](./onebot/) |
+| QQ | `copy candidate` | `pkg/channels/qq/` | [QQ](./qq/) |
+| WeCom | `copy candidate` | `pkg/channels/wecom/` | [WeCom](./wecom/) |
+| WeiXin | `adapt pattern only` | `pkg/channels/weixin/` | [WeiXin](./weixin/) |
+| Feishu | `adapt pattern only` | `pkg/channels/feishu/` | [Feishu](./feishu/) |
+| DingTalk | `adapt pattern only` | `pkg/channels/dingtalk/` | [DingTalk](./dingtalk/) |
+| VK | `not worth reusing` | `pkg/channels/vk/` | [VK](./vk/) |
+| Webhook | `adapt pattern only` | `pkg/channels/webhook.go` | [Webhook](./webhook/) |
