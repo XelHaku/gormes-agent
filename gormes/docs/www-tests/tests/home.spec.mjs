@@ -1,17 +1,34 @@
 import { test, expect } from '@playwright/test';
 
-test('docs home renders the three-audience split', async ({ page }) => {
+test('docs home hero, quickstart, and three enhanced cards render', async ({ page }) => {
   await page.goto('/');
 
   await expect(page).toHaveTitle(/Gormes Docs/);
-  await expect(page.getByRole('heading', { name: 'Gormes Docs', level: 1 })).toBeVisible();
+  // Hero
+  await expect(page.locator('.docs-home-hero h1')).toBeVisible();
+  await expect(page.locator('.docs-home-hero .kicker')).toBeVisible();
 
-  // Three cards, one per audience
+  // Quickstart strip
+  const qs = page.locator('.docs-home-quickstart');
+  await expect(qs).toBeVisible();
+  await expect(qs.locator('code')).toContainText(/brew|curl|go install|go run/i);
+
+  // Three enhanced cards with ordinals and mini-TOCs
+  const cards = page.locator('.docs-home-card');
+  await expect(cards).toHaveCount(3);
+  for (let i = 0; i < 3; i++) {
+    const c = cards.nth(i);
+    await expect(c.locator('.docs-home-card-ordinal')).toBeVisible();
+    await expect(c.locator('.docs-home-card-mini-toc li')).toHaveCount(3);
+    await expect(c.locator('.docs-home-card-cta')).toContainText(/Explore/i);
+  }
+
+  // Kickers map to the existing colored labels
   await expect(page.getByRole('link', { name: /USING GORMES/i })).toBeVisible();
   await expect(page.getByRole('link', { name: /BUILDING GORMES/i })).toBeVisible();
   await expect(page.getByRole('link', { name: /UPSTREAM HERMES/i })).toBeVisible();
 
-  // Sidebar has colored group labels
+  // Sidebar unchanged
   await expect(page.locator('.docs-nav-group-label-shipped')).toBeVisible();
   await expect(page.locator('.docs-nav-group-label-progress')).toBeVisible();
   await expect(page.locator('.docs-nav-group-label-next')).toBeVisible();
@@ -22,5 +39,5 @@ test('docs home renders the three-audience split', async ({ page }) => {
   const scripts = await page
     .locator('script[src]')
     .evaluateAll(els => els.filter(el => !el.src.includes('livereload')).length);
-  expect(scripts).toBeLessThanOrEqual(2); // pagefind-ui.js + site.js
+  expect(scripts).toBeLessThanOrEqual(2);
 });

@@ -1,26 +1,51 @@
 {{ define "main" }}
+{{ $using := site.GetPage "/using-gormes" }}
+{{ $building := site.GetPage "/building-gormes" }}
+{{ $upstream := site.GetPage "/upstream-hermes" }}
+{{ $sections := slice
+  (dict "page" $using "tone" "shipped" "label" "USING GORMES" "heading" "For operators" "blurb" "Install, run, configure. Wire up Telegram. Troubleshoot with the doctor." "ord" "01")
+  (dict "page" $building "tone" "progress" "label" "BUILDING GORMES" "heading" "For contributors" "blurb" "Architecture, roadmap, how to port a subsystem from upstream." "ord" "02")
+  (dict "page" $upstream "tone" "next" "label" "UPSTREAM HERMES" "heading" "For reference" "blurb" "Inherited Hermes guides. What the Python upstream does that Gormes is porting." "ord" "03")
+}}
+
 <article class="docs-home">
-  <header>
-    <p class="kicker">GORMES · DOCUMENTATION</p>
-    <h1 class="docs-home-title">{{ site.Title }}</h1>
-    <p class="docs-lede">The Go operator shell for Hermes. Install it, run it, understand how it's built.</p>
+  <header class="docs-home-hero">
+    <p class="kicker">Gormes · Documentation</p>
+    <h1 class="docs-home-title">The Go operator shell for <em>Hermes.</em></h1>
+    <p class="docs-lede">Install it, run it, understand how it's built. A single binary, no runtime — designed to replace the Python Hermes stack piece by piece.</p>
   </header>
+
+  <section class="docs-home-quickstart">
+    <div class="docs-home-quickstart-text">
+      <p class="kicker docs-home-quickstart-kicker">New here? Start in 60 seconds</p>
+      <h2 class="docs-home-quickstart-title">Install and run</h2>
+      <p>A single binary on macOS or Linux. Telegram adapter optional.</p>
+    </div>
+    <code class="docs-home-quickstart-cmd">brew install trebuchet/gormes</code>
+  </section>
+
   <section class="docs-home-cards">
-    <a class="docs-home-card" href="/using-gormes/">
-      <p class="kicker" style="color:var(--status-shipped-fg)">USING GORMES</p>
-      <h2>For operators</h2>
-      <p>Install, run, configure. Wire up Telegram. Troubleshoot with the doctor.</p>
-    </a>
-    <a class="docs-home-card" href="/building-gormes/">
-      <p class="kicker" style="color:var(--status-progress-fg)">BUILDING GORMES</p>
-      <h2>For contributors</h2>
-      <p>Architecture, roadmap, how to port a subsystem from upstream.</p>
-    </a>
-    <a class="docs-home-card" href="/upstream-hermes/">
-      <p class="kicker" style="color:var(--status-next-fg)">UPSTREAM HERMES</p>
-      <h2>For reference</h2>
-      <p>Inherited Hermes guides. What the Python upstream does that Gormes is porting.</p>
-    </a>
+    {{ range $sections }}
+      {{ $tone := .tone }}
+      {{ $label := .label }}
+      {{ $heading := .heading }}
+      {{ $blurb := .blurb }}
+      {{ $ord := .ord }}
+      {{ with .page }}
+      <a class="docs-home-card" href="{{ .RelPermalink }}">
+        <span class="docs-home-card-ordinal" aria-hidden="true">{{ $ord }}</span>
+        <p class="kicker docs-home-card-label docs-home-card-label--{{ $tone }}">{{ $label }}</p>
+        <h2 class="docs-home-card-heading">{{ $heading }}</h2>
+        <p class="docs-home-card-blurb">{{ $blurb }}</p>
+        <ul class="docs-home-card-mini-toc">
+          {{ range first 3 .Pages.ByWeight }}
+          <li>{{ .Title }}</li>
+          {{ end }}
+        </ul>
+        <span class="docs-home-card-cta">Explore →</span>
+      </a>
+      {{ end }}
+    {{ end }}
   </section>
 </article>
 {{ end }}

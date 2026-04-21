@@ -390,7 +390,8 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
 .docs-toc-body ul ul { padding-left: 10px; }
 
 /* ── Home page ─────────────────────────────────────── */
-.docs-home { padding-top: 40px; }
+.docs-home { padding-top: 32px; }
+.docs-home-hero { margin: 0 0 32px; }
 .docs-home-title {
   font-family: var(--font-display);
   font-weight: 900;
@@ -400,37 +401,110 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
   margin: 14px 0 16px;
   font-variation-settings: "opsz" 144, "SOFT" 30;
 }
-.kicker {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--label);
-  margin: 0 0 8px;
+.docs-home-title em { color: var(--accent); font-style: normal; }
+
+.docs-home-quickstart {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: linear-gradient(135deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 20px 24px;
+  margin: 0 0 40px;
 }
+.docs-home-quickstart-text { flex: 1; min-width: 0; }
+.docs-home-quickstart-kicker { color: var(--accent); margin: 0 0 4px; }
+.docs-home-quickstart-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.docs-home-quickstart p { margin: 0; font-size: 14px; color: var(--muted-strong); }
+.docs-home-quickstart-cmd {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--bg-0);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border-radius: 4px;
+  color: var(--status-shipped-fg);
+  white-space: nowrap;
+}
+
 .docs-home-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 18px;
-  margin-top: 40px;
+  margin-top: 0;
 }
 .docs-home-card {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 22px;
+  border-radius: 6px;
+  padding: 24px;
   color: var(--text);
+  position: relative;
+  display: flex;
+  flex-direction: column;
   transition: border-color 0.2s, transform 0.2s;
 }
 .docs-home-card:hover { border-color: var(--accent); transform: translateY(-2px); color: var(--text); }
-.docs-home-card h2 {
+.docs-home-card-ordinal {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 48px;
+  font-weight: 900;
+  font-style: italic;
+  color: rgba(235, 233, 226, 0.10);
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  line-height: 1;
+  pointer-events: none;
+}
+.docs-home-card-label { margin: 0 0 10px; }
+.docs-home-card-label--shipped { color: var(--status-shipped-fg); }
+.docs-home-card-label--progress { color: var(--status-progress-fg); }
+.docs-home-card-label--next { color: var(--status-next-fg); }
+.docs-home-card-heading {
+  font-family: var(--font-display);
+  font-size: 22px;
   font-weight: 700;
-  margin: 8px 0 6px;
+  margin: 0 0 8px;
   color: var(--text);
 }
-.docs-home-card p { font-size: 13px; color: var(--muted-strong); margin: 0; line-height: 1.55; }
+.docs-home-card-blurb {
+  font-size: 13.5px;
+  color: var(--muted-strong);
+  margin: 0 0 18px;
+  line-height: 1.5;
+  flex: 1;
+}
+.docs-home-card-mini-toc {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+}
+.docs-home-card-mini-toc li {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 0;
+  color: var(--muted-strong);
+}
+.docs-home-card-mini-toc li::before { content: '→ '; color: var(--label); }
+.docs-home-card-cta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-top: auto;
+}
+
+/* Legacy list — still used by list.html fallback when _index is empty */
 .docs-child-list { list-style: none; padding: 0; display: grid; gap: 10px; }
 .docs-child-list li {
   background: var(--bg-1);
@@ -473,6 +547,8 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
   .docs-toc-details { background: var(--bg-1); border: 1px solid var(--border); border-radius: 3px; padding: 10px 14px; }
   .docs-toc-details[open] { padding-bottom: 14px; }
   .docs-home-cards { grid-template-columns: 1fr; }
+  .docs-home-quickstart { flex-direction: column; align-items: flex-start; }
+  .docs-home-quickstart-cmd { align-self: stretch; text-align: center; }
 }
 
 /* Drawer header — only visible inside the mobile drawer */
