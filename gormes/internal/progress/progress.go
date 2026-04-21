@@ -1,0 +1,68 @@
+// Package progress is the single source of truth for Gormes roadmap progress.
+// It parses progress.json, derives phase/subphase status from items, and
+// renders the canonical markdown sections consumed by README and docs.
+package progress
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
+type Status string
+
+const (
+	StatusComplete   Status = "complete"
+	StatusInProgress Status = "in_progress"
+	StatusPlanned    Status = "planned"
+)
+
+type Meta struct {
+	Version     string            `json:"version"`
+	LastUpdated string            `json:"last_updated"`
+	Links       map[string]string `json:"links"`
+}
+
+type Item struct {
+	Name   string `json:"name"`
+	Status Status `json:"status"`
+	// Optional, reserved, not rendered yet.
+	PR    string `json:"pr,omitempty"`
+	Owner string `json:"owner,omitempty"`
+	ETA   string `json:"eta,omitempty"`
+	Note  string `json:"note,omitempty"`
+}
+
+type Subphase struct {
+	Name     string `json:"name"`
+	Priority string `json:"priority,omitempty"`
+	// Exactly one of Items or Status is set. Enforced by Validate.
+	Items  []Item `json:"items,omitempty"`
+	Status Status `json:"status,omitempty"`
+}
+
+type Phase struct {
+	Name        string `json:"name"`
+	Deliverable string `json:"deliverable"`
+	// DependencyNote is a free-form string on some phases.
+	DependencyNote string              `json:"dependency_note,omitempty"`
+	Subphases      map[string]Subphase `json:"subphases"`
+}
+
+type Progress struct {
+	Meta   Meta             `json:"meta"`
+	Phases map[string]Phase `json:"phases"`
+}
+
+// Load reads and parses progress.json from the given path.
+func Load(path string) (*Progress, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("progress: read %s: %w", path, err)
+	}
+	var p Progress
+	if err := json.Unmarshal(b, &p); err != nil {
+		return nil, fmt.Errorf("progress: parse %s: %w", path, err)
+	}
+	return &p, nil
+}

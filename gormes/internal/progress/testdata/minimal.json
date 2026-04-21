@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "version": "2.0",
+    "last_updated": "2026-04-20",
+    "links": {
+      "github_readme": "https://example.test/readme",
+      "landing_page": "https://example.test",
+      "docs_site": "https://example.test/docs",
+      "source_code": "https://example.test/src"
+    }
+  },
+  "phases": {
+    "1": {
+      "name": "Phase 1 — Test",
+      "deliverable": "test deliverable",
+      "subphases": {
+        "1.A": {
+          "name": "First subphase",
+          "items": [
+            {"name": "item one", "status": "complete"},
+            {"name": "item two", "status": "planned"}
+          ]
+        }
+      }
+    }
+  }
+}
