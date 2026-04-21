@@ -7,6 +7,13 @@ weight: 45
 
 PicoClaw is a donor repo for Go channel-edge work, not the source of truth for Gormes architecture. Gormes architecture remains authoritative, and Hermes stays the legacy reference for the older product direction and runtime model.
 
+## Provenance
+
+- Donor inspected for this section: external sibling repo `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- Donor commit pinned for this research: `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
+- Upstream donor repo: `https://github.com/sipeed/picoclaw`.
+- Any `pkg/...` or `docs/...` path listed on this page or in the linked dossiers is relative to that donor root, not relative to the Gormes repo.
+
 ## What This Section Is For
 
 - Turn PicoClaw's Go messaging adapters into Gormes porting notes

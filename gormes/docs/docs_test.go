@@ -33,6 +33,33 @@ var (
 	markdownLinkPattern = regexp.MustCompile(`\[[^\]]+\]\(([^)]+)\)`)
 )
 
+var (
+	gatewayDonorMapRequiredHeadings = []string{
+		"## Status",
+		"## Why This Adapter Is Reusable",
+		"## Picoclaw Donor Files",
+		"## What To Copy vs What To Rebuild",
+		"## Gormes Mapping",
+		"## Implementation Notes",
+		"## Risks / Mismatches",
+		"## Port Order Recommendation",
+		"## Code References",
+	}
+	gatewayDonorMapAllowedRecommendations = map[string]struct{}{
+		"copy candidate":     {},
+		"adapt pattern only": {},
+		"not worth reusing":  {},
+	}
+	gatewayDonorMapPinnedProvenance = []string{
+		"/home/xel/git/sages-openclaw/workspace-mineru/picoclaw",
+		"6421f146a99df1bebcd4b1ca8de2a289dfca3622",
+		"https://github.com/sipeed/picoclaw",
+		"relative to that donor root, not relative to the Gormes repo",
+	}
+	gatewayDonorMapHubRowPattern = regexp.MustCompile(`(?m)^\| ([^|]+) \| ` + "`" + `([^` + "`" + `]+)` + "`" + ` \| [^|]+ \| \[([^\]]+)\]\(\./([^/]+)/\) \|$`)
+	gatewayDonorMapRecommendationPattern = regexp.MustCompile("Recommendation: `([^`]+)`\\.")
+)
+
 var targets = []string{
 	"ARCH_PLAN.md",
 	"THEORETICAL_ADVANTAGES_GORMES_HERMES.md",
@@ -197,6 +224,99 @@ func TestHugoInternalLinksResolve(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestGatewayDonorMapInvariants(t *testing.T) {
+	const donorMapDir = "content/building-gormes/gateway-donor-map"
+
+	entries, err := os.ReadDir(donorMapDir)
+	if err != nil {
+		t.Fatalf("read donor map dir: %v", err)
+	}
+
+	dossierRecommendations := make(map[string]string)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+
+		name := entry.Name()
+		path := filepath.Join(donorMapDir, name)
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		content := string(raw)
+
+		switch name {
+		case "_index.md", "shared-adapter-patterns.md":
+			for _, want := range gatewayDonorMapPinnedProvenance {
+				if !strings.Contains(content, want) {
+					t.Fatalf("%s missing pinned provenance string %q", path, want)
+				}
+			}
+			continue
+		}
+
+		for _, heading := range gatewayDonorMapRequiredHeadings {
+			if !strings.Contains(content, heading) {
+				t.Fatalf("%s missing heading %q", path, heading)
+			}
+		}
+
+		match := gatewayDonorMapRecommendationPattern.FindStringSubmatch(content)
+		if len(match) != 2 {
+			t.Fatalf("%s missing final recommendation label", path)
+		}
+		recommendation := match[1]
+		if _, ok := gatewayDonorMapAllowedRecommendations[recommendation]; !ok {
+			t.Fatalf("%s has unsupported recommendation %q", path, recommendation)
+		}
+
+		dossierRecommendations[strings.TrimSuffix(name, ".md")] = recommendation
+	}
+
+	indexPath := filepath.Join(donorMapDir, "_index.md")
+	indexRaw, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", indexPath, err)
+	}
+
+	matches := gatewayDonorMapHubRowPattern.FindAllStringSubmatch(string(indexRaw), -1)
+	if len(matches) == 0 {
+		t.Fatalf("%s missing triage table rows", indexPath)
+	}
+
+	seen := make(map[string]struct{}, len(matches))
+	for _, match := range matches {
+		channel := match[1]
+		recommendation := match[2]
+		label := match[3]
+		slug := match[4]
+
+		if channel != label {
+			t.Fatalf("%s row channel %q does not match dossier label %q", indexPath, channel, label)
+		}
+		want, ok := dossierRecommendations[slug]
+		if !ok {
+			t.Fatalf("%s row for %q points to unknown dossier %q", indexPath, channel, slug)
+		}
+		if recommendation != want {
+			t.Fatalf("%s row for %q has recommendation %q, dossier has %q", indexPath, channel, recommendation, want)
+		}
+		seen[slug] = struct{}{}
+	}
+
+	if len(seen) != len(dossierRecommendations) {
+		var missing []string
+		for slug := range dossierRecommendations {
+			if _, ok := seen[slug]; !ok {
+				missing = append(missing, slug)
+			}
+		}
+		sort.Strings(missing)
+		t.Fatalf("%s missing triage rows for dossiers: %s", indexPath, strings.Join(missing, ", "))
 	}
 }
 

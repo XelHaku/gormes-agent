@@ -7,6 +7,13 @@ weight: 10
 
 This page captures the PicoClaw mechanics that are reusable across more than one channel adapter. Copy transport-edge ideas from here; do not import PicoClaw's product architecture.
 
+## Provenance
+
+- Donor inspected for this page: external sibling repo `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- Donor commit pinned for this research: `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
+- Upstream donor repo: `https://github.com/sipeed/picoclaw`.
+- Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
+
 ## Donor Files
 
 - `picoclaw/pkg/channels/base.go`
