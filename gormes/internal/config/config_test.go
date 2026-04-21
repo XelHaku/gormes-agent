@@ -371,3 +371,39 @@ func TestLoad_CronDefaults(t *testing.T) {
 		t.Errorf("Cron.MirrorPath default = %q, want empty (caller resolves XDG)", cfg.Cron.MirrorPath)
 	}
 }
+
+func TestLoad_DelegationDefaults(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Delegation.Enabled {
+		t.Errorf("Delegation.Enabled default = true, want false")
+	}
+	if cfg.Delegation.DefaultMaxIterations != 8 {
+		t.Errorf("DefaultMaxIterations = %d, want 8", cfg.Delegation.DefaultMaxIterations)
+	}
+	if cfg.Delegation.DefaultTimeout != 45*time.Second {
+		t.Errorf("DefaultTimeout = %v, want 45s", cfg.Delegation.DefaultTimeout)
+	}
+	if cfg.Delegation.MaxChildDepth != 1 {
+		t.Errorf("MaxChildDepth = %d, want 1", cfg.Delegation.MaxChildDepth)
+	}
+}
+
+func TestDelegationRunLogPath_HonorsOverride(t *testing.T) {
+	cfg := Config{Delegation: DelegationCfg{RunLogPath: "/tmp/custom-runs.jsonl"}}
+	if got := cfg.DelegationRunLogPath(); got != "/tmp/custom-runs.jsonl" {
+		t.Errorf("DelegationRunLogPath() = %q, want /tmp/custom-runs.jsonl", got)
+	}
+}
+
+func TestDelegationRunLogPath_DefaultsToXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-xdg")
+	cfg := Config{}
+	want := "/tmp/gormes-xdg/gormes/subagents/runs.jsonl"
+	if got := cfg.DelegationRunLogPath(); got != want {
+		t.Errorf("DelegationRunLogPath() = %q, want %q", got, want)
+	}
+}

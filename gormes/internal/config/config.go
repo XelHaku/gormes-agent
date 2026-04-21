@@ -24,11 +24,12 @@ type Config struct {
 	// document. Absent in TOML = treated as 1.
 	ConfigVersion int `toml:"_config_version"`
 
-	Hermes   HermesCfg   `toml:"hermes"`
-	TUI      TUICfg      `toml:"tui"`
-	Input    InputCfg    `toml:"input"`
-	Telegram TelegramCfg `toml:"telegram"`
-	Cron     CronCfg     `toml:"cron"`
+	Hermes     HermesCfg     `toml:"hermes"`
+	TUI        TUICfg        `toml:"tui"`
+	Input      InputCfg      `toml:"input"`
+	Telegram   TelegramCfg   `toml:"telegram"`
+	Cron       CronCfg       `toml:"cron"`
+	Delegation DelegationCfg `toml:"delegation"`
 	// Resume is set only via the --resume CLI flag; intentionally not
 	// a TOML field. Empty means "use whatever internal/session had
 	// persisted for this binary's default key."
@@ -79,6 +80,14 @@ type CronCfg struct {
 	CallTimeout    time.Duration `toml:"call_timeout"`
 	MirrorInterval time.Duration `toml:"mirror_interval"`
 	MirrorPath     string        `toml:"mirror_path"`
+}
+
+type DelegationCfg struct {
+	Enabled              bool          `toml:"enabled"`
+	DefaultMaxIterations int           `toml:"default_max_iterations"`
+	DefaultTimeout       time.Duration `toml:"default_timeout"`
+	MaxChildDepth        int           `toml:"max_child_depth"`
+	RunLogPath           string        `toml:"run_log_path"`
 }
 
 type HermesCfg struct {
@@ -156,6 +165,13 @@ func defaults() Config {
 			CallTimeout:    60 * time.Second,
 			MirrorInterval: 30 * time.Second,
 			MirrorPath:     "",
+		},
+		Delegation: DelegationCfg{
+			Enabled:              false,
+			DefaultMaxIterations: 8,
+			DefaultTimeout:       45 * time.Second,
+			MaxChildDepth:        1,
+			RunLogPath:           "",
 		},
 	}
 }
@@ -292,6 +308,15 @@ func (c *Config) CronMirrorPath() string {
 		return c.Cron.MirrorPath
 	}
 	return filepath.Join(xdgDataHome(), "gormes", "cron", "CRON.md")
+}
+
+// DelegationRunLogPath returns the JSONL run-log path for subagent runs.
+// Explicit override wins; otherwise XDG_DATA_HOME/gormes/subagents/runs.jsonl.
+func (c *Config) DelegationRunLogPath() string {
+	if c.Delegation.RunLogPath != "" {
+		return c.Delegation.RunLogPath
+	}
+	return filepath.Join(xdgDataHome(), "gormes", "subagents", "runs.jsonl")
 }
 
 // LegacyHermesHome reports an upstream Hermes state directory if one is
