@@ -2,6 +2,7 @@ package site
 
 import (
 	"io/fs"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -35,64 +36,26 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		"In-Process Tool Loop",
 		"Survives Dropped Streams",
 		"Route-B reconnect treats SSE drops",
-		// Roadmap section
+		// Roadmap section — structural checks only. The roadmap itself
+		// is now driven by progress.json; asserting exact counts or
+		// item names here would re-introduce the very drift we just
+		// eliminated. We check for tones and structure instead.
 		"SHIPPING STATE",
 		"What ships now, what doesn&#39;t.",
-		// Phase 1 header + items
-		"SHIPPED · EVOLVING",
-		"Phase 1 — Dashboard",
-		"Bubble Tea TUI shell",
-		"16 ms render mailbox",
-		"Route-B SSE reconnect",
-		"Wire Doctor",
-		"Streaming token renderer",
-		"Ongoing: polish, bug fixes, TUI ergonomics",
-		// Phase 2 header + items
-		"IN PROGRESS · 3/7",
-		"Phase 2 — Gateway",
-		"2.A Go-native tool registry + kernel tool loop",
-		"2.B.1 Telegram adapter",
-		"2.C Thin session persistence (bbolt)",
-		"2.B.2+ Wider platforms (23 upstream connectors queued)",
-		"2.D Cron / scheduled automations",
-		"2.E Subagent delegation",
-		"2.F Hooks + lifecycle",
-		// Phase 3 header + items
-		"IN PROGRESS · 4/5",
-		"Phase 3 — Memory",
-		"3.A SQLite + FTS5 lattice",
-		"3.B Ontological graph + LLM extractor",
-		"3.C Neural recall + context injection",
-		"3.D.5 USER.md mirror — Gormes-original, no upstream equivalent",
-		"3.D Ollama embeddings + semantic fusion",
-		// Phase 4 header + subtitle + items
-		"PLANNED · 0/8",
-		"Phase 4 — Brain Transplant",
-		"Ships hermes-off after 4.A–4.D. Backend becomes optional.",
-		"4.A Provider adapters",
-		"4.B Context engine + compression",
-		"4.C Native Go prompt builder",
-		"4.D Smart model routing",
-		"4.E Trajectory + insights",
-		"4.F Title generation",
-		"4.G Credentials + OAuth flows",
-		"4.H Rate / retry / prompt caching",
-		// Phase 5 header + subtitle + collapsed row
-		"LATER · 0/16",
-		"Phase 5 — Final Purge (100% Go)",
-		"Delete the last Python dependency. Ship entirely in Go.",
-		"5.A–5.P",
-		"See ARCH_PLAN §7.",
-		// Phase 6 — Learning Loop (new)
-		"PLANNED · 0/6",
-		"Phase 6 — Learning Loop (The Soul)",
-		"Compounding intelligence. The feature Hermes doesn&#39;t have.",
-		"6.A Complexity detector",
-		"6.B Skill extractor",
-		"6.C Skill storage format",
-		"6.D Skill retrieval + matching",
-		"6.E Feedback loop",
-		"6.F Skill surface",
+		// Fuzzy phase-title presence (each phase renders)
+		"Phase 1",
+		"Phase 2",
+		"Phase 3",
+		"Phase 4",
+		"Phase 5",
+		"Phase 6",
+		// Status tone classes (every tone the template knows about)
+		"roadmap-status-shipped",
+		"roadmap-status-progress",
+		"roadmap-status-planned",
+		"roadmap-status-later",
+		// Structural class anchors
+		"roadmap-phase",
 		// Footer — brand text + company anchor + license
 		`Gormes v0.1.0 · <a href="https://trebuchetdynamics.com/">TrebuchetDynamics</a>`,
 		"MIT License · 2026",
@@ -133,6 +96,20 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		if strings.Contains(text, reject) {
 			t.Fatalf("rendered page still contains stale token %q", reject)
 		}
+	}
+
+	// There should be exactly 6 roadmap phase blocks — not a specific
+	// phase-name assertion, just that the roadmap actually renders the
+	// full phase set from progress.json.
+	if n := strings.Count(text, `class="roadmap-phase"`); n != 6 {
+		t.Errorf("roadmap phase count = %d, want 6", n)
+	}
+
+	// The progress tracker label follows a "N/M shipped" shape driven
+	// by progress.json Stats(). We assert the shape, not the numbers.
+	trackerRE := regexp.MustCompile(`\d+/\d+ shipped`)
+	if !trackerRE.MatchString(text) {
+		t.Errorf("missing N/M shipped progress tracker label; body:\n%s", text)
 	}
 }
 

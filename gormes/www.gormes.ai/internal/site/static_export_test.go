@@ -3,6 +3,7 @@ package site
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -24,19 +25,20 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		"curl -fsSL https://gormes.ai/install.sh | sh",
 		"Why a Go layer matters.",
 		"What ships now, what doesn&#39;t.",
-		// Roadmap group headers — confirms the new nested structure shipped
-		"SHIPPED · EVOLVING",
-		"IN PROGRESS · 3/7",
-		"IN PROGRESS · 4/5",
-		"PLANNED · 0/8",
-		"LATER · 0/16",
-		// At least one sub-item per phase proves the grouping renders
-		"Bubble Tea TUI shell",
-		"2.A Go-native tool registry + kernel tool loop",
-		"3.D.5 USER.md mirror — Gormes-original, no upstream equivalent",
-		"4.A Provider adapters",
-		"5.A–5.P",
-		"Phase 6 — Learning Loop (The Soul)",
+		// Structural roadmap checks — no exact counts or item names,
+		// those come from progress.json and must not be locked in here.
+		"roadmap-status-shipped",
+		"roadmap-status-progress",
+		"roadmap-status-planned",
+		"roadmap-status-later",
+		"roadmap-phase",
+		// Fuzzy phase-title presence — each phase renders, no subtitles
+		"Phase 1",
+		"Phase 2",
+		"Phase 3",
+		"Phase 4",
+		"Phase 5",
+		"Phase 6",
 	}
 	rejects := []string{
 		"Run Hermes Through a Go Operator Console.",
@@ -62,6 +64,17 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		if strings.Contains(text, reject) {
 			t.Fatalf("dist/index.html still contains stale token %q", reject)
 		}
+	}
+
+	// Roadmap renders all 6 phases — structural, not count-specific.
+	if n := strings.Count(text, `class="roadmap-phase"`); n != 6 {
+		t.Errorf("dist/index.html roadmap phase count = %d, want 6", n)
+	}
+
+	// The progress tracker follows "N/M shipped" — shape, not numbers.
+	trackerRE := regexp.MustCompile(`\d+/\d+ shipped`)
+	if !trackerRE.MatchString(text) {
+		t.Errorf("dist/index.html missing N/M shipped tracker label")
 	}
 
 	cssPath := filepath.Join(root, "static", "site.css")

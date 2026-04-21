@@ -20,3 +20,7 @@ playwright/.cache/
 
 # ── Transient deploy trigger markers ─────────────────
 .deploy-trigger
+
+# ── Progress SSoT embed (checked in; root .gitignore excludes data/) ─
+!internal/site/data/
+!internal/site/data/progress.json

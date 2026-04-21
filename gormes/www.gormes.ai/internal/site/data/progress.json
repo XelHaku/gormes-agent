@@ -1,0 +1,330 @@
+{
+  "meta": {
+    "version": "2.0",
+    "last_updated": "2026-04-20",
+    "links": {
+      "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
+      "landing_page": "https://gormes.ai",
+      "docs_site": "https://docs.gormes.ai/building-gormes/architecture_plan/",
+      "source_code": "https://github.com/TrebuchetDynamics/gormes-agent"
+    }
+  },
+  "phases": {
+    "1": {
+      "name": "Phase 1 — The Dashboard",
+      "deliverable": "Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary",
+      "subphases": {
+        "1.A": {
+          "name": "Core TUI",
+          "items": [
+            { "name": "Bubble Tea shell", "status": "complete" },
+            { "name": "16ms coalescing mailbox", "status": "complete" },
+            { "name": "SSE reconnect", "status": "complete" }
+          ]
+        },
+        "1.B": {
+          "name": "Wire Doctor",
+          "items": [
+            { "name": "Offline tool validation", "status": "complete" }
+          ]
+        }
+      }
+    },
+    "2": {
+      "name": "Phase 2 — The Gateway",
+      "deliverable": "Go-native tools + Telegram + session resume + wider adapters",
+      "subphases": {
+        "2.A": {
+          "name": "Tool Registry",
+          "items": [
+            { "name": "In-process Go tool registry", "status": "complete" },
+            { "name": "Streamed tool_calls accumulation", "status": "complete" },
+            { "name": "Kernel tool loop", "status": "complete" },
+            { "name": "Doctor verification", "status": "complete" }
+          ]
+        },
+        "2.B.1": {
+          "name": "Telegram Scout",
+          "items": [
+            { "name": "Telegram adapter", "status": "complete" },
+            { "name": "Long-poll ingress", "status": "complete" },
+            { "name": "Edit coalescing", "status": "complete" }
+          ]
+        },
+        "2.C": {
+          "name": "Thin Mapping Persistence",
+          "items": [
+            { "name": "bbolt session resume", "status": "complete" },
+            { "name": "(platform, chat_id) -> session_id", "status": "complete" }
+          ]
+        },
+        "2.D": {
+          "name": "Cron / Scheduled Automations",
+          "items": [
+            { "name": "Go ticker + bbolt job store", "status": "planned" },
+            { "name": "Natural-language cron parsing (Phase 4)", "status": "planned" }
+          ]
+        },
+        "2.B.2": {
+          "name": "Wider Gateway Surface",
+          "items": [
+            { "name": "Discord", "status": "planned" },
+            { "name": "Slack", "status": "planned" },
+            { "name": "WhatsApp", "status": "planned" },
+            { "name": "Signal", "status": "planned" },
+            { "name": "Email", "status": "planned" },
+            { "name": "SMS", "status": "planned" }
+          ]
+        },
+        "2.E": {
+          "name": "Subagent System",
+          "priority": "P0",
+          "items": [
+            { "name": "Execution isolation", "status": "planned" },
+            { "name": "Resource boundaries", "status": "planned" },
+            { "name": "Context isolation", "status": "planned" },
+            { "name": "Cancellation scopes", "status": "planned" }
+          ]
+        },
+        "2.F": {
+          "name": "Hooks + Lifecycle",
+          "items": [
+            { "name": "Per-event extension points", "status": "planned" },
+            { "name": "Managed restarts", "status": "planned" }
+          ]
+        },
+        "2.G": {
+          "name": "Skills System",
+          "priority": "P0",
+          "items": [
+            { "name": "Learning loop foundation", "status": "planned" },
+            { "name": "Pattern extraction", "status": "planned" }
+          ]
+        }
+      }
+    },
+    "3": {
+      "name": "Phase 3 — The Black Box (Memory)",
+      "deliverable": "SQLite + FTS5 + ontological graph + semantic fusion in Go",
+      "subphases": {
+        "3.A": {
+          "name": "SQLite + FTS5 Lattice",
+          "items": [
+            { "name": "SqliteStore", "status": "complete" },
+            { "name": "FTS5 triggers", "status": "complete" },
+            { "name": "Schema migrations v3a->v3d", "status": "complete" }
+          ]
+        },
+        "3.B": {
+          "name": "Ontological Graph + LLM Extractor",
+          "items": [
+            { "name": "Extractor", "status": "complete" },
+            { "name": "Entity/relationship upsert", "status": "complete" },
+            { "name": "Dead-letter queue", "status": "complete" }
+          ]
+        },
+        "3.C": {
+          "name": "Neural Recall + Context Injection",
+          "items": [
+            { "name": "RecallProvider", "status": "complete" },
+            { "name": "2-layer seed selection", "status": "complete" },
+            { "name": "CTE traversal", "status": "complete" },
+            { "name": "<memory-context> fence", "status": "complete" }
+          ]
+        },
+        "3.D": {
+          "name": "Semantic Fusion + Local Embeddings",
+          "items": [
+            { "name": "Ollama embeddings", "status": "complete" },
+            { "name": "Vector cache", "status": "complete" },
+            { "name": "Cosine similarity recall", "status": "complete" },
+            { "name": "Hybrid fusion", "status": "complete" }
+          ]
+        },
+        "3.D.5": {
+          "name": "Memory Mirror (USER.md sync)",
+          "items": [
+            { "name": "Async background export", "status": "complete" },
+            { "name": "SQLite as source of truth", "status": "complete" }
+          ]
+        },
+        "3.E.1": {
+          "name": "Session Index Mirror",
+          "items": [
+            { "name": "bbolt sessions.yaml export", "status": "planned" }
+          ]
+        },
+        "3.E.2": {
+          "name": "Tool Execution Audit Log",
+          "items": [
+            { "name": "JSONL audit trail", "status": "planned" }
+          ]
+        },
+        "3.E.3": {
+          "name": "Transcript Export Command",
+          "items": [
+            { "name": "Markdown export", "status": "planned" }
+          ]
+        },
+        "3.E.4": {
+          "name": "Extraction State Visibility",
+          "items": [
+            { "name": "gormes memory status", "status": "planned" }
+          ]
+        },
+        "3.E.5": {
+          "name": "Insights Audit Log",
+          "items": [
+            { "name": "Usage JSONL", "status": "planned" }
+          ]
+        },
+        "3.E.6": {
+          "name": "Memory Decay",
+          "items": [
+            { "name": "Weight attenuation", "status": "planned" },
+            { "name": "last_seen tracking", "status": "planned" }
+          ]
+        },
+        "3.E.7": {
+          "name": "Cross-Chat Synthesis",
+          "items": [
+            { "name": "Graph unification across chats", "status": "planned" }
+          ]
+        }
+      }
+    },
+    "4": {
+      "name": "Phase 4 — The Brain Transplant",
+      "deliverable": "Native Go agent orchestrator + prompt builder",
+      "dependency_note": "Build priority: Skills (2.G) -> Subagents (2.E) -> Gateway -> Native Agent Loop",
+      "subphases": {
+        "4.A": {
+          "name": "Provider Adapters",
+          "items": [
+            { "name": "Anthropic", "status": "planned" },
+            { "name": "Bedrock", "status": "planned" },
+            { "name": "Gemini", "status": "planned" },
+            { "name": "OpenRouter", "status": "planned" },
+            { "name": "Google Code Assist", "status": "planned" },
+            { "name": "Codex", "status": "planned" }
+          ]
+        },
+        "4.B": { "name": "Context Engine + Compression", "items": [
+          { "name": "Long session management", "status": "planned" },
+          { "name": "Context compression", "status": "planned" }
+        ]},
+        "4.C": { "name": "Native Prompt Builder", "items": [
+          { "name": "System + memory + tools + history assembly", "status": "planned" }
+        ]},
+        "4.D": { "name": "Smart Model Routing", "items": [
+          { "name": "Per-turn model selection", "status": "planned" }
+        ]},
+        "4.E": { "name": "Trajectory + Insights", "items": [
+          { "name": "Self-monitoring telemetry", "status": "planned" }
+        ]},
+        "4.F": { "name": "Title Generation", "items": [
+          { "name": "Auto-naming sessions", "status": "planned" }
+        ]},
+        "4.G": { "name": "Credentials + OAuth", "items": [
+          { "name": "Token vault", "status": "planned" },
+          { "name": "Multi-account auth", "status": "planned" }
+        ]},
+        "4.H": { "name": "Rate / Retry / Caching", "items": [
+          { "name": "Provider-side resilience", "status": "planned" }
+        ]}
+      }
+    },
+    "5": {
+      "name": "Phase 5 — The Final Purge",
+      "deliverable": "Python tool scripts ported to Go or WASM",
+      "subphases": {
+        "5.A": { "name": "Tool Surface Port", "items": [
+          { "name": "61-tool registry port", "status": "planned" }
+        ]},
+        "5.B": { "name": "Sandboxing Backends", "items": [
+          { "name": "Docker", "status": "planned" },
+          { "name": "Modal", "status": "planned" },
+          { "name": "Daytona", "status": "planned" },
+          { "name": "Singularity", "status": "planned" }
+        ]},
+        "5.C": { "name": "Browser Automation", "items": [
+          { "name": "Chromedp", "status": "planned" },
+          { "name": "Rod", "status": "planned" }
+        ]},
+        "5.D": { "name": "Vision + Image Generation", "items": [
+          { "name": "Multimodal in/out", "status": "planned" }
+        ]},
+        "5.E": { "name": "TTS / Voice / Transcription", "items": [
+          { "name": "Voice mode port", "status": "planned" }
+        ]},
+        "5.F": { "name": "Skills System (Remaining)", "items": [
+          { "name": "Skills hub", "status": "planned" },
+          { "name": "Skill registries", "status": "planned" }
+        ]},
+        "5.G": { "name": "MCP Integration", "items": [
+          { "name": "MCP client", "status": "planned" },
+          { "name": "OAuth flows", "status": "planned" }
+        ]},
+        "5.H": { "name": "ACP Integration", "items": [
+          { "name": "ACP server side", "status": "planned" }
+        ]},
+        "5.I": { "name": "Plugins Architecture", "items": [
+          { "name": "Plugin SDK", "status": "planned" },
+          { "name": "Third-party extensions", "status": "planned" }
+        ]},
+        "5.J": { "name": "Approval / Security Guards", "items": [
+          { "name": "Dangerous action gating", "status": "planned" }
+        ]},
+        "5.K": { "name": "Code Execution", "items": [
+          { "name": "Sandboxed exec", "status": "planned" }
+        ]},
+        "5.L": { "name": "File Ops + Patches", "items": [
+          { "name": "Atomic checkpoints", "status": "planned" }
+        ]},
+        "5.M": { "name": "Mixture of Agents", "items": [
+          { "name": "Multi-model coordination", "status": "planned" }
+        ]},
+        "5.N": { "name": "Misc Operator Tools", "items": [
+          { "name": "Todo", "status": "planned" },
+          { "name": "Clarify", "status": "planned" },
+          { "name": "Session search", "status": "planned" },
+          { "name": "Debug helpers", "status": "planned" }
+        ]},
+        "5.O": { "name": "Hermes CLI Parity", "items": [
+          { "name": "49-file CLI tree port", "status": "planned" }
+        ]},
+        "5.P": { "name": "Docker / Packaging", "items": [
+          { "name": "OCI image", "status": "planned" },
+          { "name": "Homebrew", "status": "planned" }
+        ]},
+        "5.Q": { "name": "TUI Gateway Streaming", "items": [
+          { "name": "SSE streaming to Bubble Tea TUI", "status": "planned" }
+        ]}
+      }
+    },
+    "6": {
+      "name": "Phase 6 — The Learning Loop (Soul)",
+      "deliverable": "Native skill extraction. Compounding intelligence. The feature Hermes doesn't have.",
+      "subphases": {
+        "6.A": { "name": "Complexity Detector", "items": [
+          { "name": "Heuristic or LLM-scored signal", "status": "planned" }
+        ]},
+        "6.B": { "name": "Skill Extractor", "items": [
+          { "name": "LLM-assisted pattern distillation", "status": "planned" }
+        ]},
+        "6.C": { "name": "Skill Storage Format", "items": [
+          { "name": "Portable SKILL.md format", "status": "planned" }
+        ]},
+        "6.D": { "name": "Skill Retrieval + Matching", "items": [
+          { "name": "Hybrid lexical + semantic lookup", "status": "planned" }
+        ]},
+        "6.E": { "name": "Feedback Loop", "items": [
+          { "name": "Skill effectiveness scoring", "status": "planned" }
+        ]},
+        "6.F": { "name": "Skill Surface", "items": [
+          { "name": "TUI + Telegram browsing", "status": "planned" }
+        ]}
+      }
+    }
+  }
+}
