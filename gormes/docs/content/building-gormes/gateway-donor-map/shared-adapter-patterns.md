@@ -21,11 +21,14 @@ This page captures the PicoClaw mechanics that are reusable across more than one
 - `picoclaw/pkg/channels/voice_capabilities.go`
 - `picoclaw/pkg/channels/webhook.go`
 
+If you are porting a new adapter, start with `picoclaw/pkg/channels/base.go`, `picoclaw/pkg/channels/interfaces.go`, `picoclaw/pkg/channels/manager.go`, and `picoclaw/pkg/channels/split.go` before drilling into the channel-specific donor files.
+
 ## The Reusable Shape
 
 PicoClaw's reusable contribution is not a full gateway architecture. The reusable part is a small adapter surface plus a set of optional capabilities.
 
-- Treat `picoclaw/pkg/channels/interfaces.go` as the donor for capability-style boundaries: typing, message edit, delete, reaction, placeholder, streaming, media send, webhook receive, and voice support are all optional interfaces instead of one giant adapter contract.
+- Treat `picoclaw/pkg/channels/interfaces.go` as the donor for capability-style boundaries around typing, message edit, delete, reaction, placeholder, streaming, and placeholder recording instead of one giant adapter contract.
+- Treat `picoclaw/pkg/channels/media.go`, `picoclaw/pkg/channels/webhook.go`, and `picoclaw/pkg/channels/voice_capabilities.go` as the donor files for media send, webhook or health endpoints, and voice capability reporting respectively.
 - Treat `picoclaw/pkg/channels/base.go` as the donor for common adapter state: runtime name, running flag, allow-list evaluation, group-trigger policy, media store injection, placeholder-recorder injection, and a per-adapter outbound length declaration.
 - Keep Gormes authoritative on message models and runtime ownership. PicoClaw's `Channel` interface is coupled to its own bus and config types, so only the shape should transfer cleanly.
 
