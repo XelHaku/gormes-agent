@@ -1,0 +1,309 @@
+package slack
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"strings"
+	"sync"
+
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/kernel"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
+)
+
+type Config struct {
+	AllowedChannelID string
+	ReplyInThread    bool
+	CoalesceMs       int
+	SessionMap       session.Map
+}
+
+type Bot struct {
+	cfg    Config
+	client Client
+	kernel *kernel.Kernel
+	log    *slog.Logger
+
+	selfUserID string
+
+	mu         sync.Mutex
+	nextTicket uint64
+	reserved   *reservedTurn
+	current    *turnBinding
+}
+
+type reservedTurn struct {
+	ticket    uint64
+	channelID string
+	threadTS  string
+}
+
+type turnBinding struct {
+	channelID     string
+	threadTS      string
+	placeholderTS string
+	lastSID       string
+}
+
+func New(cfg Config, client Client, k *kernel.Kernel, log *slog.Logger) *Bot {
+	if log == nil {
+		log = slog.Default()
+	}
+	if cfg.CoalesceMs <= 0 {
+		cfg.CoalesceMs = 1000
+	}
+	return &Bot{cfg: cfg, client: client, kernel: k, log: log}
+}
+
+func (b *Bot) Run(ctx context.Context) error {
+	selfID, err := b.client.AuthTest(ctx)
+	if err != nil {
+		return err
+	}
+	b.selfUserID = selfID
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go b.runOutbound(ctx, &wg)
+	defer wg.Wait()
+
+	return b.client.Run(ctx, func(e Event) {
+		b.handleEvent(ctx, e)
+	})
+}
+
+func (b *Bot) handleEvent(ctx context.Context, e Event) {
+	b.client.Ack(e.RequestID)
+
+	if e.UserID == "" || e.UserID == b.selfUserID {
+		return
+	}
+	if b.cfg.AllowedChannelID != "" && e.ChannelID != b.cfg.AllowedChannelID {
+		return
+	}
+
+	threadTS := b.replyThreadTS(e)
+	text := strings.TrimSpace(e.Text)
+	switch {
+	case text == "/start":
+		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
+			"Gormes is online. Send a message to start a turn. Commands: /stop /new")
+	case text == "/stop":
+		_ = b.kernel.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventCancel})
+	case text == "/new":
+		if err := b.kernel.ResetSession(); err != nil {
+			if errors.Is(err, kernel.ErrResetDuringTurn) {
+				_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
+					"Cannot reset during active turn - send /stop first.")
+			} else {
+				_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
+					"Session reset failed: "+err.Error())
+			}
+			return
+		}
+		b.clearSessionState(e.ChannelID)
+		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
+			"Session reset. Next message starts fresh.")
+	case strings.HasPrefix(text, "/"):
+		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "unknown command")
+	case text == "":
+		return
+	default:
+		ticket := b.reserveTurn(e.ChannelID, threadTS)
+		if ticket == 0 {
+			_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "Busy - try again in a second.")
+			return
+		}
+		if err := b.kernel.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventSubmit, Text: text}); err != nil {
+			b.cancelReservedTurn(ticket)
+			_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "Busy - try again in a second.")
+		}
+	}
+}
+
+func (b *Bot) runOutbound(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	frames := b.kernel.Render()
+	for {
+		select {
+		case <-ctx.Done():
+			b.finishTurn()
+			return
+		case f, ok := <-frames:
+			if !ok {
+				b.finishTurn()
+				return
+			}
+
+			binding, ok := b.bindTurnForFrame()
+			if !ok {
+				continue
+			}
+			b.persistIfChanged(ctx, binding.channelID, f)
+
+			switch f.Phase {
+			case kernel.PhaseConnecting, kernel.PhaseStreaming, kernel.PhaseFinalizing, kernel.PhaseReconnecting:
+				if err := b.ensurePlaceholder(ctx, binding); err != nil {
+					b.log.Warn("slack placeholder send failed", "channel_id", binding.channelID, "err", err)
+					continue
+				}
+				if err := b.client.UpdateMessage(ctx, binding.channelID, b.placeholderTS(), formatStream(f)); err != nil {
+					b.log.Warn("slack placeholder update failed", "channel_id", binding.channelID, "ts", b.placeholderTS(), "err", err)
+				}
+			case kernel.PhaseIdle:
+				if err := b.deliverCurrent(ctx, formatFinal(f)); err != nil {
+					b.log.Warn("slack final delivery failed", "channel_id", binding.channelID, "err", err)
+				}
+				b.finishTurn()
+			case kernel.PhaseFailed, kernel.PhaseCancelling:
+				if err := b.deliverCurrent(ctx, formatError(f)); err != nil {
+					b.log.Warn("slack error delivery failed", "channel_id", binding.channelID, "err", err)
+				}
+				b.finishTurn()
+			}
+		}
+	}
+}
+
+func (b *Bot) replyThreadTS(e Event) string {
+	if !b.cfg.ReplyInThread {
+		return ""
+	}
+	if e.ThreadTS != "" {
+		return e.ThreadTS
+	}
+	return e.Timestamp
+}
+
+func (b *Bot) reserveTurn(channelID, threadTS string) uint64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if channelID == "" || b.reserved != nil || b.current != nil {
+		return 0
+	}
+	b.nextTicket++
+	b.reserved = &reservedTurn{
+		ticket:    b.nextTicket,
+		channelID: channelID,
+		threadTS:  threadTS,
+	}
+	return b.nextTicket
+}
+
+func (b *Bot) cancelReservedTurn(ticket uint64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.reserved != nil && b.reserved.ticket == ticket {
+		b.reserved = nil
+	}
+}
+
+func (b *Bot) bindTurnForFrame() (turnBinding, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.current != nil {
+		return *b.current, true
+	}
+	if b.reserved == nil {
+		return turnBinding{}, false
+	}
+	b.current = &turnBinding{
+		channelID: b.reserved.channelID,
+		threadTS:  b.reserved.threadTS,
+	}
+	b.reserved = nil
+	return *b.current, true
+}
+
+func (b *Bot) persistIfChanged(ctx context.Context, channelID string, f kernel.RenderFrame) {
+	if b.cfg.SessionMap == nil || channelID == "" {
+		return
+	}
+
+	b.mu.Lock()
+	lastSID := ""
+	if b.current != nil && b.current.channelID == channelID {
+		lastSID = b.current.lastSID
+	}
+	b.mu.Unlock()
+
+	if f.SessionID == "" || f.SessionID == lastSID {
+		return
+	}
+	if err := b.cfg.SessionMap.Put(ctx, SessionKey(channelID), f.SessionID); err != nil {
+		b.log.Warn("failed to persist session_id", "key", SessionKey(channelID), "session_id", f.SessionID, "err", err)
+		return
+	}
+
+	b.mu.Lock()
+	if b.current != nil && b.current.channelID == channelID {
+		b.current.lastSID = f.SessionID
+	}
+	b.mu.Unlock()
+}
+
+func (b *Bot) ensurePlaceholder(ctx context.Context, binding turnBinding) error {
+	if ts := b.placeholderTS(); ts != "" {
+		return nil
+	}
+	ts, err := b.client.PostMessage(ctx, binding.channelID, binding.threadTS, formatPending())
+	if err != nil {
+		return err
+	}
+	b.setPlaceholderTS(ts)
+	return nil
+}
+
+func (b *Bot) deliverCurrent(ctx context.Context, text string) error {
+	b.mu.Lock()
+	var binding turnBinding
+	if b.current != nil {
+		binding = *b.current
+	}
+	b.mu.Unlock()
+
+	if binding.channelID == "" {
+		return nil
+	}
+	if binding.placeholderTS != "" {
+		return b.client.UpdateMessage(ctx, binding.channelID, binding.placeholderTS, text)
+	}
+	_, err := b.client.PostMessage(ctx, binding.channelID, binding.threadTS, text)
+	return err
+}
+
+func (b *Bot) placeholderTS() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.current == nil {
+		return ""
+	}
+	return b.current.placeholderTS
+}
+
+func (b *Bot) setPlaceholderTS(ts string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.current != nil {
+		b.current.placeholderTS = ts
+	}
+}
+
+func (b *Bot) clearSessionState(channelID string) {
+	b.mu.Lock()
+	if b.current != nil && b.current.channelID == channelID {
+		b.current.lastSID = ""
+	}
+	b.mu.Unlock()
+
+	if b.cfg.SessionMap != nil {
+		_ = b.cfg.SessionMap.Put(context.Background(), SessionKey(channelID), "")
+	}
+}
+
+func (b *Bot) finishTurn() {
+	b.mu.Lock()
+	b.current = nil
+	b.mu.Unlock()
+}
