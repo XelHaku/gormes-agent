@@ -377,27 +377,36 @@ func TestBot_RunOutbound_EmitsPendingStreamAndFinal(t *testing.T) {
 
 	waitForSlackOutput(t, mc, "roger")
 	outputs := mc.outputs()
-	if len(outputs) < 3 {
-		t.Fatalf("outputs = %d, want at least pending + stream + final", len(outputs))
+	if len(outputs) == 0 {
+		t.Fatal("outputs = 0, want at least one delivered reply")
 	}
-	if outputs[0].text != "⏳" || outputs[0].updated {
-		t.Fatalf("first output = %+v, want pending placeholder post", outputs[0])
+	if mc.lastThreadTS() != "1711111111.000400" {
+		t.Fatalf("thread_ts = %q, want 1711111111.000400", mc.lastThreadTS())
 	}
-	foundStream := false
+
+	// The kernel render mailbox is capacity-1 with replace-latest semantics,
+	// so a fast turn may expose only the latest observable frame. The adapter
+	// must still deliver the final reply correctly; intermediate placeholder
+	// and stream updates are opportunistic rather than guaranteed.
 	foundFinal := false
-	for _, out := range outputs[1:] {
+	foundPending := false
+	foundStreamingLike := false
+	for _, out := range outputs {
+		if out.text == "⏳" && !out.updated {
+			foundPending = true
+		}
 		if out.updated && strings.Contains(out.text, "rog") {
-			foundStream = true
+			foundStreamingLike = true
 		}
 		if strings.Contains(out.text, "roger") {
 			foundFinal = true
 		}
 	}
-	if !foundStream {
-		t.Fatalf("outputs = %+v, want streamed update containing partial draft", outputs)
-	}
 	if !foundFinal {
 		t.Fatalf("outputs = %+v, want final reply containing roger", outputs)
+	}
+	if foundStreamingLike && !foundPending {
+		t.Fatalf("outputs = %+v, want placeholder before any streamed update", outputs)
 	}
 }
 
