@@ -1,6 +1,6 @@
 <nav class="docs-breadcrumbs" aria-label="Breadcrumbs">
   {{ range .Ancestors.Reverse }}
-    <a href="{{ .RelPermalink }}">{{ .Title | upper }}</a>
+    <a href="{{ .RelPermalink }}">{{ .Title }}</a>
     <span class="docs-breadcrumb-sep">/</span>
   {{ end }}
 </nav>

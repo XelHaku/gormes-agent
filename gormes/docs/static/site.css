@@ -201,10 +201,11 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
 /* ── Article typography ────────────────────────────── */
 .docs-breadcrumbs {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.04em;
   color: var(--label);
   margin-bottom: 14px;
+  text-transform: none;
 }
 .docs-breadcrumbs a { color: var(--muted); }
 .docs-breadcrumb-sep { margin: 0 6px; color: var(--label); }
@@ -375,7 +376,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
 .kicker {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--label);
   margin: 0 0 8px;
