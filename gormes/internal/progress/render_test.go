@@ -57,3 +57,43 @@ func TestRenderReadmeRollup_Sorted(t *testing.T) {
 		t.Errorf("phases not sorted (i1=%d, i2=%d):\n%s", i1, i2, got)
 	}
 }
+
+func TestRenderDocsChecklist_StatsLine(t *testing.T) {
+	p := &Progress{
+		Meta: Meta{Version: "2.0"},
+		Phases: map[string]Phase{
+			"1": {Name: "P1", Subphases: map[string]Subphase{
+				"1.A": {Items: []Item{{Name: "done", Status: StatusComplete}}},
+				"1.B": {Items: []Item{{Name: "todo", Status: StatusPlanned}}},
+			}},
+		},
+	}
+	got := RenderDocsChecklist(p)
+	if !strings.Contains(got, "**Overall:** 1/2 subphases shipped") {
+		t.Errorf("checklist missing overall stats line; got:\n%s", got)
+	}
+}
+
+func TestRenderDocsChecklist_ItemCheckboxes(t *testing.T) {
+	p := &Progress{
+		Meta: Meta{Version: "2.0"},
+		Phases: map[string]Phase{
+			"1": {Name: "Phase 1 — Test", Subphases: map[string]Subphase{
+				"1.A": {Name: "Alpha", Items: []Item{
+					{Name: "done", Status: StatusComplete},
+					{Name: "todo", Status: StatusPlanned},
+				}},
+			}},
+		},
+	}
+	got := RenderDocsChecklist(p)
+	if !strings.Contains(got, "- [x] done") {
+		t.Errorf("checklist missing checked item; got:\n%s", got)
+	}
+	if !strings.Contains(got, "- [ ] todo") {
+		t.Errorf("checklist missing unchecked item; got:\n%s", got)
+	}
+	if !strings.Contains(got, "### 1.A — Alpha") {
+		t.Errorf("checklist missing subphase header; got:\n%s", got)
+	}
+}
