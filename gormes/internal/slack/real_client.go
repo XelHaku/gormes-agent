@@ -75,20 +75,24 @@ func (c *realClient) Run(ctx context.Context, fn func(Event)) error {
 	}
 }
 
-func (c *realClient) Ack(requestID string) {
+func (c *realClient) Ack(requestID string) error {
 	if requestID == "" {
-		return
+		return nil
 	}
 
 	c.mu.Lock()
 	req, ok := c.pending[requestID]
-	if ok {
-		delete(c.pending, requestID)
-	}
 	c.mu.Unlock()
-	if ok {
-		_ = c.ackFn(req)
+	if !ok {
+		return nil
 	}
+	if err := c.ackFn(req); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	delete(c.pending, requestID)
+	c.mu.Unlock()
+	return nil
 }
 
 func (c *realClient) PostMessage(ctx context.Context, channelID, threadTS, text string) (string, error) {

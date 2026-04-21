@@ -20,12 +20,15 @@ type mockClient struct {
 	events     chan Event
 	nextTS     int
 	acked      map[string]bool
+	ackCount   map[string]int
 	callLog    []string
 	outputLog  []outputCall
 	threadByTS map[string]string
 
+	AckErr    error
 	PostErr   error
 	UpdateErr error
+	AckFn     func(string) error
 }
 
 var _ Client = (*mockClient)(nil)
@@ -35,6 +38,7 @@ func newMockClient() *mockClient {
 		events:     make(chan Event, 16),
 		nextTS:     1000,
 		acked:      make(map[string]bool),
+		ackCount:   make(map[string]int),
 		threadByTS: make(map[string]string),
 	}
 }
@@ -54,13 +58,27 @@ func (m *mockClient) Run(ctx context.Context, fn func(Event)) error {
 	}
 }
 
-func (m *mockClient) Ack(requestID string) {
+func (m *mockClient) Ack(requestID string) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.ackCount[requestID]++
+	m.callLog = append(m.callLog, "ack:"+requestID)
+	ackFn := m.AckFn
+	ackErr := m.AckErr
+	m.mu.Unlock()
 	if requestID != "" {
+		if ackFn != nil {
+			if err := ackFn(requestID); err != nil {
+				return err
+			}
+		}
+		if ackErr != nil {
+			return ackErr
+		}
+		m.mu.Lock()
 		m.acked[requestID] = true
-		m.callLog = append(m.callLog, "ack:"+requestID)
+		m.mu.Unlock()
 	}
+	return nil
 }
 
 func (m *mockClient) PostMessage(_ context.Context, channelID, threadTS, text string) (string, error) {
@@ -141,6 +159,12 @@ func (m *mockClient) calls() []string {
 	out := make([]string, len(m.callLog))
 	copy(out, m.callLog)
 	return out
+}
+
+func (m *mockClient) ackAttempts(requestID string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.ackCount[requestID]
 }
 
 func (m *mockClient) rememberThread(ts, threadTS string) {

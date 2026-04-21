@@ -233,6 +233,124 @@ func TestBot_IgnoresThreadBroadcastSubtype(t *testing.T) {
 	}
 }
 
+func TestBot_AllowsFileShareSubtype(t *testing.T) {
+	mc := newMockClient()
+	k := newSlackKernel("file ok", "sess-file")
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+		CoalesceMs:       50,
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-file",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "see attached",
+		Timestamp: "1711111111.000360",
+		SubType:   "file_share",
+	})
+
+	waitForSlackOutput(t, mc, "file ok")
+}
+
+func TestBot_RootMessageDoesNotThreadWhenReplyInThreadDisabled(t *testing.T) {
+	mc := newMockClient()
+	k := newSlackKernel("root ok", "sess-root")
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    false,
+		CoalesceMs:       50,
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-root",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "hello root",
+		Timestamp: "1711111111.000370",
+	})
+
+	waitForSlackOutput(t, mc, "root ok")
+	if mc.lastThreadTS() != "" {
+		t.Fatalf("thread_ts = %q, want empty for root reply", mc.lastThreadTS())
+	}
+}
+
+func TestBot_ThreadedInboundStillRepliesInThreadWhenReplyInThreadDisabled(t *testing.T) {
+	mc := newMockClient()
+	k := newSlackKernel("thread keep", "sess-keep")
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    false,
+		CoalesceMs:       50,
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-thread-keep",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "hello thread keep",
+		Timestamp: "1711111111.000380",
+		ThreadTS:  "1711111111.000381",
+	})
+
+	waitForSlackOutput(t, mc, "thread keep")
+	if mc.lastThreadTS() != "1711111111.000381" {
+		t.Fatalf("thread_ts = %q, want 1711111111.000381", mc.lastThreadTS())
+	}
+}
+
+func TestBot_DoesNotHandleEventWhenAckFails(t *testing.T) {
+	mc := newMockClient()
+	mc.AckErr = errors.New("ack failed")
+	k := newIdleSlackKernel()
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+	}, mc, k, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go k.Run(ctx)
+	<-k.Render()
+	go func() { _ = b.Run(ctx) }()
+
+	mc.pushEvent(Event{
+		RequestID: "req-ack-fail",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "/start",
+		Timestamp: "1711111111.000390",
+	})
+
+	time.Sleep(100 * time.Millisecond)
+	if got := len(mc.outputs()); got != 0 {
+		t.Fatalf("outputs = %d, want 0 when ack fails", got)
+	}
+	if got := mc.ackAttempts("req-ack-fail"); got != 1 {
+		t.Fatalf("ackAttempts = %d, want 1", got)
+	}
+}
+
 func TestBot_RunOutbound_EmitsPendingStreamAndFinal(t *testing.T) {
 	mc := newMockClient()
 	k := newSlackKernel("roger", "sess-slack")
@@ -461,8 +579,9 @@ func TestRealClient_HandleEventsAPI_PreservesSubtypeMetadata(t *testing.T) {
 	}
 }
 
-func TestRealClient_AckIsIdempotentAndCleansPending(t *testing.T) {
+func TestRealClient_AckFailureRetainsPendingAndSuccessClearsIt(t *testing.T) {
 	ackCount := 0
+	ackErr := errors.New("ack failed")
 	rc := &realClient{
 		pending: map[string]socketmode.Request{
 			"env-1": {EnvelopeID: "env-1"},
@@ -472,17 +591,34 @@ func TestRealClient_AckIsIdempotentAndCleansPending(t *testing.T) {
 			if req.EnvelopeID != "env-1" {
 				t.Fatalf("EnvelopeID = %q, want env-1", req.EnvelopeID)
 			}
+			if ackCount == 1 {
+				return ackErr
+			}
 			return nil
 		},
 	}
 
-	rc.Ack("env-1")
-	rc.Ack("env-1")
+	if err := rc.Ack("env-1"); !errors.Is(err, ackErr) {
+		t.Fatalf("Ack err = %v, want %v", err, ackErr)
+	}
+	if got := len(rc.pending); got != 1 {
+		t.Fatalf("pending len after failed ack = %d, want 1", got)
+	}
 
-	if ackCount != 1 {
-		t.Fatalf("ackCount = %d, want 1", ackCount)
+	if err := rc.Ack("env-1"); err != nil {
+		t.Fatalf("Ack retry err = %v, want nil", err)
 	}
 	if got := len(rc.pending); got != 0 {
-		t.Fatalf("pending len = %d, want 0", got)
+		t.Fatalf("pending len after successful ack = %d, want 0", got)
+	}
+	if ackCount != 2 {
+		t.Fatalf("ackCount = %d, want 2", ackCount)
+	}
+
+	if err := rc.Ack("env-1"); err != nil {
+		t.Fatalf("Ack on cleared request err = %v, want nil", err)
+	}
+	if ackCount != 2 {
+		t.Fatalf("ackCount after idempotent ack = %d, want 2", ackCount)
 	}
 }

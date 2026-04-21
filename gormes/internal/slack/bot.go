@@ -75,12 +75,15 @@ func (b *Bot) Run(ctx context.Context) error {
 }
 
 func (b *Bot) handleEvent(ctx context.Context, e Event) {
-	b.client.Ack(e.RequestID)
+	if err := b.client.Ack(e.RequestID); err != nil {
+		b.log.Warn("slack ack failed", "request_id", e.RequestID, "err", err)
+		return
+	}
 
 	if e.UserID == "" || e.UserID == b.selfUserID {
 		return
 	}
-	if e.SubType != "" {
+	if ignoreSubtype(e.SubType) {
 		return
 	}
 	if b.cfg.AllowedChannelID != "" && e.ChannelID != b.cfg.AllowedChannelID {
@@ -175,13 +178,17 @@ func (b *Bot) runOutbound(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (b *Bot) replyThreadTS(e Event) string {
-	if !b.cfg.ReplyInThread {
-		return ""
-	}
 	if e.ThreadTS != "" {
 		return e.ThreadTS
 	}
+	if !b.cfg.ReplyInThread {
+		return ""
+	}
 	return e.Timestamp
+}
+
+func ignoreSubtype(subtype string) bool {
+	return subtype != "" && subtype != "file_share"
 }
 
 func (b *Bot) reserveTurn(channelID, threadTS string) uint64 {
