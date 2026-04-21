@@ -10,6 +10,7 @@
   --bg-2: #1a1f29;
   --border: #1e232e;
   --border-strong: #2a3140;
+  --bg-elev: #161c26;
 
   --text: #ebe9e2;
   --muted: rgba(235, 233, 226, 0.62);
@@ -39,8 +40,8 @@ html, body {
   background: var(--bg-0);
   color: var(--text);
   font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'kern', 'liga', 'calt';
@@ -211,7 +212,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
 .docs-title {
   font-family: var(--font-display);
   font-weight: 900;
-  font-size: clamp(28px, 4.5vw, 42px);
+  font-size: clamp(30px, 4.5vw, 44px);
   line-height: 1.05;
   letter-spacing: -0.02em;
   margin: 0 0 14px;
@@ -219,7 +220,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
   overflow-wrap: break-word;
 }
 .docs-lede {
-  font-size: 16px;
+  font-size: 17px;
   color: var(--muted-strong);
   margin: 0 0 28px;
   line-height: 1.55;
@@ -229,24 +230,24 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
 
 .docs-content h2 {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   font-variation-settings: "opsz" 60, "SOFT" 20;
   letter-spacing: -0.01em;
-  margin: 44px 0 14px;
+  margin: 56px 0 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
   overflow-wrap: break-word;
 }
 .docs-content h3 {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   font-variation-settings: "opsz" 48, "SOFT" 15;
-  margin: 32px 0 10px;
+  margin: 28px 0 10px;
   overflow-wrap: break-word;
 }
-.docs-content p { margin: 0 0 14px; overflow-wrap: break-word; }
+.docs-content p { margin: 0 0 16px; overflow-wrap: break-word; max-width: 62ch; }
 .docs-content ul, .docs-content ol { margin: 0 0 18px; padding-left: 22px; }
 .docs-content li { margin-bottom: 4px; }
 .docs-content li > p { margin-bottom: 4px; }
@@ -517,6 +518,7 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-
   .cmd { padding-right: 80px; }
   .docs-footer-inner { flex-direction: column; align-items: flex-start; gap: 6px; }
   .docs-content table { font-size: 12px; }
+  .docs-title { font-size: clamp(26px, 7vw, 32px); }
 }
 
 /* ── Reduced motion ────────────────────────────────── */
