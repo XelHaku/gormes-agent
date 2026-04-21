@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/config"
 )
 
@@ -35,5 +37,51 @@ func TestNewRootCmd_RegistersDiscord(t *testing.T) {
 	}
 	if !names["discord"] {
 		t.Fatal("root command missing discord subcommand")
+	}
+}
+
+func TestNewRootCmd_MakesResumePersistentForDiscord(t *testing.T) {
+	root := newRootCmd()
+	if root.PersistentFlags().Lookup("resume") == nil {
+		t.Fatal("root command missing persistent resume flag")
+	}
+
+	discord, _, err := root.Find([]string{"discord"})
+	if err != nil {
+		t.Fatalf("find discord command: %v", err)
+	}
+	if discord == nil {
+		t.Fatal("discord command not found")
+	}
+	if discord.InheritedFlags().Lookup("resume") == nil {
+		t.Fatal("discord command does not inherit resume flag")
+	}
+}
+
+func TestDiscordCommand_AcceptsResumeFlagPath(t *testing.T) {
+	oldRunE := discordCmd.RunE
+	t.Cleanup(func() {
+		discordCmd.RunE = oldRunE
+	})
+
+	var gotResume string
+	discordCmd.RunE = func(cmd *cobra.Command, _ []string) error {
+		gotResume, _ = cmd.Flags().GetString("resume")
+		return nil
+	}
+
+	for _, args := range [][]string{
+		{"discord", "--resume", "test-sid"},
+		{"--resume", "test-sid", "discord"},
+	} {
+		root := newRootCmd()
+		root.SetArgs(args)
+		gotResume = ""
+		if err := root.Execute(); err != nil {
+			t.Fatalf("args %v: execute failed: %v", args, err)
+		}
+		if gotResume != "test-sid" {
+			t.Fatalf("args %v: got resume %q, want %q", args, gotResume, "test-sid")
+		}
 	}
 }

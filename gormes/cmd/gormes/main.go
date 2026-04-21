@@ -45,7 +45,7 @@ func newRootCmd() *cobra.Command {
 		RunE:         runTUI,
 	}
 	root.Flags().Bool("offline", false, "skip startup api_server health check (dev only — turns the TUI into a cosmetic smoke-tester)")
-	root.Flags().String("resume", "", "override persisted session_id for the TUI's default key")
+	root.PersistentFlags().String("resume", "", "override persisted session_id for the TUI's default key")
 	root.AddCommand(doctorCmd, versionCmd, telegramCmd, discordCmd)
 	return root
 }
