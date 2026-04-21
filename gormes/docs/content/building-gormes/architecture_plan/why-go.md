@@ -22,7 +22,7 @@ On a high-end PC you don't feel install latency. You feel these.
 
 1. **It still works in a year.** No pip drift, no CUDA/torch realignment, no Python 3.X bump breaking imports, no wheel that stopped building on your OS. The binary you copied in April runs identically in November. Python long-running agents rot — that's why users babysit them. Go genuinely closes this failure mode.
 
-2. **No mystery stalls.** Python agents under concurrent load (gateway + cron + TUI + tools) hit GIL edges and asyncio-vs-threading seams that manifest as "it froze for a sec." On a fast PC, startup is invisible — stutters aren't. Go's scheduler + the bounded-mailbox kernel (see [Core Systems → Gateway](../../core-systems/gateway/)) removes that class of bug.
+2. **No mystery stalls.** Python agents under concurrent load (gateway + cron + TUI + tools) hit GIL edges and asyncio-vs-threading seams that manifest as "it froze for a sec." On a fast PC, startup is invisible — stutters aren't. Go's scheduler + the bounded-mailbox kernel (see [Core Systems → Gateway](../core-systems/gateway/)) removes that class of bug.
 
 3. **No segfault class.** Python with native deps (torch, numpy, llama.cpp bindings) can take the whole process down with a C-level crash. Go crashes are recoverable panics with stack traces. Users experience this as "it never disappears on me."
 

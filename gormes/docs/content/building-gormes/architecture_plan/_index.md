@@ -5,7 +5,8 @@ weight: 10
 
 # Gormes — Executive Roadmap
 
-**Single source of truth:** [`progress.json`](progress.json) — machine-readable, validated + regenerated on build.
+**Single source of truth:** `progress.json` — machine-readable, validated + regenerated on build.
+**Public site:** https://gormes.ai
 
 **Linked surfaces:**
 - [README.md](https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md) — Quick start + rollup phase table
@@ -322,7 +323,7 @@ weight: 10
 
 ## Data Format
 
-[`progress.json`](progress.json) is the machine-readable source of truth. Top-level structure:
+`progress.json` is the machine-readable source of truth. Top-level structure:
 
 - `meta` — schema version, last-updated timestamp, canonical URLs
 - `phases` — six phases keyed `"1"`..`"6"`, each containing `subphases`
