@@ -42,7 +42,7 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Channel / contact directory | `gateway/channel_directory.py` | 2.F | ⏳ planned |
 | Platform enum + per-platform config | `gateway/*` — `Platform` (enum), `PlatformConfig` | 2.B | 🔨 Telegram/Discord/Slack config surfaces landed; canonical cross-platform enum parity remains |
 | Cron / scheduled automations | `cron/scheduler.py`, `cron/jobs.py`, `tools/cronjob_tools.py` | 2.D | ✅ shipped (scheduler + bbolt `cron_jobs` bucket + SQLite `cron_runs` audit + CRON.md mirror + Heartbeat prefix + exact-match `[SILENT]` suppression + kernel `PlatformEvent.SessionID/CronJobID` per-event override; upstream's file tick lock not needed — single-process) |
-| Webhook subscription system (GitHub events / API triggers → prompt → deliver) | `hermes_cli/webhook.py` + gateway routing | 2.D | ⏳ planned |
+| Webhook subscription system (GitHub events / API triggers → prompt → deliver) | `hermes_cli/webhook.py` + gateway routing | 2.B.9 / 2.D | 🔨 typed prompt-to-delivery bridge landed in `internal/channels/webhook`; signed ingress/auth and runtime adapter wiring remain |
 | Subagent delegation | `tools/delegate_tool.py` | 2.E | ✅ deterministic runtime, `delegate_task`, runner policy, typed child tool-call audit, append-only run logging, and real child stream execution landed |
 | Hooks system (`HookRegistry`) | `gateway/hooks.py`, `gateway/builtin_hooks/{boot_md}.py` | 2.F | ✅ in-process gateway hook points, live `HOOK.yaml` command loading, and built-in `BOOT.md` startup queuing with non-blocking failure semantics landed |
 | Restart / pairing / lifecycle | `gateway/{restart,pairing,status}.py` + `PairingStore` | 2.F | ⏳ planned |

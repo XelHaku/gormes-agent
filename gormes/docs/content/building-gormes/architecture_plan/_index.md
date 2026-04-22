@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 25/66 subphases shipped · 6 in progress · 35 planned
+**Overall:** 25/66 subphases shipped · 7 in progress · 34 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -105,10 +105,10 @@ weight: 10
 - [x] Threaded text adapter contract suite
 - [ ] Matrix + Mattermost transport wiring
 
-### 2.B.9 — Webhook + Trigger Ingress ⏳
+### 2.B.9 — Webhook + Trigger Ingress 🔨
 
 - [ ] Signed event parsing + auth gates
-- [ ] Prompt-to-delivery routing bridge
+- [x] Prompt-to-delivery routing bridge
 
 ### 2.B.10 — Regional + Device Adapter Flood 🔨
 

@@ -22,7 +22,7 @@ weight: 30
 | Phase 2.B.6 — Signal Adapter | ✅ complete | P2 | Signal ingress, session identity, and reply/send semantics on the shared chassis |
 | Phase 2.B.7 — Email + SMS Adapters | ⏳ planned | P3 | Normalize low-bandwidth ingress and outbound delivery contracts without special-casing the kernel |
 | Phase 2.B.8 — Matrix + Mattermost Adapters | 🔨 in progress | P4 | Shared threaded-text contract suite landed in `internal/channels/threadtext`; Matrix + Mattermost transport wiring remains |
-| Phase 2.B.9 — Webhook + Trigger Ingress | ⏳ planned | P4 | Signed webhook ingress and prompt-to-delivery routing for GitHub and generic API triggers |
+| Phase 2.B.9 — Webhook + Trigger Ingress | 🔨 in progress | P4 | Typed prompt-to-delivery bridge landed in `internal/channels/webhook`; signed webhook ingress and auth gates remain |
 | Phase 2.B.10 — Regional + Device Adapter Flood | ⏳ planned | P4 | BlueBubbles, HomeAssistant, Feishu, WeChat/WeCom, DingTalk, and QQ Bot on the same gateway contracts |
 | Phase 2.C — Thin Mapping Persistence | ✅ complete | P0 | bbolt-backed `(platform, chat_id) -> session_id` resume; no transcript ownership moved into Go |
 | Phase 2.D — Cron / Scheduled Automations | ✅ complete | P2 | `internal/cron` package with `robfig/cron/v3` scheduler, bbolt `cron_jobs` bucket, SQLite `cron_runs` audit table, CRON.md mirror, Heartbeat `[SYSTEM:]` prefix + exact-match `[SILENT]` suppression, kernel `PlatformEvent.SessionID`/`CronJobID` per-event override, generic `DeliverySink` interface. Opt-in via `[cron].enabled=true` + `[telegram].allowed_chat_id`. Ship criterion proven live against Ollama (commits `e0b2fcea`…`8aa9a6e6`). Natural-language cron parsing deferred to Phase 4.C |

@@ -230,8 +230,8 @@
             },
             {
               "name": "Prompt-to-delivery routing bridge",
-              "status": "planned",
-              "note": "TDD: require end-to-end routing fixtures before connecting GitHub or generic API triggers."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/webhook now renders prompt and deliver_extra templates, derives deterministic webhook session chat IDs, and resolves typed gateway delivery targets including thread aliases."
             }
           ]
         },
