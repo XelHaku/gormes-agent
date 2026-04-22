@@ -8,6 +8,7 @@ This directory is the design-proof set for the Go-native port. Public-facing man
 - [2026-04-21-gormes-phase2-os-ai-spine-design.md](2026-04-21-gormes-phase2-os-ai-spine-design.md) — sequencing contract for subagents, static skills, and reviewed skill candidates as the first OS-AI slice.
 - [2026-04-19-gormes-phase2-tools-design.md](2026-04-19-gormes-phase2-tools-design.md) — Phase 2.A Tool Registry design for Go-native tools.
 - [2026-04-19-gormes-phase2b-telegram.md](2026-04-19-gormes-phase2b-telegram.md) — Phase 2.B.1 Telegram Scout design for split-binary messaging.
+- [2026-04-21-gormes-phase2b2-discord-slack-design.md](2026-04-21-gormes-phase2b2-discord-slack-design.md) — Phase 2.B.2-2.B.3 wider gateway batch for Discord and Slack.
 - [2026-04-19-gormes-phase2c-persistence-design.md](2026-04-19-gormes-phase2c-persistence-design.md) — Phase 2.C thin bbolt mapping for session-handle resume.
 
 ## Phase 2 Cross-Links
@@ -16,6 +17,7 @@ This directory is the design-proof set for the Go-native port. Public-facing man
 - [Phase 2 OS-AI Spine](2026-04-21-gormes-phase2-os-ai-spine-design.md)
 - [Phase 2.A — Tool Registry](2026-04-19-gormes-phase2-tools-design.md)
 - [Phase 2.B.1 — Telegram Scout](2026-04-19-gormes-phase2b-telegram.md)
+- [Phase 2.B.2-2.B.3 — Discord + Slack Batch](2026-04-21-gormes-phase2b2-discord-slack-design.md)
 - [Phase 2.C — Thin Mapping Persistence](2026-04-19-gormes-phase2c-persistence-design.md)
 
 ## Chronological Index
@@ -32,3 +34,4 @@ This directory is the design-proof set for the Go-native port. Public-facing man
 - [2026-04-19-gormes-phase2c-persistence-design.md](2026-04-19-gormes-phase2c-persistence-design.md) — Thin bbolt session-handle persistence.
 - [2026-04-20-gormes-phase3a-memory-design.md](2026-04-20-gormes-phase3a-memory-design.md) — Planned SQLite + FTS5 memory foundation for the Phase 3 lattice.
 - [2026-04-21-gormes-phase2-os-ai-spine-design.md](2026-04-21-gormes-phase2-os-ai-spine-design.md) — staged Phase 2 spine for subagents, static skills, and reviewed candidate promotion.
+- [2026-04-21-gormes-phase2b2-discord-slack-design.md](2026-04-21-gormes-phase2b2-discord-slack-design.md) — Discord + Slack wider gateway batch.

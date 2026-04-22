@@ -1,9 +1,6 @@
 # ── Build outputs (Makefile writes to bin/) ──────────
 bin/
-
-# Note: gormes/gormes (root-level binary) is intentionally tracked
-# per the repo's existing 'refresh tracked binary' pattern. See
-# commit b42ff8a6 if that policy needs revisiting.
+/gormes
 
 # ── Go binaries for other platforms ──────────────────
 *.exe

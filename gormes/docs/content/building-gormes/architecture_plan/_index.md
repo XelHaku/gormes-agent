@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 21/66 subphases shipped · 1 in progress · 44 planned
+**Overall:** 21/66 subphases shipped · 2 in progress · 43 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -206,9 +206,9 @@ weight: 10
 - [x] Async background export
 - [x] SQLite as source of truth
 
-### 3.E.1 — Session Index Mirror ⏳
+### 3.E.1 — Session Index Mirror 🔨
 
-- [ ] Read-only bbolt sessions.db -> index.yaml mirror
+- [x] Read-only bbolt sessions.db -> index.yaml mirror
 - [ ] Deterministic mirror refresh without mutating session state
 
 ### 3.E.2 — Tool Execution Audit Log ✅

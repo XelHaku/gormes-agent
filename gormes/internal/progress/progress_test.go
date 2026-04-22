@@ -385,11 +385,15 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	}
 	indexItems := itemsByName(index.Items)
 	mirror := indexItems["Read-only bbolt sessions.db -> index.yaml mirror"]
-	if mirror.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.1 mirror status = %q, want planned", mirror.Status)
+	if mirror.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.1 mirror status = %q, want complete", mirror.Status)
 	}
-	if !strings.Contains(mirror.Note, "TDD") {
-		t.Fatalf("Phase 3.E.1 mirror note = %q, want TDD guidance", mirror.Note)
+	if !strings.Contains(mirror.Note, "SessionIndexMirror") {
+		t.Fatalf("Phase 3.E.1 mirror note = %q, want SessionIndexMirror implementation detail", mirror.Note)
+	}
+	refresh := indexItems["Deterministic mirror refresh without mutating session state"]
+	if refresh.Status != StatusPlanned {
+		t.Fatalf("Phase 3.E.1 refresh status = %q, want planned", refresh.Status)
 	}
 
 	audit := p.Phases["3"].Subphases["3.E.2"]

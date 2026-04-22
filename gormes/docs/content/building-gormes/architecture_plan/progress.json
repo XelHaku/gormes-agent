@@ -534,8 +534,8 @@
           "items": [
             {
               "name": "Read-only bbolt sessions.db -> index.yaml mirror",
-              "status": "planned",
-              "note": "TDD: lock YAML shape, natural ordering, and atomic rewrite semantics before adding filesystem writes."
+              "status": "complete",
+              "note": "TDD: shipped internal/session SessionIndexMirror with fixed YAML shape, lexically ordered bbolt key export, and atomic temp-file rewrite semantics."
             },
             {
               "name": "Deterministic mirror refresh without mutating session state",
