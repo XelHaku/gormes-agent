@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 26/66 subphases shipped · 6 in progress · 34 planned
+**Overall:** 26/66 subphases shipped · 7 in progress · 33 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -237,9 +237,9 @@ weight: 10
 - [ ] Relationship last_seen tracking
 - [x] Deterministic weight attenuation at recall time
 
-### 3.E.7 — Cross-Chat Synthesis ⏳
+### 3.E.7 — Cross-Chat Synthesis 🔨
 
-- [ ] user_id concept above chat_id
+- [x] user_id concept above chat_id
 - [ ] Cross-chat entity merge + recall fence
 
 ### 3.E.8 — Session Lineage + Cross-Source Search ⏳

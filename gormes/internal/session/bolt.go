@@ -43,6 +43,13 @@ func OpenBolt(path string) (*BoltMap, error) {
 
 	if err := db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte(bucketName))
+		if err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists([]byte(metadataBucketName)); err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists([]byte(chatUserBucketName))
 		return err
 	}); err != nil {
 		_ = db.Close()

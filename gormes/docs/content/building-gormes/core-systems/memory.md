@@ -23,7 +23,7 @@ Persistent, searchable state that outlives the process. Structured enough for gr
 
 - **Session mirror closeout** (3.E.1) — the `SessionIndexMirror` writer plus deterministic runtime refresh wiring are now landed, giving operators a stable `sessions/index.yaml` audit surface.
 - **`last_seen` closeout** (3.E.6) — append-only `usage.jsonl` persistence is now landed; the remaining open half is timestamp-tracking for decay.
-- **Cross-chat identity** (3.E.7) — GONCHO identity hierarchy is `user_id > chat_id > session_id`; recall stays same-chat by default and only widens when cross-chat scope is explicitly requested.
+- **Cross-chat identity** (3.E.7) — GONCHO identity hierarchy is `user_id > chat_id > session_id`; `internal/session` now persists canonical chat-to-user bindings, while recall still stays same-chat by default until explicit cross-chat scope lands.
 - **Session lineage + cross-source search** (3.E.8) — `parent_session_id` marks compression/fork descendants, and source-filtered search spans one canonical `user_id` across chats instead of bypassing transport boundaries blindly.
 
 ## Identity + lineage contract

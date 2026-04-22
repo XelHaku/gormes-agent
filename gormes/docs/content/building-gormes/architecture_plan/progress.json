@@ -635,8 +635,8 @@
           "items": [
             {
               "name": "user_id concept above chat_id",
-              "status": "planned",
-              "note": "Architecture frozen in docs/superpowers/plans/2026-04-22-gormes-phase3-identity-lineage-plan.md: canonical GONCHO hierarchy is user_id > chat_id > session_id, with explicit alias binding and no heuristic merge-by-name."
+              "status": "complete",
+              "note": "TDD landed: internal/session now persists per-session source/chat/user metadata, resolves canonical user_id bindings above chat_id, inherits known chat bindings for resumed sessions, and rejects conflicting chat-to-user merges."
             },
             {
               "name": "Cross-chat entity merge + recall fence",

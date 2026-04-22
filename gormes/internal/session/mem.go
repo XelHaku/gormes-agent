@@ -10,11 +10,18 @@ import (
 type MemMap struct {
 	mu sync.Mutex
 	m  map[string]string
+
+	meta      map[string]Metadata
+	chatUsers map[string]string
 }
 
 // NewMemMap constructs an empty MemMap.
 func NewMemMap() *MemMap {
-	return &MemMap{m: make(map[string]string)}
+	return &MemMap{
+		m:         make(map[string]string),
+		meta:      make(map[string]Metadata),
+		chatUsers: make(map[string]string),
+	}
 }
 
 func (m *MemMap) Get(ctx context.Context, key string) (string, error) {
