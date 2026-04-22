@@ -72,23 +72,7 @@ func (b *Bot) toInboundEvent(u tgbotapi.Update) (gateway.InboundEvent, bool) {
 
 	chatID := u.Message.Chat.ID
 	text := strings.TrimSpace(u.Message.Text)
-
-	kind := gateway.EventSubmit
-	body := text
-	switch {
-	case text == "/start":
-		kind = gateway.EventStart
-		body = ""
-	case text == "/stop":
-		kind = gateway.EventCancel
-		body = ""
-	case text == "/new":
-		kind = gateway.EventReset
-		body = ""
-	case strings.HasPrefix(text, "/"):
-		kind = gateway.EventUnknown
-		body = ""
-	}
+	kind, body := gateway.ParseInboundText(text)
 
 	var userID string
 	if u.Message.From != nil {

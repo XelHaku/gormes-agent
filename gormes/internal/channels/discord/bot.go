@@ -79,23 +79,7 @@ func (b *Bot) Run(ctx context.Context, inbox chan<- gateway.InboundEvent) error 
 
 func (b *Bot) toInboundEvent(m *discordgo.Message) (gateway.InboundEvent, bool) {
 	text := strings.TrimSpace(m.Content)
-
-	kind := gateway.EventSubmit
-	body := text
-	switch {
-	case text == "/start":
-		kind = gateway.EventStart
-		body = ""
-	case text == "/stop":
-		kind = gateway.EventCancel
-		body = ""
-	case text == "/new":
-		kind = gateway.EventReset
-		body = ""
-	case strings.HasPrefix(text, "/"):
-		kind = gateway.EventUnknown
-		body = ""
-	}
+	kind, body := gateway.ParseInboundText(text)
 
 	userID := ""
 	if m.Author != nil {

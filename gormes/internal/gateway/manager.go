@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"sync"
 	"time"
 
@@ -12,7 +13,9 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
 )
 
-const startGreeting = "Gormes is online. Send a message to start a turn. Commands: /stop /new"
+var startGreeting = gatewayHelpText()
+
+const shutdownNotice = "Gateway is shutting down — send /stop to cancel the active turn or try again shortly."
 
 // ManagerConfig drives the shared gateway manager.
 type ManagerConfig struct {
@@ -20,6 +23,7 @@ type ManagerConfig struct {
 	AllowDiscovery map[string]bool
 	CoalesceMs     int
 	SessionMap     session.Map
+	Hooks          *Hooks
 }
 
 type kernelSubmitter interface {
@@ -41,8 +45,51 @@ type Manager struct {
 	turnPlatform string
 	turnChatID   string
 	turnMsgID    string
+	shuttingDown bool
 
 	renderChan <-chan kernel.RenderFrame
+}
+
+type hookedPlaceholderEditor struct {
+	base     placeholderEditor
+	manager  *Manager
+	platform string
+}
+
+func (h hookedPlaceholderEditor) SendPlaceholder(ctx context.Context, chatID string) (string, error) {
+	const placeholderText = "⏳"
+
+	h.manager.fireHook(ctx, HookEvent{
+		Point:    HookBeforeSend,
+		Platform: h.platform,
+		ChatID:   chatID,
+		Text:     placeholderText,
+	})
+
+	msgID, err := h.base.SendPlaceholder(ctx, chatID)
+	if err != nil {
+		h.manager.fireHook(ctx, HookEvent{
+			Point:    HookOnError,
+			Platform: h.platform,
+			ChatID:   chatID,
+			Text:     placeholderText,
+			Err:      err,
+		})
+		return "", err
+	}
+
+	h.manager.fireHook(ctx, HookEvent{
+		Point:    HookAfterSend,
+		Platform: h.platform,
+		ChatID:   chatID,
+		MsgID:    msgID,
+		Text:     placeholderText,
+	})
+	return msgID, nil
+}
+
+func (h hookedPlaceholderEditor) EditMessage(ctx context.Context, chatID, msgID, text string) error {
+	return h.base.EditMessage(ctx, chatID, msgID, text)
 }
 
 // ErrDuplicateChannel is returned when two registered channels share a name.
@@ -105,6 +152,28 @@ func (m *Manager) ChannelCount() int {
 	return len(m.channels)
 }
 
+// Shutdown prevents new work from starting and waits for the currently active
+// turn, if any, to drain before returning or timing out.
+func (m *Manager) Shutdown(ctx context.Context) error {
+	m.turnMu.Lock()
+	m.shuttingDown = true
+	m.turnMu.Unlock()
+
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if !m.hasActiveTurn() {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
 func (m *Manager) setRenderChan(c <-chan kernel.RenderFrame) {
 	m.renderChan = c
 }
@@ -125,6 +194,11 @@ func (m *Manager) Run(ctx context.Context) error {
 		go func(c Channel) {
 			defer wg.Done()
 			if err := c.Run(ctx, inbox); err != nil && !errors.Is(err, context.Canceled) {
+				m.fireHook(ctx, HookEvent{
+					Point:    HookOnError,
+					Platform: c.Name(),
+					Err:      err,
+				})
 				m.log.Warn("channel exited with error", "channel", c.Name(), "err", err)
 			}
 		}(ch)
@@ -183,6 +257,25 @@ func (m *Manager) runOutbound(ctx context.Context) {
 }
 
 func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) {
+	m.fireHook(ctx, HookEvent{
+		Point:    HookBeforeReceive,
+		Platform: ev.Platform,
+		ChatID:   ev.ChatID,
+		MsgID:    ev.MsgID,
+		Kind:     ev.Kind,
+		Text:     ev.Text,
+		Inbound:  &ev,
+	})
+	defer m.fireHook(ctx, HookEvent{
+		Point:    HookAfterReceive,
+		Platform: ev.Platform,
+		ChatID:   ev.ChatID,
+		MsgID:    ev.MsgID,
+		Kind:     ev.Kind,
+		Text:     ev.Text,
+		Inbound:  &ev,
+	})
+
 	if !m.allowed(ev) {
 		if m.cfg.AllowDiscovery[ev.Platform] {
 			m.log.Info("first-run discovery: unknown chat", "platform", ev.Platform, "chat_id", ev.ChatID)
@@ -197,10 +290,14 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) {
 		m.log.Warn("inbound for unknown channel", "platform", ev.Platform)
 		return
 	}
+	if m.isShuttingDown() && ev.Kind != EventCancel {
+		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, shutdownNotice)
+		return
+	}
 
 	switch ev.Kind {
 	case EventStart:
-		if _, err := ch.Send(ctx, ev.ChatID, startGreeting); err != nil {
+		if _, err := m.sendWithHooks(ctx, ch, ev.ChatID, startGreeting); err != nil {
 			m.log.Warn("send greeting", "platform", ev.Platform, "chat_id", ev.ChatID, "err", err)
 		}
 	case EventCancel:
@@ -213,9 +310,9 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) {
 		}
 		if err := m.kernel.ResetSession(); err != nil {
 			if errors.Is(err, kernel.ErrResetDuringTurn) {
-				_, _ = ch.Send(ctx, ev.ChatID, "Cannot reset during active turn — send /stop first.")
+				_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Cannot reset during active turn — send /stop first.")
 			} else {
-				_, _ = ch.Send(ctx, ev.ChatID, "Session reset failed: "+err.Error())
+				_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Session reset failed: "+err.Error())
 			}
 			return
 		}
@@ -224,30 +321,34 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) {
 				m.log.Warn("clear session mapping", "key", ev.ChatKey(), "err", err)
 			}
 		}
-		_, _ = ch.Send(ctx, ev.ChatID, "Session reset. Next message starts fresh.")
+		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Session reset. Next message starts fresh.")
 	case EventSubmit:
 		if m.kernel == nil {
 			return
 		}
-		sessionID := ev.ChatKey()
-		if m.cfg.SessionMap != nil {
-			if stored, err := m.cfg.SessionMap.Get(ctx, ev.ChatKey()); err != nil {
-				m.log.Warn("load session mapping", "key", ev.ChatKey(), "err", err)
-			} else if stored != "" {
-				sessionID = stored
-			}
+		sessionID, err := resolveSessionID(ctx, m.cfg.SessionMap, ev.ChatKey())
+		if err != nil {
+			m.log.Warn("load session mapping", "key", ev.ChatKey(), "err", err)
 		}
+		sessionContext := BuildSessionContextPrompt(SessionContext{
+			Source:             sessionSourceFromInbound(ev),
+			SessionKey:         ev.ChatKey(),
+			SessionID:          sessionID,
+			ConnectedPlatforms: m.connectedPlatforms(),
+		})
+		m.pinTurn(ev.Platform, ev.ChatID, ev.MsgID)
 		if err := m.kernel.Submit(kernel.PlatformEvent{
-			Kind:      kernel.PlatformEventSubmit,
-			Text:      ev.Text,
-			SessionID: sessionID,
+			Kind:           kernel.PlatformEventSubmit,
+			Text:           ev.Text,
+			SessionID:      sessionID,
+			SessionContext: sessionContext,
 		}); err != nil {
-			_, _ = ch.Send(ctx, ev.ChatID, "Busy — try again in a second.")
+			m.clearTurn()
+			_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Busy — try again in a second.")
 			return
 		}
-		m.pinTurn(ev.Platform, ev.ChatID, ev.MsgID)
 	case EventUnknown:
-		_, _ = ch.Send(ctx, ev.ChatID, "unknown command")
+		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "unknown command")
 	}
 }
 
@@ -282,7 +383,7 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 			*co = nil
 			*coCancel = nil
 		} else {
-			_, _ = ch.Send(ctx, chatID, m.formatFinal(platform, f))
+			_, _ = m.sendWithHooks(ctx, ch, chatID, m.formatFinal(platform, f))
 		}
 		m.clearTurn()
 	case kernel.PhaseFailed, kernel.PhaseCancelling:
@@ -293,14 +394,18 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 			*co = nil
 			*coCancel = nil
 		} else {
-			_, _ = ch.Send(ctx, chatID, text)
+			_, _ = m.sendWithHooks(ctx, ch, chatID, text)
 		}
 		m.clearTurn()
 	case kernel.PhaseConnecting, kernel.PhaseStreaming, kernel.PhaseReconnecting, kernel.PhaseFinalizing:
 		if *co == nil {
 			cCtx, cancel := context.WithCancel(ctx)
 			*coCancel = cancel
-			nc := newCoalescer(pe, time.Duration(m.cfg.CoalesceMs)*time.Millisecond, chatID)
+			nc := newCoalescer(hookedPlaceholderEditor{
+				base:     pe,
+				manager:  m,
+				platform: platform,
+			}, time.Duration(m.cfg.CoalesceMs)*time.Millisecond, chatID)
 			*co = nc
 			go nc.run(cCtx)
 			nc.flushImmediate(ctx, "⏳")
@@ -312,10 +417,51 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 func (m *Manager) sendFinalNoStream(ctx context.Context, ch Channel, f kernel.RenderFrame, chatID string) {
 	switch f.Phase {
 	case kernel.PhaseIdle:
-		_, _ = ch.Send(ctx, chatID, m.formatFinal(ch.Name(), f))
+		_, _ = m.sendWithHooks(ctx, ch, chatID, m.formatFinal(ch.Name(), f))
 	case kernel.PhaseFailed, kernel.PhaseCancelling:
-		_, _ = ch.Send(ctx, chatID, m.formatError(ch.Name(), f))
+		_, _ = m.sendWithHooks(ctx, ch, chatID, m.formatError(ch.Name(), f))
 	}
+}
+
+func (m *Manager) sendWithHooks(ctx context.Context, ch Channel, chatID, text string) (string, error) {
+	if ch == nil {
+		return "", nil
+	}
+	ev := HookEvent{
+		Point:    HookBeforeSend,
+		Platform: ch.Name(),
+		ChatID:   chatID,
+		Text:     text,
+	}
+	m.fireHook(ctx, ev)
+
+	msgID, err := ch.Send(ctx, chatID, text)
+	if err != nil {
+		m.fireHook(ctx, HookEvent{
+			Point:    HookOnError,
+			Platform: ch.Name(),
+			ChatID:   chatID,
+			Text:     text,
+			Err:      err,
+		})
+		return "", err
+	}
+
+	m.fireHook(ctx, HookEvent{
+		Point:    HookAfterSend,
+		Platform: ch.Name(),
+		ChatID:   chatID,
+		MsgID:    msgID,
+		Text:     text,
+	})
+	return msgID, nil
+}
+
+func (m *Manager) fireHook(ctx context.Context, ev HookEvent) {
+	if m.cfg.Hooks == nil {
+		return
+	}
+	m.cfg.Hooks.Fire(ctx, ev)
 }
 
 func (m *Manager) allowed(ev InboundEvent) bool {
@@ -332,6 +478,17 @@ func (m *Manager) lookupChannel(name string) Channel {
 	return m.channels[name]
 }
 
+func (m *Manager) connectedPlatforms() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	names := make([]string, 0, len(m.channels))
+	for name := range m.channels {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 func (m *Manager) pinTurn(platform, chatID, msgID string) {
 	m.turnMu.Lock()
 	defer m.turnMu.Unlock()
@@ -346,6 +503,18 @@ func (m *Manager) clearTurn() {
 	m.turnPlatform = ""
 	m.turnChatID = ""
 	m.turnMsgID = ""
+}
+
+func (m *Manager) hasActiveTurn() bool {
+	m.turnMu.Lock()
+	defer m.turnMu.Unlock()
+	return m.turnPlatform != "" || m.turnChatID != "" || m.turnMsgID != ""
+}
+
+func (m *Manager) isShuttingDown() bool {
+	m.turnMu.Lock()
+	defer m.turnMu.Unlock()
+	return m.shuttingDown
 }
 
 func (m *Manager) formatStream(platform string, f kernel.RenderFrame) string {

@@ -2,8 +2,11 @@ package subagent
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
 func newStubManager(t *testing.T, depth int) (SubagentManager, context.Context, context.CancelFunc) {
@@ -173,6 +176,73 @@ func TestManagerSpawnUsesConfiguredDefaultTimeout(t *testing.T) {
 	_, _ = sa.WaitForResult(context.Background())
 }
 
+func TestManagerCapturesToolCallAuditIntoResult(t *testing.T) {
+	parentCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reg := tools.NewRegistry()
+	reg.MustRegister(&tools.EchoTool{})
+
+	mgr := NewManager(ManagerOpts{
+		ParentCtx:            parentCtx,
+		ParentID:             "parent_test",
+		Depth:                0,
+		Registry:             NewRegistry(),
+		NewRunner:            func() Runner { return auditedToolRunner{} },
+		DefaultMaxIterations: DefaultMaxIterations,
+		ToolExecutor:         tools.NewInProcessToolExecutor(reg),
+	})
+	defer mgr.Close()
+
+	sa, err := mgr.Spawn(context.Background(), SubagentConfig{
+		Goal:         "audit child tool",
+		EnabledTools: []string{"echo"},
+	})
+	if err != nil {
+		t.Fatalf("Spawn: %v", err)
+	}
+
+	result, err := sa.WaitForResult(context.Background())
+	if err != nil {
+		t.Fatalf("WaitForResult: %v", err)
+	}
+	if result.Status != StatusCompleted {
+		t.Fatalf("Status = %q, want %q", result.Status, StatusCompleted)
+	}
+	if len(result.ToolCalls) != 1 {
+		t.Fatalf("ToolCalls len = %d, want 1", len(result.ToolCalls))
+	}
+	if result.ToolCalls[0].Name != "echo" {
+		t.Fatalf("ToolCalls[0].Name = %q, want %q", result.ToolCalls[0].Name, "echo")
+	}
+	if result.ToolCalls[0].Status != "completed" {
+		t.Fatalf("ToolCalls[0].Status = %q, want %q", result.ToolCalls[0].Status, "completed")
+	}
+	if result.ToolCalls[0].ResultSize == 0 {
+		t.Fatal("ToolCalls[0].ResultSize = 0, want > 0")
+	}
+
+	var (
+		sawToolEvent bool
+		toolEvent    ToolCallInfo
+	)
+	for ev := range sa.Events() {
+		if ev.Type == EventToolCall && ev.ToolCall != nil {
+			sawToolEvent = true
+			toolEvent = *ev.ToolCall
+		}
+	}
+	if !sawToolEvent {
+		t.Fatal("Events: want at least one EventToolCall")
+	}
+	if toolEvent.Name != "echo" {
+		t.Fatalf("event ToolCall.Name = %q, want %q", toolEvent.Name, "echo")
+	}
+	if toolEvent.Status != "completed" {
+		t.Fatalf("event ToolCall.Status = %q, want %q", toolEvent.Status, "completed")
+	}
+}
+
 type blockingRunner struct{}
 
 func (blockingRunner) Run(ctx context.Context, cfg SubagentConfig, events chan<- SubagentEvent) *SubagentResult {
@@ -185,6 +255,27 @@ func (blockingRunner) Run(ctx context.Context, cfg SubagentConfig, events chan<-
 		Status:     StatusInterrupted,
 		ExitReason: "ctx_cancelled",
 		Error:      ctx.Err().Error(),
+	}
+}
+
+type auditedToolRunner struct{}
+
+func (auditedToolRunner) Run(ctx context.Context, cfg SubagentConfig, events chan<- SubagentEvent) *SubagentResult {
+	_, _, err := executeChildTool(ctx, cfg, events, tools.ToolRequest{
+		ToolName: "echo",
+		Input:    json.RawMessage(`{"text":"hello from child"}`),
+	})
+	if err != nil {
+		return &SubagentResult{
+			Status:     StatusFailed,
+			ExitReason: "tool_audit_failed",
+			Error:      err.Error(),
+		}
+	}
+	return &SubagentResult{
+		Status:     StatusCompleted,
+		Summary:    "tool audited",
+		ExitReason: "tool_audit_complete",
 	}
 }
 

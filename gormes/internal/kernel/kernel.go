@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/audit"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/store"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
@@ -48,6 +49,22 @@ type Config struct {
 	// If GetContext misses the budget, its return value is discarded
 	// and the turn proceeds without memory context.
 	RecallDeadline time.Duration
+	// Skills injects a deterministic procedural block ahead of the user turn.
+	// Nil means no skill runtime.
+	Skills SkillProvider
+	// SkillUsage records selected skill names for later analysis. Nil disables
+	// usage logging.
+	SkillUsage SkillUsageRecorder
+	// ToolAudit records append-only JSONL tool execution events when non-nil.
+	ToolAudit audit.Recorder
+}
+
+type SkillProvider interface {
+	BuildSkillBlock(ctx context.Context, userMessage string) (string, []string, error)
+}
+
+type SkillUsageRecorder interface {
+	RecordSkillUsage(ctx context.Context, skillNames []string) error
 }
 
 type Kernel struct {
@@ -159,7 +176,7 @@ func (k *Kernel) Run(ctx context.Context) error {
 						k.sessionID = e.SessionID
 						defer func() { k.sessionID = prevSessionID }()
 					}
-					k.runTurn(ctx, e.Text, e.CronJobID)
+					k.runTurn(ctx, e.Text, e.SessionContext, e.CronJobID)
 				}()
 			case PlatformEventCancel:
 				// No active turn; ignore (cancel during a turn is handled
@@ -192,7 +209,7 @@ func (k *Kernel) Run(ctx context.Context) error {
 // goroutine — this is part of the single-owner invariant.
 // cronJobID is non-empty for Phase 2.D cron-fired turns; it is passed through
 // to the store.Command payload and is otherwise opaque to the kernel.
-func (k *Kernel) runTurn(ctx context.Context, text, cronJobID string) {
+func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID string) {
 	prov := newProvenance(k.cfg.Endpoint)
 
 	// 1. Admission. Reject locally before any HTTP.
@@ -236,6 +253,11 @@ func (k *Kernel) runTurn(ctx context.Context, text, cronJobID string) {
 	// tool results appended to the message history. Capped at MaxToolIterations
 	// to prevent runaway agent loops.
 	msgs := []hermes.Message{{Role: "user", Content: text}}
+	systemMsgs := make([]hermes.Message, 0, 3)
+
+	if sessionContext != "" {
+		systemMsgs = append(systemMsgs, hermes.Message{Role: "system", Content: sessionContext})
+	}
 
 	if k.cfg.Recall != nil {
 		deadline := k.cfg.RecallDeadline
@@ -250,10 +272,24 @@ func (k *Kernel) runTurn(ctx context.Context, text, cronJobID string) {
 		})
 		recallCancel()
 		if ctxStr != "" {
-			msgs = append([]hermes.Message{
-				{Role: "system", Content: ctxStr},
-			}, msgs...)
+			systemMsgs = append(systemMsgs, hermes.Message{Role: "system", Content: ctxStr})
 		}
+	}
+	if k.cfg.Skills != nil {
+		block, skillNames, err := k.cfg.Skills.BuildSkillBlock(ctx, text)
+		if err != nil {
+			k.log.Warn("kernel: skill runtime failed; continuing without skills", "err", err)
+		} else if block != "" {
+			systemMsgs = append(systemMsgs, hermes.Message{Role: "system", Content: block})
+			if len(skillNames) > 0 && k.cfg.SkillUsage != nil {
+				if err := k.cfg.SkillUsage.RecordSkillUsage(ctx, skillNames); err != nil {
+					k.log.Warn("kernel: record skill usage failed", "err", err)
+				}
+			}
+		}
+	}
+	if len(systemMsgs) > 0 {
+		msgs = append(systemMsgs, msgs...)
 	}
 
 	request := hermes.ChatRequest{
@@ -282,6 +318,7 @@ func (k *Kernel) runTurn(ctx context.Context, text, cronJobID string) {
 		gotFinal        bool
 		latestSessionID string
 		toolIteration   = 0
+		toolCallsSeen   []hermes.ToolCall
 	)
 
 	start := time.Now()
@@ -368,6 +405,7 @@ toolLoop:
 			// Normal end of turn. Exit the tool loop to finalise.
 			break toolLoop
 		}
+		toolCallsSeen = append(toolCallsSeen, finalDelta.ToolCalls...)
 
 		// tool_calls round. Execute tools and append results to the request.
 		toolIteration++
@@ -447,12 +485,17 @@ toolLoop:
 		// Phase 3.A: finalize in the memory store. Fire-and-forget — the worker
 		// handles I/O off the hot path. 250ms context bound kept as a safety net
 		// in case someone injects a synchronous store in the future.
-		finalPayload, _ := json.Marshal(map[string]any{
+		payload := map[string]any{
 			"session_id": k.sessionID,
 			"content":    k.draft,
 			"ts_unix":    time.Now().Unix(),
 			"chat_id":    k.cfg.ChatKey,
-		})
+		}
+		if len(toolCallsSeen) > 0 {
+			meta, _ := json.Marshal(map[string]any{"tool_calls": toolCallsSeen})
+			payload["meta_json"] = string(meta)
+		}
+		finalPayload, _ := json.Marshal(payload)
 		finalCtx, finalCancel := context.WithTimeout(ctx, StoreAckDeadline)
 		_, _ = k.store.Exec(finalCtx, store.Command{Kind: store.FinalizeAssistantTurn, Payload: finalPayload})
 		finalCancel()

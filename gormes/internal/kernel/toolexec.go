@@ -3,9 +3,11 @@ package kernel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/audit"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
@@ -24,12 +26,36 @@ type toolResult struct {
 func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCall) []toolResult {
 	results := make([]toolResult, len(calls))
 	for i, call := range calls {
+		start := time.Now()
+		recordAudit := func(status string, result json.RawMessage, err error) {
+			if k.cfg.ToolAudit == nil {
+				return
+			}
+			rec := audit.Record{
+				Timestamp:       time.Now().UTC(),
+				Source:          "kernel",
+				SessionID:       k.sessionID,
+				Tool:            call.Name,
+				Args:            append(json.RawMessage(nil), call.Arguments...),
+				DurationMs:      time.Since(start).Milliseconds(),
+				Status:          status,
+				ResultSizeBytes: len(result),
+			}
+			if err != nil {
+				rec.Error = err.Error()
+			}
+			if auditErr := k.cfg.ToolAudit.Record(rec); auditErr != nil && k.log != nil {
+				k.log.Warn("kernel: append tool audit failed", "tool", call.Name, "err", auditErr)
+			}
+		}
+
 		select {
 		case <-runCtx.Done():
 			results[i] = toolResult{
 				ID: call.ID, Name: call.Name,
 				Content: `{"error":"cancelled before execution"}`,
 			}
+			recordAudit("cancelled", nil, errors.New("cancelled before execution"))
 			continue
 		default:
 		}
@@ -39,6 +65,7 @@ func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCal
 				ID: call.ID, Name: call.Name,
 				Content: `{"error":"no tool registry configured"}`,
 			}
+			recordAudit("failed", nil, errors.New("no tool registry configured"))
 			continue
 		}
 
@@ -49,6 +76,7 @@ func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCal
 				Content: fmt.Sprintf(`{"error":"unknown tool: %q"}`, call.Name),
 			}
 			k.addSoul("tool unknown: " + call.Name)
+			recordAudit("failed", nil, fmt.Errorf("unknown tool: %q", call.Name))
 			continue
 		}
 
@@ -74,10 +102,12 @@ func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCal
 				Content: fmt.Sprintf(`{"error":%q}`, err.Error()),
 			}
 			k.addSoul("tool error: " + call.Name + ": " + err.Error())
+			recordAudit("failed", nil, err)
 			continue
 		}
 		results[i] = toolResult{ID: call.ID, Name: call.Name, Content: string(payload)}
 		k.addSoul("tool done: " + call.Name)
+		recordAudit("completed", payload, nil)
 	}
 	return results
 }

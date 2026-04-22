@@ -5,7 +5,12 @@
 // a swappable Runner interface. See gormes/docs/superpowers/specs/2026-04-20-gormes-phase2e-subagent-design.md.
 package subagent
 
-import "time"
+import (
+	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/audit"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
+)
 
 // SubagentConfig is the per-subagent configuration handed to the Runner.
 // Defaults are applied at Spawn time, not at TOML decode time.
@@ -13,9 +18,12 @@ type SubagentConfig struct {
 	Goal          string
 	Context       string
 	MaxIterations int           // 0 → DefaultMaxIterations at Spawn time
-	EnabledTools  []string      // empty → all parent tools minus BlockedTools (enforcement deferred to 2.E.7)
+	EnabledTools  []string      // empty → all parent tools minus BlockedTools
 	Model         string        // empty → inherit from parent
 	Timeout       time.Duration // 0 → no timeout
+	toolExecutor  tools.ToolExecutor
+	toolAudit     audit.Recorder
+	agentID       string
 }
 
 // EventType discriminates SubagentEvent values streamed from runner to parent.

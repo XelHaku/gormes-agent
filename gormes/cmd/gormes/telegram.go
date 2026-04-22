@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/audit"
 	telegram "github.com/TrebuchetDynamics/gormes-agent/gormes/internal/channels/telegram"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/config"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/cron"
@@ -111,7 +112,7 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 	rootCtx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	reg := buildDefaultRegistry(rootCtx, cfg.Delegation)
+	reg := buildDefaultRegistry(rootCtx, cfg.Delegation, cfg.SkillsRoot(), hc, cfg.Hermes.Model)
 	tools.RegisterHonchoTools(reg, goncho.NewService(mstore.DB(), goncho.Config{
 		WorkspaceID:    "default",
 		ObserverPeerID: "gormes",
@@ -119,6 +120,7 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 	}, slog.Default()))
 
 	tm := telemetry.New()
+	toolAudit := audit.NewJSONLWriter(config.ToolAuditLogPath())
 
 	var recallProv kernel.RecallProvider
 
@@ -166,6 +168,7 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 		InitialSessionID:  initialSID,
 		Recall:            recallProv,
 		ChatKey:           key,
+		ToolAudit:         toolAudit,
 	}, hc, mstore, tm, slog.Default())
 
 	// Phase 3.B — async LLM-assisted entity/relationship extractor.

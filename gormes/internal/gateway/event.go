@@ -42,7 +42,10 @@ func (k EventKind) String() string {
 type InboundEvent struct {
 	Platform string
 	ChatID   string
+	ChatName string
 	UserID   string
+	UserName string
+	ThreadID string
 	MsgID    string
 	Kind     EventKind
 	Text     string

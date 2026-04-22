@@ -223,6 +223,80 @@ func TestMemoryDBPath_DefaultsToHomeLocalShare(t *testing.T) {
 	}
 }
 
+func TestSkillsRoot_DefaultsToHomeLocalShare(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "")
+	home, _ := os.UserHomeDir()
+	var cfg Config
+	got := cfg.SkillsRoot()
+	want := filepath.Join(home, ".local", "share", "gormes", "skills")
+	if got != want {
+		t.Errorf("SkillsRoot() default = %q, want %q", got, want)
+	}
+}
+
+func TestSkillsRoot_HonorsXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-test-skills")
+	var cfg Config
+	got := cfg.SkillsRoot()
+	want := "/tmp/gormes-test-skills/gormes/skills"
+	if got != want {
+		t.Errorf("SkillsRoot() = %q, want %q", got, want)
+	}
+}
+
+func TestHooksRoot_DefaultsToHomeLocalShare(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	got := HooksRoot()
+	want := filepath.Join(home, ".local", "share", "gormes", "hooks")
+	if got != want {
+		t.Errorf("HooksRoot() default = %q, want %q", got, want)
+	}
+}
+
+func TestHooksRoot_HonorsXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-test-hooks")
+	got := HooksRoot()
+	want := "/tmp/gormes-test-hooks/gormes/hooks"
+	if got != want {
+		t.Errorf("HooksRoot() = %q, want %q", got, want)
+	}
+}
+
+func TestBootPath_DefaultsToHomeLocalShare(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	got := BootPath()
+	want := filepath.Join(home, ".local", "share", "gormes", "BOOT.md")
+	if got != want {
+		t.Errorf("BootPath() default = %q, want %q", got, want)
+	}
+}
+
+func TestBootPath_HonorsXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-test-boot")
+	got := BootPath()
+	want := "/tmp/gormes-test-boot/gormes/BOOT.md"
+	if got != want {
+		t.Errorf("BootPath() = %q, want %q", got, want)
+	}
+}
+
+func TestLoad_SkillsRootEnvOverride(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("GORMES_SKILLS_ROOT", "/tmp/custom-skills")
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got := cfg.SkillsRoot(); got != "/tmp/custom-skills" {
+		t.Fatalf("SkillsRoot() = %q, want %q", got, "/tmp/custom-skills")
+	}
+}
+
 func TestLoad_ExtractorDefaults(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	cfg, err := Load(nil)

@@ -5,11 +5,17 @@ import (
 	"strings"
 )
 
+const (
+	DefaultMaxDocumentBytes = 64 * 1024
+	DefaultSelectionCap     = 3
+)
+
 // Skill is the typed in-memory representation of one SKILL.md artifact.
 type Skill struct {
 	Name        string
 	Description string
 	Body        string
+	Path        string
 	RawBytes    int
 }
 

@@ -12,10 +12,27 @@ import (
 // DelegateTool is the Go-native delegate_task tool.
 type DelegateTool struct {
 	manager SubagentManager
+	drafter CandidateDrafter
+}
+
+type CandidateDraftRequest struct {
+	Slug            string
+	Goal            string
+	Summary         string
+	SourceRunID     string
+	ParentSessionID string
+	ChildAgentID    string
+	ToolNames       []string
+}
+
+type CandidateDrafter interface {
+	DraftCandidate(ctx context.Context, req CandidateDraftRequest) (string, error)
 }
 
 // NewDelegateTool wires a DelegateTool to the supplied SubagentManager.
-func NewDelegateTool(m SubagentManager) *DelegateTool { return &DelegateTool{manager: m} }
+func NewDelegateTool(m SubagentManager, drafter CandidateDrafter) *DelegateTool {
+	return &DelegateTool{manager: m, drafter: drafter}
+}
 
 func (*DelegateTool) Name() string { return "delegate_task" }
 
@@ -34,7 +51,9 @@ func (*DelegateTool) Schema() json.RawMessage {
 			"goal":           {"type": "string", "description": "Task goal for the subagent"},
 			"context":        {"type": "string", "description": "Optional additional context"},
 			"max_iterations": {"type": "integer", "description": "Max LLM turns for the subagent"},
-			"toolsets":       {"type": "string", "description": "Comma-separated toolset names to enable"}
+			"toolsets":       {"type": "string", "description": "Comma-separated tool names to allowlist for the child run"},
+			"draft_candidate_slug": {"type": "string", "description": "Optional inactive skill slug to draft from a successful delegated run"},
+			"allow_no_tool_draft": {"type": "boolean", "description": "Explicit override allowing candidate drafting even when the child emitted no tool calls"}
 		},
 		"required": ["goal"]
 	}`)
@@ -45,6 +64,8 @@ type delegateArgs struct {
 	Context       string `json:"context"`
 	MaxIterations int    `json:"max_iterations"`
 	Toolsets      string `json:"toolsets"`
+	DraftSlug     string `json:"draft_candidate_slug"`
+	AllowNoTool   bool   `json:"allow_no_tool_draft"`
 }
 
 func (t *DelegateTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
@@ -84,6 +105,21 @@ func (t *DelegateTool) Execute(ctx context.Context, args json.RawMessage) (json.
 		return nil, err
 	}
 
+	var candidateID string
+	var candidateErr error
+	if t.drafter != nil && strings.TrimSpace(in.DraftSlug) != "" && result.Status == StatusCompleted {
+		if len(result.ToolCalls) > 0 || in.AllowNoTool {
+			candidateID, candidateErr = t.drafter.DraftCandidate(ctx, CandidateDraftRequest{
+				Slug:         strings.TrimSpace(in.DraftSlug),
+				Goal:         strings.TrimSpace(in.Goal),
+				Summary:      result.Summary,
+				SourceRunID:  result.ID,
+				ChildAgentID: result.ID,
+				ToolNames:    toolCallNames(result.ToolCalls),
+			})
+		}
+	}
+
 	out := map[string]any{
 		"id":          result.ID,
 		"status":      string(result.Status),
@@ -93,5 +129,24 @@ func (t *DelegateTool) Execute(ctx context.Context, args json.RawMessage) (json.
 		"iterations":  result.Iterations,
 		"error":       result.Error,
 	}
+	if len(result.ToolCalls) > 0 {
+		out["tool_calls"] = result.ToolCalls
+	}
+	if candidateID != "" {
+		out["candidate_id"] = candidateID
+	}
+	if candidateErr != nil {
+		out["candidate_error"] = candidateErr.Error()
+	}
 	return json.Marshal(out)
+}
+
+func toolCallNames(calls []ToolCallInfo) []string {
+	out := make([]string, 0, len(calls))
+	for _, call := range calls {
+		if name := strings.TrimSpace(call.Name); name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
 }

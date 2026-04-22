@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -210,7 +211,9 @@ func TestManager_Inbound_Start_RepliesHelp(t *testing.T) {
 		sent := tg.sentSnapshot()
 		return len(sent) == 1 &&
 			sent[0].ChatID == "42" &&
-			strings.Contains(sent[0].Text, "online")
+			strings.Contains(sent[0].Text, "/help") &&
+			strings.Contains(sent[0].Text, "/new") &&
+			strings.Contains(sent[0].Text, "/stop")
 	})
 	if n := len(fk.submitsSnapshot()); n != 0 {
 		t.Errorf("EventStart should not submit to kernel, got %d", n)
@@ -318,4 +321,117 @@ func TestManager_Outbound_FinalFrameClearsTurn(t *testing.T) {
 		defer m.turnMu.Unlock()
 		return m.turnPlatform == ""
 	})
+}
+
+func TestManager_ShutdownWaitsForActiveTurn(t *testing.T) {
+	m := NewManagerWithSubmitter(ManagerConfig{}, &fakeKernel{}, slog.Default())
+	m.pinTurn("telegram", "42", "m1")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- m.Shutdown(shutdownCtx)
+	}()
+
+	time.Sleep(20 * time.Millisecond)
+	select {
+	case err := <-done:
+		t.Fatalf("Shutdown returned before turn cleared: %v", err)
+	default:
+	}
+
+	m.clearTurn()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Shutdown: %v", err)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Shutdown did not return after turn cleared")
+	}
+}
+
+func TestManager_ShutdownTimesOutWhileTurnActive(t *testing.T) {
+	m := NewManagerWithSubmitter(ManagerConfig{}, &fakeKernel{}, slog.Default())
+	m.pinTurn("telegram", "42", "m1")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	err := m.Shutdown(shutdownCtx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Shutdown error = %v, want deadline exceeded", err)
+	}
+}
+
+func TestManager_Inbound_SubmitRejectedDuringShutdown(t *testing.T) {
+	tg := newFakeChannel("telegram")
+	fk := &fakeKernel{}
+
+	m := NewManagerWithSubmitter(ManagerConfig{
+		AllowedChats: map[string]string{"telegram": "42"},
+	}, fk, slog.Default())
+	_ = m.Register(tg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = m.Run(ctx) }()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second)
+	defer shutdownCancel()
+	if err := m.Shutdown(shutdownCtx); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
+
+	tg.pushInbound(InboundEvent{
+		Platform: "telegram", ChatID: "42", MsgID: "m1",
+		Kind: EventSubmit, Text: "hello",
+	})
+
+	waitFor(t, 200*time.Millisecond, func() bool {
+		return len(tg.sentSnapshot()) == 1
+	})
+
+	if n := len(fk.submitsSnapshot()); n != 0 {
+		t.Fatalf("submit count = %d, want 0", n)
+	}
+	if got := tg.sentSnapshot()[0].Text; !strings.Contains(strings.ToLower(got), "shutting down") {
+		t.Fatalf("shutdown reply = %q, want shutdown notice", got)
+	}
+}
+
+func TestManager_Inbound_CancelAllowedDuringShutdown(t *testing.T) {
+	tg := newFakeChannel("telegram")
+	fk := &fakeKernel{}
+
+	m := NewManagerWithSubmitter(ManagerConfig{
+		AllowedChats: map[string]string{"telegram": "42"},
+	}, fk, slog.Default())
+	_ = m.Register(tg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = m.Run(ctx) }()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second)
+	defer shutdownCancel()
+	if err := m.Shutdown(shutdownCtx); err != nil {
+		t.Fatalf("Shutdown: %v", err)
+	}
+
+	tg.pushInbound(InboundEvent{
+		Platform: "telegram", ChatID: "42", Kind: EventCancel,
+	})
+
+	waitFor(t, 200*time.Millisecond, func() bool {
+		s := fk.submitsSnapshot()
+		return len(s) == 1 && s[0].Kind == kernel.PlatformEventCancel
+	})
+
+	if n := len(tg.sentSnapshot()); n != 0 {
+		t.Fatalf("shutdown cancel should not send a reply, got %d messages", n)
+	}
 }

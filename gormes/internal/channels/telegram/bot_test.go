@@ -47,6 +47,7 @@ func TestBot_ToInboundEvent_Commands(t *testing.T) {
 		text string
 		want gateway.EventKind
 	}{
+		{"/help", gateway.EventStart},
 		{"/start", gateway.EventStart},
 		{"/stop", gateway.EventCancel},
 		{"/new", gateway.EventReset},

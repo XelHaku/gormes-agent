@@ -31,6 +31,7 @@ type Config struct {
 	Telegram   TelegramCfg   `toml:"telegram"`
 	Discord    DiscordCfg    `toml:"discord"`
 	Cron       CronCfg       `toml:"cron"`
+	Skills     SkillsCfg     `toml:"skills"`
 	Delegation DelegationCfg `toml:"delegation"`
 	// Resume is set only via the --resume CLI flag; intentionally not
 	// a TOML field. Empty means "use whatever internal/session had
@@ -97,6 +98,14 @@ type CronCfg struct {
 	CallTimeout    time.Duration `toml:"call_timeout"`
 	MirrorInterval time.Duration `toml:"mirror_interval"`
 	MirrorPath     string        `toml:"mirror_path"`
+}
+
+// SkillsCfg configures the Phase 2.G0 static skills runtime.
+type SkillsCfg struct {
+	Root             string `toml:"root"`
+	SelectionCap     int    `toml:"selection_cap"`
+	MaxDocumentBytes int    `toml:"max_document_bytes"`
+	UsageLogPath     string `toml:"usage_log_path"`
 }
 
 // DelegationCfg configures Phase 2.E subagent execution.
@@ -223,6 +232,19 @@ func defaults() Config {
 			MirrorInterval: 30 * time.Second,
 			MirrorPath:     "",
 		},
+		Skills: SkillsCfg{
+			SelectionCap:     3,
+			MaxDocumentBytes: 64 * 1024,
+			UsageLogPath:     "",
+		},
+		Delegation: DelegationCfg{
+			Enabled:               false,
+			MaxDepth:              2,
+			MaxConcurrentChildren: 3,
+			DefaultMaxIterations:  8,
+			DefaultTimeout:        45 * time.Second,
+			RunLogPath:            "",
+		},
 	}
 }
 
@@ -290,6 +312,9 @@ func loadEnv(cfg *Config) {
 	}
 	if v := os.Getenv("GORMES_DISCORD_CHANNEL_ID"); v != "" {
 		cfg.Discord.AllowedChannelID = v
+	}
+	if v := os.Getenv("GORMES_SKILLS_ROOT"); v != "" {
+		cfg.Skills.Root = v
 	}
 }
 
@@ -359,11 +384,46 @@ func MemoryDBPath() string {
 // CronMirrorPath returns the resolved CRON.md path — either
 // cfg.Cron.MirrorPath (explicit override) or the XDG default
 // $XDG_DATA_HOME/gormes/cron/CRON.md.
-func (c *Config) CronMirrorPath() string {
+func (c Config) CronMirrorPath() string {
 	if c.Cron.MirrorPath != "" {
 		return c.Cron.MirrorPath
 	}
 	return filepath.Join(xdgDataHome(), "gormes", "cron", "CRON.md")
+}
+
+// SkillsRoot returns the root directory of the static skills runtime.
+// Explicit override wins; otherwise the XDG default is used.
+func (c Config) SkillsRoot() string {
+	if c.Skills.Root != "" {
+		return c.Skills.Root
+	}
+	return filepath.Join(xdgDataHome(), "gormes", "skills")
+}
+
+// HooksRoot returns the root directory for gateway HOOK.yaml hook directories.
+// Gormes uses XDG data paths for live state instead of ~/.hermes/.
+func HooksRoot() string {
+	return filepath.Join(xdgDataHome(), "gormes", "hooks")
+}
+
+// BootPath returns the BOOT.md path used by the built-in gateway startup hook.
+func BootPath() string {
+	return filepath.Join(xdgDataHome(), "gormes", "BOOT.md")
+}
+
+// SkillsUsageLogPath returns the append-only JSONL path for skill usage.
+// Explicit override wins; otherwise it lives under the skills root.
+func (c Config) SkillsUsageLogPath() string {
+	if c.Skills.UsageLogPath != "" {
+		return c.Skills.UsageLogPath
+	}
+	return filepath.Join(c.SkillsRoot(), "usage.jsonl")
+}
+
+// ToolAuditLogPath returns the append-only JSONL path for tool execution
+// audit records.
+func ToolAuditLogPath() string {
+	return filepath.Join(xdgDataHome(), "gormes", "tools", "audit.jsonl")
 }
 
 // ResolvedRunLogPath returns the JSONL path for append-only subagent run logs.

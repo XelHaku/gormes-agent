@@ -7,6 +7,9 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/audit"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
 // SubagentManager owns the goroutine lifecycle for every subagent it spawns.
@@ -55,6 +58,14 @@ type ManagerOpts struct {
 
 	// RunLogPath enables append-only JSONL run logging when non-empty.
 	RunLogPath string
+
+	// ToolExecutor is injected into every spawned child config so runners can
+	// enforce allowlists at tool-execution time.
+	ToolExecutor tools.ToolExecutor
+
+	// ToolAudit records append-only JSONL child-tool execution events when
+	// delegate_task spawns a runner that invokes tools.
+	ToolAudit audit.Recorder
 }
 
 type manager struct {
@@ -101,6 +112,12 @@ func (m *manager) Spawn(ctx context.Context, cfg SubagentConfig) (*Subagent, err
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = m.opts.DefaultTimeout
 	}
+	if cfg.toolExecutor == nil {
+		cfg.toolExecutor = m.opts.ToolExecutor
+	}
+	if cfg.toolAudit == nil {
+		cfg.toolAudit = m.opts.ToolAudit
+	}
 
 	childCtx, cancel := context.WithCancel(m.opts.ParentCtx)
 	var timeoutCancel context.CancelFunc
@@ -130,6 +147,7 @@ func (m *manager) Spawn(ctx context.Context, cfg SubagentConfig) (*Subagent, err
 			cancel()
 		}
 	}
+	sa.cfg.agentID = sa.ID
 
 	m.children[sa.ID] = sa
 	m.opts.Registry.Register(sa)
@@ -162,10 +180,14 @@ func (m *manager) run(sa *Subagent) {
 	}()
 
 	forwarderDone := make(chan struct{}, 0)
+	var capturedToolCalls []ToolCallInfo
 	go func() {
 		defer close(forwarderDone)
 		defer close(sa.publicEvents)
 		for ev := range internalEvents {
+			if ev.Type == EventToolCall && ev.ToolCall != nil {
+				capturedToolCalls = append(capturedToolCalls, *ev.ToolCall)
+			}
 			sa.publicEvents <- ev
 		}
 	}()
@@ -197,6 +219,7 @@ func (m *manager) run(sa *Subagent) {
 	}
 	close(internalEvents)
 	<-forwarderDone
+	result.ToolCalls = mergeToolCallAudit(result.ToolCalls, capturedToolCalls)
 
 	if sa.timeoutCancel != nil {
 		sa.timeoutCancel()
@@ -208,6 +231,25 @@ func (m *manager) run(sa *Subagent) {
 
 	m.removeChild(sa.ID)
 	m.opts.Registry.Unregister(sa.ID)
+}
+
+func mergeToolCallAudit(existing, captured []ToolCallInfo) []ToolCallInfo {
+	if len(captured) == 0 {
+		return existing
+	}
+	out := append([]ToolCallInfo(nil), existing...)
+	seen := make(map[ToolCallInfo]struct{}, len(existing))
+	for _, info := range existing {
+		seen[info] = struct{}{}
+	}
+	for _, info := range captured {
+		if _, ok := seen[info]; ok {
+			continue
+		}
+		seen[info] = struct{}{}
+		out = append(out, info)
+	}
+	return out
 }
 
 func (m *manager) removeChild(id string) {

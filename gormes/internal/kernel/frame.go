@@ -89,6 +89,11 @@ type PlatformEvent struct {
 	// mutated; after the turn completes, the next non-cron event uses
 	// whatever k.sessionID was before.
 	SessionID string
+	// SessionContext, when non-empty, is injected as the first system
+	// message for this turn. Gateway frontends use it to describe the
+	// current source chat and delivery options without mutating the
+	// kernel's long-lived config.
+	SessionContext string
 	// CronJobID, when non-empty, causes the kernel to set cron=1 in the
 	// AppendUserTurn payload, marking the persisted turn row as a cron
 	// turn. The extractor (T3) uses this to skip cron turns during
