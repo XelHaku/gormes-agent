@@ -14,12 +14,16 @@ Persistent, searchable state that outlives the process. Structured enough for gr
 - **Neural recall** (3.C) — 2-layer seed selection, CTE traversal, `<memory-context>` fence injection matching Hermes's `build_memory_context_block`.
 - **Semantic fusion** (3.D) — Ollama embeddings, cosine recall, and hybrid lexical+semantic seed fusion.
 - **USER.md mirror** (3.D.5) — async export of entity/relationship graph to human-readable Markdown. Gormes-original; no upstream equivalent.
+- **Tool audit JSONL** (3.E.2) — append-only JSONL from kernel and `delegate_task` tool execution with timing, outcome, and error fields.
+- **Transcript export** (3.E.3) — `gormes session export <id> --format=markdown` renders SQLite turns, timestamps, and tool calls for operator sharing.
+- **Operator visibility** (3.E.4, 3.E.5 partial) — `gormes memory status` is shipped, and the local insights rollup layer already derives per-session token/cost aggregates from `telemetry.Snapshot`.
+- **GONCHO compatibility seam** — internal memory work lives behind the `goncho` service, while the exported tool surface remains Honcho-compatible (`honcho_*`).
 
 ## Remaining Phase 3 queue
 
-- **Session and tool mirrors** (3.E.1, 3.E.2) — human-readable session index plus append-only tool audit JSONL.
-- **Transcript export + extractor status** (3.E.3, 3.E.4) — operator commands for exporting a session and inspecting queue/dead-letter health.
-- **Insights, decay, and cross-chat identity** (3.E.5, 3.E.6, 3.E.7) — lightweight usage log, `last_seen`-driven decay, and one-user-many-chats graph unification.
+- **Session mirror closeout** (3.E.1) — the `SessionIndexMirror` writer exists; runtime refresh wiring still remains.
+- **Insights writer + `last_seen` closeout** (3.E.5, 3.E.6) — append-only `usage.jsonl` persistence and the remaining timestamp-tracking half of decay are still open.
+- **Cross-chat identity** (3.E.7) — one-user-many-chats graph unification above `chat_id`.
 - **Session lineage + cross-source search** (3.E.8) — the remaining `SessionDB` donor seam, paired with later compression work.
 
 ## Why this is not just "chat logs"

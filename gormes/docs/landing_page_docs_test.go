@@ -332,6 +332,108 @@ func TestReadmeDocumentsDoctorAndArchitecturalEdge(t *testing.T) {
 	}
 }
 
+func TestArchitectureIndexCrossLinksPrePhase4Gate(t *testing.T) {
+	raw := readDoc(t, "content/building-gormes/architecture_plan/_index.md")
+	wants := []string{
+		"## Phase 4 Entry Gate",
+		"Pre-Phase-4 E2E Gate",
+		"phase-3-memory",
+		"phase-4-brain-transplant",
+	}
+	for _, want := range wants {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("architecture index is missing %q", want)
+		}
+	}
+}
+
+func TestGatewayCoreDocReflectsSharedPhase2Surface(t *testing.T) {
+	raw := readDoc(t, "content/building-gormes/core-systems/gateway.md")
+	wants := []string{
+		"Discord adapter",
+		"Slack adapter",
+		"slash-command registry",
+		"SessionContext prompt injection",
+		"BOOT.md startup hook",
+		"Gateway stream consumer",
+	}
+	for _, want := range wants {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("gateway core-systems doc is missing %q", want)
+		}
+	}
+}
+
+func TestMemoryDocsReflectShippedOperatorSurfacesAndGonchoNaming(t *testing.T) {
+	core := readDoc(t, "content/building-gormes/core-systems/memory.md")
+	for _, want := range []string{
+		"Tool audit JSONL",
+		"Transcript export",
+		"gormes memory status",
+	} {
+		if !strings.Contains(core, want) {
+			t.Fatalf("memory core-systems doc is missing %q", want)
+		}
+	}
+
+	phase3 := readDoc(t, "content/building-gormes/architecture_plan/phase-3-memory.md")
+	for _, want := range []string{
+		"GONCHO",
+		"Honcho-compatible interfaces",
+		"| 3.E.2 — Tool Execution Audit Log | ✅ shipped | P0 |",
+		"| 3.E.3 — Transcript Export Command | ✅ shipped | P2 |",
+		"| 3.E.4 — Extraction State Visibility | ✅ shipped | P1 |",
+	} {
+		if !strings.Contains(phase3, want) {
+			t.Fatalf("phase-3-memory doc is missing %q", want)
+		}
+	}
+}
+
+func TestMirrorStrategyReflectsShippedAuditAndOperatorSurfaces(t *testing.T) {
+	raw := readDoc(t, "content/building-gormes/architecture_plan/mirror-strategy.md")
+	wants := []string{
+		"✅ **Shipped in Gormes (3.E.2)**",
+		"✅ **Shipped in Gormes (3.E.3)**",
+		"Phase 2.D",
+		"Phase 2.G",
+		"Phase 2.F.2",
+	}
+	for _, want := range wants {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("mirror strategy doc is missing %q", want)
+		}
+	}
+	for _, reject := range []string{
+		"Gap: no tool audit trail",
+		"Cron not yet implemented in Gormes (Phase 4)",
+		"Skills not yet implemented (Phase 5)",
+		"Boot hooks not yet implemented",
+	} {
+		if strings.Contains(raw, reject) {
+			t.Fatalf("mirror strategy doc still contains stale claim %q", reject)
+		}
+	}
+}
+
+func TestSubsystemInventoryReflectsShippedPhase2AndPhase3Reality(t *testing.T) {
+	raw := readDoc(t, "content/building-gormes/architecture_plan/subsystem-inventory.md")
+	wants := []string{
+		"typed session-context prompt injection landed",
+		"typed delivery-target parsing landed",
+		"deterministic frame fan-out landed",
+		"Tool execution audit log | None (exceeds Hermes) | 3.E.2 | ✅ shipped",
+		"Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ✅ shipped",
+		"Extraction state visibility | None (debug visibility) | 3.E.4 | ✅ shipped",
+		"Memory decay | None (Gormes-original) | 3.E.6 | 🔨 partial",
+	}
+	for _, want := range wants {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("subsystem inventory is missing %q", want)
+		}
+	}
+}
+
 func readDoc(t *testing.T, rel string) string {
 	t.Helper()
 

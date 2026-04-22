@@ -7,9 +7,9 @@ weight: 40
 
 **Status:** 🔨 3.A–3.D.5 shipped; 3.E queued
 
-**Deliverable:** SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes auditability, decay, cross-chat synthesis, and the Honcho-shaped session/user boundaries the future plugin layer will depend on.
+**Deliverable:** SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes auditability, decay, cross-chat synthesis, and the GONCHO-shaped session/user boundaries the future plugin layer will depend on while preserving Honcho-compatible interfaces.
 
-Phase 3 (The Black Box) is substantially delivered as of 2026-04-21: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. Remaining Phase 3 work is the 3.E closeout queue: operator-facing mirrors (session index, tool audit, transcript export, extractor status), memory decay, cross-chat identity, and the remaining `SessionDB` donor gaps around lineage and cross-source search. Architecturally, this is the phase where Gormes finishes the memory substrate that a Honcho-style integration would stand on, without yet claiming full Honcho provider or plugin parity.
+Phase 3 (The Black Box) is substantially delivered as of 2026-04-22: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. The 3.E closeout queue is now mixed: tool audit (3.E.2), transcript export (3.E.3), and extraction visibility (3.E.4) are shipped; session-index refresh wiring (3.E.1), insights writer closeout (3.E.5), `last_seen`-based decay completion (3.E.6), cross-chat identity (3.E.7), and the remaining `SessionDB` donor gaps around lineage and cross-source search (3.E.8) remain. Architecturally, this is the phase where Gormes finishes the memory substrate that a GONCHO-style integration would stand on, without yet claiming full Honcho provider or plugin parity.
 
 ## Phase 3 sub-status (as of 2026-04-21)
 
@@ -18,7 +18,7 @@ Phase 3 (The Black Box) is substantially delivered as of 2026-04-21: the SQLite 
 - **3.C — Neural Recall + Context Injection** — ✅ implemented (`RecallProvider`, 2-layer seed selection, CTE traversal, `<memory-context>` fence matching Python's `build_memory_context_block`)
 - **3.D — Semantic Fusion + Local Embeddings** — ✅ implemented (`entity_embeddings` table with L2-normalized float32 LE BLOBs; `Embedder` background worker calls Ollama `/v1/embeddings` with labeled template `Entity: {Name}. Type: {Type}. Context: {Description}`; in-memory vector cache with monotonic graph-version counter; `semanticSeeds` flat cosine scan (dot product on normalized vectors); hybrid fusion in `Provider.GetContext` chains lexical → FTS5 → semantic with dedup + MaxSeeds cap; opt-in via `semantic_enabled=true` + `semantic_model="<tag>"`; empty model is a complete no-op — zero HTTP calls, zero goroutine, zero cache RAM. Ship criterion proven live against Ollama: query `"tell me about my projects"` (no lexical match) surfaces the seeded project entity via cosine in 7s.)
 - **3.D.5 — Memory Mirror (USER.md sync)** — ✅ implemented (async background goroutine exports SQLite entities/rels → Markdown every 30s; configurable path; atomic writes; SQLite remains source of truth; zero impact on 250ms latency moat)
-- **3.E — Decay + Cross-Chat + Operational Mirrors** — ⏳ queued (see Phase 3.E Ledger below)
+- **3.E — Decay + Cross-Chat + Operational Mirrors** — 🔨 mixed closeout (3.E.2–3.E.4 shipped; 3.E.1, 3.E.5, 3.E.6, 3.E.7, and 3.E.8 remain)
 
 ## Phase 3.E Ledger
 
@@ -26,12 +26,12 @@ Phase 3.E is the final Black Box milestone. It closes four orthogonal gaps: **op
 
 | Subphase | Status | Priority | Upstream reference | Deliverable |
 |---|---|---|---|---|
-| 3.E.1 — Session Index Mirror | ⏳ planned | P0 | None (Gormes-original) | Read-only YAML mirror of bbolt `sessions.db` at `~/.local/share/gormes/sessions/index.yaml`; closes the bbolt opacity gap |
-| 3.E.2 — Tool Execution Audit Log | ⏳ planned | P0 | None (exceeds Hermes) | Append-only JSONL at `~/.local/share/gormes/tools/audit.jsonl`; persistent record of every tool call with timing + outcome |
-| 3.E.3 — Transcript Export Command | ⏳ planned | P2 | Exceeds Hermes (no upstream equivalent) | `gormes session export <id> --format=markdown` renders SQLite turns as human-readable Markdown; snapshot for sharing/backup |
-| 3.E.4 — Extraction State Visibility | ⏳ planned | P1 | None (debug only) | `gormes memory status` shows extractor queue depth, recent dead letters, and current worker health |
-| 3.E.5 — Insights Audit Log | ⏳ planned | P3 | `agent/insights.py` (preview) | Lightweight append-only JSONL at `~/.local/share/gormes/insights/usage.jsonl`; accumulates session counts, token totals, cost estimates per day. Full `InsightsEngine` port lands in 4.E |
-| 3.E.6 — Memory Decay | ⏳ planned | P1 | None (Gormes-original) | Weight attenuation on relationships + `last_seen` tracking; stale facts age out of recall without deletion (reversible, audit-preserving) |
+| 3.E.1 — Session Index Mirror | 🔨 in progress | P0 | None (Gormes-original) | Read-only YAML mirror of bbolt `sessions.db` at `~/.local/share/gormes/sessions/index.yaml`; writer landed, deterministic runtime refresh still pending |
+| 3.E.2 — Tool Execution Audit Log | ✅ shipped | P0 | None (exceeds Hermes) | Append-only JSONL at `~/.local/share/gormes/tools/audit.jsonl`; persistent record of every tool call with timing + outcome |
+| 3.E.3 — Transcript Export Command | ✅ shipped | P2 | Exceeds Hermes (no upstream equivalent) | `gormes session export <id> --format=markdown` renders SQLite turns as human-readable Markdown; snapshot for sharing/backup |
+| 3.E.4 — Extraction State Visibility | ✅ shipped | P1 | None (debug only) | `gormes memory status` shows extractor queue depth, dead-letter summaries, and worker-health heuristics |
+| 3.E.5 — Insights Audit Log | 🔨 in progress | P3 | `agent/insights.py` (preview) | Rollups from local `telemetry.Snapshot` are landed; the append-only daily `usage.jsonl` writer still remains |
+| 3.E.6 — Memory Decay | 🔨 in progress | P1 | None (Gormes-original) | Deterministic recall-time weight attenuation is landed; `last_seen` tracking still remains so stale facts can age out without deletion |
 | 3.E.7 — Cross-Chat Synthesis | ⏳ planned | P2 | `agent/memory_manager.py` (cross-session) + `SessionDB.user_id` | Graph unification across `chat_id` boundaries for a single operator; query "what is Juan working on?" returns facts from Telegram, Discord, Slack in one fence |
 | 3.E.8 — Session Lineage + Cross-Source Search | ⏳ planned | P4 | `hermes_state.py` (`parent_session_id`, `search_messages`, `search_sessions`) | Port the remaining `SessionDB` donor seams: compression lineage and source-filtered session/message search |
 
@@ -41,20 +41,47 @@ The 3.E ship criterion: the operator runs `cat ~/.local/share/gormes/sessions/in
 
 The Phase 3 queue is not one flat backlog. The order matters because later memory features need operator visibility and stable identity seams before they can be debugged safely.
 
-1. **P0 — 3.E.1 Session Index Mirror + 3.E.2 Tool Execution Audit Log**
-   Freeze the read-only mirror schema and audit-event envelope with failing golden tests first. These are the observability surfaces every later Phase 3 slice will rely on.
-2. **P1 — 3.E.4 Extraction State Visibility + 3.E.6 Memory Decay**
-   Add tests around queue-depth reporting, dead-letter summaries, fixed-clock decay math, and `last_seen` updates before touching live workers or recall ranking.
-3. **P2 — 3.E.3 Transcript Export Command + 3.E.7 Cross-Chat Synthesis**
-   Once visibility exists, pin the export format and the `user_id` merge rules in tests before rewiring recall across multiple chats.
-4. **P3 — 3.E.5 Insights Audit Log**
-   Keep the audit writer lightweight and append-only. The full analytics engine still belongs in Phase 4.E.
-5. **P4 — 3.E.8 Session Lineage + Cross-Source Search**
+1. **P0 — 3.E.1 Session Index Mirror closeout**
+   Freeze the runtime refresh semantics with failing golden tests first. The YAML shape is already shipped; the remaining risk is wiring refresh without mutating session state or blocking the hot path.
+2. **P1 — 3.E.5 Insights Audit Log + 3.E.6 `last_seen` closeout**
+   The read model and recall-time attenuation are already present. Add tests around the append-only writer, fixed-clock decay math, and `last_seen` updates before touching live workers or ranking.
+3. **P2 — 3.E.7 Cross-Chat Synthesis**
+   Pin the `user_id` merge rules in tests before rewiring recall across multiple chats.
+4. **P4 — 3.E.8 Session Lineage + Cross-Source Search**
    This closes the remaining donor gap with Hermes `SessionDB`, but it pairs naturally with later context-compression work and should come after the operator-facing mirrors are stable.
 
-## Honcho architecture as the reference model
+## Pre-Phase 4 E2E Gate (Hermes still running)
 
-Honcho is useful here not just as a future plugin target, but as a clean reference architecture for what an agent-memory system needs to separate:
+Before starting Phase 4 implementation work, run and freeze a hybrid end-to-end baseline while Hermes is still the upstream brain (`api_server`) and Gormes owns runtime/gateway/memory surfaces.
+
+### Why this gate exists
+
+- It gives a parity reference before the Brain Transplant introduces new failure modes.
+- It separates "bridge baseline regressions" from "native orchestrator regressions."
+- It locks operator-facing contracts (routing, tool loop, memory fence shape, delivery semantics) before replacing the Python core path.
+
+### Required E2E scenarios
+
+1. **Gateway routing path**: inbound platform event -> session resolution -> kernel turn -> outbound delivery.
+2. **Tool-call loop path**: model requests tool(s) -> tool execution -> tool result continuation -> final assistant output.
+3. **Delegation path**: `delegate_task` child execution, allowlist/blocked-tool enforcement, terminal result envelope.
+4. **Memory path**: recall injection fence present (`<memory-context>`), expected seed/fact shape, no leak across fenced scope.
+5. **Operator visibility path**: session index/tool audit/transcript export surfaces produce deterministic artifacts.
+
+### Exit criteria (must pass)
+
+- E2E suite is green in CI and locally against Hermes-backed runtime.
+- Golden outputs are stored for key contract surfaces (memory fence + export format + delivery envelope).
+- Known acceptable divergences are documented explicitly (none implied by omission).
+- A "Phase 4 can start" note is added to the sprint/plan artifact with exact command set used.
+
+This gate is a prerequisite for Phase 4 powertrain work, not optional polish.
+
+## GONCHO architecture as the internal reference model
+
+Internally, Gormes refers to the local memory-service seam as **GONCHO**. The exported tool surface remains **Honcho-compatible interfaces** (`honcho_*`) so callers do not lose the upstream mental model while the Go substrate hardens.
+
+GONCHO is useful here not just as a future plugin target, but as a clean reference architecture for what an agent-memory system needs to separate:
 
 - **Workspace** — namespace and tenancy boundary for all memory objects
 - **Peer** — the durable identity being modeled (human, agent, or other participant)
@@ -68,11 +95,11 @@ That decomposition matters because it keeps three concerns distinct that are eas
 2. **Where** an interaction happened (`session`)
 3. **How** the system reconstructs useful context later (`representation`, `summary`, `dialectic`)
 
-Gormes Phase 3 is converging toward that same separation in Go. The local SQLite lattice, graph extractor, and semantic recall already cover most of the "representation substrate" layer. The remaining 3.E work closes the gaps around session visibility, cross-chat identity, and decay so that future Honcho parity is a thin integration layer rather than a redesign of the memory core.
+Gormes Phase 3 is converging toward that same separation in Go. The local SQLite lattice, graph extractor, and semantic recall already cover most of the "representation substrate" layer. The remaining 3.E work closes the gaps around session visibility, cross-chat identity, and decay so that future GONCHO / Honcho parity is a thin integration layer rather than a redesign of the memory core.
 
-## Honcho-to-Gormes mapping
+## GONCHO-to-Gormes mapping
 
-| Honcho concept | Role in Honcho | Phase 3 implication for Gormes |
+| GONCHO concept | Role in the Honcho-compatible model | Phase 3 implication for Gormes |
 |---|---|---|
 | **Workspace** | Top-level namespace containing peers, sessions, and derived memory | Today this is effectively the local Gormes data root plus config scope. Full provider-facing workspace semantics remain a later integration concern, but Phase 3 must keep schemas and mirrors partitionable at that boundary. |
 | **Peer** | Durable participant identity whose representation evolves over time | The closest Phase 3 equivalent is the entity/relationship graph plus USER.md mirror. Phase 3 builds the durable facts; explicit Honcho-style peer objects and peer-management UX are deferred. |
@@ -85,9 +112,9 @@ Gormes Phase 3 is converging toward that same separation in Go. The local SQLite
 
 ## Scope guard
 
-Phase 3 should therefore be read as **Honcho-aligned substrate work**, not "port all of Honcho now."
+Phase 3 should therefore be read as **GONCHO-aligned substrate work**, not "port all of Honcho now."
 
 - If the work is about local persistence, graph formation, semantic recall, session inspectability, cross-chat identity, or decay, it belongs in Phase 3.
 - If the work is about Honcho API parity, peer-management commands, plugin wiring, dialectic tools, or remote workspace/session orchestration, it belongs later with the provider/plugin surface.
 
-This boundary is deliberate. Phase 3 makes Gormes memory structurally compatible with Honcho's architecture without paying Honcho's full integration cost before the local Go memory core is finished.
+This boundary is deliberate. Phase 3 makes Gormes memory structurally compatible with the Honcho-style architecture without paying the full provider-integration cost before the local Go memory core is finished.

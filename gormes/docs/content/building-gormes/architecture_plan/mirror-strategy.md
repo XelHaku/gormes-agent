@@ -12,12 +12,12 @@ Phase 3.D.5 (Memory Mirror) closes the transparency gap for entities/relationshi
 | Data | Hermes Format | Gormes Format | Gap Analysis |
 |------|--------------|---------------|--------------|
 | **Entities/Relationships** | SQLite + USER.md (text) | SQLite + USER.md (via Mirror) | ✅ **Parity achieved (3.D.5)** |
-| **Turns/Transcripts** | SQLite + JSONL | SQLite only | 🟡 Gormes has parity; no text export in either |
+| **Turns/Transcripts** | SQLite + JSONL | SQLite + Markdown export | ✅ **Gormes exceeds upstream with `gormes session export` (3.E.3)** |
 | **Sessions** | SQLite (queryable) | bbolt (opaque binary) | 🔴 **Gap: bbolt is human-opaque** |
-| **Tool Execution** | SessionDB (persisted) | In-memory only | 🔴 **Gap: no tool audit trail** |
-| **Extraction State** | SQLite columns | SQLite columns | 🟡 Invisible in both; parity |
-| **Skills** | SKILL.md (text files) | Not implemented | ⏳ Phase 5 |
-| **Cron Output** | Markdown files | Not implemented | ⏳ Phase 4 |
+| **Tool Execution** | SessionDB (persisted) | JSONL audit trail + SQLite-backed transcripts | ✅ **Shipped in Gormes (3.E.2)** |
+| **Extraction State** | SQLite columns | SQLite columns + `gormes memory status` | ✅ **Shipped in Gormes (3.E.4)** |
+| **Skills** | SKILL.md (text files) | Active + candidate stores, usage log, reviewed promotion flow | 🔨 Core runtime shipped in Gormes (Phase 2.G); hub sync remains Phase 5.F |
+| **Cron Output** | Markdown files | SQLite `cron_runs` + `CRON.md` mirror | ✅ **Shipped in Gormes (Phase 2.D)** |
 | **Config** | YAML | TOML | ✅ Both human-readable |
 | **Logs** | Text files (agent.log, etc.) | Text file (gormes.log) | ✅ Parity |
 
@@ -46,6 +46,8 @@ updated_at: 2026-04-20T09:30:00Z
 
 #### Medium Priority: Tool Execution Audit Log (Phase 3.E.2)
 
+**Status**: ✅ **Shipped in Gormes (3.E.2)**
+
 **Problem**: Tool calls are ephemeral. The Bear runs `terminal()`, produces output, but no persistent record exists. An operator cannot audit "what did the agent do yesterday?"
 
 **Solution**: Append-only log at `~/.local/share/gormes/tools/audit.logl` (JSONL):
@@ -59,6 +61,8 @@ updated_at: 2026-04-20T09:30:00Z
 
 #### Medium Priority: Transcript Export Command (Phase 3.E.3)
 
+**Status**: ✅ **Shipped in Gormes (3.E.3)**
+
 **Problem**: While Hermes has no human-readable transcript export, operators may want to export a conversation for sharing, backup, or analysis.
 
 **Solution**: Add `gormes session export <session_id> --format=markdown` command that renders a formatted Markdown transcript.
@@ -66,6 +70,8 @@ updated_at: 2026-04-20T09:30:00Z
 **Rationale**: This is a **Gormes-only feature** that exceeds Hermes capabilities. Hermes has no equivalent human-readable export.
 
 #### Low Priority: Extraction State Visibility (Phase 3.E.4)
+
+**Status**: ✅ **Shipped in Gormes (3.E.4)** with room for richer dashboards later
 
 **Problem**: `turns.extracted`, `extraction_attempts`, `extraction_error` columns are invisible to operators. A dead-lettered turn (`extracted=2`) requires SQLite inspection.
 
@@ -82,10 +88,10 @@ Based on the comprehensive Hermes file inventory, these Hermes files do not need
 | `MEMORY.md` | Superseded by USER.md + entity graph (structured > flat) | N/A — entity graph is superior |
 | `sessions.json` | Legacy Hermes format; Gormes uses bbolt (better concurrency) | **Session Index Mirror (3.E.1)** closes bbolt opacity |
 | `*.jsonl` transcripts | Machine-readable only | **Transcript Export (3.E.3)** adds human-readable option |
-| `jobs.json` + cron output | Gormes ships Phase 2.D as SQLite `cron_runs` + derived `CRON.md`, not the upstream file layout | Existing cron audit surface is the source of truth; optional per-job export remains future work |
-| `SKILL.md` files | Gormes ships Phase 2.G with active + candidate skill stores, not the upstream shared tree layout | Skill audit trail and hub sync expand in Phase 5.F |
-| `HOOK.yaml` | Hook manifests now load from `$XDG_DATA_HOME/gormes/hooks/`; built-in BOOT startup execution is also live | Hook activity log and richer audit surfaces remain future work |
-| `BOOT.md` | Built-in startup automation file at `$XDG_DATA_HOME/gormes/BOOT.md`; run through an isolated background boot kernel on gateway start | Boot sequence audit remains future work |
+| `jobs.json` + cron output | Gormes ships **Phase 2.D** as SQLite `cron_runs` + derived `CRON.md`, not the upstream file layout | Existing cron audit surface is the source of truth; optional per-job export remains future work |
+| `SKILL.md` files | Gormes ships the **Phase 2.G** active + candidate skill stores, not the upstream shared tree layout | Skill audit trail and hub sync expand in Phase 5.F |
+| `HOOK.yaml` | Hook manifests now load from `$XDG_DATA_HOME/gormes/hooks/`; built-in BOOT startup execution is also live in **Phase 2.F.2** | Hook activity log and richer audit surfaces remain future work |
+| `BOOT.md` | Built-in startup automation file at `$XDG_DATA_HOME/gormes/BOOT.md`; run through an isolated background boot kernel on gateway start in **Phase 2.F.2** | Boot sequence audit remains future work |
 | `SOUL.md` | Personality system not yet implemented (Phase 4+) | Persona versioning when Phase 4 lands |
 | `gateway_voice_mode.json` | Voice mode not implemented (Phase 5.E) | Voice state mirroring if voice features land |
 | Platform state JSON files | Shared gateway exists, but most remaining adapter-specific state surfaces are still planned (Phase 2.B.4–2.B.10) | Per-platform state audit when those adapters land |
@@ -116,7 +122,7 @@ Based on the comprehensive Hermes file inventory, these Hermes files do not need
 - Platform breakdowns
 - Session metrics (duration, turns, success rate)
 
-Gormes currently has only basic in-memory telemetry (`internal/telemetry/telemetry.go`) that does not persist. **This is a significant operational visibility gap** — operators cannot audit their usage, costs, or trends without reimplementing the insights analysis themselves.
+Gormes now has local rollup primitives (`internal/insights/rollup.go`) plus `telemetry.Snapshot` bridging, but the append-only writer is still not landed. **This remains an operational visibility gap** — operators can derive usage locally, but the durable daily audit log is still pending.
 
 **Recommended Mirror Addition — Phase 3.E.5: Insights Audit Log**
 

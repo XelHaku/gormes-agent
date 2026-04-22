@@ -624,8 +624,8 @@
             },
             {
               "name": "Deterministic weight attenuation at recall time",
-              "status": "planned",
-              "note": "TDD: pin ranking expectations with fixed clocks before introducing any decay curve into recall."
+              "status": "complete",
+              "note": "TDD landed: recall-time decay is now wired through RecallDecayHorizonDays, fixed-clock recall_sql coverage, and ranking assertions that preserve raw fence weights while attenuating candidate ordering."
             }
           ]
         },

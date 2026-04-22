@@ -23,21 +23,21 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Webhook | `gateway/platforms/webhook.py` | 2.B.9 | ⏳ planned | |
 | BlueBubbles (iMessage) | `gateway/platforms/bluebubbles.py` | 2.B.10 | ⏳ planned | |
 | HomeAssistant | `gateway/platforms/homeassistant.py` | 2.B.10 | ⏳ planned | |
-| Feishu | `gateway/platforms/feishu*.py` | 2.B.10 | ⏳ planned | |
-| WeChat (WeCom + WeiXin) | `gateway/platforms/wecom*.py`, `weixin.py` | 2.B.10 | ⏳ planned | |
-| DingTalk | `gateway/platforms/dingtalk.py` | 2.B.10 | ⏳ planned | |
-| QQ Bot | `gateway/platforms/qqbot/` | 2.B.10 | ⏳ planned | |
+| Feishu | `gateway/platforms/feishu*.py` | 2.B.10 | 🔨 in progress | Contract-tested ingress and policy-gated delivery live in `internal/channels/feishu` |
+| WeChat (WeCom + WeiXin) | `gateway/platforms/wecom*.py`, `weixin.py` | 2.B.10 | 🔨 in progress | Contract-tested ingress and reply semantics live in `internal/channels/{wecom,weixin}` |
+| DingTalk | `gateway/platforms/dingtalk.py` | 2.B.10 | 🔨 in progress | Allow-list and session-webhook delivery contracts live in `internal/channels/dingtalk` |
+| QQ Bot | `gateway/platforms/qqbot/` | 2.B.10 | 🔨 in progress | Mention-gated ingress and passive-reply delivery contracts live in `internal/channels/qqbot` |
 
 ### Operational layer (cross-cutting, mostly Phase 2.D–2.F)
 
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
-| Gateway runtime entry (main loop + slash-command dispatch) | `gateway/run.py` + `gateway/config.py` | 2.B/2.F | 🔨 shared gateway manager + multi-channel entrypoint landed; registry-backed slash dispatch, session context, delivery routing, and stream fan-out remain |
+| Gateway runtime entry (main loop + slash-command dispatch) | `gateway/run.py` + `gateway/config.py` | 2.B/2.F | 🔨 shared gateway manager + multi-channel entrypoint landed; registry-backed slash dispatch, typed session-context prompt injection landed, typed delivery-target parsing landed, and deterministic frame fan-out landed; pairing/home-channel/webhook surfaces remain |
 | Thin mapping persistence | `gateway/session.py` (minimal subset) | 2.C | ✅ shipped (`bbolt` `(platform, chat_id) -> session_id`; transcripts stay outside this layer) |
-| Gateway session store (conversation persistence across platforms) | `gateway/session.py` (`SessionStore`, `SessionEntry`, `SessionSource`, `SessionResetPolicy`) | 2.B/2.F | ⏳ planned |
-| Gateway session context | `gateway/session_context.py` (`SessionContext`) | 2.B/2.F | ⏳ planned |
-| Delivery router (`--deliver <platform>` abstraction) | `gateway/delivery.py` (`DeliveryRouter`, `DeliveryTarget`) | 2.B/2.F | ⏳ planned |
-| Stream consumer (SSE agent-event fan-out to gateway) | `gateway/stream_consumer.py` (`GatewayStreamConsumer`, `StreamConsumerConfig`, `StreamingConfig`) | 2.B/2.F | ⏳ planned |
+| Gateway session store (conversation persistence across platforms) | `gateway/session.py` (`SessionStore`, `SessionEntry`, `SessionSource`, `SessionResetPolicy`) | 2.B/2.F | 🔨 partial — session-ID resolution + `SessionSource` parity landed; richer `SessionEntry` and reset-policy behavior still remains |
+| Gateway session context | `gateway/session_context.py` (`SessionContext`) | 2.B/2.F | ✅ shipped — typed session-context prompt injection landed in `internal/gateway/session_context.go` |
+| Delivery router (`--deliver <platform>` abstraction) | `gateway/delivery.py` (`DeliveryRouter`, `DeliveryTarget`) | 2.B/2.F | 🔨 typed delivery-target parsing landed in `internal/gateway/delivery.go`; full cross-channel resolution and home-channel semantics still remain |
+| Stream consumer (SSE agent-event fan-out to gateway) | `gateway/stream_consumer.py` (`GatewayStreamConsumer`, `StreamConsumerConfig`, `StreamingConfig`) | 2.B/2.F | 🔨 deterministic frame fan-out landed in `internal/gateway/stream_consumer.go`; richer upstream buffering/edit policy remains |
 | Home channel (operator's primary notify-to chat) | `gateway/*` — `HomeChannel` class | 2.F | ⏳ planned |
 | Channel / contact directory | `gateway/channel_directory.py` | 2.F | ⏳ planned |
 | Platform enum + per-platform config | `gateway/*` — `Platform` (enum), `PlatformConfig` | 2.B | 🔨 Telegram/Discord/Slack config surfaces landed; canonical cross-platform enum parity remains |
@@ -65,12 +65,12 @@ Upstream splits memory across three stores that Gormes compresses into two:
 | Recall + context injection | `agent/memory_provider.py` (recall half) | 3.C | ✅ shipped |
 | Semantic / embeddings | (not in upstream; Gormes-original) | 3.D | ✅ shipped |
 | USER.md mirror | `agent/memory_manager.py` (mirror writer) | 3.D.5 | ✅ shipped |
-| Session index mirror | None (closes bbolt opacity gap) | 3.E.1 | ⏳ planned |
-| Tool execution audit log | None (exceeds Hermes) | 3.E.2 | ⏳ planned |
-| Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ⏳ planned |
-| Extraction state visibility | None (debug visibility) | 3.E.4 | ⏳ planned |
-| Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | ⏳ planned |
-| Memory decay | None (Gormes-original) | 3.E.6 | ⏳ planned |
+| Session index mirror | None (closes bbolt opacity gap) | 3.E.1 | 🔨 partial — `internal/session/index_mirror.go` ships the YAML writer; runtime refresh wiring remains |
+| Tool execution audit log | None (exceeds Hermes) | 3.E.2 | ✅ shipped |
+| Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ✅ shipped |
+| Extraction state visibility | None (debug visibility) | 3.E.4 | ✅ shipped — `gormes memory status` renders extractor queue, dead-letter summary, and worker-health heuristics |
+| Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | 🔨 partial — rollups from `telemetry.Snapshot` landed; daily writer remains |
+| Memory decay | None (Gormes-original) | 3.E.6 | 🔨 partial — deterministic weight attenuation at recall time landed; `last_seen` tracking remains |
 | Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | ⏳ planned |
 | Parent-session chains (compression splits) | `hermes_state.py` (`SessionDB.parent_session_id`) | 3.E.8 | ⏳ planned (pairs with 4.B context compression) |
 | Cross-source session search | `hermes_state.py` (FTS5 across source-tagged messages) | 3.E.8 | ⏳ planned |

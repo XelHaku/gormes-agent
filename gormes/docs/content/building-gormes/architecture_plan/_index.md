@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 22/66 subphases shipped · 7 in progress · 37 planned
+**Overall:** 22/66 subphases shipped · 8 in progress · 36 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -232,10 +232,10 @@ weight: 10
 - [ ] Append-only daily usage.jsonl writer
 - [x] Session, token, and cost rollups from local runtime
 
-### 3.E.6 — Memory Decay ⏳
+### 3.E.6 — Memory Decay 🔨
 
 - [ ] Relationship last_seen tracking
-- [ ] Deterministic weight attenuation at recall time
+- [x] Deterministic weight attenuation at recall time
 
 ### 3.E.7 — Cross-Chat Synthesis ⏳
 
@@ -402,6 +402,12 @@ weight: 10
 - [ ] TUI + Telegram browsing
 
 <!-- PROGRESS:END -->
+
+---
+
+## Phase 4 Entry Gate
+
+Before any Phase 4 coding starts, the [Pre-Phase-4 E2E Gate](./phase-3-memory/) must be green. Freeze the Hermes-backed hybrid baseline for delivery envelopes, `<memory-context>` fences, and transcript/export artifacts first, then follow the entry rule in [Phase 4 — The Brain Transplant](./phase-4-brain-transplant/).
 
 ---
 
