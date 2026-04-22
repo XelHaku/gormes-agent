@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 21/66 subphases shipped · 6 in progress · 39 planned
+**Overall:** 21/66 subphases shipped · 7 in progress · 38 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -90,9 +90,9 @@ weight: 10
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 
-### 2.B.6 — Signal Adapter ⏳
+### 2.B.6 — Signal Adapter 🔨
 
-- [ ] Inbound event normalization + session identity
+- [x] Inbound event normalization + session identity
 - [ ] Reply/send contract on shared chassis
 
 ### 2.B.7 — Email + SMS Adapters ⏳

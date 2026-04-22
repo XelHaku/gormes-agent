@@ -177,8 +177,8 @@
           "items": [
             {
               "name": "Inbound event normalization + session identity",
-              "status": "planned",
-              "note": "TDD: lock DM/group identity rules and command passthrough before client wiring."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/signal.NormalizeInbound now freezes Signal DM/group chat IDs, generic slash passthrough, and alternate phone/UUID session identity before client wiring."
             },
             {
               "name": "Reply/send contract on shared chassis",
