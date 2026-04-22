@@ -329,6 +329,14 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if longTail.Priority != "P4" {
 		t.Fatalf("Phase 2.B.10 priority = %q, want P4", longTail.Priority)
 	}
+	longTailItems := itemsByName(longTail.Items)
+	dingTalkQQ := longTailItems["DingTalk + QQ Bot adapters"]
+	if dingTalkQQ.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 DingTalk + QQ Bot adapters status = %q, want complete", dingTalkQQ.Status)
+	}
+	if !strings.Contains(dingTalkQQ.Note, "TDD landed") {
+		t.Fatalf("Phase 2.B.10 DingTalk + QQ Bot adapters note = %q, want TDD landed guidance", dingTalkQQ.Note)
+	}
 }
 
 func TestLoad_RealFile_Phase3Ledger(t *testing.T) {

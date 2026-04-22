@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 21/66 subphases shipped · 3 in progress · 42 planned
+**Overall:** 21/66 subphases shipped · 4 in progress · 41 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -110,11 +110,11 @@ weight: 10
 - [ ] Signed event parsing + auth gates
 - [ ] Prompt-to-delivery routing bridge
 
-### 2.B.10 — Regional + Device Adapter Flood ⏳
+### 2.B.10 — Regional + Device Adapter Flood 🔨
 
 - [ ] BlueBubbles + HomeAssistant adapters
 - [ ] Feishu + WeChat/WeCom adapters
-- [ ] DingTalk + QQ Bot adapters
+- [x] DingTalk + QQ Bot adapters
 
 ### 2.C — Thin Mapping Persistence ✅
 

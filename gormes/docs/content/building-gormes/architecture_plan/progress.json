@@ -251,8 +251,8 @@
             },
             {
               "name": "DingTalk + QQ Bot adapters",
-              "status": "planned",
-              "note": "TDD: write allow-list, mention, and delivery contract tests before adapter code."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/dingtalk and internal/channels/qqbot now cover allow-list policy, mention-gated ingress, and webhook or passive-reply delivery contracts with adapter-focused tests before any runtime wiring."
             }
           ]
         },
