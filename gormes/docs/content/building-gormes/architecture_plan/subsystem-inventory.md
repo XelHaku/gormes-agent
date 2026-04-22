@@ -7,7 +7,7 @@ weight: 80
 
 The complete picture of what Gormes must absorb to retire the Python `hermes-agent` runtime. Each row is one upstream module or capability, mapped to its target phase. This inventory is the source of truth for "what's left" — when a subsystem is shipped in Go, mark it ✅ and link the spec.
 
-### Gateway platforms (24 connectors — 21 unshipped)
+### Gateway platforms (16 connectors — 9 unshipped)
 
 | Platform | Upstream file | Target phase | Status | Landed Go surface |
 |---|---|---|---|---|
@@ -16,8 +16,8 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Slack | `gateway/platforms/slack.py` | 2.B.3 | ✅ shipped | Shared gateway adapter with Socket Mode and threaded reply flow |
 | WhatsApp | `gateway/platforms/whatsapp.py` | 2.B.4 | ⏳ planned | |
 | Signal | `gateway/platforms/signal.py` | 2.B.6 | 🔨 in progress | Contract-tested ingress normalization and shared-chassis reply delivery live in `internal/channels/signal` |
-| Email | `gateway/platforms/email.py` | 2.B.7 | ⏳ planned | |
-| SMS | `gateway/platforms/sms.py` | 2.B.7 | ⏳ planned | |
+| Email | `gateway/platforms/email.py` | 2.B.7 | ✅ shipped | RFC 822 normalization and deterministic reply-thread targets live in `internal/channels/email` |
+| SMS | `gateway/platforms/sms.py` | 2.B.7 | ✅ shipped | Canonical phone-number session keys, generic command passthrough, and natural-boundary outbound segmentation live in `internal/channels/sms` |
 | Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ⏳ planned | |
 | Mattermost | `gateway/platforms/mattermost.py` | 2.B.8 | ⏳ planned | |
 | Webhook | `gateway/platforms/webhook.py` | 2.B.9 | ⏳ planned | |

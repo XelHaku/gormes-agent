@@ -20,7 +20,7 @@ weight: 30
 | Phase 2.B.4 — WhatsApp Adapter | ⏳ planned | P1 | Pick the bridge-vs-native runtime seam, then port inbound normalization, command passthrough, pairing, reconnect, and send contracts |
 | Phase 2.B.5 — Session Context + Delivery Routing | ⏳ planned | P1 | Port `gateway/session.py`, `session_context.py`, `delivery.py`, and `stream_consumer.py` into one tested routing layer |
 | Phase 2.B.6 — Signal Adapter | ✅ complete | P2 | Signal ingress, session identity, and reply/send semantics on the shared chassis |
-| Phase 2.B.7 — Email + SMS Adapters | ⏳ planned | P3 | Normalize low-bandwidth ingress and outbound delivery contracts without special-casing the kernel |
+| Phase 2.B.7 — Email + SMS Adapters | ✅ complete | P3 | RFC 822 email normalization plus SMS number/session normalization and segmented outbound delivery contracts now ride the shared gateway seam without special-casing the kernel |
 | Phase 2.B.8 — Matrix + Mattermost Adapters | 🔨 in progress | P4 | Shared threaded-text contract suite landed in `internal/channels/threadtext`; Matrix + Mattermost transport wiring remains |
 | Phase 2.B.9 — Webhook + Trigger Ingress | 🔨 in progress | P4 | Typed prompt-to-delivery bridge landed in `internal/channels/webhook`; signed webhook ingress and auth gates remain |
 | Phase 2.B.10 — Regional + Device Adapter Flood | ✅ complete | P4 | BlueBubbles, HomeAssistant, Feishu, WeChat/WeCom, DingTalk, and QQ Bot now have contract-tested shared-gateway adapter seams |

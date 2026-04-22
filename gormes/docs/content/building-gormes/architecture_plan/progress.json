@@ -198,8 +198,8 @@
             },
             {
               "name": "SMS ingress + outbound delivery contract",
-              "status": "planned",
-              "note": "TDD: prove number normalization, session keys, and delivery truncation semantics first."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/sms.NormalizeInbound now canonicalizes phone-number session keys, delegates generic slash commands through gateway.ParseInboundText, and BuildDelivery splits outbound replies into natural-boundary 1600-rune segments for future Twilio sends."
             }
           ]
         },
