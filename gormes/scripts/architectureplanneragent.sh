@@ -43,6 +43,12 @@ log() {
   printf '[architectureplanneragent] %s\n' "$*"
 }
 
+progress() {
+  local step="$1"
+  shift
+  printf '[architectureplanneragent] %s/5 %s\n' "$step" "$*"
+}
+
 fail() {
   printf '[architectureplanneragent] ERROR: %s\n' "$*" >&2
   exit 1
@@ -538,6 +544,7 @@ write_state_file() {
 main() {
   claim_lock
 
+  progress 1 "preflight"
   require_cmd jq
   require_cmd git
   require_cmd codexu
@@ -557,20 +564,22 @@ main() {
   LOCAL_COMMIT="$(git_field "$REPO_ROOT" commit)"
   LOCAL_BRANCH="$(git_field "$REPO_ROOT" branch)"
 
+  progress 2 "context"
   write_context_bundle
+
+  progress 3 "planning"
   run_codexu_planner
+
+  progress 4 "validation"
   run_validation
+
+  progress 5 "schedule"
   install_periodic_schedule
   write_report
   write_state_file
 
-  log "Upstream Hermes: $UPSTREAM_HERMES_DIR"
-  log "Upstream commit: $UPSTREAM_COMMIT"
-  log "Local git root: $LOCAL_GIT_ROOT"
-  log "Local commit: $LOCAL_COMMIT"
   log "Planner report: $REPORT_FILE"
   log "Planner state: $STATE_FILE"
-  log "Validation log: $VALIDATION_LOG"
   log "Periodic schedule: $SCHEDULE_METHOD"
 }
 

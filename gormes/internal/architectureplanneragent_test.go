@@ -183,11 +183,29 @@ exit 0
 		"XDG_CONFIG_HOME=" + xdgConfigHome,
 	}, "bash", "scripts/architectureplanneragent.sh")
 
+	outputText := string(out)
+	for _, want := range []string{
+		"1/5 preflight",
+		"2/5 context",
+		"3/5 planning",
+		"4/5 validation",
+		"5/5 schedule",
+	} {
+		if !strings.Contains(outputText, want) {
+			t.Fatalf("output missing progress checkpoint %q:\n%s", want, outputText)
+		}
+	}
 	if !strings.Contains(string(out), "Planner report:") {
 		t.Fatalf("output missing planner report line:\n%s", string(out))
 	}
+	if !strings.Contains(string(out), "Planner state:") {
+		t.Fatalf("output missing planner state line:\n%s", string(out))
+	}
 	if !strings.Contains(string(out), "Periodic schedule: systemd") {
 		t.Fatalf("output missing periodic schedule line:\n%s", string(out))
+	}
+	if strings.Contains(outputText, "Upstream commit:") || strings.Contains(outputText, "Local commit:") {
+		t.Fatalf("output too verbose for normal progress mode:\n%s", outputText)
 	}
 
 	rawCodexuLog, err := os.ReadFile(logPath)
