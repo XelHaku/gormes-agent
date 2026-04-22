@@ -13,12 +13,14 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/config"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/cron"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/goncho"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/kernel"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/memory"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telegram"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
 // telegramCmd runs Gormes as a Telegram bot — the adapter previously
@@ -108,6 +110,11 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 	defer cancel()
 
 	reg := buildDefaultRegistry(rootCtx, cfg.Delegation)
+	tools.RegisterHonchoTools(reg, goncho.NewService(mstore.DB(), goncho.Config{
+		WorkspaceID:    "default",
+		ObserverPeerID: "gormes",
+		RecentMessages: 4,
+	}, slog.Default()))
 
 	tm := telemetry.New()
 

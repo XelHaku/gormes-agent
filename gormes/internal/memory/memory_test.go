@@ -43,8 +43,8 @@ func TestOpenSqlite_SchemaMetaVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("schema_meta missing: %v", err)
 	}
-	if v != "3e" {
-		t.Errorf("schema version = %q, want %q", v, "3e")
+	if v != "3f" {
+		t.Errorf("schema version = %q, want %q", v, "3f")
 	}
 }
 

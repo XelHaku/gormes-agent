@@ -3,7 +3,7 @@ package memory
 // schemaVersion is the canonical target version for this binary. OpenSqlite
 // migrates any earlier supported version up to this value, and refuses to
 // open DBs with an unknown version (future schemas).
-const schemaVersion = "3e"
+const schemaVersion = "3f"
 
 // schemaV3a is the baseline schema installed on a fresh DB. It matches
 // exactly what Phase 3.A shipped — any change to this string is a schema
@@ -151,4 +151,61 @@ CREATE INDEX IF NOT EXISTS idx_cron_runs_job_started
 	ON cron_runs(job_id, started_at DESC);
 
 UPDATE schema_meta SET v = '3e' WHERE k = 'version' AND v = '3d';
+`
+
+// migration3eTo3f adds the first Goncho-owned persistence surface:
+//   - goncho_peer_cards stores the global card per peer
+//   - goncho_conclusions stores durable manual or derived facts
+//   - goncho_conclusions_fts indexes conclusion content for lexical search
+const migration3eTo3f = `
+CREATE TABLE IF NOT EXISTS goncho_peer_cards (
+	workspace_id TEXT NOT NULL,
+	peer_id      TEXT NOT NULL,
+	card_json    TEXT NOT NULL,
+	updated_at   INTEGER NOT NULL,
+	PRIMARY KEY(workspace_id, peer_id)
+);
+
+CREATE TABLE IF NOT EXISTS goncho_conclusions (
+	id               INTEGER PRIMARY KEY AUTOINCREMENT,
+	workspace_id     TEXT NOT NULL,
+	observer_peer_id TEXT NOT NULL,
+	peer_id          TEXT NOT NULL,
+	session_key      TEXT,
+	content          TEXT NOT NULL,
+	kind             TEXT NOT NULL DEFAULT 'manual',
+	status           TEXT NOT NULL CHECK(status IN ('pending','processed','dead_letter')),
+	source           TEXT NOT NULL DEFAULT 'manual',
+	idempotency_key  TEXT NOT NULL,
+	evidence_json    TEXT NOT NULL DEFAULT '[]',
+	created_at       INTEGER NOT NULL,
+	updated_at       INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_goncho_conclusions_idempotency
+	ON goncho_conclusions(workspace_id, observer_peer_id, peer_id, idempotency_key);
+CREATE INDEX IF NOT EXISTS idx_goncho_conclusions_peer
+	ON goncho_conclusions(workspace_id, peer_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_goncho_conclusions_session
+	ON goncho_conclusions(workspace_id, session_key, updated_at DESC);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS goncho_conclusions_fts USING fts5(
+	content,
+	content='goncho_conclusions',
+	content_rowid='id'
+);
+
+CREATE TRIGGER IF NOT EXISTS goncho_conclusions_ai AFTER INSERT ON goncho_conclusions BEGIN
+	INSERT INTO goncho_conclusions_fts(rowid, content) VALUES (new.id, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS goncho_conclusions_ad AFTER DELETE ON goncho_conclusions BEGIN
+	INSERT INTO goncho_conclusions_fts(goncho_conclusions_fts, rowid, content) VALUES('delete', old.id, old.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS goncho_conclusions_au AFTER UPDATE ON goncho_conclusions BEGIN
+	INSERT INTO goncho_conclusions_fts(goncho_conclusions_fts, rowid, content) VALUES('delete', old.id, old.content);
+	INSERT INTO goncho_conclusions_fts(rowid, content) VALUES (new.id, new.content);
+END;
+
+UPDATE schema_meta SET v = '3f' WHERE k = 'version' AND v = '3e';
 `

@@ -49,6 +49,11 @@ func migrate(db *sql.DB) error {
 		}
 		return migrate(db)
 	case "3e":
+		if err := runMigrationTx(db, migration3eTo3f); err != nil {
+			return fmt.Errorf("memory: migrate 3e->3f: %w", err)
+		}
+		return migrate(db)
+	case "3f":
 		return nil
 	default:
 		return fmt.Errorf("%w: got %q, want %q", ErrSchemaUnknown, v, schemaVersion)

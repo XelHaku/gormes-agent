@@ -19,8 +19,8 @@ func TestOpenSqlite_FreshDBIsV3b(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3e" {
-		t.Errorf("schema version = %q, want 3e", v)
+	if v != "3f" {
+		t.Errorf("schema version = %q, want 3f", v)
 	}
 }
 
@@ -61,7 +61,7 @@ func TestMigrate_Idempotent(t *testing.T) {
 	}
 	s.Close(context.Background())
 
-	// Re-open — migration runs against v3e, should no-op.
+	// Re-open — migration runs against v3f, should no-op.
 	s2, err := OpenSqlite(path, 0, nil)
 	if err != nil {
 		t.Fatalf("re-open failed: %v", err)
@@ -70,8 +70,8 @@ func TestMigrate_Idempotent(t *testing.T) {
 
 	var v string
 	_ = s2.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3e" {
-		t.Errorf("version = %q after re-open, want 3e", v)
+	if v != "3f" {
+		t.Errorf("version = %q after re-open, want 3f", v)
 	}
 }
 
@@ -94,8 +94,8 @@ func TestOpenSqlite_FreshDBIsV3c(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3e" {
-		t.Errorf("schema version = %q, want 3e", v)
+	if v != "3f" {
+		t.Errorf("schema version = %q, want 3f", v)
 	}
 }
 
@@ -160,8 +160,8 @@ func TestOpenSqlite_FreshDBIsV3d(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3e" {
-		t.Errorf("schema version = %q, want 3e", v)
+	if v != "3f" {
+		t.Errorf("schema version = %q, want 3f", v)
 	}
 }
 
@@ -251,8 +251,53 @@ func TestOpenSqlite_FreshDBIsV3e(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3e" {
-		t.Errorf("schema version = %q, want 3e", v)
+	if v != "3f" {
+		t.Errorf("schema version = %q, want 3f", v)
+	}
+}
+
+func TestOpenSqlite_FreshDBIsV3f(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	var v string
+	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
+	if v != "3f" {
+		t.Errorf("schema version = %q, want 3f", v)
+	}
+}
+
+func TestMigrate_3eTo3f_AddsGonchoTables(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, err := OpenSqlite(path, 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer s.Close(context.Background())
+
+	for _, table := range []string{"goncho_peer_cards", "goncho_conclusions"} {
+		var n int
+		if err := s.db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
+			t.Fatalf("table %s missing: %v", table, err)
+		}
+	}
+}
+
+func TestMigrate_3eTo3f_AddsGonchoConclusionsFTS(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, err := OpenSqlite(path, 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer s.Close(context.Background())
+
+	var name string
+	err = s.db.QueryRow(
+		`SELECT name FROM sqlite_master WHERE type='table' AND name='goncho_conclusions_fts'`,
+	).Scan(&name)
+	if err != nil {
+		t.Fatalf("goncho_conclusions_fts missing: %v", err)
 	}
 }
 
