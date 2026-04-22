@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 21/66 subphases shipped · 4 in progress · 41 planned
+**Overall:** 21/66 subphases shipped · 5 in progress · 40 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -77,10 +77,10 @@ weight: 10
 - [x] Thread routing + coalesced reply flow
 - [x] Gateway command wiring
 
-### 2.B.4 — WhatsApp Adapter ⏳
+### 2.B.4 — WhatsApp Adapter 🔨
 
 - [ ] Bridge-vs-native runtime decision
-- [ ] Inbound normalization + command passthrough
+- [x] Inbound normalization + command passthrough
 - [ ] Pairing, reconnect, and send contract
 
 ### 2.B.5 — Session Context + Delivery Routing ✅

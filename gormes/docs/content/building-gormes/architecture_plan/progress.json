@@ -135,8 +135,8 @@
             },
             {
               "name": "Inbound normalization + command passthrough",
-              "status": "planned",
-              "note": "TDD: port bridge/native command tests first, then map chat and sender metadata onto gateway contracts."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/whatsapp.NormalizeInbound normalizes bridge/native peer IDs and routes generic slash commands through gateway.ParseInboundText."
             },
             {
               "name": "Pairing, reconnect, and send contract",

@@ -223,10 +223,20 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if whatsApp.Priority != "P1" {
 		t.Fatalf("Phase 2.B.4 priority = %q, want P1", whatsApp.Priority)
 	}
+	if got := whatsApp.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.B.4 = %q, want in_progress", got)
+	}
 	whatsAppItems := itemsByName(whatsApp.Items)
 	decision := whatsAppItems["Bridge-vs-native runtime decision"]
 	if !strings.Contains(decision.Note, "TDD") {
 		t.Fatalf("Phase 2.B.4 decision note = %q, want TDD guidance", decision.Note)
+	}
+	inbound := whatsAppItems["Inbound normalization + command passthrough"]
+	if inbound.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.4 inbound normalization status = %q, want complete", inbound.Status)
+	}
+	if !strings.Contains(inbound.Note, "NormalizeInbound") || !strings.Contains(inbound.Note, "ParseInboundText") {
+		t.Fatalf("Phase 2.B.4 inbound normalization note = %q, want NormalizeInbound/ParseInboundText detail", inbound.Note)
 	}
 
 	routing := p.Phases["2"].Subphases["2.B.5"]
