@@ -36,7 +36,7 @@ func openGraphWithSeeds(t *testing.T) *SqliteStore {
 func TestSeedsExactName_MatchesCaseInsensitive(t *testing.T) {
 	s := openGraphWithSeeds(t)
 	ids, err := seedsExactName(context.Background(), s.db,
-		[]string{"acme", "Vania"}, 5)
+		[]string{"acme", "Vania"}, nil, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestSeedsExactName_MatchesCaseInsensitive(t *testing.T) {
 
 func TestSeedsExactName_SkipsShortNames(t *testing.T) {
 	s := openGraphWithSeeds(t)
-	ids, _ := seedsExactName(context.Background(), s.db, []string{"Vo"}, 5)
+	ids, _ := seedsExactName(context.Background(), s.db, []string{"Vo"}, nil, 5)
 	if len(ids) != 0 {
 		t.Errorf("short name returned %d seeds, want 0", len(ids))
 	}
@@ -55,7 +55,7 @@ func TestSeedsExactName_SkipsShortNames(t *testing.T) {
 
 func TestSeedsExactName_EmptyCandidateReturnsEmpty(t *testing.T) {
 	s := openGraphWithSeeds(t)
-	ids, err := seedsExactName(context.Background(), s.db, nil, 5)
+	ids, err := seedsExactName(context.Background(), s.db, nil, nil, 5)
 	if err != nil {
 		t.Errorf("err = %v, want nil on empty candidates", err)
 	}

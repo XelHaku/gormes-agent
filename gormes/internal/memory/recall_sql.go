@@ -31,7 +31,7 @@ func weightExpr(horizonDays int) string {
 // matches any of the provided candidates. Silently drops short candidates
 // (<3 chars) before sending to SQL. Empty candidates list returns
 // (nil, nil) with no DB round-trip.
-func seedsExactName(ctx context.Context, db *sql.DB, candidates []string, limit int) ([]int64, error) {
+func seedsExactName(ctx context.Context, db *sql.DB, candidates []string, chatKeys []string, limit int) ([]int64, error) {
 	// Pre-filter: drop empties and shorts, lower-fold for the IN-list.
 	clean := make([]any, 0, len(candidates))
 	for _, c := range candidates {
@@ -47,12 +47,33 @@ func seedsExactName(ctx context.Context, db *sql.DB, candidates []string, limit 
 
 	placeholders := strings.Repeat("?,", len(clean))
 	placeholders = placeholders[:len(placeholders)-1] // trim trailing comma
-	args := append(clean, any(limit))
-	q := fmt.Sprintf(
-		`SELECT id FROM entities
-		 WHERE lower(name) IN (%s)
-		   AND length(name) >= 3
-		 LIMIT ?`, placeholders)
+	args := append([]any{}, clean...)
+	var q string
+	if len(chatKeys) == 0 {
+		args = append(args, any(limit))
+		q = fmt.Sprintf(
+			`SELECT id FROM entities
+			 WHERE lower(name) IN (%s)
+			   AND length(name) >= 3
+			 ORDER BY updated_at DESC
+			 LIMIT ?`, placeholders)
+	} else {
+		chatPlaceholders := strings.Repeat("?,", len(chatKeys))
+		chatPlaceholders = chatPlaceholders[:len(chatPlaceholders)-1]
+		for _, chatKey := range chatKeys {
+			args = append(args, chatKey)
+		}
+		args = append(args, any(limit))
+		q = fmt.Sprintf(
+			`SELECT DISTINCT e.id
+			 FROM entities e
+			 JOIN turns t ON lower(t.content) LIKE '%%' || lower(e.name) || '%%'
+			 WHERE lower(e.name) IN (%s)
+			   AND length(e.name) >= 3
+			   AND t.chat_id IN (%s)
+			 ORDER BY e.updated_at DESC
+			 LIMIT ?`, placeholders, chatPlaceholders)
+	}
 
 	rows, err := db.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -60,6 +81,83 @@ func seedsExactName(ctx context.Context, db *sql.DB, candidates []string, limit 
 	}
 	defer rows.Close()
 	return scanIDs(rows)
+}
+
+func seedsFTS5Scoped(ctx context.Context, db *sql.DB, userMessage string, chatKeys []string, limit int) ([]int64, error) {
+	if len(chatKeys) == 0 {
+		return seedsFTS5(ctx, db, userMessage, "", limit)
+	}
+
+	seen := make(map[int64]struct{}, limit)
+	out := make([]int64, 0, limit)
+	for _, chatKey := range chatKeys {
+		ids, err := seedsFTS5(ctx, db, userMessage, chatKey, limit)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range ids {
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			out = append(out, id)
+			if len(out) >= limit {
+				return out, nil
+			}
+		}
+	}
+	return out, nil
+}
+
+func filterEntityIDsByChatScope(ctx context.Context, db *sql.DB, ids []int64, chatKeys []string) ([]int64, error) {
+	if len(ids) == 0 || len(chatKeys) == 0 {
+		return ids, nil
+	}
+
+	idPlaceholders := strings.Repeat("?,", len(ids))
+	idPlaceholders = idPlaceholders[:len(idPlaceholders)-1]
+	chatPlaceholders := strings.Repeat("?,", len(chatKeys))
+	chatPlaceholders = chatPlaceholders[:len(chatPlaceholders)-1]
+
+	args := make([]any, 0, len(ids)+len(chatKeys))
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	for _, chatKey := range chatKeys {
+		args = append(args, chatKey)
+	}
+
+	q := fmt.Sprintf(
+		`SELECT DISTINCT e.id
+		 FROM entities e
+		 JOIN turns t ON lower(t.content) LIKE '%%' || lower(e.name) || '%%'
+		 WHERE e.id IN (%s)
+		   AND t.chat_id IN (%s)`, idPlaceholders, chatPlaceholders)
+	rows, err := db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("filterEntityIDsByChatScope: %w", err)
+	}
+	defer rows.Close()
+
+	allowed := make(map[int64]struct{}, len(ids))
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		allowed[id] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := allowed[id]; ok {
+			out = append(out, id)
+		}
+	}
+	return out, nil
 }
 
 // seedsFTS5 is the Layer 2 fallback: FTS5 MATCH over turns.content, joined

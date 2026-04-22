@@ -3,7 +3,10 @@ package memory
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
 )
 
 // RecallConfig controls the seed + CTE parameters.
@@ -74,6 +77,13 @@ type RecallInput struct {
 	UserMessage string
 	ChatKey     string
 	SessionID   string
+	UserID      string
+	CrossChat   bool
+	Sources     []string
+}
+
+type recallDirectory interface {
+	ListMetadataByUserID(ctx context.Context, userID string) ([]session.Metadata, error)
 }
 
 // Provider is the recall orchestrator. Use NewRecall to construct; wire the
@@ -84,6 +94,7 @@ type Provider struct {
 	log   *slog.Logger
 	ec    *embedClient   // nil disables semantic recall
 	cache *semanticCache // shared with the Embedder; always non-nil for consistency
+	dir   recallDirectory
 }
 
 func NewRecall(s *SqliteStore, cfg RecallConfig, log *slog.Logger) *Provider {
@@ -106,6 +117,13 @@ func (p *Provider) WithEmbedClient(ec *embedClient, cache *semanticCache) *Provi
 	return p
 }
 
+// WithDirectory attaches the session metadata directory used to resolve
+// canonical user_id -> chat scopes for opt-in cross-chat recall.
+func (p *Provider) WithDirectory(dir recallDirectory) *Provider {
+	p.dir = dir
+	return p
+}
+
 // GetContext is the single public entry point. Best-effort: any internal
 // error results in "" (no context injected) with a WARN log. Caller
 // bounds us via ctx (typically 100ms).
@@ -114,9 +132,11 @@ func (p *Provider) GetContext(ctx context.Context, in RecallInput) string {
 		return ""
 	}
 
+	allowedChats := p.allowedChatKeys(ctx, in)
+
 	// 1. Layer-1 seed selection — exact name match.
 	candidates := extractCandidates(in.UserMessage)
-	seeds, err := seedsExactName(ctx, p.store.db, candidates, p.cfg.MaxSeeds)
+	seeds, err := seedsExactName(ctx, p.store.db, candidates, allowedChats, p.cfg.MaxSeeds)
 	if err != nil {
 		p.log.Warn("recall: Layer-1 seed query failed", "err", err)
 		return ""
@@ -124,7 +144,7 @@ func (p *Provider) GetContext(ctx context.Context, in RecallInput) string {
 
 	// 2. Layer-2 fallback if Layer-1 didn't get enough.
 	if len(seeds) < 2 {
-		fts, err := seedsFTS5(ctx, p.store.db, in.UserMessage, in.ChatKey, p.cfg.MaxSeeds)
+		fts, err := seedsFTS5Scoped(ctx, p.store.db, in.UserMessage, allowedChats, p.cfg.MaxSeeds)
 		if err != nil {
 			p.log.Warn("recall: Layer-2 FTS5 query failed", "err", err)
 			// Continue with whatever Layer-1 gave us.
@@ -159,6 +179,11 @@ func (p *Provider) GetContext(ctx context.Context, in RecallInput) string {
 			if err != nil {
 				p.log.Warn("recall: semantic scan failed", "err", err)
 			} else {
+				semIDs, err = filterEntityIDsByChatScope(ctx, p.store.db, semIDs, allowedChats)
+				if err != nil {
+					p.log.Warn("recall: semantic scope filter failed", "err", err)
+					semIDs = nil
+				}
 				seen := make(map[int64]struct{}, len(seeds))
 				for _, id := range seeds {
 					seen[id] = struct{}{}
@@ -208,6 +233,64 @@ func (p *Provider) GetContext(ctx context.Context, in RecallInput) string {
 
 	// 6. Format.
 	return formatContextBlock(entities, rels)
+}
+
+func (p *Provider) allowedChatKeys(ctx context.Context, in RecallInput) []string {
+	chatKey := strings.TrimSpace(in.ChatKey)
+	if !in.CrossChat || strings.TrimSpace(in.UserID) == "" || p.dir == nil {
+		return fallbackChatScope(chatKey)
+	}
+
+	allowedSources := normalizedSourceFilters(in.Sources)
+
+	metadata, err := p.dir.ListMetadataByUserID(ctx, strings.TrimSpace(in.UserID))
+	if err != nil {
+		p.log.Warn("recall: session metadata lookup failed", "err", err)
+		return fallbackChatScope(chatKey)
+	}
+
+	seen := make(map[string]struct{}, len(metadata))
+	chats := make([]string, 0, len(metadata))
+	for _, meta := range metadata {
+		source := strings.ToLower(strings.TrimSpace(meta.Source))
+		chatID := strings.TrimSpace(meta.ChatID)
+		if source == "" || chatID == "" {
+			continue
+		}
+		if len(allowedSources) > 0 {
+			if _, ok := allowedSources[source]; !ok {
+				continue
+			}
+		}
+		key := source + ":" + chatID
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		chats = append(chats, key)
+	}
+	if len(chats) == 0 {
+		return fallbackChatScope(chatKey)
+	}
+	return chats
+}
+
+func fallbackChatScope(chatKey string) []string {
+	if chatKey == "" {
+		return nil
+	}
+	return []string{chatKey}
+}
+
+func normalizedSourceFilters(sources []string) map[string]struct{} {
+	allowed := make(map[string]struct{}, len(sources))
+	for _, source := range sources {
+		source = strings.ToLower(strings.TrimSpace(source))
+		if source != "" {
+			allowed[source] = struct{}{}
+		}
+	}
+	return allowed
 }
 
 // idsForNames resolves entity IDs for a set of recalledEntities.

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
 )
 
 func openProviderWithRichGraph(t *testing.T) (*SqliteStore, *Provider) {
@@ -124,16 +126,94 @@ func TestProvider_GetContext_RespectsContextDeadline(t *testing.T) {
 	}
 }
 
-func TestProvider_GetContext_Layer1FindsEntityRegardlessOfChat(t *testing.T) {
-	// Layer-1 (exact-name match) doesn't scope by chat_id — entities are
-	// global. So a query from any chat that NAMES the entity finds it.
+func TestProvider_GetContext_Layer1SameChatFence(t *testing.T) {
 	_, p := openProviderWithRichGraph(t)
 	out := p.GetContext(context.Background(), RecallInput{
 		UserMessage: "Acme progress?",
 		ChatKey:     "telegram:99", // different chat from the seeded turn
 	})
+	if out != "" {
+		t.Errorf("same-chat default should fence exact-name recall; got %q", out)
+	}
+}
+
+func TestProvider_GetContext_CrossChatOptInUsesSameUserBindings(t *testing.T) {
+	_, p := openProviderWithRichGraph(t)
+
+	dir := session.NewMemMap()
+	ctx := context.Background()
+	if err := dir.PutMetadata(ctx, session.Metadata{
+		SessionID: "sess-telegram",
+		Source:    "telegram",
+		ChatID:    "42",
+		UserID:    "user-juan",
+	}); err != nil {
+		t.Fatalf("PutMetadata telegram: %v", err)
+	}
+	if err := dir.PutMetadata(ctx, session.Metadata{
+		SessionID: "sess-discord",
+		Source:    "discord",
+		ChatID:    "7",
+		UserID:    "user-juan",
+	}); err != nil {
+		t.Fatalf("PutMetadata discord: %v", err)
+	}
+
+	p = p.WithDirectory(dir)
+	out := p.GetContext(ctx, RecallInput{
+		UserMessage: "Acme progress?",
+		ChatKey:     "discord:7",
+		UserID:      "user-juan",
+		CrossChat:   true,
+	})
 	if !strings.Contains(out, "Acme") {
-		t.Errorf("Layer-1 exact match should still find Acme regardless of chat; got %q", out)
+		t.Fatalf("cross-chat opt-in should surface Acme from same user's other chat; got %q", out)
+	}
+}
+
+func TestProvider_GetContext_CrossChatSourceFilter(t *testing.T) {
+	_, p := openProviderWithRichGraph(t)
+
+	dir := session.NewMemMap()
+	ctx := context.Background()
+	if err := dir.PutMetadata(ctx, session.Metadata{
+		SessionID: "sess-telegram",
+		Source:    "telegram",
+		ChatID:    "42",
+		UserID:    "user-juan",
+	}); err != nil {
+		t.Fatalf("PutMetadata telegram: %v", err)
+	}
+	if err := dir.PutMetadata(ctx, session.Metadata{
+		SessionID: "sess-discord",
+		Source:    "discord",
+		ChatID:    "7",
+		UserID:    "user-juan",
+	}); err != nil {
+		t.Fatalf("PutMetadata discord: %v", err)
+	}
+
+	p = p.WithDirectory(dir)
+	blocked := p.GetContext(ctx, RecallInput{
+		UserMessage: "Acme progress?",
+		ChatKey:     "discord:7",
+		UserID:      "user-juan",
+		CrossChat:   true,
+		Sources:     []string{"discord"},
+	})
+	if blocked != "" {
+		t.Fatalf("discord-only source filter should block telegram facts; got %q", blocked)
+	}
+
+	allowed := p.GetContext(ctx, RecallInput{
+		UserMessage: "Acme progress?",
+		ChatKey:     "discord:7",
+		UserID:      "user-juan",
+		CrossChat:   true,
+		Sources:     []string{"telegram"},
+	})
+	if !strings.Contains(allowed, "Acme") {
+		t.Fatalf("telegram source filter should allow Acme; got %q", allowed)
 	}
 }
 

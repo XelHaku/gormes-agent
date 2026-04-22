@@ -564,8 +564,8 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	if crossChat.Priority != "P2" {
 		t.Fatalf("Phase 3.E.7 priority = %q, want P2", crossChat.Priority)
 	}
-	if got := crossChat.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 3.E.7 = %q, want in_progress", got)
+	if got := crossChat.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 3.E.7 = %q, want complete", got)
 	}
 	crossChatItems := itemsByName(crossChat.Items)
 	userID := crossChatItems["user_id concept above chat_id"]
@@ -576,8 +576,13 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 3.E.7 user_id note = %q, want session metadata + conflict detail", userID.Note)
 	}
 	mergeFence := crossChatItems["Cross-chat entity merge + recall fence"]
-	if mergeFence.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.7 recall fence status = %q, want planned", mergeFence.Status)
+	if mergeFence.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.7 recall fence status = %q, want complete", mergeFence.Status)
+	}
+	if !strings.Contains(mergeFence.Note, "same-chat default") ||
+		!strings.Contains(mergeFence.Note, "canonical user_id") ||
+		!strings.Contains(mergeFence.Note, "source filters") {
+		t.Fatalf("Phase 3.E.7 recall fence note = %q, want same-chat/user_id/source detail", mergeFence.Note)
 	}
 
 	insights := p.Phases["3"].Subphases["3.E.5"]
