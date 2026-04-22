@@ -209,8 +209,8 @@
           "items": [
             {
               "name": "Threaded text adapter contract suite",
-              "status": "planned",
-              "note": "TDD: define one shared contract for threaded text channels before per-platform code."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/threadtext freezes canonical thread IDs, gateway inbound normalization, and reply-target derivation before Matrix/Mattermost transport work."
             },
             {
               "name": "Matrix + Mattermost transport wiring",

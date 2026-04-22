@@ -110,3 +110,9 @@ Do not pull these pieces over wholesale:
 - Gormes-only shared runtime extraction:
   `gormes/cmd/gormes/telegram.go`
   → `gormes/cmd/gormes/gateway_runtime.go`
+
+- Gormes-only threaded text contract freeze ahead of Matrix/Mattermost:
+  `gormes/internal/slack/bot.go`
+  → `gormes/internal/gateway/event.go`
+  → `gormes/internal/gateway/delivery.go`
+  → `gormes/internal/channels/threadtext/contract.go`

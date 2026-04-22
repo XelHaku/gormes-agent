@@ -21,7 +21,7 @@ weight: 30
 | Phase 2.B.5 — Session Context + Delivery Routing | ⏳ planned | P1 | Port `gateway/session.py`, `session_context.py`, `delivery.py`, and `stream_consumer.py` into one tested routing layer |
 | Phase 2.B.6 — Signal Adapter | ⏳ planned | P2 | Signal ingress, session identity, and reply/send semantics on the shared chassis |
 | Phase 2.B.7 — Email + SMS Adapters | ⏳ planned | P3 | Normalize low-bandwidth ingress and outbound delivery contracts without special-casing the kernel |
-| Phase 2.B.8 — Matrix + Mattermost Adapters | ⏳ planned | P4 | Reuse one threaded-text adapter contract suite before platform-specific feature work |
+| Phase 2.B.8 — Matrix + Mattermost Adapters | 🔨 in progress | P4 | Shared threaded-text contract suite landed in `internal/channels/threadtext`; Matrix + Mattermost transport wiring remains |
 | Phase 2.B.9 — Webhook + Trigger Ingress | ⏳ planned | P4 | Signed webhook ingress and prompt-to-delivery routing for GitHub and generic API triggers |
 | Phase 2.B.10 — Regional + Device Adapter Flood | ⏳ planned | P4 | BlueBubbles, HomeAssistant, Feishu, WeChat/WeCom, DingTalk, and QQ Bot on the same gateway contracts |
 | Phase 2.C — Thin Mapping Persistence | ✅ complete | P0 | bbolt-backed `(platform, chat_id) -> session_id` resume; no transcript ownership moved into Go |

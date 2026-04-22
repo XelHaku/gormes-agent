@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 22/66 subphases shipped · 8 in progress · 36 planned
+**Overall:** 22/66 subphases shipped · 9 in progress · 35 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -100,9 +100,9 @@ weight: 10
 - [x] Email ingress + outbound delivery contract
 - [ ] SMS ingress + outbound delivery contract
 
-### 2.B.8 — Matrix + Mattermost Adapters ⏳
+### 2.B.8 — Matrix + Mattermost Adapters 🔨
 
-- [ ] Threaded text adapter contract suite
+- [x] Threaded text adapter contract suite
 - [ ] Matrix + Mattermost transport wiring
 
 ### 2.B.9 — Webhook + Trigger Ingress ⏳
