@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+func itemStatusByName(items []Item) map[string]Status {
+	out := make(map[string]Status, len(items))
+	for _, it := range items {
+		out[it.Name] = it.Status
+	}
+	return out
+}
+
 func TestLoad_MinimalFixture(t *testing.T) {
 	p, err := Load(filepath.Join("testdata", "minimal.json"))
 	if err != nil {
@@ -66,5 +74,57 @@ func TestLoad_RealFile(t *testing.T) {
 	}
 	if s.Items.Total < 100 {
 		t.Errorf("item total = %d, want >= 100", s.Items.Total)
+	}
+}
+
+func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	cron := p.Phases["2"].Subphases["2.D"]
+	if got := cron.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.D = %q, want complete", got)
+	}
+	cronItems := itemStatusByName(cron.Items)
+	for name, want := range map[string]Status{
+		"robfig/cron scheduler + bbolt job store":          StatusComplete,
+		"SQLite cron_runs audit + CRON.md mirror":          StatusComplete,
+		"Heartbeat [SYSTEM:] + [SILENT] delivery contract": StatusComplete,
+	} {
+		if got := cronItems[name]; got != want {
+			t.Errorf("Phase 2.D item %q = %q, want %q", name, got, want)
+		}
+	}
+
+	gateway := p.Phases["2"].Subphases["2.B.2"]
+	if got := gateway.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.B.2 = %q, want in_progress", got)
+	}
+	gatewayItems := itemStatusByName(gateway.Items)
+	for name, want := range map[string]Status{
+		"Discord": StatusComplete,
+		"Slack":   StatusComplete,
+	} {
+		if got := gatewayItems[name]; got != want {
+			t.Errorf("Phase 2.B.2 item %q = %q, want %q", name, got, want)
+		}
+	}
+
+	skills := p.Phases["2"].Subphases["2.G"]
+	if got := skills.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.G = %q, want in_progress", got)
+	}
+	skillItems := itemStatusByName(skills.Items)
+	for name, want := range map[string]Status{
+		"SKILL.md parsing + active store":        StatusComplete,
+		"Deterministic selection + prompt block": StatusComplete,
+		"Kernel injection + usage log":           StatusComplete,
+		"Candidate drafting + promotion flow":    StatusPlanned,
+	} {
+		if got := skillItems[name]; got != want {
+			t.Errorf("Phase 2.G item %q = %q, want %q", name, got, want)
+		}
 	}
 }
