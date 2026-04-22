@@ -16,13 +16,13 @@ Persistent, searchable state that outlives the process. Structured enough for gr
 - **USER.md mirror** (3.D.5) — async export of entity/relationship graph to human-readable Markdown. Gormes-original; no upstream equivalent.
 - **Tool audit JSONL** (3.E.2) — append-only JSONL from kernel and `delegate_task` tool execution with timing, outcome, and error fields.
 - **Transcript export** (3.E.3) — `gormes session export <id> --format=markdown` renders SQLite turns, timestamps, and tool calls for operator sharing.
-- **Operator visibility** (3.E.4, 3.E.5 partial) — `gormes memory status` is shipped, and the local insights rollup layer already derives per-session token/cost aggregates from `telemetry.Snapshot`.
+- **Operator visibility** (3.E.4, 3.E.5) — `gormes memory status` is shipped, and the local insights layer now persists append-only daily `usage.jsonl` records from `telemetry.Snapshot` rollups.
 - **GONCHO compatibility seam** — internal memory work lives behind the `goncho` service, while the exported tool surface remains Honcho-compatible (`honcho_*`).
 
 ## Remaining Phase 3 queue
 
 - **Session mirror closeout** (3.E.1) — the `SessionIndexMirror` writer exists; runtime refresh wiring still remains.
-- **Insights writer + `last_seen` closeout** (3.E.5, 3.E.6) — append-only `usage.jsonl` persistence and the remaining timestamp-tracking half of decay are still open.
+- **`last_seen` closeout** (3.E.6) — append-only `usage.jsonl` persistence is now landed; the remaining open half is timestamp-tracking for decay.
 - **Cross-chat identity** (3.E.7) — one-user-many-chats graph unification above `chat_id`.
 - **Session lineage + cross-source search** (3.E.8) — the remaining `SessionDB` donor seam, paired with later compression work.
 

@@ -20,13 +20,13 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 22/66 subphases shipped · 9 in progress · 35 planned
+**Overall:** 23/66 subphases shipped · 8 in progress · 35 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
 | Phase 2 — The Gateway | 🔨 | 12/20 subphases |
-| Phase 3 — The Black Box (Memory) | 🔨 | 8/13 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 9/13 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
@@ -227,9 +227,9 @@ weight: 10
 - [x] gormes memory status command
 - [x] Extractor queue depth + dead-letter summary
 
-### 3.E.5 — Insights Audit Log 🔨
+### 3.E.5 — Insights Audit Log ✅
 
-- [ ] Append-only daily usage.jsonl writer
+- [x] Append-only daily usage.jsonl writer
 - [x] Session, token, and cost rollups from local runtime
 
 ### 3.E.6 — Memory Decay 🔨

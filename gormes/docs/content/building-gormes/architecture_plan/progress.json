@@ -603,8 +603,8 @@
           "items": [
             {
               "name": "Append-only daily usage.jsonl writer",
-              "status": "planned",
-              "note": "TDD: lock the daily record schema before accumulating live counters."
+              "status": "complete",
+              "note": "TDD landed: internal/insights now appends normalized DailyRollup records to usage.jsonl with schema-locked JSONL lines and deterministic append ordering."
             },
             {
               "name": "Session, token, and cost rollups from local runtime",

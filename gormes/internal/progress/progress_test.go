@@ -542,8 +542,11 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	}
 	insightItems := itemsByName(insights.Items)
 	usageWriter := insightItems["Append-only daily usage.jsonl writer"]
-	if usageWriter.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.5 writer status = %q, want planned", usageWriter.Status)
+	if usageWriter.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.5 writer status = %q, want complete", usageWriter.Status)
+	}
+	if !strings.Contains(usageWriter.Note, "TDD landed") {
+		t.Fatalf("Phase 3.E.5 writer note = %q, want TDD landed detail", usageWriter.Note)
 	}
 	rollups := insightItems["Session, token, and cost rollups from local runtime"]
 	if rollups.Status != StatusComplete {

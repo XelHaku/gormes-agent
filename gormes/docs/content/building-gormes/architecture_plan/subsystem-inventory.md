@@ -69,7 +69,7 @@ Upstream splits memory across three stores that Gormes compresses into two:
 | Tool execution audit log | None (exceeds Hermes) | 3.E.2 | ✅ shipped |
 | Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ✅ shipped |
 | Extraction state visibility | None (debug visibility) | 3.E.4 | ✅ shipped — `gormes memory status` renders extractor queue, dead-letter summary, and worker-health heuristics |
-| Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | 🔨 partial — rollups from `telemetry.Snapshot` landed; daily writer remains |
+| Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | ✅ shipped — rollups from `telemetry.Snapshot` plus append-only `internal/insights` JSONL persistence are landed |
 | Memory decay | None (Gormes-original) | 3.E.6 | 🔨 partial — deterministic weight attenuation at recall time landed; `last_seen` tracking remains |
 | Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | ⏳ planned |
 | Parent-session chains (compression splits) | `hermes_state.py` (`SessionDB.parent_session_id`) | 3.E.8 | ⏳ planned (pairs with 4.B context compression) |

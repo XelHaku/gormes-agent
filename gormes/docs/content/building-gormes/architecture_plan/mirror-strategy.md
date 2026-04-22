@@ -122,9 +122,9 @@ Based on the comprehensive Hermes file inventory, these Hermes files do not need
 - Platform breakdowns
 - Session metrics (duration, turns, success rate)
 
-Gormes now has local rollup primitives (`internal/insights/rollup.go`) plus `telemetry.Snapshot` bridging, but the append-only writer is still not landed. **This remains an operational visibility gap** — operators can derive usage locally, but the durable daily audit log is still pending.
+Gormes now has local rollup primitives (`internal/insights/rollup.go`), `telemetry.Snapshot` bridging, and append-only JSONL persistence for daily usage records. Operators can derive usage locally and keep a durable daily audit trail without waiting for the broader Phase 4 InsightsEngine port.
 
-**Recommended Mirror Addition — Phase 3.E.5: Insights Audit Log**
+**Shipped Mirror Addition — Phase 3.E.5: Insights Audit Log**
 
 Export aggregated session metrics to `~/.local/share/gormes/insights/usage.jsonl`:
 
@@ -132,7 +132,7 @@ Export aggregated session metrics to `~/.local/share/gormes/insights/usage.jsonl
 {"date":"2026-04-20","session_count":5,"total_tokens_in":45000,"total_tokens_out":12000,"estimated_cost_usd":0.45,"model_breakdown":{"claude-opus":3,"gpt-4":2}}
 ```
 
-This would provide a lightweight, append-only cost and usage audit trail that accumulates over time, even before the full InsightsEngine is ported in Phase 4.E.
+This now provides a lightweight, append-only cost and usage audit trail that accumulates over time, even before the full InsightsEngine is ported in Phase 4.E.
 
 ### 8.4 Mirror Implementation Principles
 
