@@ -291,11 +291,12 @@ func TestManagerInterruptIsIdempotent(t *testing.T) {
 
 func TestManagerParentCtxCancellationCascades(t *testing.T) {
 	parentCtx, cancelParent := context.WithCancel(context.Background())
+	reg := NewRegistry()
 	mgr := NewManager(ManagerOpts{
 		ParentCtx: parentCtx,
 		ParentID:  "parent_test",
 		Depth:     0,
-		Registry:  NewRegistry(),
+		Registry:  reg,
 		NewRunner: func() Runner { return blockingRunner{} },
 	})
 
@@ -320,6 +321,45 @@ func TestManagerParentCtxCancellationCascades(t *testing.T) {
 			t.Errorf("subagent %d Status: want %q, got %q", i, StatusInterrupted, result.Status)
 		}
 	}
+}
+
+func TestManagerSpawnCallerCtxCancellationCascades(t *testing.T) {
+	parentCtx, cancelParent := context.WithCancel(context.Background())
+	defer cancelParent()
+
+	reg := NewRegistry()
+	mgr := NewManager(ManagerOpts{
+		ParentCtx: parentCtx,
+		ParentID:  "parent_test",
+		Depth:     0,
+		Registry:  reg,
+		NewRunner: func() Runner { return blockingRunner{} },
+	})
+	defer mgr.Close()
+
+	callerCtx, cancelCaller := context.WithCancel(context.Background())
+	sa, err := mgr.Spawn(callerCtx, SubagentConfig{Goal: "caller scoped"})
+	if err != nil {
+		t.Fatalf("Spawn: %v", err)
+	}
+
+	cancelCaller()
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer waitCancel()
+
+	result, err := sa.WaitForResult(waitCtx)
+	if err != nil {
+		t.Fatalf("WaitForResult: %v", err)
+	}
+	if result.Status != StatusInterrupted {
+		t.Fatalf("Status: want %q, got %q", StatusInterrupted, result.Status)
+	}
+	if result.ExitReason != "cancelled" {
+		t.Fatalf("ExitReason: want %q, got %q", "cancelled", result.ExitReason)
+	}
+
+	waitForRegistryEmpty(t, reg, 2*time.Second)
 }
 
 func TestManagerSpawnAtMaxDepthRejected(t *testing.T) {
@@ -430,4 +470,48 @@ func TestManagerSuccessPathCancelsChildContext(t *testing.T) {
 	default:
 		t.Fatal("child ctx still open after successful completion")
 	}
+}
+
+func TestManagerTimeoutProducesCanonicalExitReason(t *testing.T) {
+	parentCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mgr := NewManager(ManagerOpts{
+		ParentCtx:      parentCtx,
+		ParentID:       "parent_test",
+		Depth:          0,
+		Registry:       NewRegistry(),
+		NewRunner:      func() Runner { return blockingRunner{} },
+		DefaultTimeout: 25 * time.Millisecond,
+	})
+	defer mgr.Close()
+
+	sa, err := mgr.Spawn(context.Background(), SubagentConfig{Goal: "timed"})
+	if err != nil {
+		t.Fatalf("Spawn: %v", err)
+	}
+
+	result, err := sa.WaitForResult(context.Background())
+	if err != nil {
+		t.Fatalf("WaitForResult: %v", err)
+	}
+	if result.Status != StatusInterrupted {
+		t.Fatalf("Status: want %q, got %q", StatusInterrupted, result.Status)
+	}
+	if result.ExitReason != "timeout" {
+		t.Fatalf("ExitReason: want %q, got %q", "timeout", result.ExitReason)
+	}
+}
+
+func waitForRegistryEmpty(t *testing.T, reg SubagentRegistry, timeout time.Duration) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if len(reg.List()) == 0 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("registry still has %d live subagents after %v", len(reg.List()), timeout)
 }

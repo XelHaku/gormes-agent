@@ -8,6 +8,7 @@
 // Skips cleanly if Ollama or the chosen embedding model aren't available.
 // Environment:
 //
+//	GORMES_RUN_OLLAMA_INTEGRATION  set to 1 to opt into live Ollama coverage
 //	GORMES_EXTRACTOR_ENDPOINT  (default http://localhost:11434)
 //	GORMES_EXTRACTOR_MODEL     (chat model for extractor; see 3.B)
 //	GORMES_SEMANTIC_MODEL      (embedding model; default nomic-embed-text)
@@ -23,6 +24,7 @@ import (
 	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/testutil/ollama"
 )
 
 func semanticModel() string {
@@ -34,9 +36,9 @@ func semanticModel() string {
 
 func skipIfNoEmbeddingModel(t *testing.T) {
 	t.Helper()
-	// Reuse skipIfNoOllama for base reachability, then probe the embed
+	// Reuse the extractor-ready gate for base reachability, then probe the embed
 	// endpoint specifically.
-	skipIfNoOllama(t)
+	ollama.SkipUnlessExtractorReady(t)
 	ec := newEmbedClient(integrationEndpoint(), "")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -2,7 +2,9 @@ package subagent
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -36,9 +38,8 @@ type ManagerOpts struct {
 	// Registry tracks every live subagent process-wide.
 	Registry SubagentRegistry
 
-	// NewRunner mints a Runner for each spawned subagent. This slice always
-	// passes a func returning StubRunner{}; later tasks will pass different
-	// runner factories.
+	// NewRunner mints a Runner for each spawned subagent. Phase 2.E closeout
+	// defaults this to StubRunner; later slices may supply alternate runners.
 	NewRunner func() Runner
 
 	// DefaultMaxIterations overrides the package default iteration budget when
@@ -51,13 +52,17 @@ type ManagerOpts struct {
 
 	// DefaultTimeout applies when cfg.Timeout <= 0.
 	DefaultTimeout time.Duration
+
+	// RunLogPath enables append-only JSONL run logging when non-empty.
+	RunLogPath string
 }
 
 type manager struct {
 	opts ManagerOpts
 
-	mu       sync.RWMutex
-	children map[string]*Subagent
+	mu        sync.RWMutex
+	children  map[string]*Subagent
+	runLogger *runLogger
 
 	closeOnce sync.Once
 	closed    chan struct{}
@@ -75,13 +80,14 @@ func NewManager(opts ManagerOpts) SubagentManager {
 		opts.ParentCtx = context.Background()
 	}
 	return &manager{
-		opts:     opts,
-		children: make(map[string]*Subagent),
-		closed:   make(chan struct{}),
+		opts:      opts,
+		children:  make(map[string]*Subagent),
+		runLogger: newRunLogger(opts.RunLogPath),
+		closed:    make(chan struct{}, 0),
 	}
 }
 
-func (m *manager) Spawn(_ context.Context, cfg SubagentConfig) (*Subagent, error) {
+func (m *manager) Spawn(ctx context.Context, cfg SubagentConfig) (*Subagent, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -110,8 +116,19 @@ func (m *manager) Spawn(_ context.Context, cfg SubagentConfig) (*Subagent, error
 		ctx:           childCtx,
 		cancel:        cancel,
 		timeoutCancel: timeoutCancel,
+		callerStop:    func() bool { return true },
 		publicEvents:  make(chan SubagentEvent, 16),
-		done:          make(chan struct{}),
+		done:          make(chan struct{}, 0),
+	}
+	if ctx != nil {
+		sa.callerStop = context.AfterFunc(ctx, func() {
+			sa.setCancelReason(classifyContextErr(ctx.Err()))
+			cancel()
+		})
+		if err := ctx.Err(); err != nil {
+			sa.setCancelReason(classifyContextErr(err))
+			cancel()
+		}
 	}
 
 	m.children[sa.ID] = sa
@@ -128,7 +145,7 @@ func (m *manager) run(sa *Subagent) {
 
 	internalEvents := make(chan SubagentEvent, 16)
 	resultCh := make(chan *SubagentResult, 1)
-	runnerDone := make(chan struct{})
+	runnerDone := make(chan struct{}, 0)
 
 	go func() {
 		defer close(runnerDone)
@@ -144,7 +161,7 @@ func (m *manager) run(sa *Subagent) {
 		resultCh <- runner.Run(sa.ctx, sa.cfg, internalEvents)
 	}()
 
-	forwarderDone := make(chan struct{})
+	forwarderDone := make(chan struct{}, 0)
 	go func() {
 		defer close(forwarderDone)
 		defer close(sa.publicEvents)
@@ -161,9 +178,16 @@ func (m *manager) run(sa *Subagent) {
 			Error:      "subagent: runner returned nil result",
 		}
 	}
+	if sa.callerStop != nil {
+		sa.callerStop()
+	}
+	result = normalizeResult(sa, result)
 	result.ID = sa.ID
 	if result.Duration == 0 {
 		result.Duration = time.Since(start)
+	}
+	if err := m.appendRunLog(sa, result); err != nil {
+		slog.Warn("subagent: append run log failed", "subagent_id", sa.ID, "path", m.opts.RunLogPath, "err", err)
 	}
 
 	<-runnerDone
@@ -192,7 +216,8 @@ func (m *manager) removeChild(id string) {
 	delete(m.children, id)
 }
 
-// Interrupt is implemented in a later task.
+// Interrupt records the message for the final interrupted event and cancels the
+// tracked subagent context.
 func (m *manager) Interrupt(sa *Subagent, message string) error {
 	m.mu.RLock()
 	tracked, ok := m.children[sa.ID]
@@ -201,11 +226,12 @@ func (m *manager) Interrupt(sa *Subagent, message string) error {
 		return fmt.Errorf("%w: %s", ErrSubagentNotFound, sa.ID)
 	}
 	tracked.interruptMsg.Store(message)
+	tracked.setCancelReason("interrupted")
 	tracked.cancel()
 	return nil
 }
 
-// Collect is implemented in a later task.
+// Collect returns the terminal result once the subagent is done, otherwise nil.
 func (m *manager) Collect(sa *Subagent) *SubagentResult {
 	select {
 	case <-sa.done:
@@ -217,7 +243,8 @@ func (m *manager) Collect(sa *Subagent) *SubagentResult {
 	}
 }
 
-// Close is implemented in a later task.
+// Close cancels every live child, waits for them to finish, and closes the
+// manager exactly once.
 func (m *manager) Close() error {
 	m.closeOnce.Do(func() {
 		m.mu.RLock()
@@ -238,7 +265,8 @@ func (m *manager) Close() error {
 	return nil
 }
 
-// SpawnBatch is implemented in a later task.
+// SpawnBatch executes multiple subagent specs with bounded concurrency and
+// returns one result per input config in order.
 func (m *manager) SpawnBatch(ctx context.Context, cfgs []SubagentConfig, maxConcurrent int) ([]*SubagentResult, error) {
 	return m.spawnBatch(ctx, cfgs, maxConcurrent)
 }
@@ -262,4 +290,46 @@ func (m *manager) defaultMaxConcurrent() int {
 		return m.opts.DefaultMaxConcurrent
 	}
 	return DefaultMaxConcurrent
+}
+
+func (m *manager) appendRunLog(sa *Subagent, result *SubagentResult) error {
+	if m.runLogger == nil {
+		return nil
+	}
+	return m.runLogger.append(sa, result)
+}
+
+func normalizeResult(sa *Subagent, result *SubagentResult) *SubagentResult {
+	if result == nil {
+		return nil
+	}
+	if result.Status == StatusCompleted || result.Status == StatusFailed {
+		return result
+	}
+
+	reason := sa.getCancelReason()
+	if reason == "" {
+		reason = classifyContextErr(sa.ctx.Err())
+	}
+	if reason == "" {
+		return result
+	}
+
+	result.Status = StatusInterrupted
+	result.ExitReason = reason
+	if result.Error == "" && sa.ctx.Err() != nil {
+		result.Error = sa.ctx.Err().Error()
+	}
+	return result
+}
+
+func classifyContextErr(err error) string {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, context.Canceled):
+		return "cancelled"
+	default:
+		return ""
+	}
 }

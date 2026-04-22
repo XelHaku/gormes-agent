@@ -11,20 +11,20 @@
 // + bring-your-own-LLM" out of the box.
 //
 // Overrides (operator):
-//   GORMES_EXTRACTOR_ENDPOINT   base URL (default http://localhost:11434)
-//   GORMES_EXTRACTOR_MODEL      model tag to use (default gemma4:26b)
+//
+//	GORMES_RUN_OLLAMA_INTEGRATION  set to 1 to opt into live Ollama coverage
+//	GORMES_EXTRACTOR_ENDPOINT   base URL (default http://localhost:11434)
+//	GORMES_EXTRACTOR_MODEL      model tag to use (default gemma4:26b)
 //
 // Run just this test against a real Ollama:
-//   GORMES_EXTRACTOR_MODEL=qwen2.5:3b \
-//     go test ./internal/memory/... -run TestExtractor_Integration_Ollama -v -timeout 3m
+//
+//	GORMES_RUN_OLLAMA_INTEGRATION=1 GORMES_EXTRACTOR_MODEL=qwen2.5:3b \
+//	  go test ./internal/memory/... -run TestExtractor_Integration_Ollama -v -timeout 3m
 package memory
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,70 +32,15 @@ import (
 	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/testutil/ollama"
 )
 
-// ollamaDefaultEndpoint is the conventional Ollama localhost port.
-// Must NOT include /v1 — hermes.HTTPClient appends /v1/chat/completions.
-const ollamaDefaultEndpoint = "http://localhost:11434"
-const ollamaDefaultModel = "gemma4:26b"
-
 func integrationEndpoint() string {
-	if v := os.Getenv("GORMES_EXTRACTOR_ENDPOINT"); v != "" {
-		return v
-	}
-	return ollamaDefaultEndpoint
+	return ollama.Endpoint()
 }
 
 func integrationModel() string {
-	if v := os.Getenv("GORMES_EXTRACTOR_MODEL"); v != "" {
-		return v
-	}
-	return ollamaDefaultModel
-}
-
-// skipIfNoOllama pings the /v1/models endpoint. Any connection failure,
-// 4xx, or 5xx → t.Skip with a helpful message. Also verifies the
-// configured model is listed; skips with a clear message if not.
-func skipIfNoOllama(t *testing.T) {
-	t.Helper()
-	endpoint := integrationEndpoint()
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(endpoint + "/v1/models")
-	if err != nil {
-		t.Skipf("LLM endpoint %s not reachable (connection refused?): %v\n"+
-			"  To run this test: start Ollama (or any OpenAI-compatible server)\n"+
-			"  and optionally set GORMES_EXTRACTOR_ENDPOINT / GORMES_EXTRACTOR_MODEL.",
-			endpoint, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		t.Skipf("LLM endpoint %s returned HTTP %d: %s", endpoint, resp.StatusCode, string(body))
-	}
-
-	// Verify the model is available.
-	var models struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&models); err != nil {
-		t.Skipf("could not decode /v1/models response: %v", err)
-	}
-	want := integrationModel()
-	for _, m := range models.Data {
-		if m.ID == want {
-			return
-		}
-	}
-	available := make([]string, 0, len(models.Data))
-	for _, m := range models.Data {
-		available = append(available, m.ID)
-	}
-	t.Skipf("model %q not loaded on %s; available: %v\n"+
-		"  Pull with: ollama pull %s\n"+
-		"  Or override with GORMES_EXTRACTOR_MODEL=<one of the above>.",
-		want, endpoint, available, want)
+	return ollama.Model()
 }
 
 // TestExtractor_Integration_Ollama is the 100%-Go-native end-to-end
@@ -105,7 +50,7 @@ func skipIfNoOllama(t *testing.T) {
 // the polling loop to drain the batch, then dumps entities + relationships
 // + turn state via t.Logf.
 func TestExtractor_Integration_Ollama(t *testing.T) {
-	skipIfNoOllama(t)
+	ollama.SkipUnlessExtractorReady(t)
 
 	endpoint := integrationEndpoint()
 	model := integrationModel()

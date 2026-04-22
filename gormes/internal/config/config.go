@@ -25,11 +25,12 @@ type Config struct {
 	// document. Absent in TOML = treated as 1.
 	ConfigVersion int `toml:"_config_version"`
 
-	Hermes   HermesCfg   `toml:"hermes"`
-	TUI      TUICfg      `toml:"tui"`
-	Input    InputCfg    `toml:"input"`
-	Telegram TelegramCfg `toml:"telegram"`
-	Cron     CronCfg     `toml:"cron"`
+	Hermes     HermesCfg     `toml:"hermes"`
+	TUI        TUICfg        `toml:"tui"`
+	Input      InputCfg      `toml:"input"`
+	Telegram   TelegramCfg   `toml:"telegram"`
+	Discord    DiscordCfg    `toml:"discord"`
+	Cron       CronCfg       `toml:"cron"`
 	Delegation DelegationCfg `toml:"delegation"`
 	// Resume is set only via the --resume CLI flag; intentionally not
 	// a TOML field. Empty means "use whatever internal/session had
@@ -76,6 +77,21 @@ type TelegramCfg struct {
 	QueryEmbedTimeout     time.Duration `toml:"query_embed_timeout"`
 }
 
+// DiscordCfg drives the Discord channel adapter.
+type DiscordCfg struct {
+	Token             string `toml:"token"`
+	AllowedChannelID  string `toml:"allowed_channel_id"`
+	CoalesceMs        int    `toml:"coalesce_ms"`
+	FirstRunDiscovery bool   `toml:"first_run_discovery"`
+}
+
+func (c DiscordCfg) Enabled() bool {
+	if c.Token == "" {
+		return false
+	}
+	return c.AllowedChannelID != "" || c.FirstRunDiscovery
+}
+
 type CronCfg struct {
 	Enabled        bool          `toml:"enabled"`
 	CallTimeout    time.Duration `toml:"call_timeout"`
@@ -90,6 +106,7 @@ type DelegationCfg struct {
 	MaxConcurrentChildren int           `toml:"max_concurrent_children"`
 	DefaultMaxIterations  int           `toml:"default_max_iterations"`
 	DefaultTimeout        time.Duration `toml:"default_timeout"`
+	RunLogPath            string        `toml:"run_log_path"`
 }
 
 func (d *DelegationCfg) UnmarshalTOML(data []byte) error {
@@ -99,6 +116,7 @@ func (d *DelegationCfg) UnmarshalTOML(data []byte) error {
 		MaxConcurrentChildren int    `toml:"max_concurrent_children"`
 		DefaultMaxIterations  int    `toml:"default_max_iterations"`
 		DefaultTimeout        string `toml:"default_timeout"`
+		RunLogPath            string `toml:"run_log_path"`
 	}
 
 	var raw rawDelegationCfg
@@ -111,6 +129,7 @@ func (d *DelegationCfg) UnmarshalTOML(data []byte) error {
 		MaxDepth:              raw.MaxDepth,
 		MaxConcurrentChildren: raw.MaxConcurrentChildren,
 		DefaultMaxIterations:  raw.DefaultMaxIterations,
+		RunLogPath:            raw.RunLogPath,
 	}
 	if raw.DefaultTimeout == "" {
 		return nil
@@ -171,28 +190,32 @@ func defaults() Config {
 		TUI:   TUICfg{Theme: "dark"},
 		Input: InputCfg{MaxBytes: 200_000, MaxLines: 10_000},
 		Telegram: TelegramCfg{
-			CoalesceMs:            1000,
-			FirstRunDiscovery:     true,
-			MemoryQueueCap:        1024,
-			ExtractorBatchSize:    5,
-			ExtractorPollInterval: 10 * time.Second,
+			CoalesceMs:             1000,
+			FirstRunDiscovery:      true,
+			MemoryQueueCap:         1024,
+			ExtractorBatchSize:     5,
+			ExtractorPollInterval:  10 * time.Second,
 			RecallEnabled:          true,
 			RecallWeightThreshold:  1.0,
 			RecallMaxFacts:         10,
 			RecallDepth:            2,
 			RecallDecayHorizonDays: 180,
-			MirrorEnabled:         true,
-			MirrorPath:            filepath.Join(xdgDataHome(), "gormes", "memory", "USER.md"),
-			MirrorInterval:        30 * time.Second,
-			SemanticEnabled:       false,
-			SemanticEndpoint:      "",
-			SemanticModel:         "",
-			SemanticTopK:          3,
-			SemanticMinSimilarity: 0.35,
-			EmbedderPollInterval:  30 * time.Second,
-			EmbedderBatchSize:     10,
-			EmbedderCallTimeout:   10 * time.Second,
-			QueryEmbedTimeout:     60 * time.Millisecond,
+			MirrorEnabled:          true,
+			MirrorPath:             filepath.Join(xdgDataHome(), "gormes", "memory", "USER.md"),
+			MirrorInterval:         30 * time.Second,
+			SemanticEnabled:        false,
+			SemanticEndpoint:       "",
+			SemanticModel:          "",
+			SemanticTopK:           3,
+			SemanticMinSimilarity:  0.35,
+			EmbedderPollInterval:   30 * time.Second,
+			EmbedderBatchSize:      10,
+			EmbedderCallTimeout:    10 * time.Second,
+			QueryEmbedTimeout:      60 * time.Millisecond,
+		},
+		Discord: DiscordCfg{
+			CoalesceMs:        1000,
+			FirstRunDiscovery: false,
 		},
 		Cron: CronCfg{
 			Enabled:        false,
@@ -261,6 +284,12 @@ func loadEnv(cfg *Config) {
 		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
 			cfg.Telegram.AllowedChatID = id
 		}
+	}
+	if v := os.Getenv("GORMES_DISCORD_TOKEN"); v != "" {
+		cfg.Discord.Token = v
+	}
+	if v := os.Getenv("GORMES_DISCORD_CHANNEL_ID"); v != "" {
+		cfg.Discord.AllowedChannelID = v
 	}
 }
 
@@ -335,6 +364,15 @@ func (c *Config) CronMirrorPath() string {
 		return c.Cron.MirrorPath
 	}
 	return filepath.Join(xdgDataHome(), "gormes", "cron", "CRON.md")
+}
+
+// ResolvedRunLogPath returns the JSONL path for append-only subagent run logs.
+// An explicit TOML override wins; otherwise Gormes writes under XDG_DATA_HOME.
+func (d DelegationCfg) ResolvedRunLogPath() string {
+	if d.RunLogPath != "" {
+		return d.RunLogPath
+	}
+	return filepath.Join(xdgDataHome(), "gormes", "subagents", "runs.jsonl")
 }
 
 // LegacyHermesHome reports an upstream Hermes state directory if one is

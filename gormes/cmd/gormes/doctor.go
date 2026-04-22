@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/channels/discord"
+	telegram "github.com/TrebuchetDynamics/gormes-agent/gormes/internal/channels/telegram"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/config"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/doctor"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
@@ -47,6 +49,30 @@ var doctorCmd = &cobra.Command{
 		reg := buildDefaultRegistry(context.Background(), cfg.Delegation)
 		result := doctor.CheckTools(reg)
 		fmt.Print(result.Format())
+
+		if cfg.Telegram.BotToken == "" && !cfg.Discord.Enabled() {
+			fmt.Println("[WARN] gateway: no channels configured ([telegram] or [discord])")
+		} else {
+			if cfg.Telegram.BotToken != "" {
+				if _, err := telegram.NewRealClient(cfg.Telegram.BotToken); err != nil {
+					fmt.Printf("[FAIL] gateway/telegram: %v\n", err)
+					os.Exit(2)
+				}
+				fmt.Printf("[PASS] gateway/telegram: allowed_chat_id=%d\n", cfg.Telegram.AllowedChatID)
+			} else {
+				fmt.Println("[SKIP] gateway/telegram: disabled")
+			}
+
+			if cfg.Discord.Enabled() {
+				if _, err := discord.NewRealSession(cfg.Discord.Token); err != nil {
+					fmt.Printf("[FAIL] gateway/discord: %v\n", err)
+					os.Exit(2)
+				}
+				fmt.Printf("[PASS] gateway/discord: allowed_channel_id=%s\n", cfg.Discord.AllowedChannelID)
+			} else {
+				fmt.Println("[SKIP] gateway/discord: disabled")
+			}
+		}
 
 		if result.Status == doctor.StatusFail {
 			os.Exit(2)

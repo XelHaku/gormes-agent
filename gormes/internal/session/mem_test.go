@@ -91,3 +91,9 @@ func TestTelegramKey(t *testing.T) {
 		t.Errorf("TelegramKey(-100) = %q, want %q", got, "telegram:-100")
 	}
 }
+
+func TestDiscordKey(t *testing.T) {
+	if got := DiscordKey("123456789"); got != "discord:123456789" {
+		t.Errorf("DiscordKey(123456789) = %q, want %q", got, "discord:123456789")
+	}
+}

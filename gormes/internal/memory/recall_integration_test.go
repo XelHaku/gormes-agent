@@ -6,23 +6,27 @@
 // isn't loaded.
 //
 // Flow (the "does the Bear remember?" test):
-//   1. Seed 3 entity-rich turns directly into the turns table.
-//   2. Run the real Phase-3.B extractor against Ollama to populate
-//      entities + relationships.
-//   3. Construct memory.NewRecall.
-//   4. Ask a SEPARATE question ("tell me about my projects") that does
-//      NOT name any of the seed entities directly — this forces the
-//      recall pipeline to rely on the graph, not on exact-name match.
-//   5. Dump the fence block; assert it contains at least one of the
-//      project entities.
+//  1. Seed 3 entity-rich turns directly into the turns table.
+//  2. Run the real Phase-3.B extractor against Ollama to populate
+//     entities + relationships.
+//  3. Construct memory.NewRecall.
+//  4. Ask a SEPARATE question ("tell me about my projects") that does
+//     NOT name any of the seed entities directly — this forces the
+//     recall pipeline to rely on the graph, not on exact-name match.
+//  5. Dump the fence block; assert it contains at least one of the
+//     project entities.
 //
 // Overrides (same as extractor_integration_test.go):
-//   GORMES_EXTRACTOR_ENDPOINT  (default http://localhost:11434)
-//   GORMES_EXTRACTOR_MODEL     (default gemma4:26b)
+//
+//	GORMES_RUN_OLLAMA_INTEGRATION  set to 1 to opt into live Ollama coverage
+//	GORMES_EXTRACTOR_ENDPOINT  (default http://localhost:11434)
+//	GORMES_EXTRACTOR_MODEL     (default gemma4:26b)
 //
 // Recommended: run with the fast qwen model:
-//   GORMES_EXTRACTOR_MODEL="huggingface.co/r1r21nb/qwen2.5-3b-instruct.Q4_K_M.gguf:latest" \
-//     go test ./internal/memory/... -run TestRecall_Integration_Ollama -v -timeout 5m
+//
+//	GORMES_RUN_OLLAMA_INTEGRATION=1 \
+//	GORMES_EXTRACTOR_MODEL="huggingface.co/r1r21nb/qwen2.5-3b-instruct.Q4_K_M.gguf:latest" \
+//	  go test ./internal/memory/... -run TestRecall_Integration_Ollama -v -timeout 5m
 package memory
 
 import (
@@ -34,10 +38,11 @@ import (
 	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/testutil/ollama"
 )
 
 func TestRecall_Integration_Ollama_SecondTurnSeesFirstTurnEntities(t *testing.T) {
-	skipIfNoOllama(t) // helper from extractor_integration_test.go
+	ollama.SkipUnlessExtractorReady(t)
 
 	endpoint := integrationEndpoint()
 	model := integrationModel()

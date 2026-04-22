@@ -48,3 +48,8 @@ func TUIKey() string { return "tui:default" }
 func TelegramKey(chatID int64) string {
 	return "telegram:" + strconv.FormatInt(chatID, 10)
 }
+
+// DiscordKey returns the canonical map key for a Discord channel.
+func DiscordKey(channelID string) string {
+	return "discord:" + channelID
+}

@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-20",
+    "last_updated": "2026-04-21",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -32,7 +32,7 @@
     },
     "2": {
       "name": "Phase 2 — The Gateway",
-      "deliverable": "Go-native tools + Telegram + session resume + wider adapters",
+      "deliverable": "Go-native operator wiring harness: tools, Telegram, thin session resume, shipped cron, then the first OS-AI spine slices before the wider adapter flood",
       "subphases": {
         "2.A": {
           "name": "Tool Registry",
@@ -61,14 +61,17 @@
         "2.D": {
           "name": "Cron / Scheduled Automations",
           "items": [
-            { "name": "Go ticker + bbolt job store", "status": "planned" },
-            { "name": "Natural-language cron parsing (Phase 4)", "status": "planned" }
+            { "name": "Go ticker + bbolt job store", "status": "complete" },
+            { "name": "Natural-language cron parsing (Phase 4)", "status": "complete" }
           ]
         },
         "2.B.2": {
-          "name": "Wider Gateway Surface",
+          "name": "Gateway Chassis + Wider Gateway Surface",
           "items": [
-            { "name": "Discord", "status": "planned" },
+            { "name": "Reusable gateway chassis", "status": "complete" },
+            { "name": "Telegram on shared chassis", "status": "complete" },
+            { "name": "Discord", "status": "complete" },
+            { "name": "gormes gateway multi-channel entrypoint", "status": "complete" },
             { "name": "Slack", "status": "planned" },
             { "name": "WhatsApp", "status": "planned" },
             { "name": "Signal", "status": "planned" },
@@ -77,13 +80,15 @@
           ]
         },
         "2.E": {
-          "name": "Subagent System",
+          "name": "OS-AI Spine: Subagent Runtime",
           "priority": "P0",
           "items": [
-            { "name": "Execution isolation", "status": "planned" },
-            { "name": "Resource boundaries", "status": "planned" },
-            { "name": "Context isolation", "status": "planned" },
-            { "name": "Cancellation scopes", "status": "planned" }
+            { "name": "Deterministic subagent runtime", "status": "complete" },
+            { "name": "Max-depth guard + bounded batch execution", "status": "complete" },
+            { "name": "Runner-enforced tool allowlists", "status": "planned" },
+            { "name": "Timeout + cancellation scopes", "status": "complete" },
+            { "name": "Typed result envelope", "status": "complete" },
+            { "name": "Append-only run log", "status": "complete" }
           ]
         },
         "2.F": {
@@ -94,11 +99,13 @@
           ]
         },
         "2.G": {
-          "name": "Skills System",
+          "name": "OS-AI Spine: Skills Runtime",
           "priority": "P0",
           "items": [
-            { "name": "Learning loop foundation", "status": "planned" },
-            { "name": "Pattern extraction", "status": "planned" }
+            { "name": "Static skill runtime", "status": "planned" },
+            { "name": "Deterministic selection + injection", "status": "planned" },
+            { "name": "Candidate skill drafting (inactive)", "status": "planned" },
+            { "name": "Promotion path + usage log", "status": "planned" }
           ]
         }
       }
@@ -196,7 +203,7 @@
     "4": {
       "name": "Phase 4 — The Brain Transplant",
       "deliverable": "Native Go agent orchestrator + prompt builder",
-      "dependency_note": "Build priority: Skills (2.G) -> Subagents (2.E) -> Gateway -> Native Agent Loop",
+      "dependency_note": "Build priority: 2.E0 deterministic subagent runtime -> 2.G0 static skills -> 2.E1/2.G1 reviewed vertical proof -> wider gateway surface -> native agent loop",
       "subphases": {
         "4.A": {
           "name": "Provider Adapters",

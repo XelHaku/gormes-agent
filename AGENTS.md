@@ -18,7 +18,7 @@ This repository is being ported to Go. Unless the user explicitly changes this p
 
 - Do not write or modify any Python code.
 - Do not edit legacy Python paths such as `run_agent.py`, `cli.py`, `agent/`, `gateway/`, `hermes_cli/`, `tools/`, `tui_gateway/`, `cron/`, `acp_adapter/`, `tests/`, or other `.py` files.
-- Allowed edit scope is limited to the root `README.md` and files under `gormes/`.
+- Allowed edit scope is limited to the root `README.md`, files under `gormes/`, and `.github/workflows/deploy-gormes-docs.yml` when the task is specifically about docs deployment validation or fixes.
 - Treat the Python codebase as reference material only while rebuilding behavior in Go.
 - If a requested change would require touching Python, stop and ask the user whether they want to change this repository policy first.
 

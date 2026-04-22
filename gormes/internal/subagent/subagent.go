@@ -19,14 +19,16 @@ type Subagent struct {
 	ctx           context.Context
 	cancel        context.CancelFunc // cancels the composed child ctx
 	timeoutCancel context.CancelFunc // optional; nil if cfg.Timeout == 0
+	callerStop    func() bool        // optional; disarms Spawn caller bridge
 
 	publicEvents chan SubagentEvent // closed by lifecycle goroutine after runner returns
 	done         chan struct{}      // closed after result is set
 
 	interruptMsg atomic.Value // string; written by Manager.Interrupt before sa.cancel()
 
-	mu     sync.RWMutex
-	result *SubagentResult
+	mu           sync.RWMutex
+	result       *SubagentResult
+	cancelReason string
 }
 
 // Events returns a receive-only channel that receives every SubagentEvent
@@ -53,4 +55,21 @@ func (s *Subagent) setResult(r *SubagentResult) {
 	s.mu.Lock()
 	s.result = r
 	s.mu.Unlock()
+}
+
+func (s *Subagent) setCancelReason(reason string) {
+	if reason == "" {
+		return
+	}
+	s.mu.Lock()
+	if s.cancelReason == "" {
+		s.cancelReason = reason
+	}
+	s.mu.Unlock()
+}
+
+func (s *Subagent) getCancelReason() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.cancelReason
 }

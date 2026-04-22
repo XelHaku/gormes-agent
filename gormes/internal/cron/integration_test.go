@@ -3,6 +3,7 @@
 // Skips cleanly when Ollama is unreachable or the configured model
 // isn't loaded. Environment overrides:
 //
+//	GORMES_RUN_OLLAMA_INTEGRATION  set to 1 to opt into live Ollama coverage
 //	GORMES_EXTRACTOR_ENDPOINT  (default http://localhost:11434)
 //	GORMES_EXTRACTOR_MODEL     (default gemma4:26b; override with a
 //	                            faster local model for CI speed)
@@ -21,10 +22,6 @@ package cron
 
 import (
 	"context"
-	"encoding/json"
-	"io"
-	"net/http"
-	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -34,73 +31,24 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/kernel"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/memory"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/testutil/ollama"
 	"go.etcd.io/bbolt"
 )
 
 // integrationEndpoint returns the Ollama base URL for integration tests.
 // Falls back to localhost:11434 when GORMES_EXTRACTOR_ENDPOINT is unset.
 func integrationEndpoint() string {
-	if v := os.Getenv("GORMES_EXTRACTOR_ENDPOINT"); v != "" {
-		return v
-	}
-	return "http://localhost:11434"
+	return ollama.Endpoint()
 }
 
 // integrationModel returns the LLM model tag for integration tests.
 // Falls back to gemma4:26b when GORMES_EXTRACTOR_MODEL is unset.
 func integrationModel() string {
-	if v := os.Getenv("GORMES_EXTRACTOR_MODEL"); v != "" {
-		return v
-	}
-	return "gemma4:26b"
-}
-
-// skipIfNoOllama pings the /v1/models endpoint. Any connection failure,
-// non-200 status, or missing model → t.Skip with a helpful message.
-func skipIfNoOllama(t *testing.T) {
-	t.Helper()
-	endpoint := integrationEndpoint()
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(endpoint + "/v1/models")
-	if err != nil {
-		t.Skipf("LLM endpoint %s not reachable (connection refused?): %v\n"+
-			"  To run this test: start Ollama (or any OpenAI-compatible server)\n"+
-			"  and optionally set GORMES_EXTRACTOR_ENDPOINT / GORMES_EXTRACTOR_MODEL.",
-			endpoint, err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		t.Skipf("LLM endpoint %s returned HTTP %d: %s", endpoint, resp.StatusCode, string(body))
-	}
-
-	// Verify the model is available.
-	var models struct {
-		Data []struct {
-			ID string `json:"id"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&models); err != nil {
-		t.Skipf("could not decode /v1/models response: %v", err)
-	}
-	want := integrationModel()
-	for _, m := range models.Data {
-		if m.ID == want {
-			return
-		}
-	}
-	available := make([]string, 0, len(models.Data))
-	for _, m := range models.Data {
-		available = append(available, m.ID)
-	}
-	t.Skipf("model %q not loaded on %s; available: %v\n"+
-		"  Pull with: ollama pull %s\n"+
-		"  Or override with GORMES_EXTRACTOR_MODEL=<one of the above>.",
-		want, endpoint, available, want)
+	return ollama.Model()
 }
 
 func TestCron_Integration_Ollama_Heartbeat(t *testing.T) {
-	skipIfNoOllama(t)
+	ollama.SkipUnlessExtractorReady(t)
 
 	endpoint := integrationEndpoint()
 	model := integrationModel()

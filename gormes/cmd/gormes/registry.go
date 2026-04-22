@@ -28,6 +28,7 @@ func buildDefaultRegistry(parentCtx context.Context, delegation config.Delegatio
 			DefaultMaxIterations: delegation.DefaultMaxIterations,
 			DefaultMaxConcurrent: delegation.MaxConcurrentChildren,
 			DefaultTimeout:       delegation.DefaultTimeout,
+			RunLogPath:           delegation.ResolvedRunLogPath(),
 		})))
 	}
 	return reg

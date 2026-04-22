@@ -44,6 +44,12 @@ jobs:
           test -d public/pagefind
           test -f public/pagefind/pagefind-ui.js
 
+      - name: Verify homepage content
+        working-directory: gormes/docs
+        run: |
+          grep -F "curl -fsSL https://gormes.ai/install.sh | sh" public/index.html >/dev/null
+          ! grep -F "brew install trebuchet/gormes" public/index.html >/dev/null
+
       - name: Ensure Pages project exists
         uses: cloudflare/wrangler-action@v3
         continue-on-error: true

@@ -7,12 +7,12 @@ weight: 80
 
 The complete picture of what Gormes must absorb to retire the Python `hermes-agent` runtime. Each row is one upstream module or capability, mapped to its target phase. This inventory is the source of truth for "what's left" — when a subsystem is shipped in Go, mark it ✅ and link the spec.
 
-### Gateway platforms (24 connectors — 23 unshipped)
+### Gateway platforms (24 connectors — 22 unshipped)
 
 | Platform | Upstream file | Target phase | Status |
 |---|---|---|---|
 | Telegram | `gateway/platforms/telegram.py` | 2.B.1 | ✅ shipped |
-| Discord | `gateway/platforms/discord.py` | 2.B.2 | ⏳ planned |
+| Discord | `gateway/platforms/discord.py` | 2.B.2 | ✅ shipped |
 | Slack | `gateway/platforms/slack.py` | 2.B.3 | ⏳ planned |
 | WhatsApp | `gateway/platforms/whatsapp.py` | 2.B.4 | ⏳ planned |
 | Signal | `gateway/platforms/signal.py` | 2.B.5 | ⏳ planned |
@@ -32,7 +32,8 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
-| Gateway runtime entry (main loop + slash-command dispatch) | `gateway/run.py` + `gateway/config.py` | 2.B/2.F | ⏳ planned |
+| Gateway runtime entry (main loop + slash-command dispatch) | `gateway/run.py` + `gateway/config.py` | 2.B/2.F | 🔨 `cmd/gormes/gateway.go` + `internal/gateway` landed; slash-command dispatch remains |
+| Thin mapping persistence | `gateway/session.py` (minimal subset) | 2.C | ✅ shipped (`bbolt` `(platform, chat_id) -> session_id`; transcripts stay outside this layer) |
 | Gateway session store (conversation persistence across platforms) | `gateway/session.py` (`SessionStore`, `SessionEntry`, `SessionSource`, `SessionResetPolicy`) | 2.B/2.F | ⏳ planned |
 | Gateway session context | `gateway/session_context.py` (`SessionContext`) | 2.B/2.F | ⏳ planned |
 | Delivery router (`--deliver <platform>` abstraction) | `gateway/delivery.py` (`DeliveryRouter`, `DeliveryTarget`) | 2.B/2.F | ⏳ planned |
@@ -42,7 +43,7 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Platform enum + per-platform config | `gateway/*` — `Platform` (enum), `PlatformConfig` | 2.B | ⏳ planned |
 | Cron / scheduled automations | `cron/scheduler.py`, `cron/jobs.py`, `tools/cronjob_tools.py` | 2.D | ✅ shipped (scheduler + bbolt `cron_jobs` bucket + SQLite `cron_runs` audit + CRON.md mirror + Heartbeat prefix + exact-match `[SILENT]` suppression + kernel `PlatformEvent.SessionID/CronJobID` per-event override; upstream's file tick lock not needed — single-process) |
 | Webhook subscription system (GitHub events / API triggers → prompt → deliver) | `hermes_cli/webhook.py` + gateway routing | 2.D | ⏳ planned |
-| Subagent delegation | `tools/delegate_tool.py` | 2.E | ⏳ planned |
+| Subagent delegation | `tools/delegate_tool.py` | 2.E | 🔨 `internal/subagent` + Go-native `delegate_task` landed; tool policy/logging remain |
 | Hooks system (`HookRegistry`) | `gateway/hooks.py`, `gateway/builtin_hooks/{boot_md}.py` | 2.F | ⏳ planned |
 | Restart / pairing / lifecycle | `gateway/{restart,pairing,status}.py` + `PairingStore` | 2.F | ⏳ planned |
 | Mirror / sticker cache | `gateway/{mirror,sticker_cache}.py` | 2.F | ⏳ planned |

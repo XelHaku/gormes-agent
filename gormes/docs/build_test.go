@@ -112,3 +112,52 @@ func TestHugoBuild_IndexHasSidebarSections(t *testing.T) {
 		}
 	}
 }
+
+func TestHugoBuild_IndexQuickstartUsesCurrentInstallCommand(t *testing.T) {
+	tmp := t.TempDir()
+	cmd := exec.Command("hugo", "--minify", "-d", tmp)
+	cmd.Dir = "."
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("hugo build failed: %v\n%s", err, string(out))
+	}
+
+	body, err := os.ReadFile(filepath.Join(tmp, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+
+	if !strings.Contains(text, "curl -fsSL https://gormes.ai/install.sh | sh") {
+		t.Fatalf("built index.html missing current install command")
+	}
+	if strings.Contains(text, "brew install trebuchet/gormes") {
+		t.Fatalf("built index.html still contains stale Homebrew install command")
+	}
+}
+
+func TestDocsDeployWorkflowUsesCloudflarePages(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "deploy-gormes-docs.yml"))
+	if err != nil {
+		t.Fatalf("read deploy workflow: %v", err)
+	}
+	text := string(raw)
+
+	wants := []string{
+		"name: Deploy docs.gormes.ai",
+		"paths:",
+		"- 'gormes/docs/**'",
+		"workflow_dispatch:",
+		"Verify homepage content",
+		`grep -F "curl -fsSL https://gormes.ai/install.sh | sh" public/index.html >/dev/null`,
+		`! grep -F "brew install trebuchet/gormes" public/index.html >/dev/null`,
+		"cloudflare/wrangler-action@v3",
+		"command: pages project create gormes-docs --production-branch=main",
+		"command: pages deploy gormes/docs/public --project-name=gormes-docs --branch=main --commit-dirty=true",
+		"domain=docs.gormes.ai",
+	}
+	for _, want := range wants {
+		if !strings.Contains(text, want) {
+			t.Fatalf("deploy workflow missing %q", want)
+		}
+	}
+}

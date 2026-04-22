@@ -56,7 +56,7 @@ Go goes places Python won't.
 
 14. **Real skill sandboxing.** Phase 2.G skills in Python means `exec()` and hope. In Go there is a straight path to WASM via [wazero](https://github.com/tetratelabs/wazero) — user-written or third-party skills run in a box that can't exfil data or escape. This is the only way "community skills" ever becomes safe to install. Python can't get there without bolting on another runtime.
 
-15. **Subagent resource bounds that are real.** Phase 2.E in Go: a subagent gets a `context.Context` with a deadline, a goroutine with `GOMEMLIMIT`, optional cgroup isolation. You can say "this subagent gets 30 s and 200 MB and no network" and mean it. Python subagents under a shared GIL + shared heap can *claim* isolation, but a runaway one still starves the others and OOMs the parent. For a *learning loop* that runs user-written skills, this is the difference between **safe** and **pretending to be safe**.
+15. **Subagent resource bounds that are becoming real.** Phase 2.E already ships subagent-scoped `context.Context` deadlines, deterministic cancellation, max-depth guards, and bounded batch concurrency. Later slices add stronger tool policy, append-only run logging, and heavier-weight isolation. Python subagents under a shared GIL + shared heap can *claim* isolation, but a runaway one still starves the others and OOMs the parent. For a *learning loop* that runs user-written skills, this is the difference between **safe** and **pretending to be safe**.
 
 ### 2.6 The developer wins (included for completeness)
 
@@ -116,7 +116,7 @@ type SkillExtractor interface {
 
 **Without this:** You lose compounding intelligence, differentiation, and long-term value. Gormes becomes a stateless chat interface.
 
-**Status:** ⏳ **Not implemented.** Currently marked as Phase 5.F (Skills System port). **Elevated to P0 priority.**
+**Status:** ⏳ **Not implemented as a Go runtime yet.** Phase 2.G is the next planned execution slice; Phase 5.F remains the broader upstream skills-plumbing port.
 
 ---
 
@@ -146,7 +146,7 @@ type Subagent struct {
 
 **Why this beats Hermes:** Python's "isolated subagents" are loosely-defined processes. Gormes can provide **process-adjacent isolation within a single binary**—strict logical boundaries with resource accounting and deterministic cleanup.
 
-**Status:** ⏳ Mentioned in README ("isolated subagents") but **no actual implementation**. Listed as Phase 2.E (Subagent Delegation). **Elevated to P1 priority.**
+**Status:** 🔨 Runtime core implemented in `internal/subagent` and exposed through Go-native `delegate_task`. Remaining work is runner-enforced tool policy, real child LLM execution, and append-only run logging.
 
 ---
 
@@ -154,7 +154,7 @@ type Subagent struct {
 
 **Why third:** Telegram proves the pattern. Scale to Discord/Slack/WhatsApp/Signal/Email. Platform breadth matters for adoption, but it doesn't differentiate architecturally.
 
-**Status:** 🔨 Telegram complete (2.B.1). 23 platforms pending (2.B.2–2.B.16).
+**Status:** 🔨 Shared gateway chassis + `gormes gateway` landed; Telegram (2.B.1) and Discord (2.B.2) are shipped. Wider adapters remain pending.
 
 ---
 
@@ -175,4 +175,4 @@ type Subagent struct {
 | **P2** | Multi-Platform Gateway | Reach | Limited user access |
 | **P3** | Native Agent Loop | Performance optimization | Bridge dependency continues |
 
-**The rule:** Build P0 before P1, P1 before P2, P2 before P3. Each layer validates the architecture for the next.
+**Current dependency chain:** 2.E0 deterministic subagent runtime → 2.G0 static skills → 2.E1 / 2.G1-lite reviewed vertical proof → wider gateway surface → Phase 4 native agent loop.

@@ -83,8 +83,8 @@ func TestDelegateToolUsesManagerDefaultTimeout(t *testing.T) {
 	if got["status"] != "interrupted" {
 		t.Fatalf("status: want %q, got %v", "interrupted", got["status"])
 	}
-	if got["exit_reason"] != "ctx_cancelled" {
-		t.Fatalf("exit_reason: want %q, got %v", "ctx_cancelled", got["exit_reason"])
+	if got["exit_reason"] != "timeout" {
+		t.Fatalf("exit_reason: want %q, got %v", "timeout", got["exit_reason"])
 	}
 }
 

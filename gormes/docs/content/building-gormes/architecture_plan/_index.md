@@ -20,12 +20,12 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 10/53 subphases shipped · 0 in progress · 43 planned
+**Overall:** 11/53 subphases shipped · 2 in progress · 40 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
-| Phase 2 — The Gateway | 🔨 | 3/8 subphases |
+| Phase 2 — The Gateway | 🔨 | 4/8 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 5/12 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
@@ -49,7 +49,7 @@ weight: 10
 
 ## Phase 2 — The Gateway 🔨
 
-*Go-native tools + Telegram + session resume + wider adapters*
+*Go-native operator wiring harness: tools, Telegram, thin session resume, shipped cron, then the first OS-AI spine slices before the wider adapter flood*
 
 ### 2.A — Tool Registry ✅
 
@@ -64,9 +64,12 @@ weight: 10
 - [x] Long-poll ingress
 - [x] Edit coalescing
 
-### 2.B.2 — Wider Gateway Surface ⏳
+### 2.B.2 — Gateway Chassis + Wider Gateway Surface 🔨
 
-- [ ] Discord
+- [x] Reusable gateway chassis
+- [x] Telegram on shared chassis
+- [x] Discord
+- [x] gormes gateway multi-channel entrypoint
 - [ ] Slack
 - [ ] WhatsApp
 - [ ] Signal
@@ -78,27 +81,31 @@ weight: 10
 - [x] bbolt session resume
 - [x] (platform, chat_id) -> session_id
 
-### 2.D — Cron / Scheduled Automations ⏳
+### 2.D — Cron / Scheduled Automations ✅
 
-- [ ] Go ticker + bbolt job store
-- [ ] Natural-language cron parsing (Phase 4)
+- [x] Go ticker + bbolt job store
+- [x] Natural-language cron parsing (Phase 4)
 
-### 2.E — Subagent System ⏳
+### 2.E — OS-AI Spine: Subagent Runtime 🔨
 
-- [ ] Execution isolation
-- [ ] Resource boundaries
-- [ ] Context isolation
-- [ ] Cancellation scopes
+- [x] Deterministic subagent runtime
+- [x] Max-depth guard + bounded batch execution
+- [ ] Runner-enforced tool allowlists
+- [x] Timeout + cancellation scopes
+- [x] Typed result envelope
+- [x] Append-only run log
 
 ### 2.F — Hooks + Lifecycle ⏳
 
 - [ ] Per-event extension points
 - [ ] Managed restarts
 
-### 2.G — Skills System ⏳
+### 2.G — OS-AI Spine: Skills Runtime ⏳
 
-- [ ] Learning loop foundation
-- [ ] Pattern extraction
+- [ ] Static skill runtime
+- [ ] Deterministic selection + injection
+- [ ] Candidate skill drafting (inactive)
+- [ ] Promotion path + usage log
 
 ## Phase 3 — The Black Box (Memory) 🔨
 

@@ -107,3 +107,55 @@ func TestSpawnBatchEmptyInput(t *testing.T) {
 		t.Errorf("results len: want 0, got %d", len(results))
 	}
 }
+
+func TestSpawnBatchContextCancellationCancelsChildren(t *testing.T) {
+	parentCtx, cancelParent := context.WithCancel(context.Background())
+	defer cancelParent()
+
+	reg := NewRegistry()
+	mgr := NewManager(ManagerOpts{
+		ParentCtx: parentCtx,
+		ParentID:  "parent_test",
+		Depth:     0,
+		Registry:  reg,
+		NewRunner: func() Runner { return blockingRunner{} },
+	})
+	defer mgr.Close()
+
+	batchCtx, cancelBatch := context.WithCancel(context.Background())
+	done := make(chan []*SubagentResult, 1)
+	go func() {
+		results, _ := mgr.SpawnBatch(batchCtx, []SubagentConfig{
+			{Goal: "first"},
+			{Goal: "second"},
+		}, 1)
+		done <- results
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(reg.List()) > 0 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if len(reg.List()) == 0 {
+		t.Fatal("expected at least one live subagent before batch cancellation")
+	}
+
+	cancelBatch()
+
+	select {
+	case results := <-done:
+		if len(results) != 2 {
+			t.Fatalf("results len: want 2, got %d", len(results))
+		}
+		if results[0] == nil {
+			t.Fatal("results[0] nil after batch cancellation")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("SpawnBatch did not return after batch context cancellation")
+	}
+
+	waitForRegistryEmpty(t, reg, 2*time.Second)
+}

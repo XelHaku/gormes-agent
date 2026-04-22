@@ -6,19 +6,21 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	telegram "github.com/TrebuchetDynamics/gormes-agent/gormes/internal/channels/telegram"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/config"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/cron"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/gateway"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/goncho"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/kernel"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/memory"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
-	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telegram"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
@@ -189,13 +191,8 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 
 	bot := telegram.New(telegram.Config{
 		AllowedChatID:     cfg.Telegram.AllowedChatID,
-		CoalesceMs:        cfg.Telegram.CoalesceMs,
 		FirstRunDiscovery: cfg.Telegram.FirstRunDiscovery,
-		SessionMap:        smap,
-		SessionKey:        key,
-	}, tc, k, slog.Default())
-
-	go k.Run(rootCtx)
+	}, tc, slog.Default())
 	go ext.Run(rootCtx)
 
 	// Phase 3.D — Embedder worker bounded to rootCtx. No-op when ec is nil.
@@ -278,7 +275,23 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 		"extractor_poll_interval", cfg.Telegram.ExtractorPollInterval,
 		"semantic_enabled", cfg.Telegram.SemanticEnabled,
 		"semantic_model", cfg.Telegram.SemanticModel)
-	return bot.Run(rootCtx)
+
+	mgr := gateway.NewManager(gateway.ManagerConfig{
+		AllowedChats: map[string]string{
+			"telegram": strconv.FormatInt(cfg.Telegram.AllowedChatID, 10),
+		},
+		AllowDiscovery: map[string]bool{
+			"telegram": cfg.Telegram.FirstRunDiscovery,
+		},
+		CoalesceMs: cfg.Telegram.CoalesceMs,
+		SessionMap: smap,
+	}, k, slog.Default())
+	if err := mgr.Register(bot); err != nil {
+		return fmt.Errorf("register telegram: %w", err)
+	}
+
+	go k.Run(rootCtx)
+	return mgr.Run(rootCtx)
 }
 
 // recallAdapter bridges *memory.Provider (which uses memory.RecallInput)

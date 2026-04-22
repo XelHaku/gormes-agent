@@ -47,6 +47,7 @@ For Gormes, this page should be read as more than a feature list. It is the upst
 - **[Fallback Providers](fallback-providers)** — Automatic failover to backup LLM providers when your primary model encounters errors, including independent fallback for auxiliary tasks like vision and compression.
 - **[Credential Pools](credential-pools)** — Distribute API calls across multiple keys for the same provider. Automatic rotation on rate limits or failures.
 - **[Memory Providers](memory-providers)** — Plug in external memory backends (Honcho, OpenViking, Mem0, Hindsight, Holographic, RetainDB, ByteRover) for cross-session user modeling and personalization beyond the built-in memory system.
+- **[Honcho Memory](honcho)** — AI-native memory provider with dialectic reasoning, peer cards, multi-agent profile isolation, and Honcho-owned tools.
 - **[API Server](api-server)** — Expose Hermes as an OpenAI-compatible HTTP endpoint. Connect any frontend that speaks the OpenAI format — Open WebUI, LobeChat, LibreChat, and more.
 - **[IDE Integration (ACP)](acp)** — Use Hermes inside ACP-compatible editors such as VS Code, Zed, and JetBrains. Chat, tool activity, file diffs, and terminal commands render inside your editor.
 - **[RL Training](rl-training)** — Generate trajectory data from agent sessions for reinforcement learning and model fine-tuning.
@@ -97,6 +98,18 @@ The table below is the exhaustive upstream feature surface documented under `use
 | [Personality & SOUL.md](personality) | `SOUL.md` and preset personas are injected at the top of the system prompt | Preserve identity precedence in prompt assembly |
 | [Skins & Themes](skins) | CLI skin engine changes rendering data without changing agent behavior | Port as presentation-layer config, not part of cognition |
 | [Plugins](plugins) | Plugin manager discovers filesystem and entry-point plugins for tools, hooks, memory, and context engines | Keep extension boundaries small and explicit so third parties can port cleanly |
+
+## Honcho as a Cross-Cutting Port Target
+
+Honcho deserves explicit tracking because upstream Hermes exposes it through several separate surfaces:
+
+- **Feature surface** — [Honcho Memory](honcho)
+- **Provider surface** — [Memory Providers](memory-providers#honcho)
+- **Tool surface** — `honcho_profile`, `honcho_search`, `honcho_context`, `honcho_reasoning`, `honcho_conclude`
+- **CLI surface** — `hermes honcho ...`
+- **Config surface** — `HONCHO_API_KEY`, `HONCHO_BASE_URL`, and `honcho.json`
+
+If Gormes wants real Honcho parity, it has to account for all five, not just "memory provider exists."
 
 ## Practical Read Order for Porting
 

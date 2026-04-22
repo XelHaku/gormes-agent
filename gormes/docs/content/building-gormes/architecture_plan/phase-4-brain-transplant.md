@@ -28,8 +28,8 @@ Once 4.A–4.D are shipped Gormes can call LLMs directly. The `:8642` health che
 
 ## Build Priority Context
 
-Phase 4 is **optimization**, not **differentiation**. The Python bridge works. Replace it only after Skills (Phase 6 / Phase 2.G) and Subagents (Phase 2.E) prove the architecture is correct. Phase 4 is the last step in the priority sequence:
+Phase 4 is **optimization**, not **differentiation**. The Python bridge works. Replace it only after the OS-AI spine and the wider gateway surface prove the architecture is correct. The current dependency chain is:
 
-> Skills System → Subagent System → Multi-Platform Gateway → Native Agent Loop
+> 2.E0 deterministic subagent runtime → 2.G0 static skills → 2.E1 / 2.G1-lite reviewed vertical proof → wider gateway surface → native agent loop
 
-**The rule:** Build Skills before Subagents, Subagents before wider Gateway, Gateway before Phase 4. Each layer validates the architecture for the next.
+**The rule:** stabilize the runtime substrate first, then add explicit skills, then prove the reviewed vertical, then widen adapters, and only then replace the Python bridge.

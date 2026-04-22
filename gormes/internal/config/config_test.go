@@ -100,6 +100,58 @@ func TestLoad_TelegramEnvOverride(t *testing.T) {
 	}
 }
 
+func TestLoad_DiscordDefaults(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Discord.CoalesceMs != 1000 {
+		t.Errorf("Discord.CoalesceMs default = %d, want 1000", cfg.Discord.CoalesceMs)
+	}
+	if cfg.Discord.Enabled() {
+		t.Error("Discord should be disabled when no token is set")
+	}
+}
+
+func TestLoad_DiscordFromFile(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[discord]
+token = "bot-abc"
+allowed_channel_id = "9999"
+coalesce_ms = 500
+first_run_discovery = true
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Discord.Token != "bot-abc" {
+		t.Errorf("Token = %q", cfg.Discord.Token)
+	}
+	if cfg.Discord.AllowedChannelID != "9999" {
+		t.Errorf("AllowedChannelID = %q", cfg.Discord.AllowedChannelID)
+	}
+	if cfg.Discord.CoalesceMs != 500 {
+		t.Errorf("CoalesceMs = %d", cfg.Discord.CoalesceMs)
+	}
+	if !cfg.Discord.FirstRunDiscovery {
+		t.Error("FirstRunDiscovery = false, want true")
+	}
+	if !cfg.Discord.Enabled() {
+		t.Error("Discord should be enabled with token + channel id")
+	}
+}
+
 func TestLoad_ResumeFlag(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	cfg, err := Load([]string{"--resume", "sess-abc123"})
@@ -286,6 +338,7 @@ max_depth               = 2
 max_concurrent_children = 3
 default_max_iterations  = 50
 	default_timeout         = "1h"
+run_log_path            = "/tmp/subagents/runs.jsonl"
 `
 	var cfg Config
 	if err := toml.NewDecoder(strings.NewReader(tomlText)).EnableUnmarshalerInterface().Decode(&cfg); err != nil {
@@ -305,6 +358,26 @@ default_max_iterations  = 50
 	}
 	if cfg.Delegation.DefaultTimeout != time.Hour {
 		t.Errorf("DefaultTimeout: want 1h, got %v", cfg.Delegation.DefaultTimeout)
+	}
+	if cfg.Delegation.RunLogPath != "/tmp/subagents/runs.jsonl" {
+		t.Errorf("RunLogPath: want %q, got %q", "/tmp/subagents/runs.jsonl", cfg.Delegation.RunLogPath)
+	}
+}
+
+func TestDelegationCfgResolvedRunLogPathHonorsOverride(t *testing.T) {
+	cfg := DelegationCfg{RunLogPath: "/tmp/custom-runs.jsonl"}
+	if got := cfg.ResolvedRunLogPath(); got != "/tmp/custom-runs.jsonl" {
+		t.Errorf("ResolvedRunLogPath() = %q, want %q", got, "/tmp/custom-runs.jsonl")
+	}
+}
+
+func TestDelegationCfgResolvedRunLogPathDefaultsToXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-xdg")
+
+	var cfg DelegationCfg
+	want := "/tmp/gormes-xdg/gormes/subagents/runs.jsonl"
+	if got := cfg.ResolvedRunLogPath(); got != want {
+		t.Errorf("ResolvedRunLogPath() = %q, want %q", got, want)
 	}
 }
 

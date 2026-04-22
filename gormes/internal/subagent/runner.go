@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Runner is the swappable inner loop of a subagent. This slice ships
-// StubRunner; 2.E.7 will ship LLMRunner.
+// Runner is the swappable inner loop of a subagent. Phase 2.E closeout ships
+// StubRunner; future slices may replace it with an LLM-backed runner.
 //
 // Contracts (binding on every implementation):
 //
@@ -21,8 +21,9 @@ type Runner interface {
 	Run(ctx context.Context, cfg SubagentConfig, events chan<- SubagentEvent) *SubagentResult
 }
 
-// StubRunner emits started → completed and returns immediately. ExitReason
-// carries an explicit TODO marker so it is unmistakable in logs and tests.
+// StubRunner is the intentionally shipped runtime seam for Phase 2.E closeout.
+// It proves lifecycle, cancellation, and tool-surface wiring without yet
+// adding a nested LLM loop.
 type StubRunner struct{}
 
 func (StubRunner) Run(ctx context.Context, cfg SubagentConfig, events chan<- SubagentEvent) *SubagentResult {
