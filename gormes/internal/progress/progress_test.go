@@ -450,8 +450,11 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 3.E.1 mirror note = %q, want SessionIndexMirror implementation detail", mirror.Note)
 	}
 	refresh := indexItems["Deterministic mirror refresh without mutating session state"]
-	if refresh.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.1 refresh status = %q, want planned", refresh.Status)
+	if refresh.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.1 refresh status = %q, want complete", refresh.Status)
+	}
+	if !strings.Contains(refresh.Note, "background refresh loop") {
+		t.Fatalf("Phase 3.E.1 refresh note = %q, want runtime-refresh detail", refresh.Note)
 	}
 
 	audit := p.Phases["3"].Subphases["3.E.2"]

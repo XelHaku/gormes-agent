@@ -21,7 +21,7 @@ Persistent, searchable state that outlives the process. Structured enough for gr
 
 ## Remaining Phase 3 queue
 
-- **Session mirror closeout** (3.E.1) — the `SessionIndexMirror` writer exists; runtime refresh wiring still remains.
+- **Session mirror closeout** (3.E.1) — the `SessionIndexMirror` writer plus deterministic runtime refresh wiring are now landed, giving operators a stable `sessions/index.yaml` audit surface.
 - **`last_seen` closeout** (3.E.6) — append-only `usage.jsonl` persistence is now landed; the remaining open half is timestamp-tracking for decay.
 - **Cross-chat identity** (3.E.7) — one-user-many-chats graph unification above `chat_id`.
 - **Session lineage + cross-source search** (3.E.8) — the remaining `SessionDB` donor seam, paired with later compression work.

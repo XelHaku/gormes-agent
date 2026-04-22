@@ -65,7 +65,7 @@ Upstream splits memory across three stores that Gormes compresses into two:
 | Recall + context injection | `agent/memory_provider.py` (recall half) | 3.C | ✅ shipped |
 | Semantic / embeddings | (not in upstream; Gormes-original) | 3.D | ✅ shipped |
 | USER.md mirror | `agent/memory_manager.py` (mirror writer) | 3.D.5 | ✅ shipped |
-| Session index mirror | None (closes bbolt opacity gap) | 3.E.1 | 🔨 partial — `internal/session/index_mirror.go` ships the YAML writer; runtime refresh wiring remains |
+| Session index mirror | None (closes bbolt opacity gap) | 3.E.1 | ✅ shipped — `internal/session/index_mirror.go` now ships both the YAML writer and deterministic runtime refresh wiring |
 | Tool execution audit log | None (exceeds Hermes) | 3.E.2 | ✅ shipped |
 | Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ✅ shipped |
 | Extraction state visibility | None (debug visibility) | 3.E.4 | ✅ shipped — `gormes memory status` renders extractor queue, dead-letter summary, and worker-health heuristics |

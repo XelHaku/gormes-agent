@@ -51,6 +51,8 @@ func runGateway(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("session map: %w", err)
 	}
 	defer smap.Close()
+	sessionMirror := startSessionIndexMirror(smap, slog.Default())
+	defer sessionMirror.Stop()
 
 	mstore, err := memory.OpenSqlite(config.MemoryDBPath(), cfg.Telegram.MemoryQueueCap, slog.Default())
 	if err != nil {

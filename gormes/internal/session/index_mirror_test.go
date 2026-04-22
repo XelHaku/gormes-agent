@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -126,4 +127,68 @@ func TestSessionIndexMirror_WriteReplacesFileWithoutLeavingTempFiles(t *testing.
 			t.Fatalf("unexpected temp file left behind: %s", entry.Name())
 		}
 	}
+}
+
+func TestSessionIndexMirror_StartRefreshSkipsRewriteWhenSnapshotUnchanged(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "sessions.db")
+	m, err := OpenBolt(dbPath)
+	if err != nil {
+		t.Fatalf("OpenBolt: %v", err)
+	}
+	defer m.Close()
+
+	ctx := context.Background()
+	if err := m.Put(ctx, "telegram:42", "sess-telegram"); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	outPath := filepath.Join(t.TempDir(), "sessions", "index.yaml")
+	mirror := NewSessionIndexMirror(m, outPath)
+	times := []time.Time{
+		time.Date(2026, 4, 22, 14, 0, 0, 0, time.UTC),
+		time.Date(2026, 4, 22, 14, 1, 0, 0, time.UTC),
+	}
+	var nowCalls atomic.Int32
+	mirror.now = func() time.Time {
+		i := int(nowCalls.Add(1) - 1)
+		if i >= len(times) {
+			return times[len(times)-1]
+		}
+		return times[i]
+	}
+
+	refresh := mirror.StartRefresh(10*time.Millisecond, nil)
+	defer refresh.Stop()
+
+	waitForMirrorText(t, outPath, "updated_at: 2026-04-22T14:00:00Z")
+	first, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", outPath, err)
+	}
+
+	time.Sleep(40 * time.Millisecond)
+
+	second, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("ReadFile second(%q): %v", outPath, err)
+	}
+	if string(second) != string(first) {
+		t.Fatalf("unchanged snapshot rewrote index.yaml:\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
+}
+
+func waitForMirrorText(t *testing.T, path, want string) {
+	t.Helper()
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		raw, err := os.ReadFile(path)
+		if err == nil && strings.Contains(string(raw), want) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	raw, _ := os.ReadFile(path)
+	t.Fatalf("mirror %q never contained %q; last content:\n%s", path, want, raw)
 }

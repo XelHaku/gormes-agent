@@ -63,6 +63,8 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("session map: %w", err)
 	}
 	defer smap.Close()
+	sessionMirror := startSessionIndexMirror(smap, slog.Default())
+	defer sessionMirror.Stop()
 
 	ctx := context.Background()
 	var key string

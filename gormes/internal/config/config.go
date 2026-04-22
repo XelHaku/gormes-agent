@@ -374,6 +374,12 @@ func SessionDBPath() string {
 	return filepath.Join(xdgDataHome(), "gormes", "sessions.db")
 }
 
+// SessionIndexMirrorPath returns the default location of the read-only YAML
+// mirror for the bbolt session map.
+func SessionIndexMirrorPath() string {
+	return filepath.Join(xdgDataHome(), "gormes", "sessions", "index.yaml")
+}
+
 // MemoryDBPath returns the default location of the Phase-3.A SQLite
 // memory database. Honors XDG_DATA_HOME; falls back to
 // ~/.local/share/gormes/memory.db.

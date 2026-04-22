@@ -539,8 +539,8 @@
             },
             {
               "name": "Deterministic mirror refresh without mutating session state",
-              "status": "planned",
-              "note": "TDD: prove export is read-only and idempotent against fixture bbolt stores before wiring background refreshes."
+              "status": "complete",
+              "note": "TDD: shipped a deterministic background refresh loop plus TUI/gateway/telegram runtime wiring, skipping unchanged snapshots while keeping the bbolt session map read-only."
             }
           ]
         },

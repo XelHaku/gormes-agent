@@ -20,13 +20,13 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 23/66 subphases shipped · 8 in progress · 35 planned
+**Overall:** 24/66 subphases shipped · 7 in progress · 35 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
 | Phase 2 — The Gateway | 🔨 | 12/20 subphases |
-| Phase 3 — The Black Box (Memory) | 🔨 | 9/13 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 10/13 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
@@ -206,10 +206,10 @@ weight: 10
 - [x] Async background export
 - [x] SQLite as source of truth
 
-### 3.E.1 — Session Index Mirror 🔨
+### 3.E.1 — Session Index Mirror ✅
 
 - [x] Read-only bbolt sessions.db -> index.yaml mirror
-- [ ] Deterministic mirror refresh without mutating session state
+- [x] Deterministic mirror refresh without mutating session state
 
 ### 3.E.2 — Tool Execution Audit Log ✅
 
