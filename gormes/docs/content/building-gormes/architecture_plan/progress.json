@@ -225,8 +225,8 @@
           "items": [
             {
               "name": "Signed event parsing + auth gates",
-              "status": "planned",
-              "note": "TDD: port signature/auth tests before exposing webhook endpoints."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/webhook.ParseInbound now enforces body-size and event-filter gates, and ValidateSignature freezes GitHub, GitLab, and generic HMAC auth before any HTTP runtime wiring."
             },
             {
               "name": "Prompt-to-delivery routing bridge",

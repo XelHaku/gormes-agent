@@ -7,7 +7,7 @@ weight: 80
 
 The complete picture of what Gormes must absorb to retire the Python `hermes-agent` runtime. Each row is one upstream module or capability, mapped to its target phase. This inventory is the source of truth for "what's left" — when a subsystem is shipped in Go, mark it ✅ and link the spec.
 
-### Gateway platforms (16 connectors — 9 unshipped)
+### Gateway platforms (16 connectors — 8 unshipped)
 
 | Platform | Upstream file | Target phase | Status | Landed Go surface |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | SMS | `gateway/platforms/sms.py` | 2.B.7 | ✅ shipped | Canonical phone-number session keys, generic command passthrough, and natural-boundary outbound segmentation live in `internal/channels/sms` |
 | Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ⏳ planned | |
 | Mattermost | `gateway/platforms/mattermost.py` | 2.B.8 | ⏳ planned | |
-| Webhook | `gateway/platforms/webhook.py` | 2.B.9 | ⏳ planned | |
+| Webhook | `gateway/platforms/webhook.py` | 2.B.9 | ✅ shipped | Signed ingress/auth gates and typed prompt-to-delivery routing now live in `internal/channels/webhook` |
 | BlueBubbles (iMessage) | `gateway/platforms/bluebubbles.py` | 2.B.10 | ✅ shipped | Webhook-auth, cached chat-GUID resolution, and home-channel send fallback live in `internal/channels/bluebubbles` |
 | HomeAssistant | `gateway/platforms/homeassistant.py` | 2.B.10 | ✅ shipped | Filtered state-change formatting, cooldown suppression, and persistent-notification delivery live in `internal/channels/homeassistant` |
 | Feishu | `gateway/platforms/feishu*.py` | 2.B.10 | 🔨 in progress | Contract-tested ingress and policy-gated delivery live in `internal/channels/feishu` |
@@ -42,7 +42,7 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Channel / contact directory | `gateway/channel_directory.py` | 2.F | ⏳ planned |
 | Platform enum + per-platform config | `gateway/*` — `Platform` (enum), `PlatformConfig` | 2.B | 🔨 Telegram/Discord/Slack config surfaces landed; canonical cross-platform enum parity remains |
 | Cron / scheduled automations | `cron/scheduler.py`, `cron/jobs.py`, `tools/cronjob_tools.py` | 2.D | ✅ shipped (scheduler + bbolt `cron_jobs` bucket + SQLite `cron_runs` audit + CRON.md mirror + Heartbeat prefix + exact-match `[SILENT]` suppression + kernel `PlatformEvent.SessionID/CronJobID` per-event override; upstream's file tick lock not needed — single-process) |
-| Webhook subscription system (GitHub events / API triggers → prompt → deliver) | `hermes_cli/webhook.py` + gateway routing | 2.B.9 / 2.D | 🔨 typed prompt-to-delivery bridge landed in `internal/channels/webhook`; signed ingress/auth and runtime adapter wiring remain |
+| Webhook subscription system (GitHub events / API triggers → prompt → deliver) | `hermes_cli/webhook.py` + gateway routing | 2.B.9 / 2.D | 🔨 signed ingress/auth gates plus the typed prompt-to-delivery bridge landed in `internal/channels/webhook`; runtime adapter wiring still remains |
 | Subagent delegation | `tools/delegate_tool.py` | 2.E | ✅ deterministic runtime, `delegate_task`, runner policy, typed child tool-call audit, append-only run logging, and real child stream execution landed |
 | Hooks system (`HookRegistry`) | `gateway/hooks.py`, `gateway/builtin_hooks/{boot_md}.py` | 2.F | ✅ in-process gateway hook points, live `HOOK.yaml` command loading, and built-in `BOOT.md` startup queuing with non-blocking failure semantics landed |
 | Restart / pairing / lifecycle | `gateway/{restart,pairing,status}.py` + `PairingStore` | 2.F | ⏳ planned |
