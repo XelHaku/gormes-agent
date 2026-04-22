@@ -113,7 +113,7 @@ weight: 10
 ### 2.B.10 — Regional + Device Adapter Flood 🔨
 
 - [ ] BlueBubbles + HomeAssistant adapters
-- [ ] Feishu + WeChat/WeCom adapters
+- [x] Feishu + WeChat/WeCom adapters
 - [x] DingTalk + QQ Bot adapters
 
 ### 2.C — Thin Mapping Persistence ✅

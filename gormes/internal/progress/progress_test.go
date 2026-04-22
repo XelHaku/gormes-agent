@@ -340,6 +340,13 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.B.10 priority = %q, want P4", longTail.Priority)
 	}
 	longTailItems := itemsByName(longTail.Items)
+	feishuWeChat := longTailItems["Feishu + WeChat/WeCom adapters"]
+	if feishuWeChat.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 Feishu + WeChat/WeCom adapters status = %q, want complete", feishuWeChat.Status)
+	}
+	if !strings.Contains(feishuWeChat.Note, "TDD landed") {
+		t.Fatalf("Phase 2.B.10 Feishu + WeChat/WeCom adapters note = %q, want TDD landed guidance", feishuWeChat.Note)
+	}
 	dingTalkQQ := longTailItems["DingTalk + QQ Bot adapters"]
 	if dingTalkQQ.Status != StatusComplete {
 		t.Fatalf("Phase 2.B.10 DingTalk + QQ Bot adapters status = %q, want complete", dingTalkQQ.Status)

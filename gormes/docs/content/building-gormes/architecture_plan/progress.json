@@ -246,8 +246,8 @@
             },
             {
               "name": "Feishu + WeChat/WeCom adapters",
-              "status": "planned",
-              "note": "TDD: freeze websocket/webhook ingress and per-platform reply semantics before SDK wiring."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/feishu, internal/channels/wecom, and internal/channels/weixin now pin webhook or websocket ingress, policy-gated delivery, and per-platform reply-path contracts before any SDK wiring."
             },
             {
               "name": "DingTalk + QQ Bot adapters",
