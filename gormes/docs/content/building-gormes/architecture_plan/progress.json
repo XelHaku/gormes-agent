@@ -241,8 +241,8 @@
           "items": [
             {
               "name": "BlueBubbles + HomeAssistant adapters",
-              "status": "planned",
-              "note": "TDD: capture home-channel and device-state contracts before transport-specific implementation."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/bluebubbles and internal/channels/homeassistant now freeze webhook-auth, cached home-channel delivery, filtered state-change formatting, cooldown, and persistent-notification contracts before any SDK wiring."
             },
             {
               "name": "Feishu + WeChat/WeCom adapters",

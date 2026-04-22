@@ -379,7 +379,17 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if longTail.Priority != "P4" {
 		t.Fatalf("Phase 2.B.10 priority = %q, want P4", longTail.Priority)
 	}
+	if got := longTail.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.B.10 = %q, want complete", got)
+	}
 	longTailItems := itemsByName(longTail.Items)
+	blueBubblesHA := longTailItems["BlueBubbles + HomeAssistant adapters"]
+	if blueBubblesHA.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 BlueBubbles + HomeAssistant adapters status = %q, want complete", blueBubblesHA.Status)
+	}
+	if !strings.Contains(blueBubblesHA.Note, "internal/channels/bluebubbles") || !strings.Contains(blueBubblesHA.Note, "internal/channels/homeassistant") {
+		t.Fatalf("Phase 2.B.10 BlueBubbles + HomeAssistant adapters note = %q, want BlueBubbles/HomeAssistant contract detail", blueBubblesHA.Note)
+	}
 	feishuWeChat := longTailItems["Feishu + WeChat/WeCom adapters"]
 	if feishuWeChat.Status != StatusComplete {
 		t.Fatalf("Phase 2.B.10 Feishu + WeChat/WeCom adapters status = %q, want complete", feishuWeChat.Status)

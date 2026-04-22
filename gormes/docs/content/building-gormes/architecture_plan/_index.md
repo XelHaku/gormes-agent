@@ -20,12 +20,12 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 25/66 subphases shipped · 7 in progress · 34 planned
+**Overall:** 26/66 subphases shipped · 6 in progress · 34 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
-| Phase 2 — The Gateway | 🔨 | 13/20 subphases |
+| Phase 2 — The Gateway | 🔨 | 14/20 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 10/13 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
@@ -110,9 +110,9 @@ weight: 10
 - [ ] Signed event parsing + auth gates
 - [x] Prompt-to-delivery routing bridge
 
-### 2.B.10 — Regional + Device Adapter Flood 🔨
+### 2.B.10 — Regional + Device Adapter Flood ✅
 
-- [ ] BlueBubbles + HomeAssistant adapters
+- [x] BlueBubbles + HomeAssistant adapters
 - [x] Feishu + WeChat/WeCom adapters
 - [x] DingTalk + QQ Bot adapters
 

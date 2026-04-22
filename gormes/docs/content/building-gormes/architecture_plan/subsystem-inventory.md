@@ -21,8 +21,8 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ⏳ planned | |
 | Mattermost | `gateway/platforms/mattermost.py` | 2.B.8 | ⏳ planned | |
 | Webhook | `gateway/platforms/webhook.py` | 2.B.9 | ⏳ planned | |
-| BlueBubbles (iMessage) | `gateway/platforms/bluebubbles.py` | 2.B.10 | ⏳ planned | |
-| HomeAssistant | `gateway/platforms/homeassistant.py` | 2.B.10 | ⏳ planned | |
+| BlueBubbles (iMessage) | `gateway/platforms/bluebubbles.py` | 2.B.10 | ✅ shipped | Webhook-auth, cached chat-GUID resolution, and home-channel send fallback live in `internal/channels/bluebubbles` |
+| HomeAssistant | `gateway/platforms/homeassistant.py` | 2.B.10 | ✅ shipped | Filtered state-change formatting, cooldown suppression, and persistent-notification delivery live in `internal/channels/homeassistant` |
 | Feishu | `gateway/platforms/feishu*.py` | 2.B.10 | 🔨 in progress | Contract-tested ingress and policy-gated delivery live in `internal/channels/feishu` |
 | WeChat (WeCom + WeiXin) | `gateway/platforms/wecom*.py`, `weixin.py` | 2.B.10 | 🔨 in progress | Contract-tested ingress and reply semantics live in `internal/channels/{wecom,weixin}` |
 | DingTalk | `gateway/platforms/dingtalk.py` | 2.B.10 | 🔨 in progress | Allow-list and session-webhook delivery contracts live in `internal/channels/dingtalk` |
