@@ -351,6 +351,23 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.F.4 priority = %q, want P3", operator.Priority)
 	}
 
+	mail := p.Phases["2"].Subphases["2.B.7"]
+	if mail.Priority != "P3" {
+		t.Fatalf("Phase 2.B.7 priority = %q, want P3", mail.Priority)
+	}
+	mailItems := itemsByName(mail.Items)
+	email := mailItems["Email ingress + outbound delivery contract"]
+	if email.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.7 email status = %q, want complete", email.Status)
+	}
+	if !strings.Contains(email.Note, "TDD landed") {
+		t.Fatalf("Phase 2.B.7 email note = %q, want TDD landed guidance", email.Note)
+	}
+	sms := mailItems["SMS ingress + outbound delivery contract"]
+	if sms.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.7 sms status = %q, want planned", sms.Status)
+	}
+
 	longTail := p.Phases["2"].Subphases["2.B.10"]
 	if longTail.Priority != "P4" {
 		t.Fatalf("Phase 2.B.10 priority = %q, want P4", longTail.Priority)

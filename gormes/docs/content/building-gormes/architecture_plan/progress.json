@@ -193,8 +193,8 @@
           "items": [
             {
               "name": "Email ingress + outbound delivery contract",
-              "status": "planned",
-              "note": "TDD: freeze MIME/plaintext normalization and reply-target parsing before transport glue."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/email now normalizes RFC 822 MIME bodies into plaintext gateway events and derives deterministic reply-thread targets before IMAP or SMTP transport glue."
             },
             {
               "name": "SMS ingress + outbound delivery contract",

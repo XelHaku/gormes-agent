@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 22/66 subphases shipped · 6 in progress · 38 planned
+**Overall:** 22/66 subphases shipped · 7 in progress · 37 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -95,9 +95,9 @@ weight: 10
 - [x] Inbound event normalization + session identity
 - [ ] Reply/send contract on shared chassis
 
-### 2.B.7 — Email + SMS Adapters ⏳
+### 2.B.7 — Email + SMS Adapters 🔨
 
-- [ ] Email ingress + outbound delivery contract
+- [x] Email ingress + outbound delivery contract
 - [ ] SMS ingress + outbound delivery contract
 
 ### 2.B.8 — Matrix + Mattermost Adapters ⏳
