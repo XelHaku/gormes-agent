@@ -10,6 +10,12 @@ import (
 	"testing"
 )
 
+const (
+	architectureTaskManagerScript = "gormes-architecture-task-manager.sh"
+	legacyPlannerWrapperScript    = "architectureplanneragent.sh"
+	architectureTaskManagerUnit   = "gormes-architecture-task-manager"
+)
+
 func TestArchitecturePlannerAgentRunsCodexuAndInstallsPeriodicTimer(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
@@ -22,8 +28,13 @@ func TestArchitecturePlannerAgentRunsCodexuAndInstallsPeriodicTimer(t *testing.T
 	gormesRepo := filepath.Join(parentRepo, "gormes")
 
 	copyPlannerTestFile(t,
-		filepath.Join(repoRoot, "scripts", "architectureplanneragent.sh"),
-		filepath.Join(gormesRepo, "scripts", "architectureplanneragent.sh"),
+		filepath.Join(repoRoot, "scripts", architectureTaskManagerScript),
+		filepath.Join(gormesRepo, "scripts", architectureTaskManagerScript),
+		0o755,
+	)
+	copyPlannerTestFile(t,
+		filepath.Join(repoRoot, "scripts", legacyPlannerWrapperScript),
+		filepath.Join(gormesRepo, "scripts", legacyPlannerWrapperScript),
 		0o755,
 	)
 
@@ -188,7 +199,7 @@ exit 0
 		"SYSTEMCTL_LOG=" + systemctlLogPath,
 		"HOME=" + homeDir,
 		"XDG_CONFIG_HOME=" + xdgConfigHome,
-	}, "bash", "scripts/architectureplanneragent.sh")
+	}, "bash", "scripts/"+architectureTaskManagerScript)
 
 	outputText := string(out)
 	for _, want := range []string{
@@ -261,7 +272,24 @@ exit 0
 		t.Fatalf("upstream_hermes_dir = %#v, want %q", got, parentRepo)
 	}
 
-	timerPath := filepath.Join(xdgConfigHome, "systemd", "user", "gormes-architectureplanneragent.timer")
+	tasksPath := filepath.Join(plannerDir, "tasks.md")
+	tasksData, err := os.ReadFile(tasksPath)
+	if err != nil {
+		t.Fatalf("read tasks.md: %v", err)
+	}
+	tasksText := string(tasksData)
+	for _, want := range []string{
+		"# Gormes Architecture Tasks",
+		"- Planned: 2",
+		"- [ ] Phase 2 / 2.B.4: Pairing, reconnect, and send contract",
+		"- [ ] Phase 3 / 3.E.8: parent_session_id lineage for compression splits",
+	} {
+		if !strings.Contains(tasksText, want) {
+			t.Fatalf("tasks.md missing %q:\n%s", want, tasksText)
+		}
+	}
+
+	timerPath := filepath.Join(xdgConfigHome, "systemd", "user", architectureTaskManagerUnit+".timer")
 	timerData, err := os.ReadFile(timerPath)
 	if err != nil {
 		t.Fatalf("read timer unit: %v", err)
@@ -271,13 +299,13 @@ exit 0
 		t.Fatalf("timer unit missing interval:\n%s", timerText)
 	}
 
-	servicePath := filepath.Join(xdgConfigHome, "systemd", "user", "gormes-architectureplanneragent.service")
+	servicePath := filepath.Join(xdgConfigHome, "systemd", "user", architectureTaskManagerUnit+".service")
 	serviceData, err := os.ReadFile(servicePath)
 	if err != nil {
 		t.Fatalf("read service unit: %v", err)
 	}
 	serviceText := string(serviceData)
-	if !strings.Contains(serviceText, "architectureplanneragent.sh") {
+	if !strings.Contains(serviceText, architectureTaskManagerScript) {
 		t.Fatalf("service unit missing script path:\n%s", serviceText)
 	}
 	if !strings.Contains(serviceText, gormesRepo) {
@@ -307,11 +335,40 @@ exit 0
 	systemctlLog := string(systemctlData)
 	for _, want := range []string{
 		"--user daemon-reload",
-		"--user enable --now gormes-architectureplanneragent.timer",
+		"--user enable --now " + architectureTaskManagerUnit + ".timer",
 	} {
 		if !strings.Contains(systemctlLog, want) {
 			t.Fatalf("systemctl log missing %q:\n%s", want, systemctlLog)
 		}
+	}
+
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "status", args: []string{"status"}, want: "Last run UTC:"},
+		{name: "show report", args: []string{"show-report"}, want: "# Architecture Planner Run"},
+		{name: "doctor", args: []string{"doctor"}, want: "doctor: ok"},
+		{name: "help", args: []string{"--help"}, want: "gormes-architecture-task-manager.sh"},
+		{name: "legacy wrapper help", args: []string{"legacy-help"}, want: "gormes-architecture-task-manager.sh"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			script := "scripts/" + architectureTaskManagerScript
+			args := tc.args
+			if len(args) == 1 && args[0] == "legacy-help" {
+				script = "scripts/" + legacyPlannerWrapperScript
+				args = []string{"--help"}
+			}
+			out := runPlannerTestCommandEnv(t, gormesRepo, []string{
+				"PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
+				"HOME=" + homeDir,
+				"XDG_CONFIG_HOME=" + xdgConfigHome,
+			}, "bash", append([]string{script}, args...)...)
+			if !strings.Contains(string(out), tc.want) {
+				t.Fatalf("%s output missing %q:\n%s", tc.name, tc.want, string(out))
+			}
+		})
 	}
 }
 
