@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "name": "gormes",
+  "display_name": "Gormes",
+  "description": "Go-native ACP server for editor integration over stdio",
+  "icon": "icon.svg",
+  "distribution": {
+    "type": "command",
+    "command": "gormes",
+    "args": ["acp"]
+  }
+}

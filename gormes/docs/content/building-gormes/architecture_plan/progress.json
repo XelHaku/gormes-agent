@@ -902,7 +902,8 @@
           "items": [
             {
               "name": "ACP server side",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/acp/server.go` now ships the ACP stdio JSON-RPC baseline (`initialize`, `session/new`, `session/prompt`, `session/cancel`, `session/close`), `internal/acp/kernel_session.go` backs each ACP session with a live Gormes kernel turn loop, `cmd/gormes/acp.go` wires the Cobra entrypoint, and `acp_registry/agent.json` plus `acp_registry/icon.svg` advertise the editor manifest. Session/load, richer prompt content blocks, and ACP client fs/terminal callback bridges remain explicit follow-on scope."
             }
           ]
         },

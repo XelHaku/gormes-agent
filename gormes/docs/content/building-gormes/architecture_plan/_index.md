@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 49/66 subphases shipped · 1 in progress · 16 planned
+**Overall:** 50/66 subphases shipped · 1 in progress · 15 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -28,7 +28,7 @@ weight: 10
 | Phase 2 — The Gateway | ✅ | 20/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
-| Phase 5 — The Final Purge | 🔨 | 6/17 subphases |
+| Phase 5 — The Final Purge | 🔨 | 7/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 
 ---
@@ -330,9 +330,9 @@ weight: 10
 - [x] MCP client
 - [ ] OAuth flows
 
-### 5.H — ACP Integration ⏳
+### 5.H — ACP Integration ✅
 
-- [ ] ACP server side
+- [x] ACP server side
 
 ### 5.I — Plugins Architecture ⏳
 

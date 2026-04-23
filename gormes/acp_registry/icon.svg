@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Gormes ACP icon">
+  <rect width="128" height="128" rx="24" fill="#0f172a"/>
+  <path d="M34 30h34c18 0 30 12 30 30s-12 30-30 30H54v18H34V30zm20 20v20h13c7 0 11-4 11-10s-4-10-11-10H54z" fill="#f8fafc"/>
+  <circle cx="94" cy="96" r="10" fill="#38bdf8"/>
+</svg>

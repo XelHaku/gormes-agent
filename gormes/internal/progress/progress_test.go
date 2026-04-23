@@ -798,6 +798,30 @@ func TestLoad_RealFile_Phase5MCPClient(t *testing.T) {
 	}
 }
 
+func TestLoad_RealFile_Phase5ACPServer(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	acp := p.Phases["5"].Subphases["5.H"]
+	if got := acp.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 5.H = %q, want complete", got)
+	}
+
+	items := itemsByName(acp.Items)
+	server := items["ACP server side"]
+	if server.Status != StatusComplete {
+		t.Fatalf("Phase 5.H ACP server status = %q, want complete", server.Status)
+	}
+	if !strings.Contains(server.Note, "internal/acp/server.go") ||
+		!strings.Contains(server.Note, "session/prompt") ||
+		!strings.Contains(server.Note, "cmd/gormes/acp.go") ||
+		!strings.Contains(server.Note, "acp_registry/agent.json") {
+		t.Fatalf("Phase 5.H ACP server note = %q, want server.go,session/prompt,acp.go,agent.json detail", server.Note)
+	}
+}
+
 func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
 	if err != nil {
