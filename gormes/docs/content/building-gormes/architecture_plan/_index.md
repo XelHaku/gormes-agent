@@ -254,7 +254,7 @@ weight: 10
 ### 4.A — Provider Adapters 🔨
 
 - [x] Anthropic
-- [ ] Bedrock
+- [x] Bedrock
 - [ ] Gemini
 - [ ] OpenRouter
 - [ ] Google Code Assist

@@ -14,6 +14,8 @@ func NewClient(provider, endpoint, apiKey string) Client {
 	switch normalizedProvider(provider) {
 	case "anthropic":
 		return newAnthropicClient(EffectiveEndpoint(provider, endpoint), apiKey)
+	case "bedrock":
+		return newBedrockClient(EffectiveEndpoint(provider, endpoint))
 	case "codex":
 		return newCodexClient(EffectiveEndpoint(provider, endpoint), apiKey)
 	default:
@@ -29,6 +31,10 @@ func EffectiveEndpoint(provider, endpoint string) string {
 	case "anthropic":
 		if base == "" || base == defaultOpenAIEndpoint {
 			return defaultAnthropicBaseURL
+		}
+	case "bedrock":
+		if base == "" || base == defaultOpenAIEndpoint {
+			return defaultBedrockBaseURL("")
 		}
 	case "codex":
 		if base == "" || base == defaultOpenAIEndpoint {
@@ -48,6 +54,8 @@ func normalizedProvider(provider string) string {
 		return "openai"
 	case "anthropic":
 		return "anthropic"
+	case "bedrock", "aws-bedrock", "amazon-bedrock":
+		return "bedrock"
 	case "codex", "openai-codex", "openai_codex":
 		return "codex"
 	default:

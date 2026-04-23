@@ -110,7 +110,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 |---|---|---|---|
 | Anthropic adapter | `agent/anthropic_adapter.py` | 4.A | ✅ complete |
 | Codex Responses adapter | `run_agent.py` (`api_mode = codex_responses`) | 4.A | ✅ complete |
-| Bedrock adapter | `agent/bedrock_adapter.py` | 4.A | ⏳ planned |
+| Bedrock adapter | `agent/bedrock_adapter.py` | 4.A | ✅ complete |
 | Gemini Cloud Code adapter | `agent/gemini_cloudcode_adapter.py` | 4.A | ⏳ planned |
 | OpenRouter client | `agent/openrouter_client.py` | 4.A | ⏳ planned |
 | Google Code Assist | `agent/google_code_assist.py` | 4.A | ⏳ planned |

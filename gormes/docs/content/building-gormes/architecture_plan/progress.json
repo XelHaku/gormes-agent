@@ -678,7 +678,8 @@
             },
             {
               "name": "Bedrock",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/hermes.NewClient now selects a native Bedrock ConverseStream adapter that resolves AWS region defaults, delegates credential loading and SigV4 request signing to the AWS SDK, maps canonical system/user/assistant/tool messages into Bedrock tool-aware payloads, streams reasoning/text/tool_calls back into canonical Event values, and classifies Bedrock throttling/service failures as retry-safe HTTPError results without live AWS credentials in tests."
             },
             {
               "name": "Gemini",

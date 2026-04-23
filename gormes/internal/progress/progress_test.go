@@ -216,6 +216,25 @@ func TestLoad_RealFile_Phase4Codex(t *testing.T) {
 	}
 }
 
+func TestLoad_RealFile_Phase4Bedrock(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	providers := p.Phases["4"].Subphases["4.A"]
+	items := itemsByName(providers.Items)
+	bedrock := items["Bedrock"]
+	if bedrock.Status != StatusComplete {
+		t.Fatalf("Phase 4.A Bedrock status = %q, want complete", bedrock.Status)
+	}
+	if !strings.Contains(bedrock.Note, "ConverseStream") ||
+		!strings.Contains(bedrock.Note, "AWS SDK") ||
+		!strings.Contains(bedrock.Note, "tool-aware") {
+		t.Fatalf("Phase 4.A Bedrock note = %q, want ConverseStream/AWS SDK/tool-aware detail", bedrock.Note)
+	}
+}
+
 func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
 	if err != nil {
