@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 42/66 subphases shipped · 1 in progress · 23 planned
+**Overall:** 42/66 subphases shipped · 2 in progress · 22 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -281,10 +281,10 @@ weight: 10
 
 - [x] Auto-naming sessions
 
-### 4.G — Credentials + OAuth ⏳
+### 4.G — Credentials + OAuth 🔨
 
 - [ ] Token vault
-- [ ] Multi-account auth
+- [x] Multi-account auth
 
 ### 4.H — Rate / Retry / Caching ⏳
 

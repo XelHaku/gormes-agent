@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/config"
@@ -28,6 +30,56 @@ func TestNewLLMClient_AnthropicUsesModelsHealthEndpoint(t *testing.T) {
 			APIKey:   "test-key",
 		},
 	})
+	if endpoint != srv.URL {
+		t.Fatalf("endpoint = %q, want %q", endpoint, srv.URL)
+	}
+	if err := client.Health(context.Background()); err != nil {
+		t.Fatalf("Health() error = %v", err)
+	}
+}
+
+func TestNewLLMClient_UsesSelectedHermesAccount(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("path = %s, want /v1/models", r.URL.Path)
+		}
+		if got := r.Header.Get("x-api-key"); got != "work-key" {
+			t.Fatalf("x-api-key = %q, want work-key", got)
+		}
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[hermes]
+provider = "anthropic"
+account = "work"
+
+[[hermes.accounts]]
+name = "personal"
+api_key = "personal-key"
+
+[[hermes.accounts]]
+name = "work"
+api_key = "work-key"
+endpoint = "`+srv.URL+`"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, endpoint := newLLMClient(cfg)
 	if endpoint != srv.URL {
 		t.Fatalf("endpoint = %q, want %q", endpoint, srv.URL)
 	}

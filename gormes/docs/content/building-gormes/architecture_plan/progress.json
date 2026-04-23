@@ -767,7 +767,8 @@
             },
             {
               "name": "Multi-account auth",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD: `internal/config` now resolves named `[hermes].account` / `[[hermes.accounts]]` entries into the active provider, endpoint, model, and API key, with `GORMES_ACCOUNT` overriding the config-selected account before the existing env/flag precedence applies."
             }
           ]
         },

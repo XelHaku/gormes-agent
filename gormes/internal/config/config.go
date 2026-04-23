@@ -157,7 +157,17 @@ type HermesCfg struct {
 	Endpoint     string          `toml:"endpoint"`
 	APIKey       string          `toml:"api_key"`
 	Model        string          `toml:"model"`
+	Account      string          `toml:"account"`
+	Accounts     []HermesAccount `toml:"accounts"`
 	SmartRouting SmartRoutingCfg `toml:"smart_routing"`
+}
+
+type HermesAccount struct {
+	Name     string `toml:"name"`
+	Provider string `toml:"provider"`
+	Endpoint string `toml:"endpoint"`
+	APIKey   string `toml:"api_key"`
+	Model    string `toml:"model"`
 }
 
 type SmartRoutingCfg struct {
@@ -189,6 +199,9 @@ func Load(args []string) (Config, error) {
 	loadDotenvFiles() // populates os.Setenv for unset keys BEFORE loadEnv reads them
 	cfg := defaults()
 	if err := loadFile(&cfg); err != nil {
+		return cfg, err
+	}
+	if err := resolveHermesAccount(&cfg, os.Getenv("GORMES_ACCOUNT")); err != nil {
 		return cfg, err
 	}
 	loadEnv(&cfg)
@@ -332,6 +345,42 @@ func loadEnv(cfg *Config) {
 	}
 	if v := os.Getenv("GORMES_SKILLS_ROOT"); v != "" {
 		cfg.Skills.Root = v
+	}
+}
+
+func resolveHermesAccount(cfg *Config, selectorOverride string) error {
+	selected := strings.TrimSpace(selectorOverride)
+	if selected == "" {
+		selected = strings.TrimSpace(cfg.Hermes.Account)
+	}
+	if selected == "" {
+		return nil
+	}
+
+	for _, account := range cfg.Hermes.Accounts {
+		if !strings.EqualFold(strings.TrimSpace(account.Name), selected) {
+			continue
+		}
+		cfg.Hermes.Account = strings.TrimSpace(account.Name)
+		mergeHermesAccount(&cfg.Hermes, account)
+		return nil
+	}
+
+	return fmt.Errorf("config: hermes.account %q not found", selected)
+}
+
+func mergeHermesAccount(dst *HermesCfg, account HermesAccount) {
+	if v := strings.TrimSpace(account.Provider); v != "" {
+		dst.Provider = v
+	}
+	if v := strings.TrimSpace(account.Endpoint); v != "" {
+		dst.Endpoint = v
+	}
+	if v := strings.TrimSpace(account.APIKey); v != "" {
+		dst.APIKey = v
+	}
+	if v := strings.TrimSpace(account.Model); v != "" {
+		dst.Model = v
 	}
 }
 

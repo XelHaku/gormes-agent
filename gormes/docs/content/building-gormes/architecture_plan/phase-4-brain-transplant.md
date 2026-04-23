@@ -21,7 +21,7 @@ Phase 4 is when Hermes becomes optional. Each sub-phase is a separable spec.
 | 4.D — Smart Model Routing | ✅ complete | `internal/kernel/model_routing.go` now applies conservative same-provider per-turn model selection via `[hermes.smart_routing]`, and the kernel carries that effective model through request assembly, telemetry, and render frames |
 | 4.E — Trajectory + Insights | ✅ complete | `internal/telemetry` now tracks per-session turn outcomes plus tool execution totals/failures/cancellations, and the TUI renders that live self-monitoring surface for later trajectory/insights work |
 | 4.F — Title Generation | ✅ complete | `internal/session/title.go` now derives deterministic first-exchange titles, and the gateway/TUI persistence paths store them in session metadata plus the audit mirror |
-| 4.G — Credentials + OAuth | ⏳ planned | Port `agent/google_oauth.py`, `agent/credential_pool.py`, `tools/credential_files.py`; token vault + multi-account auth |
+| 4.G — Credentials + OAuth | 🔨 in progress | Port `agent/google_oauth.py`, `agent/credential_pool.py`, `tools/credential_files.py`; named multi-account selection is live, token vault + OAuth persistence remain |
 | 4.H — Rate / Retry / Caching | ⏳ planned | Port `agent/{rate_limit_tracker,retry_utils,nous_rate_guard,prompt_caching}.py`; provider-side resilience |
 
 Once 4.A–4.D are shipped Gormes can call LLMs directly. The `:8642` health check becomes optional.
@@ -37,6 +37,8 @@ Phase 4.A is now complete. Anthropic, Bedrock, Gemini, OpenRouter, Codex, and Go
 4.E is now complete as well: `internal/telemetry` now records per-session turn outcomes, total tool executions, failed/cancelled tool calls, and the last completed turn state alongside the existing token/latency counters. `internal/kernel` wires those counters into live render frames and `internal/tui/view.go` surfaces them in the sidebar, giving operators a built-in self-monitoring view before the historical `trajectory.py` / `insights.py` donor ports land.
 
 4.F is now complete as well: `internal/session/title.go` ports the donor title-generator intent as a deterministic first-exchange summarizer, so the opening user/assistant pair auto-names a new session without needing an auxiliary model. `internal/gateway/manager.go` and `cmd/gormes/main.go` run that helper when a turn settles to idle, `internal/session/directory.go` persists the title alongside the existing session metadata, and `internal/session/index_mirror.go` includes the title in the YAML audit mirror.
+
+4.G is now started as well: `internal/config/config.go` resolves a named `[hermes].account` / `[[hermes.accounts]]` selection into the active provider, endpoint, model, and API key before the existing env/flag overrides apply, and `GORMES_ACCOUNT` can switch accounts per run without rewriting `config.toml`. `internal/config/config_test.go` locks the file-selected, env-selected, and missing-account cases, while `cmd/gormes/llm_client_test.go` proves the resolved account key actually reaches the provider health check path. The token-vault and OAuth file persistence work remain tracked separately inside 4.G.
 
 ## Build Priority Context
 

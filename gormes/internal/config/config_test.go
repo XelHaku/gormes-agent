@@ -104,6 +104,113 @@ func TestLoad_ProviderEnvOverride(t *testing.T) {
 	}
 }
 
+func TestLoad_HermesAccountSelectionFromFile(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[hermes]
+provider = "anthropic"
+endpoint = "https://api.anthropic.com"
+model = "claude-default"
+account = "work"
+
+[[hermes.accounts]]
+name = "personal"
+api_key = "personal-key"
+model = "claude-personal"
+
+[[hermes.accounts]]
+name = "work"
+api_key = "work-key"
+endpoint = "https://work.example.test"
+model = "claude-work"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Hermes.APIKey != "work-key" {
+		t.Fatalf("APIKey = %q, want work-key", cfg.Hermes.APIKey)
+	}
+	if cfg.Hermes.Endpoint != "https://work.example.test" {
+		t.Fatalf("Endpoint = %q, want https://work.example.test", cfg.Hermes.Endpoint)
+	}
+	if cfg.Hermes.Model != "claude-work" {
+		t.Fatalf("Model = %q, want claude-work", cfg.Hermes.Model)
+	}
+	if cfg.Hermes.Provider != "anthropic" {
+		t.Fatalf("Provider = %q, want anthropic", cfg.Hermes.Provider)
+	}
+}
+
+func TestLoad_HermesAccountEnvOverride(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	t.Setenv("GORMES_ACCOUNT", "work")
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[hermes]
+provider = "anthropic"
+account = "personal"
+
+[[hermes.accounts]]
+name = "personal"
+api_key = "personal-key"
+
+[[hermes.accounts]]
+name = "work"
+api_key = "work-key"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Hermes.APIKey != "work-key" {
+		t.Fatalf("APIKey = %q, want work-key from env-selected account", cfg.Hermes.APIKey)
+	}
+}
+
+func TestLoad_HermesAccountMissingReturnsError(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[hermes]
+provider = "anthropic"
+account = "missing"
+
+[[hermes.accounts]]
+name = "personal"
+api_key = "personal-key"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(nil)
+	if err == nil {
+		t.Fatal("Load() error = nil, want missing account error")
+	}
+	if !strings.Contains(err.Error(), "missing") {
+		t.Fatalf("Load() error = %v, want missing account name", err)
+	}
+}
+
 func TestLoad_FlagOverridesEnv(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("GORMES_ENDPOINT", "http://env:8642")
