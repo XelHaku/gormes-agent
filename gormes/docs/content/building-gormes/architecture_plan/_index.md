@@ -300,7 +300,7 @@ weight: 10
 
 ### 5.B — Sandboxing Backends 🔨
 
-- [ ] Docker
+- [x] Docker
 - [ ] Modal
 - [x] Daytona
 - [ ] Singularity

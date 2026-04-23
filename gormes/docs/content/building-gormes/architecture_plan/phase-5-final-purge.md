@@ -16,7 +16,7 @@ Phase 5 is when Python disappears entirely from the runtime path. Each sub-phase
 | Subphase | Status | Deliverable |
 |---|---|---|
 | 5.A — Tool Surface Port | ✅ complete | `internal/tools` now ships the Go-native registry row (`ToolEntry`), toolset-scoped descriptor filtering, env/check-fn availability gates, and default runtime wiring for the built-in + delegation toolsets. |
-| 5.B — Sandboxing Backends | 🔨 in progress | `internal/tools/environments/daytona` now ports the Daytona backend seam with tested resource normalization, persistent sandbox reuse, exec translation, and cleanup policy. Docker, Modal, Singularity, and shared file-sync plumbing remain pending. |
+| 5.B — Sandboxing Backends | 🔨 in progress | `internal/tools/environments/{daytona,docker}` now port the Daytona and Docker backend seams with tested resource normalization, exec translation, lifecycle cleanup, and Docker hardening/persistence mounts. Modal, Singularity, SSH, and shared file-sync plumbing remain pending. |
 | 5.C — Browser Automation | ⏳ planned | Port `tools/browser_tool.py` + `tools/browser_camofox*.py` + `tools/browser_providers/{browserbase,browser_use,firecrawl}.py` to Go (Chromedp, Rod) or sidecar process |
 | 5.D — Vision + Image Generation | ⏳ planned | Port `tools/vision_tools.py` + `tools/image_generation_tool.py`; multimodal in/out |
 | 5.E — TTS / Voice / Transcription | ⏳ planned | Port `tools/{tts_tool,voice_mode,transcription_tools,neutts_synth}.py`; may stay as sidecar processes |

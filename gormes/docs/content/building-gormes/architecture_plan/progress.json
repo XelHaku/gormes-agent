@@ -801,7 +801,8 @@
           "items": [
             {
               "name": "Docker",
-              "status": "planned"
+              "status": "complete",
+              "note": "Go-native backend seam now lives in internal/tools/environments/docker with tested docker run/exec/cleanup arg construction, security hardening, workspace persistence mounts, env forwarding, and container lifecycle caching."
             },
             {
               "name": "Modal",
