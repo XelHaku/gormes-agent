@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -59,8 +60,14 @@ func (m *SessionIndexMirror) Write() error {
 }
 
 type sessionEntry struct {
-	Key       string
-	SessionID string
+	Key             string
+	SessionID       string
+	Source          string
+	ChatID          string
+	UserID          string
+	ParentSessionID string
+	LineageKind     string
+	LineageOrphan   bool
 }
 
 func (m *SessionIndexMirror) snapshot() ([]sessionEntry, error) {
@@ -74,11 +81,41 @@ func (m *SessionIndexMirror) snapshot() ([]sessionEntry, error) {
 	var out []sessionEntry
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucketName))
+		mb := tx.Bucket([]byte(metadataBucketName))
 		if b == nil {
 			return nil
 		}
 		return b.ForEach(func(k, v []byte) error {
-			out = append(out, sessionEntry{Key: string(k), SessionID: string(v)})
+			entry := sessionEntry{
+				Key:       string(k),
+				SessionID: string(v),
+			}
+			if mb != nil {
+				meta, ok, err := metadataFromBucket(mb, entry.SessionID)
+				if err != nil {
+					return fmt.Errorf("session: decode metadata for mirror %q: %w", entry.SessionID, err)
+				}
+				if ok {
+					entry.Source = meta.Source
+					entry.ChatID = meta.ChatID
+					entry.UserID = meta.UserID
+					entry.ParentSessionID = meta.ParentSessionID
+					entry.LineageKind = meta.LineageKind
+					if entry.ParentSessionID != "" && mb.Get([]byte(entry.ParentSessionID)) == nil {
+						entry.LineageOrphan = true
+					}
+				}
+			}
+			if entry.Source == "" || entry.ChatID == "" {
+				source, chatID := splitSessionMirrorKey(entry.Key)
+				if entry.Source == "" {
+					entry.Source = source
+				}
+				if entry.ChatID == "" {
+					entry.ChatID = chatID
+				}
+			}
+			out = append(out, entry)
 			return nil
 		})
 	})
@@ -94,10 +131,17 @@ func (m *SessionIndexMirror) render(sessions []sessionEntry) []byte {
 	b.WriteString("sessions:\n")
 	for _, entry := range sessions {
 		b.WriteString("  ")
-		b.WriteString(entry.Key)
-		b.WriteString(": ")
-		b.WriteString(entry.SessionID)
-		b.WriteString("\n")
+		b.WriteString(yamlScalar(entry.Key, true))
+		b.WriteString(":\n")
+		writeSessionMirrorField(&b, "session_id", entry.SessionID, false)
+		writeSessionMirrorField(&b, "source", entry.Source, false)
+		writeSessionMirrorField(&b, "chat_id", entry.ChatID, true)
+		writeSessionMirrorField(&b, "user_id", entry.UserID, false)
+		writeSessionMirrorField(&b, "parent_session_id", entry.ParentSessionID, false)
+		writeSessionMirrorField(&b, "lineage_kind", entry.LineageKind, false)
+		if entry.LineageOrphan {
+			b.WriteString("    lineage_orphan: true\n")
+		}
 	}
 	b.WriteString("updated_at: ")
 	b.WriteString(m.now().UTC().Format(time.RFC3339))
@@ -185,8 +229,66 @@ func fingerprintSessions(sessions []sessionEntry) string {
 		b.WriteByte(0)
 		b.WriteString(entry.SessionID)
 		b.WriteByte(0)
+		b.WriteString(entry.Source)
+		b.WriteByte(0)
+		b.WriteString(entry.ChatID)
+		b.WriteByte(0)
+		b.WriteString(entry.UserID)
+		b.WriteByte(0)
+		b.WriteString(entry.ParentSessionID)
+		b.WriteByte(0)
+		b.WriteString(entry.LineageKind)
+		b.WriteByte(0)
+		if entry.LineageOrphan {
+			b.WriteByte(1)
+		}
+		b.WriteByte(0)
 	}
 	return b.String()
+}
+
+func splitSessionMirrorKey(key string) (string, string) {
+	source, chatID, ok := strings.Cut(strings.TrimSpace(key), ":")
+	if !ok {
+		return "", ""
+	}
+	return strings.TrimSpace(source), strings.TrimSpace(chatID)
+}
+
+func writeSessionMirrorField(b *strings.Builder, key, value string, forceQuote bool) {
+	if strings.TrimSpace(value) == "" {
+		return
+	}
+	b.WriteString("    ")
+	b.WriteString(key)
+	b.WriteString(": ")
+	b.WriteString(yamlScalar(value, forceQuote))
+	b.WriteString("\n")
+}
+
+func yamlScalar(value string, forceQuote bool) string {
+	if forceQuote || needsYAMLQuotes(value) {
+		return strconv.Quote(value)
+	}
+	return value
+}
+
+func needsYAMLQuotes(value string) bool {
+	if value == "" {
+		return true
+	}
+	if _, err := strconv.ParseFloat(value, 64); err == nil {
+		return true
+	}
+	switch strings.ToLower(value) {
+	case "true", "false", "null", "~":
+		return true
+	}
+	return strings.ContainsAny(value, ":#[]{}&,*!?|>@`\"'\\") ||
+		strings.HasPrefix(value, " ") ||
+		strings.HasSuffix(value, " ") ||
+		strings.ContainsRune(value, '\n') ||
+		strings.ContainsRune(value, '\t')
 }
 
 func writeAtomic(path string, data []byte) error {

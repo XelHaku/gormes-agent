@@ -37,7 +37,7 @@ func TestStartSessionIndexMirror_WritesToXDGPath(t *testing.T) {
 	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
 		raw, err := os.ReadFile(mirrorPath)
-		if err == nil && strings.Contains(string(raw), "telegram:42: sess-telegram") {
+		if err == nil && strings.Contains(string(raw), "\"telegram:42\":") && strings.Contains(string(raw), "session_id: sess-telegram") {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

@@ -15,21 +15,31 @@ import (
 const (
 	metadataBucketName = "session_meta_v1"
 	chatUserBucketName = "session_chat_users_v1"
+
+	LineageKindPrimary          = "primary"
+	LineageKindCompressionSplit = "compression_split"
+	LineageKindFork             = "fork"
 )
 
 // ErrUserBindingConflict reports an attempt to bind one canonical chat to
 // multiple distinct user IDs.
 var ErrUserBindingConflict = errors.New("session: chat already bound to different user_id")
 
+// ErrLineageCycle reports an invalid parent chain that loops back to a
+// descendant session.
+var ErrLineageCycle = errors.New("session: lineage cycle detected")
+
 // Metadata is the first durable identity layer above the raw session map.
 // SessionID remains the resume handle; Source+ChatID identify the transport
 // chat; UserID is the canonical participant identity that can span chats.
 type Metadata struct {
-	SessionID string `json:"session_id"`
-	Source    string `json:"source,omitempty"`
-	ChatID    string `json:"chat_id,omitempty"`
-	UserID    string `json:"user_id,omitempty"`
-	UpdatedAt int64  `json:"updated_at"`
+	SessionID       string `json:"session_id"`
+	Source          string `json:"source,omitempty"`
+	ChatID          string `json:"chat_id,omitempty"`
+	UserID          string `json:"user_id,omitempty"`
+	ParentSessionID string `json:"parent_session_id,omitempty"`
+	LineageKind     string `json:"lineage_kind,omitempty"`
+	UpdatedAt       int64  `json:"updated_at"`
 }
 
 func normalizeMetadata(meta Metadata) Metadata {
@@ -37,6 +47,15 @@ func normalizeMetadata(meta Metadata) Metadata {
 	meta.Source = strings.TrimSpace(meta.Source)
 	meta.ChatID = strings.TrimSpace(meta.ChatID)
 	meta.UserID = strings.TrimSpace(meta.UserID)
+	meta.ParentSessionID = strings.TrimSpace(meta.ParentSessionID)
+	meta.LineageKind = strings.TrimSpace(meta.LineageKind)
+	return meta
+}
+
+func applyMetadataDefaults(meta Metadata) Metadata {
+	if meta.ParentSessionID == "" && meta.LineageKind == "" {
+		meta.LineageKind = LineageKindPrimary
+	}
 	return meta
 }
 
@@ -49,6 +68,19 @@ func validateMetadata(meta Metadata) error {
 	}
 	if meta.UserID != "" && (meta.Source == "" || meta.ChatID == "") {
 		return errors.New("session: metadata user_id requires source and chat_id")
+	}
+	switch meta.LineageKind {
+	case "", LineageKindPrimary, LineageKindCompressionSplit, LineageKindFork:
+	default:
+		return fmt.Errorf("session: invalid lineage_kind %q", meta.LineageKind)
+	}
+	if meta.ParentSessionID != "" {
+		if meta.LineageKind == "" {
+			return errors.New("session: metadata lineage_kind is required when parent_session_id is set")
+		}
+		if meta.LineageKind == LineageKindPrimary {
+			return errors.New("session: metadata lineage_kind primary requires empty parent_session_id")
+		}
 	}
 	return nil
 }
@@ -64,6 +96,12 @@ func mergeMetadata(existing, incoming Metadata) Metadata {
 	}
 	if incoming.UserID != "" {
 		out.UserID = incoming.UserID
+	}
+	if incoming.ParentSessionID != "" {
+		out.ParentSessionID = incoming.ParentSessionID
+	}
+	if incoming.LineageKind != "" {
+		out.LineageKind = incoming.LineageKind
 	}
 	if incoming.UpdatedAt != 0 {
 		out.UpdatedAt = incoming.UpdatedAt
@@ -89,7 +127,47 @@ func decodeMetadata(raw []byte) (Metadata, error) {
 	if err := json.Unmarshal(raw, &meta); err != nil {
 		return Metadata{}, err
 	}
-	return normalizeMetadata(meta), nil
+	return applyMetadataDefaults(normalizeMetadata(meta)), nil
+}
+
+type metadataLookup func(sessionID string) (Metadata, bool, error)
+
+func metadataFromBucket(b *bolt.Bucket, sessionID string) (Metadata, bool, error) {
+	if b == nil {
+		return Metadata{}, false, errors.New("session: metadata bucket missing")
+	}
+	raw := b.Get([]byte(sessionID))
+	if raw == nil {
+		return Metadata{}, false, nil
+	}
+	decoded, err := decodeMetadata(raw)
+	if err != nil {
+		return Metadata{}, false, fmt.Errorf("session: decode metadata for %q: %w", sessionID, err)
+	}
+	return decoded, true, nil
+}
+
+func ensureNoLineageCycle(meta Metadata, lookup metadataLookup) error {
+	seen := map[string]struct{}{
+		meta.SessionID: {},
+	}
+	current := meta.ParentSessionID
+	for current != "" {
+		if _, ok := seen[current]; ok {
+			return fmt.Errorf("%w: %s -> %s", ErrLineageCycle, meta.SessionID, current)
+		}
+		seen[current] = struct{}{}
+
+		parent, ok, err := lookup(current)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		current = parent.ParentSessionID
+	}
+	return nil
 }
 
 func (m *BoltMap) PutMetadata(ctx context.Context, meta Metadata) error {
@@ -104,8 +182,8 @@ func (m *BoltMap) PutMetadata(ctx context.Context, meta Metadata) error {
 	}
 
 	meta = normalizeMetadata(meta)
-	if err := validateMetadata(meta); err != nil {
-		return err
+	if meta.SessionID == "" {
+		return errors.New("session: metadata session_id is required")
 	}
 
 	return db.Update(func(tx *bolt.Tx) error {
@@ -121,6 +199,15 @@ func (m *BoltMap) PutMetadata(ctx context.Context, meta Metadata) error {
 				return fmt.Errorf("session: decode metadata for %q: %w", meta.SessionID, err)
 			}
 			meta = mergeMetadata(existing, meta)
+		}
+		meta = applyMetadataDefaults(meta)
+		if err := validateMetadata(meta); err != nil {
+			return err
+		}
+		if err := ensureNoLineageCycle(meta, func(sessionID string) (Metadata, bool, error) {
+			return metadataFromBucket(mb, sessionID)
+		}); err != nil {
+			return err
 		}
 
 		if meta.Source != "" && meta.ChatID != "" {
@@ -173,16 +260,12 @@ func (m *BoltMap) GetMetadata(ctx context.Context, sessionID string) (Metadata, 
 	)
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(metadataBucketName))
-		if b == nil {
-			return errors.New("session: metadata bucket missing")
-		}
-		raw := b.Get([]byte(sessionID))
-		if raw == nil {
-			return nil
-		}
-		decoded, err := decodeMetadata(raw)
+		decoded, found, err := metadataFromBucket(b, sessionID)
 		if err != nil {
-			return fmt.Errorf("session: decode metadata for %q: %w", sessionID, err)
+			return err
+		}
+		if !found {
+			return nil
 		}
 		meta = decoded
 		ok = true
@@ -274,8 +357,8 @@ func (m *MemMap) PutMetadata(ctx context.Context, meta Metadata) error {
 		return err
 	}
 	meta = normalizeMetadata(meta)
-	if err := validateMetadata(meta); err != nil {
-		return err
+	if meta.SessionID == "" {
+		return errors.New("session: metadata session_id is required")
 	}
 
 	m.mu.Lock()
@@ -283,6 +366,16 @@ func (m *MemMap) PutMetadata(ctx context.Context, meta Metadata) error {
 
 	if existing, ok := m.meta[meta.SessionID]; ok {
 		meta = mergeMetadata(existing, meta)
+	}
+	meta = applyMetadataDefaults(meta)
+	if err := validateMetadata(meta); err != nil {
+		return err
+	}
+	if err := ensureNoLineageCycle(meta, func(sessionID string) (Metadata, bool, error) {
+		parent, ok := m.meta[sessionID]
+		return parent, ok, nil
+	}); err != nil {
+		return err
 	}
 	if meta.Source != "" && meta.ChatID != "" {
 		key := chatBindingKey(meta.Source, meta.ChatID)

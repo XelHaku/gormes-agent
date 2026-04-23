@@ -491,13 +491,16 @@ func TestLoad_RealFile_Phase3Ledger(t *testing.T) {
 	}
 
 	sessionSearch := p.Phases["3"].Subphases["3.E.8"]
-	if got := sessionSearch.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 3.E.8 = %q, want in_progress", got)
+	if got := sessionSearch.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 3.E.8 = %q, want complete", got)
 	}
 	e8Items := itemsByName(sessionSearch.Items)
 	lineage := e8Items["parent_session_id lineage for compression splits"]
-	if lineage.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.8 lineage status = %q, want planned", lineage.Status)
+	if lineage.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.8 lineage status = %q, want complete", lineage.Status)
+	}
+	if !strings.Contains(lineage.Note, "lineage_orphan") || !strings.Contains(lineage.Note, "lineage_kind") {
+		t.Fatalf("Phase 3.E.8 lineage note = %q, want lineage_orphan/lineage_kind detail", lineage.Note)
 	}
 	search := e8Items["Source-filtered FTS/session search across chats"]
 	if search.Status != StatusComplete {

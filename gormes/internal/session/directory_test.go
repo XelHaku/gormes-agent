@@ -135,6 +135,107 @@ func TestBoltMap_PutMetadataRejectsConflictingUserBinding(t *testing.T) {
 	}
 }
 
+func TestBoltMap_MetadataRoundTripIncludesParentSessionAndLineageKind(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sessions.db")
+	m, err := OpenBolt(path)
+	if err != nil {
+		t.Fatalf("OpenBolt: %v", err)
+	}
+	defer m.Close()
+
+	ctx := context.Background()
+	if err := m.PutMetadata(ctx, Metadata{
+		SessionID: "sess-root",
+		Source:    "telegram",
+		ChatID:    "42",
+		UserID:    "user-juan",
+		UpdatedAt: 10,
+	}); err != nil {
+		t.Fatalf("PutMetadata root: %v", err)
+	}
+	if err := m.PutMetadata(ctx, Metadata{
+		SessionID:       "sess-child",
+		Source:          "telegram",
+		ChatID:          "42",
+		UserID:          "user-juan",
+		ParentSessionID: "sess-root",
+		LineageKind:     LineageKindCompressionSplit,
+		UpdatedAt:       20,
+	}); err != nil {
+		t.Fatalf("PutMetadata child: %v", err)
+	}
+
+	root, ok, err := m.GetMetadata(ctx, "sess-root")
+	if err != nil {
+		t.Fatalf("GetMetadata root: %v", err)
+	}
+	if !ok {
+		t.Fatal("GetMetadata(root) ok = false, want true")
+	}
+	if root.ParentSessionID != "" {
+		t.Fatalf("root ParentSessionID = %q, want empty", root.ParentSessionID)
+	}
+	if root.LineageKind != LineageKindPrimary {
+		t.Fatalf("root LineageKind = %q, want %q", root.LineageKind, LineageKindPrimary)
+	}
+
+	child, ok, err := m.GetMetadata(ctx, "sess-child")
+	if err != nil {
+		t.Fatalf("GetMetadata child: %v", err)
+	}
+	if !ok {
+		t.Fatal("GetMetadata(child) ok = false, want true")
+	}
+	if child.ParentSessionID != "sess-root" || child.LineageKind != LineageKindCompressionSplit {
+		t.Fatalf("GetMetadata(child) = %+v, want parent sess-root with compression_split lineage", child)
+	}
+}
+
+func TestBoltMap_PutMetadataRejectsLineageLoops(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sessions.db")
+	m, err := OpenBolt(path)
+	if err != nil {
+		t.Fatalf("OpenBolt: %v", err)
+	}
+	defer m.Close()
+
+	ctx := context.Background()
+
+	err = m.PutMetadata(ctx, Metadata{
+		SessionID:       "sess-self",
+		ParentSessionID: "sess-self",
+		LineageKind:     LineageKindCompressionSplit,
+	})
+	if !errors.Is(err, ErrLineageCycle) {
+		t.Fatalf("PutMetadata self-parent err = %v, want ErrLineageCycle", err)
+	}
+
+	if err := m.PutMetadata(ctx, Metadata{
+		SessionID: "sess-root",
+		UpdatedAt: 10,
+	}); err != nil {
+		t.Fatalf("PutMetadata root: %v", err)
+	}
+	if err := m.PutMetadata(ctx, Metadata{
+		SessionID:       "sess-child",
+		ParentSessionID: "sess-root",
+		LineageKind:     LineageKindCompressionSplit,
+		UpdatedAt:       20,
+	}); err != nil {
+		t.Fatalf("PutMetadata child: %v", err)
+	}
+
+	err = m.PutMetadata(ctx, Metadata{
+		SessionID:       "sess-root",
+		ParentSessionID: "sess-child",
+		LineageKind:     LineageKindFork,
+		UpdatedAt:       30,
+	})
+	if !errors.Is(err, ErrLineageCycle) {
+		t.Fatalf("PutMetadata trivial loop err = %v, want ErrLineageCycle", err)
+	}
+}
+
 func TestMemMap_MetadataRoundTripAndConflictRules(t *testing.T) {
 	m := NewMemMap()
 	ctx := context.Background()

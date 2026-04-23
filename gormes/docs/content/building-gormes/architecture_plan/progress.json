@@ -651,8 +651,8 @@
           "items": [
             {
               "name": "parent_session_id lineage for compression splits",
-              "status": "planned",
-              "note": "Execution plan frozen: add parent_session_id + lineage_kind to session.Metadata, keep roots null/primary by default, reject trivial loops, and surface orphan chains in mirrors/status instead of failing silently."
+              "status": "complete",
+              "note": "TDD landed: internal/session.Metadata now persists parent_session_id + lineage_kind with roots defaulting to primary, rejects self-parent and trivial lineage loops, and sessions/index.yaml now surfaces parent_session_id, lineage_kind, and lineage_orphan audit fields without widening recall scope."
             },
             {
               "name": "Source-filtered FTS/session search across chats",

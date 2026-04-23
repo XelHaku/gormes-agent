@@ -20,13 +20,13 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 33/66 subphases shipped · 2 in progress · 31 planned
+**Overall:** 34/66 subphases shipped · 1 in progress · 31 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
 | Phase 2 — The Gateway | ✅ | 20/20 subphases |
-| Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 12/13 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
@@ -242,9 +242,9 @@ weight: 10
 - [x] user_id concept above chat_id
 - [x] Cross-chat entity merge + recall fence
 
-### 3.E.8 — Session Lineage + Cross-Source Search 🔨
+### 3.E.8 — Session Lineage + Cross-Source Search ✅
 
-- [ ] parent_session_id lineage for compression splits
+- [x] parent_session_id lineage for compression splits
 - [x] Source-filtered FTS/session search across chats
 
 ## Phase 4 — The Brain Transplant ⏳

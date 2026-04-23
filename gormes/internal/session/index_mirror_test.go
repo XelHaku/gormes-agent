@@ -45,8 +45,14 @@ func TestSessionIndexMirror_WriteCreatesStableOrderedYAML(t *testing.T) {
 		"# Auto-generated session index\n" +
 		"# This file is a read-only mirror of sessions.db for operator auditability\n" +
 		"sessions:\n" +
-		"  discord:chan-9: sess-discord\n" +
-		"  telegram:42: sess-telegram\n" +
+		"  \"discord:chan-9\":\n" +
+		"    session_id: sess-discord\n" +
+		"    source: discord\n" +
+		"    chat_id: \"chan-9\"\n" +
+		"  \"telegram:42\":\n" +
+		"    session_id: sess-telegram\n" +
+		"    source: telegram\n" +
+		"    chat_id: \"42\"\n" +
 		"updated_at: 2026-04-22T12:34:56Z\n"
 	if string(raw) != want {
 		t.Fatalf("mirror YAML =\n%s\nwant:\n%s", raw, want)
@@ -174,6 +180,63 @@ func TestSessionIndexMirror_StartRefreshSkipsRewriteWhenSnapshotUnchanged(t *tes
 	}
 	if string(second) != string(first) {
 		t.Fatalf("unchanged snapshot rewrote index.yaml:\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
+}
+
+func TestSessionIndexMirror_WriteIncludesIdentityAndLineageFields(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "sessions.db")
+	m, err := OpenBolt(dbPath)
+	if err != nil {
+		t.Fatalf("OpenBolt: %v", err)
+	}
+	defer m.Close()
+
+	ctx := context.Background()
+	if err := m.Put(ctx, "telegram:42", "sess-child"); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	if err := m.PutMetadata(ctx, Metadata{
+		SessionID:       "sess-child",
+		Source:          "telegram",
+		ChatID:          "42",
+		UserID:          "user-juan",
+		ParentSessionID: "sess-root",
+		LineageKind:     LineageKindCompressionSplit,
+		UpdatedAt:       10,
+	}); err != nil {
+		t.Fatalf("PutMetadata: %v", err)
+	}
+
+	outPath := filepath.Join(t.TempDir(), "sessions", "index.yaml")
+	mirror := NewSessionIndexMirror(m, outPath)
+	mirror.now = func() time.Time {
+		return time.Date(2026, 4, 23, 8, 30, 0, 0, time.UTC)
+	}
+
+	if err := mirror.Write(); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	raw, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", outPath, err)
+	}
+
+	for _, want := range []string{
+		"sessions:",
+		"\"telegram:42\":",
+		"session_id: sess-child",
+		"source: telegram",
+		"chat_id: \"42\"",
+		"user_id: user-juan",
+		"parent_session_id: sess-root",
+		"lineage_kind: compression_split",
+		"lineage_orphan: true",
+		"updated_at: 2026-04-23T08:30:00Z",
+	} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("mirror YAML missing %q:\n%s", want, raw)
+		}
 	}
 }
 

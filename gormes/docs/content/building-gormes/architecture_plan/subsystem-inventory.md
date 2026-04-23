@@ -54,7 +54,7 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 
 Upstream splits memory across three stores that Gormes compresses into two:
 
-- **`hermes_state.py` — `SessionDB`** (SQLite + FTS5) holds every session's message history, model config, `user_id`, parent-session chains for compression splits, and source tagging (`cli`, `telegram`, etc.). Gormes Phase 2.C uses bbolt for (platform, chat_id) → session_id mapping; Phase 3.A's SqliteStore holds turns + FTS5. Together they cover most of SessionDB's responsibilities: `user_id` metadata and source-filtered search are now explicit 3.E surfaces, while lineage still remains.
+- **`hermes_state.py` — `SessionDB`** (SQLite + FTS5) holds every session's message history, model config, `user_id`, parent-session chains for compression splits, and source tagging (`cli`, `telegram`, etc.). Gormes Phase 2.C uses bbolt for (platform, chat_id) → session_id mapping; Phase 3.A's SqliteStore holds turns + FTS5. Together they now cover most of SessionDB's responsibilities: `user_id`, `parent_session_id`, and source-filtered search are explicit 3.E surfaces, while `last_seen` freshness still remains elsewhere.
 - **`agent/memory_manager.py` — `MemoryManager`** owns the entity graph + USER.md mirror.
 - **`agent/memory_provider.py` — `MemoryProvider` (ABC)** owns recall-time seed selection + fence assembly.
 
@@ -72,7 +72,7 @@ Upstream splits memory across three stores that Gormes compresses into two:
 | Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | ✅ shipped — rollups from `telemetry.Snapshot` plus append-only `internal/insights` JSONL persistence are landed |
 | Memory decay | None (Gormes-original) | 3.E.6 | 🔨 partial — deterministic weight attenuation at recall time landed; `last_seen` tracking remains |
 | Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | ✅ shipped — canonical `user_id > chat_id > session_id` metadata now lives in `internal/session`, and recall widens across chats only when callers opt into canonical user scope with optional source filters |
-| Parent-session chains (compression splits) | `hermes_state.py` (`SessionDB.parent_session_id`) | 3.E.8 | ⏳ planned (pairs with 4.B context compression) |
+| Parent-session chains (compression splits) | `hermes_state.py` (`SessionDB.parent_session_id`) | 3.E.8 | ✅ shipped — `internal/session.Metadata` now persists `parent_session_id` + `lineage_kind`, rejects trivial lineage loops, and surfaces orphan-aware lineage audit fields in `sessions/index.yaml` |
 | Cross-source session search | `hermes_state.py` (FTS5 across source-tagged messages) | 3.E.8 | ✅ shipped — `internal/memory/session_catalog.go` plus Goncho `scope=user` / `sources[]` now search canonical user-bound sessions with deterministic latest-turn ordering |
 
 ### Cross-cutting registries (used by multiple phases)
