@@ -1129,15 +1129,17 @@ run_once() {
       status_line=$(cat "$LOGS_DIR/worker_${i}.status")
       echo "$status_line"
 
-      # Count outcomes
+      # Count outcomes. Use $((...)) assignment instead of ((var++)) because
+      # the post-increment form returns the old value, which is a "failure"
+      # exit (0) under set -e when the counter is still zero.
       if echo "$status_line" | grep -q "success"; then
-        ((success_count++))
+        success_count=$((success_count + 1))
       elif echo "$status_line" | grep -q "timeout"; then
-        ((timeout_count++))
+        timeout_count=$((timeout_count + 1))
       elif echo "$status_line" | grep -q "failed"; then
-        ((failed_count++))
+        failed_count=$((failed_count + 1))
       else
-        ((other_count++))
+        other_count=$((other_count + 1))
       fi
     fi
   done

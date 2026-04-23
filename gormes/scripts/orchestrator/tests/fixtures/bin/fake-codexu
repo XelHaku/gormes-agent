@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+# Test stub for codexu. Mimics the invocation:
+#   codexu exec --json -c key=val -c key=val --sandbox MODE \
+#     --output-last-message FINAL_FILE PROMPT
+#
+# Modes via FAKE_CODEXU_MODE env var:
+#   success (default) - emit valid 8-section final report, commit 1 file, exit 0
+#   contract_fail     - emit incomplete final report, exit 1
+#   timeout           - sleep FAKE_CODEXU_SLEEP (default 99999)
+#   conflict          - commit a change that will collide on progress.fixture.json
+#
+# Other env vars:
+#   FAKE_CODEXU_LOG        - append trace lines here (default /dev/null)
+#   FAKE_CODEXU_SLEEP      - sleep duration for timeout mode
+#   FAKE_CODEXU_WORKTREE   - override worktree for conflict mode (default cwd)
+#   FAKE_CODEXU_BRANCH     - override branch name in conflict report
+set -Eeuo pipefail
+
+MODE="${FAKE_CODEXU_MODE:-success}"
+LOGF="${FAKE_CODEXU_LOG:-/dev/null}"
+
+final_file=""
+prompt=""
+
+# Argv parser. codexu's real shape (as built by orchestrator build_codex_cmd):
+#   exec --json -c KEY=VALUE --sandbox MODE --output-last-message FILE PROMPT
+# We accept the subcommand, ignore -c key=val, --sandbox, --json, and capture
+# --output-last-message and the trailing positional PROMPT.
+while (( $# > 0 )); do
+  case "$1" in
+    exec|--json)
+      shift
+      ;;
+    -c)
+      # Consume paired value: codexu uses -c approval_policy=never
+      shift
+      if (( $# > 0 )); then
+        shift
+      fi
+      ;;
+    --sandbox)
+      shift
+      if (( $# > 0 )); then
+        shift
+      fi
+      ;;
+    --output-last-message)
+      final_file="${2:-}"
+      shift 2 || shift
+      ;;
+    --output-last-message=*)
+      final_file="${1#--output-last-message=}"
+      shift
+      ;;
+    --)
+      shift
+      # Remainder is prompt
+      prompt="${1:-}"
+      shift || true
+      ;;
+    *)
+      # Final positional = prompt. Keep the last one we see.
+      prompt="$1"
+      shift
+      ;;
+  esac
+done
+
+{
+  echo "fake-codexu pid=$$ mode=$MODE final=$final_file prompt_len=${#prompt}"
+} >> "$LOGF" 2>/dev/null || true
+
+# Emit at least one JSONL line on stdout (real codexu emits many; we emit one
+# so the orchestrator's thread-id extractor has something to find if needed).
+echo '{"type":"thread.started","thread_id":"fake-thread-1"}'
+
+case "$MODE" in
+  timeout)
+    sleep "${FAKE_CODEXU_SLEEP:-99999}"
+    ;;
+
+  contract_fail)
+    if [[ -n "$final_file" ]]; then
+      cat > "$final_file" <<'REPORT'
+1) Selected task
+Task: x / y / z
+
+2) Pre-doc baseline
+Files:
+- progress.json
+REPORT
+    fi
+    exit 1
+    ;;
+
+  success)
+    # Parse prompt to find the Repository root (first 2-space-indented line) and
+    # the declared Git branch. build_prompt emits:
+    #
+    #   Repository root:
+    #     /path/to/worker_repo
+    #   ...
+    #   - Git branch: codexu/<run>/worker<N>
+    report_branch="$(grep -E '^- Git branch: ' <<<"$prompt" | head -n1 | sed -E 's/^- Git branch: *//')"
+    report_branch="${report_branch:-codexu/fake/worker1}"
+
+    # First indented absolute path in the prompt is the repository root.
+    worktree="$(grep -E '^  /' <<<"$prompt" | head -n1 | sed -E 's/^  //')"
+
+    if [[ -n "$worktree" && -d "$worktree" ]]; then
+      cd "$worktree"
+      fname="fake-output-$$.txt"
+      printf 'from-fake-codexu\n' > "$fname"
+      git -c user.email=t@t -c user.name=T add "$fname" >/dev/null
+      git -c user.email=t@t -c user.name=T commit -q -m "fake: worker commit $$" >/dev/null
+      head_sha="$(git rev-parse HEAD)"
+    else
+      fname="fake-output-$$.txt"
+      head_sha="0000000000000000000000000000000000000000"
+    fi
+
+    if [[ -z "$final_file" ]]; then
+      echo "fake-codexu: --output-last-message not provided" >&2
+      exit 2
+    fi
+
+    cat > "$final_file" <<REPORT
+1) Selected task
+Task: 1 / 1.A / Item A2
+
+2) Pre-doc baseline
+Files:
+- progress.json
+
+3) RED proof
+Command: go test ./...
+Exit: 1
+Snippet: FAIL
+
+4) GREEN proof
+Command: go test ./...
+Exit: 0
+Snippet: PASS
+
+5) REFACTOR proof
+Command: go test ./...
+Exit: 0
+Snippet: PASS
+
+6) Regression proof
+Command: go test ./...
+Exit: 0
+Snippet: ok
+
+7) Post-doc closeout
+Files:
+- progress.json
+
+8) Commit
+Branch: $report_branch
+Commit: $head_sha
+Files:
+- $fname
+REPORT
+    exit 0
+    ;;
+
+  conflict)
+    wt="${FAKE_CODEXU_WORKTREE:-.}"
+    cd "$wt"
+    printf 'fake-conflict-%s\n' "$$" > progress.fixture.json
+    git -c user.email=t@t -c user.name=T add progress.fixture.json >/dev/null
+    git -c user.email=t@t -c user.name=T commit -q -m "fake-conflict: $$" >/dev/null
+    head_sha="$(git rev-parse HEAD)"
+    branch="${FAKE_CODEXU_BRANCH:-codexu/fake/worker1}"
+
+    if [[ -z "$final_file" ]]; then
+      echo "fake-codexu: --output-last-message not provided" >&2
+      exit 2
+    fi
+
+    cat > "$final_file" <<REPORT
+1) Selected task
+Task: 1 / 1.A / Item A2
+
+2) Pre-doc baseline
+Files:
+- progress.fixture.json
+
+3) RED proof
+Command: x
+Exit: 1
+Snippet: x
+
+4) GREEN proof
+Command: x
+Exit: 0
+Snippet: x
+
+5) REFACTOR proof
+Command: x
+Exit: 0
+Snippet: x
+
+6) Regression proof
+Command: x
+Exit: 0
+Snippet: x
+
+7) Post-doc closeout
+Files:
+- progress.fixture.json
+
+8) Commit
+Branch: $branch
+Commit: $head_sha
+Files:
+- progress.fixture.json
+REPORT
+    exit 0
+    ;;
+
+  *)
+    echo "fake-codexu: unknown FAKE_CODEXU_MODE=$MODE" >&2
+    exit 2
+    ;;
+esac
