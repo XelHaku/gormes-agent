@@ -354,7 +354,6 @@ run_codexu_landingpage_pass() {
   log "Codex stderr: $CODEXU_STDERR"
   (
     cd "$REPO_ROOT"
-    exec </dev/null
     codexu exec --json \
       -c approval_policy=never \
       -c sandbox_mode=danger-full-access \
