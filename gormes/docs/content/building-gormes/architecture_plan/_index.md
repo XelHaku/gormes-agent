@@ -20,15 +20,15 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 43/66 subphases shipped · 3 in progress · 20 planned
+**Overall:** 45/66 subphases shipped · 1 in progress · 20 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
 | Phase 2 — The Gateway | ✅ | 20/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
-| Phase 4 — The Brain Transplant | 🔨 | 7/8 subphases |
-| Phase 5 — The Final Purge | 🔨 | 1/17 subphases |
+| Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
+| Phase 5 — The Final Purge | 🔨 | 2/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 
 ---
@@ -247,7 +247,7 @@ weight: 10
 - [x] parent_session_id lineage for compression splits
 - [x] Source-filtered FTS/session search across chats
 
-## Phase 4 — The Brain Transplant 🔨
+## Phase 4 — The Brain Transplant ✅
 
 *Native Go agent orchestrator + prompt builder*
 
@@ -299,12 +299,12 @@ weight: 10
 
 - [x] 61-tool registry port
 
-### 5.B — Sandboxing Backends 🔨
+### 5.B — Sandboxing Backends ✅
 
 - [x] Docker
 - [x] Modal
 - [x] Daytona
-- [ ] Singularity
+- [x] Singularity
 
 ### 5.C — Browser Automation 🔨
 

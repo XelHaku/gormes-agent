@@ -146,7 +146,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 
 | Category | Upstream tools | Target phase | Status |
 |---|---|---|---|
-| Sandboxing backends | `tools/environments/{base,local,docker,modal,managed_modal,modal_utils,daytona,singularity,ssh,file_sync}.py` | 5.B | 🔨 in progress — `internal/tools/environments/{daytona,docker,modal}` now cover the Daytona, Docker, and Modal backend seams; Singularity, SSH, and shared file-sync work remain pending |
+| Sandboxing backends | `tools/environments/{base,local,docker,modal,managed_modal,modal_utils,daytona,singularity,ssh,file_sync}.py` | 5.B | ✅ complete (tracked 5.B scope) — `internal/tools/environments/{daytona,docker,modal,singularity}` now cover the tracked backend seams with Docker persistence hardening, Modal snapshot restore fallback, Daytona sandbox reuse, and Singularity scratch/overlay lifecycle tests; SSH and shared file-sync remain future follow-on ports outside the current checklist |
 | Browser automation | `tools/browser_tool.py`, `browser_camofox*.py`, `browser_providers/{base,browserbase,browser_use,firecrawl}.py` | 5.C | 🔨 in progress — `internal/tools/browser_chromedp.go` now provides the first Go-native `browser_navigate` Chromedp seam with local launch and `BROWSER_CDP_URL` CDP attach support; Rod and cloud-provider parity remain pending |
 | Vision | `tools/vision_tools.py` | 5.D | ⏳ planned |
 | Image generation | `tools/image_generation_tool.py` | 5.D | ⏳ planned |

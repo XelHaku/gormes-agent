@@ -823,7 +823,8 @@
             },
             {
               "name": "Singularity",
-              "status": "planned"
+              "status": "complete",
+              "note": "Go-native backend seam now lives in internal/tools/environments/singularity with tested scratch-dir precedence, deterministic apptainer/singularity exec argv construction, persistent overlay reuse, and ephemeral scratch cleanup."
             }
           ]
         },
@@ -832,7 +833,8 @@
           "items": [
             {
               "name": "Chromedp",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/tools/browser_chromedp.go` now registers a Chromedp-backed `browser_navigate` tool with local Chrome/Chromium launch, `BROWSER_CDP_URL` remote allocator support, and deterministic body/html capture defaults via `cmd/gormes/registry.go`."
             },
             {
               "name": "Rod",

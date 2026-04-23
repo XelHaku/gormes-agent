@@ -823,7 +823,8 @@
             },
             {
               "name": "Singularity",
-              "status": "planned"
+              "status": "complete",
+              "note": "Go-native backend seam now lives in internal/tools/environments/singularity with tested scratch-dir precedence, deterministic apptainer/singularity exec argv construction, persistent overlay reuse, and ephemeral scratch cleanup."
             }
           ]
         },
