@@ -4,7 +4,9 @@ import "github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 
 func (k *Kernel) buildChatRequest(systemMsgs []hermes.Message) hermes.ChatRequest {
 	msgs := append([]hermes.Message(nil), k.history...)
-	if len(systemMsgs) > 0 {
+	if k.cfg.ContextEngine != nil {
+		msgs = k.cfg.ContextEngine.PlanMessages(systemMsgs, msgs).Messages
+	} else if len(systemMsgs) > 0 {
 		assembled := make([]hermes.Message, 0, len(systemMsgs)+len(msgs))
 		assembled = append(assembled, systemMsgs...)
 		assembled = append(assembled, msgs...)

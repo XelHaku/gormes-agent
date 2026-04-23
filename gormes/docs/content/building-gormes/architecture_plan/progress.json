@@ -708,7 +708,8 @@
           "items": [
             {
               "name": "Long session management",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/contextengine now freezes UpdateModelContext + get_status state, tracks last prompt/completion totals, and plans request history by preserving system context plus newest turn groups within the threshold; internal/kernel applies that planner before provider calls. Verified with go test ./internal/contextengine ./internal/kernel."
             },
             {
               "name": "Context compression",

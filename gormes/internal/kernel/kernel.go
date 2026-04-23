@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/audit"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/contextengine"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/store"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
@@ -57,6 +58,9 @@ type Config struct {
 	SkillUsage SkillUsageRecorder
 	// ToolAudit records append-only JSONL tool execution events when non-nil.
 	ToolAudit audit.Recorder
+	// ContextEngine owns provider-free long-session planning and compression
+	// budgeting. Nil uses the built-in compressor defaults.
+	ContextEngine *contextengine.Compressor
 }
 
 type SkillProvider interface {
@@ -94,6 +98,9 @@ type Kernel struct {
 func New(cfg Config, c hermes.Client, s store.Store, tm telemetry.Telemetry, log *slog.Logger) *Kernel {
 	if log == nil {
 		log = slog.Default()
+	}
+	if cfg.ContextEngine == nil {
+		cfg.ContextEngine = contextengine.NewCompressor(contextengine.Config{})
 	}
 	tm.SetModel(cfg.Model)
 	return &Kernel{
@@ -450,6 +457,12 @@ toolLoop:
 		prov.TokensOut = finalDelta.TokensOut
 		if finalDelta.TokensIn > 0 {
 			k.tm.SetTokensIn(finalDelta.TokensIn)
+		}
+		if k.cfg.ContextEngine != nil {
+			k.cfg.ContextEngine.UpdateFromResponse(contextengine.Usage{
+				PromptTokens:     finalDelta.TokensIn,
+				CompletionTokens: finalDelta.TokensOut,
+			})
 		}
 	}
 

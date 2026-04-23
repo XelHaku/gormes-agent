@@ -1,5 +1,14 @@
 package contextengine
 
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
+)
+
 const (
 	DefaultThresholdPercent              = 0.50
 	DefaultTargetRatio                   = 0.20
@@ -26,6 +35,25 @@ type Usage struct {
 	CompletionTokens int
 }
 
+type Status struct {
+	LastPromptTokens            int  `json:"last_prompt_tokens"`
+	LastCompletionTokens        int  `json:"last_completion_tokens"`
+	LastTotalTokens             int  `json:"last_total_tokens"`
+	ThresholdTokens             int  `json:"threshold_tokens"`
+	ContextLength               int  `json:"context_length"`
+	CompressionCount            int  `json:"compression_count"`
+	TailTokenBudget             int  `json:"tail_token_budget"`
+	MaxSummaryTokens            int  `json:"max_summary_tokens"`
+	ContextProbed               bool `json:"context_probed"`
+	IneffectiveCompressionCount int  `json:"ineffective_compression_count"`
+}
+
+type RequestPlan struct {
+	Messages        []hermes.Message
+	EstimatedTokens int
+	DroppedMessages int
+}
+
 // Compressor carries the provider-free budget math needed before the later
 // context-engine and summarizer slices get wired into the kernel loop.
 type Compressor struct {
@@ -37,6 +65,7 @@ type Compressor struct {
 	maxSummaryTokens            int
 	lastPromptTokens            int
 	lastCompletionTokens        int
+	lastTotalTokens             int
 	compressionCount            int
 	contextProbed               bool
 	lastCompressionSavingsPct   float64
@@ -86,6 +115,42 @@ func (c *Compressor) IneffectiveCompressionCount() int { return c.ineffectiveCom
 func (c *Compressor) UpdateFromResponse(usage Usage) {
 	c.lastPromptTokens = usage.PromptTokens
 	c.lastCompletionTokens = usage.CompletionTokens
+	c.lastTotalTokens = usage.PromptTokens + usage.CompletionTokens
+}
+
+func (c *Compressor) UpdateModelContext(contextLength int) {
+	if contextLength <= 0 {
+		return
+	}
+	c.contextLength = contextLength
+	c.contextProbed = false
+	c.recomputeBudgets()
+}
+
+func (c *Compressor) Status() Status {
+	return Status{
+		LastPromptTokens:            c.lastPromptTokens,
+		LastCompletionTokens:        c.lastCompletionTokens,
+		LastTotalTokens:             c.lastTotalTokens,
+		ThresholdTokens:             c.thresholdTokens,
+		ContextLength:               c.contextLength,
+		CompressionCount:            c.compressionCount,
+		TailTokenBudget:             c.tailTokenBudget,
+		MaxSummaryTokens:            c.maxSummaryTokens,
+		ContextProbed:               c.contextProbed,
+		IneffectiveCompressionCount: c.ineffectiveCompressionCount,
+	}
+}
+
+func (c *Compressor) HandleToolCall(name string, _ json.RawMessage) (json.RawMessage, error) {
+	switch strings.TrimSpace(name) {
+	case "get_status":
+		return json.Marshal(c.Status())
+	default:
+		return json.Marshal(map[string]string{
+			"error": fmt.Sprintf("unknown tool: %q", name),
+		})
+	}
 }
 
 func (c *Compressor) ShouldCompress(promptTokens int) bool {
@@ -141,6 +206,35 @@ func (c *Compressor) StepDownContextLength() bool {
 	return true
 }
 
+func (c *Compressor) PlanMessages(systemMsgs, history []hermes.Message) RequestPlan {
+	plan := RequestPlan{
+		Messages: append([]hermes.Message(nil), systemMsgs...),
+	}
+	plan.EstimatedTokens = estimateMessagesTokens(plan.Messages)
+	if len(history) == 0 {
+		return plan
+	}
+
+	groups := historyGroups(history)
+	selected := make([]messageGroup, 0, len(groups))
+	selectedTokens := 0
+	for i, group := range groups {
+		if i == 0 || plan.EstimatedTokens+selectedTokens+group.tokens <= c.thresholdTokens {
+			selected = append(selected, group)
+			selectedTokens += group.tokens
+			continue
+		}
+		for _, dropped := range groups[i:] {
+			plan.DroppedMessages += len(dropped.messages)
+		}
+		break
+	}
+
+	plan.Messages = appendSelectedGroups(plan.Messages, selected)
+	plan.EstimatedTokens += selectedTokens
+	return plan
+}
+
 func (c *Compressor) recomputeBudgets() {
 	c.thresholdTokens = thresholdTokensFor(c.contextLength, c.thresholdPercent)
 	c.tailTokenBudget = int(float64(c.thresholdTokens) * c.targetRatio)
@@ -180,4 +274,68 @@ func maxSummaryBudgetFor(contextLength int) int {
 		return summaryTokensCeiling
 	}
 	return maxSummary
+}
+
+const estimatedMessageOverheadTokens = 16
+
+type messageGroup struct {
+	messages []hermes.Message
+	tokens   int
+}
+
+func historyGroups(history []hermes.Message) []messageGroup {
+	groups := make([]messageGroup, 0, len(history))
+	for i := len(history) - 1; i >= 0; {
+		if i == len(history)-1 {
+			groups = append(groups, buildGroup(history[i]))
+			i--
+			continue
+		}
+		if history[i].Role == "assistant" && i-1 >= 0 && history[i-1].Role == "user" {
+			groups = append(groups, buildGroup(history[i-1], history[i]))
+			i -= 2
+			continue
+		}
+		groups = append(groups, buildGroup(history[i]))
+		i--
+	}
+	return groups
+}
+
+func buildGroup(messages ...hermes.Message) messageGroup {
+	group := messageGroup{
+		messages: append([]hermes.Message(nil), messages...),
+	}
+	group.tokens = estimateMessagesTokens(group.messages)
+	return group
+}
+
+func estimateMessagesTokens(messages []hermes.Message) int {
+	total := 0
+	for _, msg := range messages {
+		total += estimateMessageTokens(msg)
+	}
+	return total
+}
+
+func appendSelectedGroups(dst []hermes.Message, selected []messageGroup) []hermes.Message {
+	for i := len(selected) - 1; i >= 0; i-- {
+		dst = append(dst, selected[i].messages...)
+	}
+	return dst
+}
+
+func estimateMessageTokens(msg hermes.Message) int {
+	total := estimatedMessageOverheadTokens
+	total += utf8.RuneCountInString(msg.Role)
+	total += utf8.RuneCountInString(msg.Content)
+	total += utf8.RuneCountInString(msg.ToolCallID)
+	total += utf8.RuneCountInString(msg.Name)
+	for _, tc := range msg.ToolCalls {
+		total += estimatedMessageOverheadTokens
+		total += utf8.RuneCountInString(tc.ID)
+		total += utf8.RuneCountInString(tc.Name)
+		total += utf8.RuneCount(tc.Arguments)
+	}
+	return total
 }

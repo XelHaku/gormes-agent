@@ -16,7 +16,7 @@ Phase 4 is when Hermes becomes optional. Each sub-phase is a separable spec.
 | Subphase | Status | Deliverable |
 |---|---|---|
 | 4.A — Provider Adapters | ✅ complete | Native Go adapters for Anthropic, Bedrock, Gemini, OpenRouter, Google Code Assist, Codex (mirrors the upstream provider-adapter surfaces plus `tools/openrouter_client.py`) |
-| 4.B — Context Engine + Compression | 🔨 in progress | Provider-free context-compression budgeting landed in `internal/contextengine`; long-session management and the wider context-engine wiring still remain |
+| 4.B — Context Engine + Compression | ✅ complete | `internal/contextengine` now owns provider-free budget/status planning while `internal/kernel` trims old history on the request path, preserving system context and newest turn groups before provider calls |
 | 4.C — Native Prompt Builder | ✅ complete | `internal/kernel/prompt_builder.go` now assembles session context + recall output + skill blocks ahead of accumulated history and tool descriptors inside `hermes.ChatRequest` |
 | 4.D — Smart Model Routing | ⏳ planned | Port `agent/smart_model_routing.py` + `agent/model_metadata.py` + `agent/models_dev.py`; pick the right model per turn |
 | 4.E — Trajectory + Insights | ⏳ planned | Port `agent/trajectory.py` + `agent/insights.py`; self-monitoring telemetry surface |

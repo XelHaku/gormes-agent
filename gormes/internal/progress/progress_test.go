@@ -280,10 +280,20 @@ func TestLoad_RealFile_Phase4ContextCompression(t *testing.T) {
 	}
 
 	compression := p.Phases["4"].Subphases["4.B"]
-	if got := compression.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 4.B = %q, want in_progress", got)
+	if got := compression.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 4.B = %q, want complete", got)
 	}
 	items := itemsByName(compression.Items)
+	longSession := items["Long session management"]
+	if longSession.Status != StatusComplete {
+		t.Fatalf("Phase 4.B long session management status = %q, want complete", longSession.Status)
+	}
+	if !strings.Contains(longSession.Note, "internal/contextengine") ||
+		!strings.Contains(longSession.Note, "internal/kernel") ||
+		!strings.Contains(longSession.Note, "get_status") ||
+		!strings.Contains(longSession.Note, "go test ./internal/contextengine ./internal/kernel") {
+		t.Fatalf("Phase 4.B long session management note = %q, want package/status/test detail", longSession.Note)
+	}
 	compressor := items["Context compression"]
 	if compressor.Status != StatusComplete {
 		t.Fatalf("Phase 4.B context compression status = %q, want complete", compressor.Status)
