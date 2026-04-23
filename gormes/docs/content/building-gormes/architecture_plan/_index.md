@@ -324,9 +324,9 @@ weight: 10
 - [ ] Skills hub
 - [x] Skill registries
 
-### 5.G — MCP Integration ⏳
+### 5.G — MCP Integration 🔨
 
-- [ ] MCP client
+- [x] MCP client
 - [ ] OAuth flows
 
 ### 5.H — ACP Integration ⏳

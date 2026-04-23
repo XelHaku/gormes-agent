@@ -838,7 +838,8 @@
             },
             {
               "name": "Rod",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/tools/browser_rod.go` now adds a Rod-backed `browser_navigate` path selected via `driver=rod` or `$BROWSER_DRIVER`, covering local launch plus remote `BROWSER_CDP_URL` attach parity through the shared browser tool contract."
             }
           ]
         },
@@ -847,7 +848,8 @@
           "items": [
             {
               "name": "Multimodal in/out",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/hermes` now carries canonical text+image content parts through the default HTTP client plus OpenRouter chat, Codex Responses, Anthropic Messages, Gemini/Google Code Assist, and Bedrock request builders using inline data-URL images."
             }
           ]
         },
@@ -856,7 +858,8 @@
           "items": [
             {
               "name": "Voice mode port",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/gateway/voice_mode.go` now ports the shared `/voice` control plane (`toggle|on|tts|off|status`), persists per-chat `off|voice_only|all` state to `${XDG_DATA_HOME}/gormes/gateway_voice_mode.json`, and wires `cmd/gormes/gateway.go` through the shared manager while keeping STT/TTS/transcription engines as explicit follow-on sidecar scope."
             }
           ]
         },
@@ -878,7 +881,8 @@
           "items": [
             {
               "name": "MCP client",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/mcp/client.go` now launches stdio MCP servers, performs the `initialize` + `notifications/initialized` handshake with negotiated protocol-version validation, and exposes typed `tools/list` / `tools/call` RPC helpers backed by a subprocess transport loop. HTTP transport, dynamic toolset injection, sampling, and OAuth remain explicit follow-on scope."
             },
             {
               "name": "OAuth flows",

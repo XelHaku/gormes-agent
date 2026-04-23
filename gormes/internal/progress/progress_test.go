@@ -774,6 +774,30 @@ func TestLoad_RealFile_Phase5VoiceModePort(t *testing.T) {
 	}
 }
 
+func TestLoad_RealFile_Phase5MCPClient(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	mcp := p.Phases["5"].Subphases["5.G"]
+	if got := mcp.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 5.G = %q, want in_progress", got)
+	}
+
+	items := itemsByName(mcp.Items)
+	client := items["MCP client"]
+	if client.Status != StatusComplete {
+		t.Fatalf("Phase 5.G MCP client status = %q, want complete", client.Status)
+	}
+	if !strings.Contains(client.Note, "internal/mcp/client.go") ||
+		!strings.Contains(client.Note, "notifications/initialized") ||
+		!strings.Contains(client.Note, "tools/list") ||
+		!strings.Contains(client.Note, "tools/call") {
+		t.Fatalf("Phase 5.G MCP client note = %q, want internal/mcp/client.go + handshake/tool RPC detail", client.Note)
+	}
+}
+
 func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
 	if err != nil {

@@ -882,7 +882,8 @@
           "items": [
             {
               "name": "MCP client",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/mcp/client.go` now launches stdio MCP servers, performs the `initialize` + `notifications/initialized` handshake with negotiated protocol-version validation, and exposes typed `tools/list` / `tools/call` RPC helpers backed by a subprocess transport loop. HTTP transport, dynamic toolset injection, sampling, and OAuth remain explicit follow-on scope."
             },
             {
               "name": "OAuth flows",
