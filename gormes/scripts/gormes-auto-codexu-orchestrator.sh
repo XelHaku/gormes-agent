@@ -1,5 +1,59 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+IFS=$'\n\t'
+shopt -s inherit_errexit 2>/dev/null || true
+
+# Error handler with stack trace
+err_trap() {
+  local exit_code=$?
+  local line=${BASH_LINENO[0]}
+  local cmd="${BASH_COMMAND}"
+  echo "ERROR at line $line: exit $exit_code: $cmd" >&2
+  # Print function stack
+  local i=0
+  while caller "$i" >&2; do ((i++)); done
+}
+trap err_trap ERR
+
+# Verbose logging functions
+log_info() {
+  if [[ "$VERBOSE" == "1" ]]; then
+    echo "[INFO] $(date '+%H:%M:%S') $*" >&2
+  fi
+}
+
+log_debug() {
+  if [[ "$VERBOSE" == "1" ]]; then
+    echo "[DEBUG] $(date '+%H:%M:%S') $*" >&2
+  fi
+}
+
+log_warn() {
+  echo "[WARN] $(date '+%H:%M:%S') $*" >&2
+}
+
+log_error() {
+  echo "[ERROR] $(date '+%H:%M:%S') $*" >&2
+}
+
+# Progress indicator
+show_progress() {
+  local current=$1
+  local total=$2
+  local label="${3:-Progress}"
+  local width=50
+  local percentage=$((current * 100 / total))
+  local filled=$((width * current / total))
+  local empty=$((width - filled))
+
+  printf "\r%s [%s%s] %3d%% (%d/%d)" \
+    "$label" \
+    "$(printf '%*s' "$filled" '' | tr ' ' '=')" \
+    "$(printf '%*s' "$empty" '' | tr ' ' ' ')" \
+    "$percentage" \
+    "$current" \
+    "$total"
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -8,6 +62,7 @@ PROGRESS_JSON_REL="docs/content/building-gormes/architecture_plan/progress.json"
 PROGRESS_JSON="$REPO_ROOT/$PROGRESS_JSON_REL"
 
 MAX_AGENTS="${MAX_AGENTS:-4}"
+MAX_AGENTS_HARD_CAP="${MAX_AGENTS_HARD_CAP:-8}"
 MODE="${MODE:-safe}"
 RUN_ROOT="${RUN_ROOT:-$REPO_ROOT/.codex/orchestrator}"
 RUN_ID_SEED="${RUN_ID:-}"
@@ -15,6 +70,7 @@ WORKTREES_DIR_SEED="${WORKTREES_DIR:-}"
 RUN_ID="${RUN_ID_SEED:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
 LOCKS_DIR="$RUN_ROOT/locks"
 LOGS_DIR="$RUN_ROOT/logs"
+HEARTBEAT_JSON_LOG="${HEARTBEAT_JSON_LOG:-$LOGS_DIR/heartbeat.$RUN_ID.jsonl}"
 PROMPTS_DIR="$RUN_ROOT/prompts"
 STATE_DIR="$RUN_ROOT/state"
 WORKTREES_DIR="${WORKTREES_DIR_SEED:-$RUN_ROOT/worktrees/$RUN_ID}"
@@ -40,11 +96,20 @@ HEARTBEAT_SECONDS="${HEARTBEAT_SECONDS:-20}"
 LOOP_SLEEP_SECONDS="${LOOP_SLEEP_SECONDS:-30}"
 ORCHESTRATOR_ONCE="${ORCHESTRATOR_ONCE:-0}"
 AUTO_PROMOTE_SUCCESS="${AUTO_PROMOTE_SUCCESS:-1}"
+ALLOW_SOFT_SUCCESS_NONZERO="${ALLOW_SOFT_SUCCESS_NONZERO:-1}"
 INTEGRATION_BRANCH="${INTEGRATION_BRANCH:-codexu/autoloop}"
 INTEGRATION_WORKTREE="${INTEGRATION_WORKTREE:-}"
 MAX_RUN_WORKTREE_DIRS="${MAX_RUN_WORKTREE_DIRS:-4}"
 ACTIVE_FIRST="${ACTIVE_FIRST:-1}"
 RUNS_LEDGER="$STATE_DIR/runs.jsonl"
+
+# Verbosity and commit mode settings
+VERBOSE="${VERBOSE:-0}"
+COMMIT_TO_MAIN="${COMMIT_TO_MAIN:-0}"
+AUTO_PUSH="${AUTO_PUSH:-0}"
+MAIN_BRANCH="${MAIN_BRANCH:-main}"
+REMOTE_NAME="${REMOTE_NAME:-origin}"
+PROGRESS_INTERVAL="${PROGRESS_INTERVAL:-10}"
 PINNED_RUNS_FILE="$STATE_DIR/pinned-runs.txt"
 RUN_PIDS_DIR="$STATE_DIR/pids/$RUN_ID"
 RUN_WORKER_STATE_DIR="$STATE_DIR/workers/$RUN_ID"
@@ -74,7 +139,8 @@ Usage:
 
 Env:
   REPO_ROOT                  Default: $REPO_ROOT
-  MAX_AGENTS                 Default: 4 (hard-capped to 4)
+  MAX_AGENTS                 Default: 4 (hard-capped by MAX_AGENTS_HARD_CAP)
+  MAX_AGENTS_HARD_CAP        Default: 8
   MODE                       safe | unattended | full
   RUN_ROOT                   Default: $RUN_ROOT
   WORKTREES_DIR              Default: $WORKTREES_DIR
@@ -91,10 +157,19 @@ Env:
   LOOP_SLEEP_SECONDS         Sleep between forever-loop cycles (default: 30)
   ORCHESTRATOR_ONCE          Set to 1 to run a single batch and exit
   AUTO_PROMOTE_SUCCESS       Set to 1 to promote successful workers before next cycle
+  ALLOW_SOFT_SUCCESS_NONZERO Set to 1 to treat non-zero codex exits as success if report+commit pass validation
   INTEGRATION_BRANCH         Branch that accumulates promoted worker commits
   INTEGRATION_WORKTREE       Optional managed worktree for INTEGRATION_BRANCH
   MAX_RUN_WORKTREE_DIRS      Max kept run-level worktree dirs under worktrees/ (default: 4)
   ACTIVE_FIRST               1 sorts in_progress before planned when selecting tasks
+  
+  # New verbosity and commit options
+  VERBOSE                    Set to 1 for detailed progress logging
+  COMMIT_TO_MAIN             Set to 1 to commit directly to main branch (no worker branches)
+  AUTO_PUSH                  Set to 1 to automatically push commits to remote
+  MAIN_BRANCH                Target branch for direct commits (default: main)
+  REMOTE_NAME                Git remote name for push (default: origin)
+  PROGRESS_INTERVAL          Seconds between progress updates (default: 10)
 
 Notes:
   - Default run mode loops forever. Use ORCHESTRATOR_ONCE=1 for previous one-shot behavior.
@@ -105,11 +180,14 @@ Notes:
   - 'full' is fully automatic with danger-full-access sandboxing.
   - EXTRA_CODEX_ARGS is intentionally unsupported; use EXTRA_CODEX_ARGS_FILE so
     argument boundaries stay unambiguous.
+  - COMMIT_TO_MAIN=1 bypasses worker branches and commits directly to main.
+    Use with caution - enables rapid iteration but loses isolation.
 
 Examples:
   MAX_AGENTS=4 MODE=safe $0
   printf '%s\n' '-c' 'model_reasoning_effort="high"' > /tmp/codexu.args
   MAX_AGENTS=2 EXTRA_CODEX_ARGS_FILE=/tmp/codexu.args $0
+  VERBOSE=1 COMMIT_TO_MAIN=1 AUTO_PUSH=1 $0  # Verbose, direct to main, auto-push
 EOF
 }
 
@@ -119,8 +197,21 @@ release_run_lock() {
 
 claim_run_lock() {
   if ! mkdir "$RUN_LOCK_DIR" 2>/dev/null; then
-    echo "ERROR: another orchestrator run is already active: $RUN_LOCK_DIR" >&2
-    exit 1
+    echo "WARNING: stale lock found at $RUN_LOCK_DIR" >&2
+    echo "Checking for stale processes..." >&2
+    local stale_pids
+    stale_pids=$(ps aux | grep "[gormes-auto-codexu-orchestrator] bash" | awk '{print $2}' | grep -v "^$$\$" | head -10)
+    if [[ -n "$stale_pids" ]]; then
+      echo "Auto-killing stale processes: $stale_pids" >&2
+      echo "$stale_pids" | xargs -r kill -9 2>/dev/null || true
+      sleep 1
+    fi
+    rmdir "$RUN_LOCK_DIR" 2>/dev/null || true
+    if ! mkdir "$RUN_LOCK_DIR" 2>/dev/null; then
+      echo "ERROR: could not acquire lock after cleanup" >&2
+      exit 1
+    fi
+    echo "Stale processes killed, lock acquired" >&2
   fi
   trap release_run_lock EXIT
 }
@@ -346,12 +437,16 @@ validate() {
     echo "ERROR: MAX_AGENTS must be an integer" >&2
     exit 1
   fi
+  if ! [[ "$MAX_AGENTS_HARD_CAP" =~ ^[0-9]+$ ]] || (( MAX_AGENTS_HARD_CAP < 1 )); then
+    echo "ERROR: MAX_AGENTS_HARD_CAP must be a positive integer" >&2
+    exit 1
+  fi
   if (( MAX_AGENTS < 1 )); then
     echo "ERROR: MAX_AGENTS must be >= 1" >&2
     exit 1
   fi
-  if (( MAX_AGENTS > 4 )); then
-    MAX_AGENTS=4
+  if (( MAX_AGENTS > MAX_AGENTS_HARD_CAP )); then
+    MAX_AGENTS="$MAX_AGENTS_HARD_CAP"
   fi
   if ! [[ "$WORKER_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || (( WORKER_TIMEOUT_SECONDS < 1 )); then
     echo "ERROR: WORKER_TIMEOUT_SECONDS must be a positive integer" >&2
@@ -391,6 +486,10 @@ validate() {
   fi
   if [[ "$AUTO_PROMOTE_SUCCESS" != "0" && "$AUTO_PROMOTE_SUCCESS" != "1" ]]; then
     echo "ERROR: AUTO_PROMOTE_SUCCESS must be 0 or 1" >&2
+    exit 1
+  fi
+  if [[ "$ALLOW_SOFT_SUCCESS_NONZERO" != "0" && "$ALLOW_SOFT_SUCCESS_NONZERO" != "1" ]]; then
+    echo "ERROR: ALLOW_SOFT_SUCCESS_NONZERO must be 0 or 1" >&2
     exit 1
   fi
   if promotion_enabled && [[ -z "$INTEGRATION_BRANCH" ]]; then
@@ -526,12 +625,14 @@ cleanup_stale_locks() {
   local now
   now="$(date +%s)"
 
+  [[ -d "$LOCKS_DIR" ]] || return 0
+
   shopt -s nullglob
   local dir claim pid claimed_at_epoch
   for dir in "$LOCKS_DIR"/*.lock; do
-    claim="$dir/claim.json"
+    claim="${dir}.claim.json"
     if [[ ! -f "$claim" ]]; then
-      rm -rf "$dir"
+      rm -f "$dir" "$claim"
       continue
     fi
 
@@ -540,17 +641,17 @@ cleanup_stale_locks() {
     [[ "$claimed_at_epoch" =~ ^[0-9]+$ ]] || claimed_at_epoch=0
 
     if [[ -z "$pid" || ! "$pid" =~ ^[0-9]+$ ]]; then
-      rm -rf "$dir"
+      rm -f "$dir" "$claim"
       continue
     fi
 
     if ! kill -0 "$pid" 2>/dev/null; then
-      rm -rf "$dir"
+      rm -f "$dir" "$claim"
       continue
     fi
 
     if (( claimed_at_epoch > 0 && now - claimed_at_epoch > LOCK_TTL_SECONDS )); then
-      rm -rf "$dir"
+      rm -f "$dir" "$claim"
     fi
   done
   shopt -u nullglob
@@ -559,29 +660,52 @@ cleanup_stale_locks() {
 claim_task() {
   local slug="$1"
   local worker_id="$2"
-  local dir="$LOCKS_DIR/$slug.lock"
+  local lockfile="$LOCKS_DIR/${slug}.lock"
+  local lockfd=200
 
-  if mkdir "$dir" 2>/dev/null; then
-    cat > "$dir/claim.json" <<EOF
-{
-  "run_id": "$RUN_ID",
-  "worker_id": $worker_id,
-  "pid": ${BASHPID:-$$},
-  "claimed_at_epoch": $(date +%s),
-  "claimed_at_utc": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "host": "$(hostname 2>/dev/null || echo unknown)"
-}
-EOF
-    printf '%s\n' "$dir"
-    return 0
+  # Open lockfile on dedicated FD
+  exec {lockfd}>"$lockfile"
+
+  # Try to acquire exclusive lock with timeout (non-blocking first)
+  if ! flock -x -n "$lockfd"; then
+    # Lock held by another process - close FD and fail
+    exec {lockfd}>&- 2>/dev/null || true
+    return 1
   fi
-  return 1
+
+  # Lock acquired - write claim metadata
+  mkdir -p "$LOCKS_DIR"
+  jq -n \
+    --arg run_id "$RUN_ID" \
+    --argjson worker_id "$worker_id" \
+    --argjson pid "$$" \
+    --argjson claimed_at_epoch "$(date +%s)" \
+    --arg claimed_at_utc "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+    --arg host "$(hostname 2>/dev/null || echo unknown)" \
+    '{
+      run_id: $run_id,
+      worker_id: $worker_id,
+      pid: $pid,
+      claimed_at_epoch: $claimed_at_epoch,
+      claimed_at_utc: $claimed_at_utc,
+      host: $host
+    }' > "$lockfile.claim.json"
+
+  # Return lockfile path for release_task
+  printf '%s\n' "$lockfile"
+  return 0
 }
 
 release_task() {
-  local dir="${1:-}"
-  [[ -n "$dir" && -d "$dir" ]] || return 0
-  rm -rf "$dir"
+  local lockfile="${1:-}"
+  [[ -n "$lockfile" ]] || return 0
+
+  # Close the file descriptor to release the flock
+  # FD 200 was used in claim_task
+  exec 200>&- 2>/dev/null || true
+
+  # Clean up lock files
+  rm -f "$lockfile" "$lockfile.claim.json" 2>/dev/null || true
 }
 
 worker_branch_name() {
@@ -613,6 +737,71 @@ create_worker_worktree() {
 
   mkdir -p "$(dirname "$worktree_root")"
   git -C "$GIT_ROOT" worktree add -b "$branch" "$worktree_root" "$BASE_COMMIT" >/dev/null 2>&1
+}
+
+# Commit directly to main branch (when COMMIT_TO_MAIN=1)
+commit_to_main_directly() {
+  local worktree_root="$1"
+  local worker_id="$2"
+  local commit_msg="${3:-Worker $worker_id auto-commit}"
+
+  log_info "Committing directly to $MAIN_BRANCH from worker $worker_id"
+
+  # Ensure we're on main and it's up to date
+  git -C "$worktree_root" fetch "$REMOTE_NAME" "$MAIN_BRANCH" 2>/dev/null || true
+  git -C "$worktree_root" checkout "$MAIN_BRANCH" 2>/dev/null || git -C "$worktree_root" checkout -b "$MAIN_BRANCH"
+
+  # Pull latest changes (with merge)
+  if ! git -C "$worktree_root" pull "$REMOTE_NAME" "$MAIN_BRANCH" --no-rebase 2>/dev/null; then
+    log_warn "Could not pull latest $MAIN_BRANCH, continuing with local version"
+  fi
+
+  # Stage and commit all changes
+  git -C "$worktree_root" add -A
+  if git -C "$worktree_root" diff --cached --quiet; then
+    log_info "No changes to commit for worker $worker_id"
+    return 1
+  fi
+
+  # Create the commit
+  if git -C "$worktree_root" commit -m "$commit_msg" -m "Auto-generated by gormes-auto-codexu-orchestrator"; then
+    local commit_hash
+    commit_hash=$(git -C "$worktree_root" rev-parse HEAD)
+    log_info "Created commit $commit_hash on $MAIN_BRANCH"
+
+    # Push if AUTO_PUSH is enabled
+    if [[ "$AUTO_PUSH" == "1" ]]; then
+      log_info "Pushing commit to $REMOTE_NAME/$MAIN_BRANCH"
+      if git -C "$worktree_root" push "$REMOTE_NAME" "$MAIN_BRANCH"; then
+        log_info "Successfully pushed to $REMOTE_NAME/$MAIN_BRANCH"
+      else
+        log_error "Failed to push to $REMOTE_NAME/$MAIN_BRANCH"
+        return 1
+      fi
+    fi
+
+    printf '%s\n' "$commit_hash"
+    return 0
+  fi
+
+  return 1
+}
+
+# Push integration branch to remote
+push_integration_branch() {
+  if [[ "$AUTO_PUSH" != "1" ]]; then
+    return 0
+  fi
+
+  log_info "Pushing $INTEGRATION_BRANCH to $REMOTE_NAME"
+
+  if ! git -C "$GIT_ROOT" push "$REMOTE_NAME" "$INTEGRATION_BRANCH"; then
+    log_error "Failed to push $INTEGRATION_BRANCH to $REMOTE_NAME"
+    return 1
+  fi
+
+  log_info "Successfully pushed $INTEGRATION_BRANCH"
+  return 0
 }
 
 maybe_remove_worker_worktree() {
@@ -662,6 +851,21 @@ classify_worker_failure() {
   else
     printf 'worker_error\n'
   fi
+}
+
+try_soft_success_nonzero() {
+  local worker_id="$1"
+  local rc="$2"
+  local final_file="$3"
+  local stderr_file="$4"
+  local jsonl_file="$5"
+
+  [[ "$ALLOW_SOFT_SUCCESS_NONZERO" == "1" ]] || return 1
+  [[ "$rc" != "124" && "$rc" != "137" ]] || return 1
+
+  wait_for_valid_final_report "$worker_id" "$final_file" "$stderr_file" "$jsonl_file" || return 1
+  verify_worker_commit "$worker_id" "$final_file" || return 1
+  return 0
 }
 
 latest_worker_log_prefix() {
@@ -1020,7 +1224,19 @@ run_worker() {
   local worker_id="$1"
   local total idx pivots candidate phase_id subphase_id item_name slug trail=""
   local claim_dir=""
-  trap 'release_task "$claim_dir"; maybe_remove_worker_worktree "$worker_id"' RETURN
+
+  # Signal handler for graceful shutdown with process group cleanup
+  cleanup_worker() {
+    local sig="${1:-TERM}"
+    [[ -n "$claim_dir" ]] && release_task "$claim_dir"
+    # Kill entire process group if we're the leader
+    kill -"$sig" -$$ 2>/dev/null || true
+    maybe_remove_worker_worktree "$worker_id"
+  }
+
+  trap 'cleanup_worker INT' INT
+  trap 'cleanup_worker TERM' TERM
+  trap 'cleanup_worker EXIT' EXIT
 
   total="$(candidate_count)"
   if (( total == 0 )); then
@@ -1045,9 +1261,11 @@ run_worker() {
     [[ -n "$trail" ]] && trail+=", "
     trail+="$normalized_idx:$phase_id/$subphase_id/$item_name"
 
+    log_info "Worker $worker_id: attempting to claim task $slug"
+
     if claim_dir="$(claim_task "$slug" "$worker_id")"; then
       local stamp run_base prompt_file meta_file jsonl_file stderr_file final_file
-      local worktree_root worker_dir branch rc session_id head_commit
+      local worktree_root worker_dir branch rc session_id head_commit original_rc soft_success
       stamp="$(date -u +%Y%m%dT%H%M%SZ)"
       run_base="$LOGS_DIR/${slug}__worker${worker_id}__${stamp}"
       prompt_file="$PROMPTS_DIR/${slug}__worker${worker_id}__${stamp}.prompt.txt"
@@ -1105,6 +1323,8 @@ run_worker() {
       echo "worker[$worker_id]: worktree -> $worktree_root"
 
       (
+        # Forward signals to child process group for proper cleanup
+        trap 'kill -TERM -$$' INT TERM
         cd "$worker_dir"
         exec </dev/null
         set +e
@@ -1122,6 +1342,11 @@ run_worker() {
       )
 
       rc="$(cat "$run_base.exitcode")"
+      original_rc="$rc"
+      soft_success=0
+
+      log_info "Worker $worker_id: codexu exited with code $rc"
+
       if [[ "$rc" == "0" ]] && ! wait_for_valid_final_report "$worker_id" "$final_file" "$stderr_file" "$jsonl_file"; then
         rc=1
         echo "$rc" > "$run_base.exitcode"
@@ -1131,15 +1356,41 @@ run_worker() {
         echo "$rc" > "$run_base.exitcode"
       fi
 
+      if [[ "$rc" != "0" ]] && try_soft_success_nonzero "$worker_id" "$rc" "$final_file" "$stderr_file" "$jsonl_file"; then
+        soft_success=1
+        rc=0
+        echo "$rc" > "$run_base.exitcode"
+        echo "$original_rc" > "$run_base.original_exitcode"
+      fi
+
       session_id="$(extract_session_id "$jsonl_file" || true)"
       [[ -n "$session_id" ]] && echo "$session_id" > "$run_base.session_id"
       head_commit="$(git -C "$worktree_root" rev-parse HEAD 2>/dev/null || true)"
       [[ -n "$head_commit" ]] && echo "$head_commit" > "$run_base.head"
 
       if [[ "$rc" == "0" ]]; then
-        echo "worker[$worker_id]: success -> $slug ($head_commit)" | tee "$LOGS_DIR/worker_${worker_id}.status"
-        save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'success' --arg slug "$slug" --arg commit "$head_commit" '{run_id:$run_id,status:$status,slug:$slug,commit:$commit}')"
-        log_event "worker_success" "$worker_id" "$slug@$head_commit" "success"
+        # Handle COMMIT_TO_MAIN mode - commit directly to main instead of keeping worker branch
+        if [[ "$COMMIT_TO_MAIN" == "1" ]]; then
+          log_info "Worker $worker_id: COMMIT_TO_MAIN enabled, committing directly to $MAIN_BRANCH"
+          local main_commit
+          if main_commit=$(commit_to_main_directly "$worktree_root" "$worker_id" "$slug"); then
+            head_commit="$main_commit"
+            echo "$head_commit" > "$run_base.head"
+            log_info "Worker $worker_id: Successfully committed to $MAIN_BRANCH: $head_commit"
+          else
+            log_warn "Worker $worker_id: Failed to commit to $MAIN_BRANCH, keeping worker branch"
+          fi
+        fi
+
+        if [[ "$soft_success" == "1" ]]; then
+          echo "worker[$worker_id]: soft-success(nonzero=$original_rc) -> $slug ($head_commit)" | tee "$LOGS_DIR/worker_${worker_id}.status"
+          save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'success' --arg slug "$slug" --arg commit "$head_commit" --arg original_rc "$original_rc" --arg mode 'soft_success_nonzero' '{run_id:$run_id,status:$status,slug:$slug,commit:$commit,original_rc:($original_rc|tonumber),mode:$mode}')"
+          log_event "worker_success" "$worker_id" "$slug@$head_commit" "soft_success_nonzero"
+        else
+          echo "worker[$worker_id]: success -> $slug ($head_commit)" | tee "$LOGS_DIR/worker_${worker_id}.status"
+          save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'success' --arg slug "$slug" --arg commit "$head_commit" '{run_id:$run_id,status:$status,slug:$slug,commit:$commit}')"
+          log_event "worker_success" "$worker_id" "$slug@$head_commit" "success"
+        fi
       elif [[ "$rc" == "124" ]]; then
         echo "worker[$worker_id]: timeout(${WORKER_TIMEOUT_SECONDS}s) -> $slug" | tee "$LOGS_DIR/worker_${worker_id}.status"
         save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'failed' --arg slug "$slug" --arg reason 'timeout' '{run_id:$run_id,status:$status,slug:$slug,reason:$reason}')"
@@ -1188,22 +1439,163 @@ run_worker_resume() {
   run_worker "$worker_id"
 }
 
+# Check if process is alive and not zombie using /proc
+proc_alive() {
+  local pid=$1
+  [[ -d "/proc/$pid" ]] && ! grep -q 'Z)' "/proc/$pid/stat" 2>/dev/null
+}
+
+# Get memory pressure from PSI (Linux 4.20+)
+get_memory_psi() {
+  if [[ -f /proc/pressure/memory ]]; then
+    awk '{print $4}' /proc/pressure/memory | cut -d= -f2 | head -n1
+  fi
+}
+
+# Emit JSON heartbeat for machine parsing
+emit_heartbeat_json() {
+  local -n pids_ref=$1
+  local run_id=$2
+  local cycle=$3
+
+  local workers_json="["
+  local first=true
+  local i pid state pid_num state_escaped
+
+  for (( i=0; i<${#pids_ref[@]}; i++ )); do
+    pid="${pids_ref[$i]}"
+    if proc_alive "$pid"; then
+      state="alive"
+    elif [[ -f "$LOGS_DIR/worker_$((i+1)).status" ]]; then
+      state="$(tr -d '\n' < "$LOGS_DIR/worker_$((i+1)).status")"
+    else
+      state="exited"
+    fi
+
+    if [[ "$pid" =~ ^[0-9]+$ ]]; then
+      pid_num="$pid"
+    else
+      pid_num=0
+    fi
+
+    state_escaped="${state//\\/\\\\}"
+    state_escaped="${state_escaped//\"/\\\"}"
+
+    $first || workers_json+="," 
+    first=false
+    workers_json+="{\"worker\":$((i+1)),\"state\":\"$state_escaped\",\"pid\":$pid_num}"
+  done
+  workers_json+="]"
+
+  local progress_complete="${5:-0}"
+  local progress_total="${6:-0}"
+  local progress_pct=0
+
+  [[ "$progress_complete" =~ ^[0-9]+$ ]] || progress_complete=0
+  [[ "$progress_total" =~ ^[0-9]+$ ]] || progress_total=0
+
+  if (( progress_total > 0 )); then
+    progress_pct=$((progress_complete * 100 / progress_total))
+  fi
+
+  jq -nc \
+    --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg run_id "$run_id" \
+    --arg cycle "$cycle" \
+    --arg alive "$4" \
+    --arg workers "$workers_json" \
+    --arg progress_complete "$progress_complete" \
+    --arg progress_total "$progress_total" \
+    --arg progress_pct "$progress_pct" \
+    '{
+      ts:$ts,
+      run_id:$run_id,
+      cycle:($cycle|tonumber? // 0),
+      alive:($alive|tonumber? // 0),
+      workers:($workers|fromjson? // []),
+      progress:{
+        complete:($progress_complete|tonumber? // 0),
+        total:($progress_total|tonumber? // 0),
+        percent:($progress_pct|tonumber? // 0)
+      }
+    }'
+}
+
+# Read progress from progress.json using a single resilient jq query
+read_progress_summary() {
+  local summary complete in_progress planned total
+
+  if [[ -f "$PROGRESS_JSON" ]]; then
+    summary="$(jq -r '
+      try (
+        [ .phases[]?.subphases[]? | (.items // [])[] | .status ] as $statuses
+        | [
+            ($statuses | map(select(. == "complete")) | length),
+            ($statuses | map(select(. == "in_progress")) | length),
+            ($statuses | map(select(. == "planned")) | length)
+          ] as $counts
+        | "\($counts[0]) \($counts[1]) \($counts[2]) \($counts[0] + $counts[1] + $counts[2])"
+      ) catch "0 0 0 0"
+    ' "$PROGRESS_JSON" 2>/dev/null || true)"
+
+    read -r complete in_progress planned total <<< "${summary:-0 0 0 0}"
+
+    [[ "$complete" =~ ^[0-9]+$ ]] || complete=0
+    [[ "$in_progress" =~ ^[0-9]+$ ]] || in_progress=0
+    [[ "$planned" =~ ^[0-9]+$ ]] || planned=0
+    [[ "$total" =~ ^[0-9]+$ ]] || total=0
+  else
+    complete=0
+    in_progress=0
+    planned=0
+    total=0
+  fi
+
+  printf '%d %d %d %d\n' "$complete" "$in_progress" "$planned" "$total"
+}
+
+# Get current item a worker is working on
+get_worker_task() {
+  local worker_num=$1
+  local worker_file="$STATE_DIR/workers/$RUN_ID/worker_${worker_num}.json"
+
+  if [[ -f "$worker_file" ]]; then
+    local item_name phase_id subphase_id
+    item_name=$(jq -r '.item_name // ""' "$worker_file" 2>/dev/null)
+    phase_id=$(jq -r '.phase_id // ""' "$worker_file" 2>/dev/null)
+    subphase_id=$(jq -r '.subphase_id // ""' "$worker_file" 2>/dev/null)
+
+    if [[ -n "$item_name" && "$item_name" != "null" ]]; then
+      echo "${phase_id}/${subphase_id}: ${item_name}"
+    else
+      echo "idle"
+    fi
+  else
+    echo "idle"
+  fi
+}
+
 heartbeat_loop() {
   local -a pids=("$@")
+  local cycle=${HEARTBEAT_CYCLE:-0}
+
   while true; do
     local alive=0
     local status_line=""
     local i pid
+
     for (( i=0; i<${#pids[@]}; i++ )); do
       pid="${pids[$i]}"
-      if kill -0 "$pid" 2>/dev/null; then
+      if proc_alive "$pid"; then
         alive=$((alive + 1))
-        status_line+=" worker$((i+1))=running"
+        local worker_task
+        worker_task=$(get_worker_task $((i+1)))
+        status_line+=" w$((i+1))=${worker_task}"
       else
         if [[ -f "$LOGS_DIR/worker_$((i+1)).status" ]]; then
-          status_line+=" worker$((i+1))=$(tr -d '\n' < "$LOGS_DIR/worker_$((i+1)).status")"
+          status_line+=" w$((i+1))=$(tr -d '\n' < "$LOGS_DIR/worker_$((i+1)).status")"
         else
-          status_line+=" worker$((i+1))=done"
+          status_line+=" w$((i+1))=done"
         fi
       fi
     done
@@ -1211,8 +1603,44 @@ heartbeat_loop() {
     if (( alive == 0 )); then
       return 0
     fi
-    echo "heartbeat[$RUN_ID]: alive=$alive;${status_line}"
+
+    local progress_complete progress_in_progress progress_planned progress_total
+    read -r progress_complete progress_in_progress progress_planned progress_total <<< "$(read_progress_summary)"
+
+    [[ "$progress_complete" =~ ^[0-9]+$ ]] || progress_complete=0
+    [[ "$progress_in_progress" =~ ^[0-9]+$ ]] || progress_in_progress=0
+    [[ "$progress_planned" =~ ^[0-9]+$ ]] || progress_planned=0
+    [[ "$progress_total" =~ ^[0-9]+$ ]] || progress_total=0
+
+    local progress_pct=0
+    if (( progress_total > 0 )); then
+      progress_pct=$((progress_complete * 100 / progress_total))
+    fi
+
+    local timestamp
+    timestamp=$(date -u +%H:%M:%S)
+
+    printf '%s [progress] %3d%% (%d/%d) | alive=%d |%s\n' \
+      "$timestamp" \
+      "$progress_pct" \
+      "$progress_complete" \
+      "$progress_total" \
+      "$alive" \
+      "$status_line"
+
+    if (( (cycle % 6) == 0 )) && [[ -f "$PROGRESS_JSON" ]]; then
+      printf '           phases: %d complete | %d in-progress | %d planned\n' \
+        "$progress_complete" \
+        "$progress_in_progress" \
+        "$progress_planned" >&2
+    fi
+
+    if [[ -n "${HEARTBEAT_JSON_LOG:-}" ]]; then
+      emit_heartbeat_json pids "$RUN_ID" "$cycle" "$alive" "$progress_complete" "$progress_total" >> "$HEARTBEAT_JSON_LOG"
+    fi
+
     sleep "$HEARTBEAT_SECONDS"
+    cycle=$((cycle + 1))
   done
 }
 
@@ -1348,6 +1776,11 @@ promote_successful_workers() {
   if (( promoted > 0 )); then
     echo "Promoted worker commits: $promoted"
     echo "Integration head: $(git -C "$GIT_ROOT" rev-parse --short HEAD)"
+
+    # Push integration branch to remote if AUTO_PUSH is enabled
+    if [[ "$AUTO_PUSH" == "1" ]]; then
+      push_integration_branch || rc=1
+    fi
   fi
 
   return "$rc"
@@ -1388,7 +1821,16 @@ run_once() {
   echo "Launching workers: $workers"
   echo "Mode:             $MODE"
   echo "Safety floor:     min-available-mem=${MIN_AVAILABLE_MEM_MB}MB, per-worker=${MIN_MEM_PER_WORKER_MB}MB"
+  echo "Verbose:          $VERBOSE"
+  echo "Commit to main:   $COMMIT_TO_MAIN"
+  echo "Auto push:        $AUTO_PUSH"
+  [[ "$COMMIT_TO_MAIN" == "1" ]] && echo "Main branch:      $MAIN_BRANCH"
+  [[ "$AUTO_PUSH" == "1" ]] && echo "Remote:           $REMOTE_NAME"
   echo
+
+  log_info "Starting orchestration run"
+  log_info "Total unfinished tasks: $total"
+  log_info "Workers allocated: $workers"
 
   local pids=()
   local i
@@ -1406,10 +1848,39 @@ run_once() {
   local heartbeat_pid=$!
 
   local rc=0
+  local remaining=()
   local pid
+
+  # Validate PIDs before waiting
   for pid in "${pids[@]}"; do
-    if ! wait "$pid"; then
-      rc=1
+    if ! proc_alive "$pid"; then
+      echo "Warning: Worker PID $pid is not alive at startup" >&2
+    fi
+    remaining+=("$pid")
+  done
+
+  # Wait for workers using wait -n for faster reaping (Bash 4.3+)
+  while (( ${#remaining[@]} > 0 )); do
+    local new_remaining=()
+    local found_done=false
+
+    for pid in "${remaining[@]}"; do
+      if ! proc_alive "$pid"; then
+        # Process has exited - reap it
+        if ! wait "$pid"; then
+          rc=1
+        fi
+        found_done=true
+      else
+        new_remaining+=("$pid")
+      fi
+    done
+
+    remaining=("${new_remaining[@]}")
+
+    if ! $found_done && (( ${#remaining[@]} > 0 )); then
+      # No process exited this iteration - sleep briefly
+      sleep 0.5
     fi
   done
 
@@ -1418,32 +1889,66 @@ run_once() {
 
   echo
   echo "Worker summary:"
+  local success_count=0 failed_count=0 timeout_count=0 other_count=0
   for (( i = 1; i <= workers; i++ )); do
     if [[ -f "$LOGS_DIR/worker_${i}.status" ]]; then
-      cat "$LOGS_DIR/worker_${i}.status"
+      local status_line
+      status_line=$(cat "$LOGS_DIR/worker_${i}.status")
+      echo "$status_line"
+
+      # Count outcomes
+      if echo "$status_line" | grep -q "success"; then
+        ((success_count++))
+      elif echo "$status_line" | grep -q "timeout"; then
+        ((timeout_count++))
+      elif echo "$status_line" | grep -q "failed"; then
+        ((failed_count++))
+      else
+        ((other_count++))
+      fi
     fi
   done
+
+  log_info "Worker outcomes - Success: $success_count, Failed: $failed_count, Timeout: $timeout_count, Other: $other_count"
 
   if ! promote_successful_workers "$workers"; then
     rc=1
   fi
 
   echo
-  echo "Artifacts:"
-  echo "  Logs:      $LOGS_DIR"
-  echo "  Prompts:   $PROMPTS_DIR"
-  echo "  Locks:     $LOCKS_DIR"
-  echo "  State:     $STATE_DIR"
-  echo "  Worktrees: $WORKTREES_DIR"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "                    RUN SUMMARY REPORT"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "  Run ID:           $RUN_ID"
+  echo "  Workers:          $workers"
+  echo "  Successful:       $success_count"
+  echo "  Failed:           $failed_count"
+  echo "  Timeout:          $timeout_count"
+  echo "  Other:            $other_count"
+  echo "  Overall status:   $([[ "$rc" == "0" ]] && echo "SUCCESS ✓" || echo "FAILURE ✗")"
+  echo
+  echo "  Artifacts:"
+  echo "    Logs:      $LOGS_DIR"
+  echo "    Prompts:   $PROMPTS_DIR"
+  echo "    Locks:     $LOCKS_DIR"
+  echo "    State:     $STATE_DIR"
+  echo "    Worktrees: $WORKTREES_DIR"
   if promotion_enabled; then
-    echo "  Integration branch: $INTEGRATION_BRANCH"
-    echo "  Integration tree:   $GIT_ROOT"
+    echo "    Integration branch: $INTEGRATION_BRANCH"
+    echo "    Integration tree:   $GIT_ROOT"
   fi
+  if [[ "$COMMIT_TO_MAIN" == "1" ]]; then
+    echo "    Main branch commits: enabled"
+    [[ "$AUTO_PUSH" == "1" ]] && echo "    Auto-push: enabled to $REMOTE_NAME/$MAIN_BRANCH"
+  fi
+  echo "═══════════════════════════════════════════════════════════════"
 
   if [[ "$rc" == "0" ]]; then
-    log_event "run_completed" null "workers=${workers}" "success"
+    log_info "Run completed successfully"
+    log_event "run_completed" null "workers=${workers} success=${success_count} failed=${failed_count}" "success"
   else
-    log_event "run_completed" null "workers=${workers}" "failure"
+    log_error "Run completed with failures"
+    log_event "run_completed" null "workers=${workers} success=${success_count} failed=${failed_count}" "failure"
   fi
 
   enforce_worktree_dir_cap

@@ -20,20 +20,20 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 29/66 subphases shipped · 5 in progress · 32 planned
+**Overall:** 25/67 subphases shipped · 10 in progress · 32 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
-| Phase 1 — The Dashboard | ✅ | 2/2 subphases |
-| Phase 2 — The Gateway | 🔨 | 16/20 subphases |
-| Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
+| Phase 1 — The Dashboard | 🔨 | 2/3 subphases |
+| Phase 2 — The Gateway | 🔨 | 13/20 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 10/13 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 
 ---
 
-## Phase 1 — The Dashboard ✅
+## Phase 1 — The Dashboard 🔨
 
 *Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary*
 
@@ -46,6 +46,11 @@ weight: 10
 ### 1.B — Wire Doctor ✅
 
 - [x] Offline tool validation
+
+### 1.C — Automation Reliability 🔨
+
+- [ ] Orchestrator failure-row stabilization for 4-8 workers
+- [ ] Planner wrapper/test consistency closeout
 
 ## Phase 2 — The Gateway 🔨
 
@@ -71,15 +76,17 @@ weight: 10
 - [x] gormes gateway multi-channel entrypoint
 - [x] Discord
 
-### 2.B.3 — Slack on Shared Chassis ✅
+### 2.B.3 — Slack on Shared Chassis 🔨
 
 - [x] Slack Socket Mode adapter
 - [x] Thread routing + coalesced reply flow
-- [x] Gateway command wiring
+- [ ] Slack CommandRegistry parser wiring
+- [ ] Slack gateway.Channel adapter shim
+- [ ] Slack config + cmd/gormes gateway registration
 
 ### 2.B.4 — WhatsApp Adapter 🔨
 
-- [x] Bridge-vs-native runtime decision
+- [ ] Bridge-vs-native runtime decision
 - [x] Inbound normalization + command passthrough
 - [ ] Pairing, reconnect, and send contract
 
@@ -90,10 +97,11 @@ weight: 10
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 
-### 2.B.6 — Signal Adapter ✅
+### 2.B.6 — Signal Adapter 🔨
 
 - [x] Inbound event normalization + session identity
 - [x] Reply/send contract on shared chassis
+- [ ] Signal transport/bootstrap layer
 
 ### 2.B.7 — Email + SMS Adapters ✅
 
@@ -103,18 +111,30 @@ weight: 10
 ### 2.B.8 — Matrix + Mattermost Adapters 🔨
 
 - [x] Threaded text adapter contract suite
-- [ ] Matrix + Mattermost transport wiring
+- [ ] Matrix shared-chassis bot seam
+- [ ] Mattermost shared-chassis bot seam
+- [ ] Matrix real client/bootstrap layer
+- [ ] Mattermost REST/WS bootstrap layer
 
 ### 2.B.9 — Webhook + Trigger Ingress ✅
 
 - [x] Signed event parsing + auth gates
 - [x] Prompt-to-delivery routing bridge
 
-### 2.B.10 — Regional + Device Adapter Flood ✅
+### 2.B.10 — Regional + Device Adapter Flood 🔨
 
 - [x] BlueBubbles + HomeAssistant adapters
-- [x] Feishu + WeChat/WeCom adapters
-- [x] DingTalk + QQ Bot adapters
+- [x] Feishu shared-chassis bot seam
+- [x] WeCom + WeiXin shared-chassis bot seam
+- [x] DingTalk shared-chassis bot seam
+- [x] QQ Bot shared-chassis bot seam
+- [ ] Feishu transport/bootstrap layer
+- [ ] Feishu drive-comment rule + pairing seam
+- [ ] Feishu drive-comment reply workflow
+- [ ] WeCom + WeiXin transport/bootstrap layer
+- [x] DingTalk transport/bootstrap layer
+- [ ] DingTalk real SDK binding
+- [ ] QQ Bot transport/bootstrap layer
 
 ### 2.C — Thin Mapping Persistence ✅
 
@@ -156,12 +176,24 @@ weight: 10
 ### 2.F.3 — Restart / Pairing / Status 🔨
 
 - [x] Graceful restart drain + managed shutdown
-- [ ] Pairing state + status surfaces
+- [ ] Adapter startup failure cleanup contract
+- [ ] Active-turn follow-up queue + late-arrival drain policy
+- [ ] Drain-timeout resume_pending recovery
+- [ ] Pairing read-model schema + atomic persistence
+- [ ] Pairing approval + rate-limit semantics
+- [ ] `gormes gateway status` read-only command
+- [ ] Runtime status JSON + PID/process validation
+- [ ] Token-scoped gateway locks
+- [ ] Gateway /restart command + takeover markers
+- [ ] Channel lifecycle writers into status model
 
 ### 2.F.4 — Home Channel + Operator Surfaces ⏳
 
-- [ ] Home channel ownership + notify-to routing
-- [ ] Channel/contact directory
+- [ ] Home channel ownership rules
+- [ ] Notify-to delivery routing
+- [ ] Channel directory atomic persistence + lookup
+- [ ] Channel directory refresh + stale-target invalidation
+- [ ] Manager remember-source hook
 - [ ] Mirror + sticker cache surfaces
 
 ### 2.G — OS-AI Spine: Skills Runtime ✅
@@ -235,18 +267,25 @@ weight: 10
 
 ### 3.E.6 — Memory Decay 🔨
 
-- [ ] Relationship last_seen tracking
+- [ ] relationships.last_seen schema + backfill
+- [ ] Relationship writer freshness updates
 - [x] Deterministic weight attenuation at recall time
 
-### 3.E.7 — Cross-Chat Synthesis ✅
+### 3.E.7 — Cross-Chat Synthesis 🔨
 
 - [x] user_id concept above chat_id
-- [x] Cross-chat entity merge + recall fence
+- [x] Same-chat default recall fence
+- [x] Opt-in user-scope recall + source filters
+- [ ] Honcho-compatible scope/source tool schema
+- [ ] Cross-chat deny-path + operator evidence
 
 ### 3.E.8 — Session Lineage + Cross-Source Search 🔨
 
 - [ ] parent_session_id lineage for compression splits
-- [x] Source-filtered FTS/session search across chats
+- [x] Source-filtered session/message search core
+- [x] GONCHO user-scope search/context parameters
+- [ ] Lineage-aware source-filtered search hits
+- [ ] Operator-auditable search evidence
 
 ## Phase 4 — The Brain Transplant ⏳
 
@@ -265,10 +304,18 @@ weight: 10
 
 - [ ] Long session management
 - [ ] Context compression
+- [ ] ContextEngine interface + status tool contract
+- [ ] Compression token-budget trigger + summary sizing
+- [ ] Tool-result pruning + protected head/tail summary
+- [ ] Manual compression feedback + context references
 
 ### 4.C — Native Prompt Builder ⏳
 
 - [ ] System + memory + tools + history assembly
+- [ ] Context-file discovery + injection scan
+- [ ] Model-specific role and tool-use guidance
+- [ ] Toolset-aware skills prompt snapshot
+- [ ] Memory and session-search guidance assembly
 
 ### 4.D — Smart Model Routing ⏳
 
@@ -290,6 +337,9 @@ weight: 10
 ### 4.H — Rate / Retry / Caching ⏳
 
 - [ ] Provider-side resilience
+- [ ] Classified provider-error taxonomy
+- [ ] Retry-After + jittered backoff policy
+- [ ] Prompt-cache capability guard
 
 ## Phase 5 — The Final Purge ⏳
 
@@ -341,6 +391,10 @@ weight: 10
 ### 5.J — Approval / Security Guards ⏳
 
 - [ ] Dangerous action gating
+- [ ] Dangerous-command detector + blocked-result schema
+- [ ] Approval mode config normalization
+- [ ] Cron dangerous-command approval mode
+- [ ] Tirith, path, URL, and website policy integration
 
 ### 5.K — Code Execution ⏳
 
@@ -360,19 +414,29 @@ weight: 10
 - [ ] Clarify
 - [ ] Session search
 - [ ] Debug helpers
+- [ ] Cronjob tool API + schedule parser parity
+- [ ] Cron prompt/script safety + pre-run script contract
+- [ ] Cron multi-target delivery + media/live-adapter fallback
 
 ### 5.O — Hermes CLI Parity ⏳
 
 - [ ] 49-file CLI tree port
+- [ ] CLI command registry parity + active-turn busy policy
+- [ ] Config, profile, auth, and setup command surfaces
+- [ ] Gateway, platform, webhook, and cron management CLI
+- [ ] Diagnostics, backup, logs, and status CLI
 
 ### 5.P — Docker / Packaging ⏳
 
 - [ ] OCI image
 - [ ] Homebrew
 
-### 5.Q — TUI Gateway Streaming ⏳
+### 5.Q — API Server + TUI Gateway Streaming ⏳
 
 - [ ] SSE streaming to Bubble Tea TUI
+- [ ] OpenAI-compatible chat-completions API server
+- [ ] Responses API store + run event stream
+- [ ] API server health + cron admin endpoints
 
 ## Phase 6 — The Learning Loop (Soul) ⏳
 

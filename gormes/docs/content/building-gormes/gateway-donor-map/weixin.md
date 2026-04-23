@@ -9,7 +9,7 @@ WeiXin is the opposite of WeCom in reuse terms: PicoClaw proves the channel is p
 
 ## Status
 
-`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now groups personal WeChat into the Phase `2.B.10` regional/device adapter tranche. Gormes carries upstream Hermes docs for personal WeChat behavior, but no Go adapter exists yet.
+`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now groups personal WeChat into the Phase `2.B.10` regional/device adapter tranche. Gormes has a contract-tested shared-bot seam in `internal/channels/weixin` for policy-gated ingress and reply-path behavior, but the real iLink transport/bootstrap binding remains planned.
 
 Evidence level:
 
@@ -17,7 +17,7 @@ Evidence level:
 - The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - The upstream donor repo is `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
-- Current Gormes status and target behavior were verified in-tree against `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` and `gormes/docs/content/upstream-hermes/user-guide/messaging/weixin.md`.
+- Current Gormes status and target behavior were verified in-tree against `gormes/internal/channels/weixin/bot.go`, `gormes/internal/channels/weixin/bot_test.go`, `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md`, and `gormes/docs/content/upstream-hermes/user-guide/messaging/weixin.md`.
 
 Keep the boundary explicit: PicoClaw donates ideas and channel-specific edge behavior. Gormes remains authoritative for architecture, session ownership, and operator policy.
 

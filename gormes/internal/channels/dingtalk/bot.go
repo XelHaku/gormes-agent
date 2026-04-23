@@ -2,10 +2,8 @@ package dingtalk
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/gateway"
 )
@@ -42,7 +40,8 @@ type Bot struct {
 	log     *slog.Logger
 	allowed map[string]struct{}
 
-	sessionWebhooks sync.Map
+	sessionWebhooks *SessionWebhooks
+	replySender     *ReplySender
 }
 
 var _ gateway.Channel = (*Bot)(nil)
@@ -60,10 +59,12 @@ func New(cfg Config, client Client, log *slog.Logger) *Bot {
 		allowed[id] = struct{}{}
 	}
 	return &Bot{
-		cfg:     cfg,
-		client:  client,
-		log:     log,
-		allowed: allowed,
+		cfg:             cfg,
+		client:          client,
+		log:             log,
+		allowed:         allowed,
+		sessionWebhooks: NewSessionWebhooks(),
+		replySender:     NewReplySender(client, DefaultReplyRetryPolicy()),
 	}
 }
 
@@ -96,15 +97,7 @@ func (b *Bot) Run(ctx context.Context, inbox chan<- gateway.InboundEvent) error 
 }
 
 func (b *Bot) Send(ctx context.Context, chatID, text string) (string, error) {
-	raw, ok := b.sessionWebhooks.Load(chatID)
-	if !ok {
-		return "", fmt.Errorf("dingtalk: no session webhook for chat %q", chatID)
-	}
-	webhook, ok := raw.(string)
-	if !ok || webhook == "" {
-		return "", fmt.Errorf("dingtalk: invalid session webhook for chat %q", chatID)
-	}
-	return b.client.SendReply(ctx, webhook, text)
+	return b.replySender.Send(ctx, b.sessionWebhooks, chatID, text)
 }
 
 func (b *Bot) toInboundEvent(msg InboundMessage) (gateway.InboundEvent, bool) {
@@ -129,9 +122,7 @@ func (b *Bot) toInboundEvent(msg InboundMessage) (gateway.InboundEvent, bool) {
 		return gateway.InboundEvent{}, false
 	}
 
-	if strings.TrimSpace(msg.SessionWebhook) != "" {
-		b.sessionWebhooks.Store(chatID, strings.TrimSpace(msg.SessionWebhook))
-	}
+	b.sessionWebhooks.Remember(chatID, msg.SessionWebhook)
 
 	if strings.TrimSpace(msg.ConversationType) != "1" {
 		if !msg.Mentioned {

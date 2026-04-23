@@ -70,9 +70,9 @@ The non-transferable part is the full PicoClaw manager/bus ownership model. Gorm
 
 ## Webhook And Dynamic-Mux Patterns
 
-`pkg/channels/dynamic_mux.go` and `pkg/channels/webhook.go` are valuable for webhook-family channels such as LINE, WeCom, WeiXin, Feishu, and DingTalk. The key lesson is that webhook ingress needs a shared registration and routing layer so each provider does not reinvent HTTP path dispatch, signature verification hooks, or listener startup.
+`pkg/channels/dynamic_mux.go` and `pkg/channels/webhook.go` are valuable for webhook-family channels such as LINE, WeCom, WeiXin, and Feishu. The key lesson is that webhook ingress needs a shared registration and routing layer so each provider does not reinvent HTTP path dispatch, signature verification hooks, or listener startup.
 
-That does not mean every Gormes adapter should route through a universal webhook abstraction. Long-poll and socket-mode channels still deserve simpler dedicated loops.
+That does not mean every Gormes adapter should route through a universal webhook abstraction. Long-poll, socket-mode, and DingTalk Stream Mode channels still deserve simpler dedicated loops.
 
 ## What Gormes Should Not Import Blindly
 
@@ -97,22 +97,27 @@ Do not pull these pieces over wholesale:
 
 - PicoClaw Discord startup, mention-gate, and typing references:
   `picoclaw/pkg/channels/discord/discord.go`
-  → `gormes/internal/discord/real_client.go`
-  → `gormes/internal/discord/bot.go`
-  → `gormes/cmd/gormes/discord.go`
+  → `gormes/internal/channels/discord/real_client.go`
+  → `gormes/internal/channels/discord/bot.go`
+  → `gormes/cmd/gormes/gateway.go`
 
-- PicoClaw Slack Socket Mode, ACK, and thread target references:
+- PicoClaw Slack Socket Mode, ACK, and thread target references (partially landed, not yet on the shared gateway entrypoint):
   `picoclaw/pkg/channels/slack/slack.go`
   → `gormes/internal/slack/real_client.go`
   → `gormes/internal/slack/bot.go`
-  → `gormes/cmd/gormes/slack.go`
 
 - Gormes-only shared runtime extraction:
-  `gormes/cmd/gormes/telegram.go`
-  → `gormes/cmd/gormes/gateway_runtime.go`
+  `gormes/cmd/gormes/gateway.go`
+  → `gormes/internal/gateway/manager.go`
+  → `gormes/internal/channels/telegram/bot.go`
 
 - Gormes-only threaded text contract freeze ahead of Matrix/Mattermost:
   `gormes/internal/slack/bot.go`
   → `gormes/internal/gateway/event.go`
   → `gormes/internal/gateway/delivery.go`
   → `gormes/internal/channels/threadtext/contract.go`
+
+- PicoClaw DingTalk Stream Mode and session-webhook reply references (bot seam and runtime contract landed; real SDK binding still planned):
+  `picoclaw/pkg/channels/dingtalk/dingtalk.go`
+  → `gormes/internal/channels/dingtalk/bot.go`
+  → `gormes/internal/channels/dingtalk/runtime.go`

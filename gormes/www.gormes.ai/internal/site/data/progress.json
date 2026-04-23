@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-20",
+    "last_updated": "2026-04-23",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -11,319 +11,1179 @@
   },
   "phases": {
     "1": {
-      "name": "Phase 1 — The Dashboard",
+      "name": "Phase 1 \u2014 The Dashboard",
       "deliverable": "Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary",
       "subphases": {
         "1.A": {
           "name": "Core TUI",
           "items": [
-            { "name": "Bubble Tea shell", "status": "complete" },
-            { "name": "16ms coalescing mailbox", "status": "complete" },
-            { "name": "SSE reconnect", "status": "complete" }
+            {
+              "name": "Bubble Tea shell",
+              "status": "complete"
+            },
+            {
+              "name": "16ms coalescing mailbox",
+              "status": "complete"
+            },
+            {
+              "name": "SSE reconnect",
+              "status": "complete"
+            }
           ]
         },
         "1.B": {
           "name": "Wire Doctor",
           "items": [
-            { "name": "Offline tool validation", "status": "complete" }
+            {
+              "name": "Offline tool validation",
+              "status": "complete"
+            }
+          ]
+        },
+        "1.C": {
+          "name": "Automation Reliability",
+          "items": [
+            {
+              "name": "Orchestrator failure-row stabilization for 4-8 workers",
+              "status": "in_progress",
+              "note": "P0: stop false failure rows when codex exits non-zero despite valid final report + single clean commit; preserve promotion flow and keep loop throughput viable at higher parallelism."
+            }
           ]
         }
       }
     },
     "2": {
-      "name": "Phase 2 — The Gateway",
-      "deliverable": "Go-native tools + Telegram + session resume + wider adapters",
+      "name": "Phase 2 \u2014 The Gateway",
+      "deliverable": "Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before the long-tail adapter flood",
       "subphases": {
         "2.A": {
           "name": "Tool Registry",
           "items": [
-            { "name": "In-process Go tool registry", "status": "complete" },
-            { "name": "Streamed tool_calls accumulation", "status": "complete" },
-            { "name": "Kernel tool loop", "status": "complete" },
-            { "name": "Doctor verification", "status": "complete" }
+            {
+              "name": "In-process Go tool registry",
+              "status": "complete"
+            },
+            {
+              "name": "Streamed tool_calls accumulation",
+              "status": "complete"
+            },
+            {
+              "name": "Kernel tool loop",
+              "status": "complete"
+            },
+            {
+              "name": "Doctor verification",
+              "status": "complete"
+            }
           ]
         },
         "2.B.1": {
           "name": "Telegram Scout",
           "items": [
-            { "name": "Telegram adapter", "status": "complete" },
-            { "name": "Long-poll ingress", "status": "complete" },
-            { "name": "Edit coalescing", "status": "complete" }
+            {
+              "name": "Telegram adapter",
+              "status": "complete"
+            },
+            {
+              "name": "Long-poll ingress",
+              "status": "complete"
+            },
+            {
+              "name": "Edit coalescing",
+              "status": "complete"
+            }
+          ]
+        },
+        "2.B.2": {
+          "name": "Gateway Chassis + Discord",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "Reusable gateway chassis",
+              "status": "complete"
+            },
+            {
+              "name": "Telegram on shared chassis",
+              "status": "complete"
+            },
+            {
+              "name": "gormes gateway multi-channel entrypoint",
+              "status": "complete"
+            },
+            {
+              "name": "Discord",
+              "status": "complete"
+            }
+          ]
+        },
+        "2.B.3": {
+          "name": "Slack on Shared Chassis",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "Slack Socket Mode adapter",
+              "status": "complete",
+              "note": "TDD landed: internal/slack owns a Socket Mode bot with AuthTest, event acking, message filtering, placeholder updates, and final/error delivery over the kernel."
+            },
+            {
+              "name": "Thread routing + coalesced reply flow",
+              "status": "complete",
+              "note": "TDD landed: internal/slack preserves reply thread timestamps, coalesces streaming updates through a placeholder, and persists channel/thread session handles."
+            },
+            {
+              "name": "Slack CommandRegistry parser wiring",
+              "status": "planned",
+              "note": "TDD: route Slack slash/message command ingress through gateway.ParseInboundText and the shared CommandRegistry, with adapter-local affordances kept behind Slack-specific tests."
+            },
+            {
+              "name": "Slack gateway.Channel adapter shim",
+              "status": "planned",
+              "note": "TDD: adapt internal/slack onto the gateway.Channel interface and Manager lifecycle without rewriting the existing Socket Mode client or coalesced reply tests."
+            },
+            {
+              "name": "Slack config + cmd/gormes gateway registration",
+              "status": "planned",
+              "note": "TDD: add Slack config loading, doctor coverage, and cmd/gormes gateway registration only after the Channel shim is green; current evidence shows only Telegram and Discord are registered there."
+            }
+          ]
+        },
+        "2.B.4": {
+          "name": "WhatsApp Adapter",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "Bridge-vs-native runtime decision",
+              "status": "planned",
+              "note": "TDD: port the runtime-selection seam from upstream `gateway/platforms/whatsapp.py` into a Go contract that freezes bridge-first vs native-first startup, session-path ownership, and bot/self-chat policy before transport wiring. Current tree only lands `internal/channels/whatsapp.NormalizeInbound`."
+            },
+            {
+              "name": "Inbound normalization + command passthrough",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/whatsapp.NormalizeInbound normalizes bridge/native peer IDs and routes generic slash commands through gateway.ParseInboundText."
+            },
+            {
+              "name": "Pairing, reconnect, and send contract",
+              "status": "planned",
+              "note": "TDD: add a transport-neutral outbound lifecycle contract that gates sends on pairing state, retries reconnects with bounded backoff, and maps normalized gateway chat IDs back to raw WhatsApp DM/group peers with reply metadata preservation."
+            }
+          ]
+        },
+        "2.B.5": {
+          "name": "Session Context + Delivery Routing",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "Gateway session store + SessionSource parity",
+              "status": "complete",
+              "note": "TDD landed: gateway session-ID resolution now prefers stored handles, falls back deterministically to the chat-scoped key on empty/error paths, and freezes SessionSource/session-context prompt contracts in gateway tests."
+            },
+            {
+              "name": "SessionContext prompt injection",
+              "status": "complete",
+              "note": "TDD landed: each inbound submit now injects a stable Current Session Context system block ahead of recall/user messages, covering source metadata plus deterministic delivery-target exposure."
+            },
+            {
+              "name": "DeliveryRouter + --deliver target parsing",
+              "status": "complete",
+              "note": "TDD landed: --deliver parsing now covers origin/local/platform/platform:chat/platform:chat:thread forms with explicit invalid-shape tests before future adapter routing binds them to live channels."
+            },
+            {
+              "name": "Gateway stream consumer for agent-event fan-out",
+              "status": "complete",
+              "note": "TDD landed: a typed GatewayStreamConsumer contract now replays one render frame to multiple delivery targets in deterministic order and preserves later deliveries when one sink fails."
+            }
+          ]
+        },
+        "2.B.6": {
+          "name": "Signal Adapter",
+          "priority": "P2",
+          "items": [
+            {
+              "name": "Inbound event normalization + session identity",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/signal.NormalizeInbound now freezes Signal DM/group chat IDs, generic slash passthrough, and alternate phone/UUID session identity before client wiring."
+            },
+            {
+              "name": "Reply/send contract on shared chassis",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/signal.Bot now records reply metadata from normalized inbound events and routes shared-chassis sends back to direct recipients or native group IDs with reply-to preservation."
+            },
+            {
+              "name": "Signal transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze signal-cli or bridge client lifecycle, receive-loop reconnect/error handling, and outbound attachment/send seams before binding a real transport."
+            }
+          ]
+        },
+        "2.B.7": {
+          "name": "Email + SMS Adapters",
+          "priority": "P3",
+          "items": [
+            {
+              "name": "Email ingress + outbound delivery contract",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/email now normalizes RFC 822 MIME bodies into plaintext gateway events and derives deterministic reply-thread targets before IMAP or SMTP transport glue."
+            },
+            {
+              "name": "SMS ingress + outbound delivery contract",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/sms.NormalizeInbound now canonicalizes phone-number session keys, delegates generic slash commands through gateway.ParseInboundText, and BuildDelivery splits outbound replies into natural-boundary 1600-rune segments for future Twilio sends."
+            }
+          ]
+        },
+        "2.B.8": {
+          "name": "Matrix + Mattermost Adapters",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "Threaded text adapter contract suite",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/threadtext freezes canonical thread IDs, gateway inbound normalization, and reply-target derivation before Matrix/Mattermost transport work."
+            },
+            {
+              "name": "Matrix shared-chassis bot seam",
+              "status": "planned",
+              "note": "TDD: land a Matrix-specific bot seam on top of `internal/channels/threadtext` that freezes canonical thread reply targets, root-message thread defaults, and placeholder/edit hooks before auth/sync/E2EE transport work."
+            },
+            {
+              "name": "Mattermost shared-chassis bot seam",
+              "status": "planned",
+              "note": "TDD: land a Mattermost-specific bot seam on top of `internal/channels/threadtext` that freezes canonical reply targets, flat-vs-thread root reply defaults, and placeholder/edit hooks before REST/WS transport work."
+            },
+            {
+              "name": "Matrix real client/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze auth, sync/invite handling, room-kind and mention policy, and media/E2EE bootstrap seams before binding a real Matrix client."
+            },
+            {
+              "name": "Mattermost REST/WS bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze auth, websocket reconnect, channel/user lookup, and file upload/edit seams before binding a real Mattermost transport."
+            }
+          ]
+        },
+        "2.B.9": {
+          "name": "Webhook + Trigger Ingress",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "Signed event parsing + auth gates",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/webhook.ParseInbound now enforces body-size and event-filter gates, and ValidateSignature freezes GitHub, GitLab, and generic HMAC auth before any HTTP runtime wiring."
+            },
+            {
+              "name": "Prompt-to-delivery routing bridge",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/webhook now renders prompt and deliver_extra templates, derives deterministic webhook session chat IDs, and resolves typed gateway delivery targets including thread aliases."
+            }
+          ]
+        },
+        "2.B.10": {
+          "name": "Regional + Device Adapter Flood",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "BlueBubbles + HomeAssistant adapters",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/bluebubbles and internal/channels/homeassistant now freeze webhook-auth, cached home-channel delivery, filtered state-change formatting, cooldown, and persistent-notification contracts before any SDK wiring."
+            },
+            {
+              "name": "Feishu shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/feishu now pins webhook-versus-websocket ingress, group mention policy, allowlist behavior, and reply-target preservation before any SDK wiring."
+            },
+            {
+              "name": "WeCom + WeiXin shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/wecom and internal/channels/weixin now pin policy-gated ingress, request/reply routing, and per-platform reply-path contracts before any SDK wiring."
+            },
+            {
+              "name": "DingTalk shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/dingtalk.Bot now covers allow-list policy, mention-gated ingress, generic command parsing, session-webhook capture, and callback-bound reply delivery; runtime/bootstrap and real SDK binding remain tracked separately."
+            },
+            {
+              "name": "QQ Bot shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/qqbot now covers DM/group policy gates, mention-gated ingress, and passive-reply sequencing before any runtime bootstrap."
+            },
+            {
+              "name": "Feishu transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze webhook and websocket client lifecycle, credential validation, and rich-text send failure modes before binding a real Feishu transport."
+            },
+            {
+              "name": "WeCom + WeiXin transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze callback/webhook bootstrap, credential validation, and outbound push/reply lifecycle seams before binding real WeCom or WeiXin transports."
+            },
+            {
+              "name": "DingTalk transport/bootstrap layer",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/dingtalk now freezes Stream Mode bootstrap via DecideRuntime plus SessionWebhooks refresh and ReplySender retry/error contracts before any real SDK binding."
+            },
+            {
+              "name": "DingTalk real SDK binding",
+              "status": "planned",
+              "note": "TDD: bind the frozen Stream Mode/runtime contract to the real DingTalk SDK, credential checks, receive loop, and send lifecycle without widening the already-tested session-webhook retry seam."
+            },
+            {
+              "name": "QQ Bot transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze gateway/event receive loops, passive-reply lifecycle, and platform-specific send failure handling before binding a real QQ transport."
+            }
           ]
         },
         "2.C": {
           "name": "Thin Mapping Persistence",
           "items": [
-            { "name": "bbolt session resume", "status": "complete" },
-            { "name": "(platform, chat_id) -> session_id", "status": "complete" }
+            {
+              "name": "bbolt session resume",
+              "status": "complete"
+            },
+            {
+              "name": "(platform, chat_id) -> session_id",
+              "status": "complete"
+            }
           ]
         },
         "2.D": {
           "name": "Cron / Scheduled Automations",
           "items": [
-            { "name": "Go ticker + bbolt job store", "status": "planned" },
-            { "name": "Natural-language cron parsing (Phase 4)", "status": "planned" }
+            {
+              "name": "robfig/cron scheduler + bbolt job store",
+              "status": "complete"
+            },
+            {
+              "name": "SQLite cron_runs audit + CRON.md mirror",
+              "status": "complete"
+            },
+            {
+              "name": "Heartbeat [SYSTEM:] + [SILENT] delivery contract",
+              "status": "complete"
+            },
+            {
+              "name": "Architecture planner tasks manager script",
+              "status": "complete",
+              "note": "TDD landed: scripts/gormes-architecture-planner-tasks-manager.sh is the tracked entrypoint, while scripts/gormes-architecture-task-manager.sh and architectureplanneragent.sh remain compatibility wrappers; it writes .codex/planner/architecture-planner-tasks.md plus report/state artifacts, logs verbose repo/upstream/progress/validation/schedule context, and installs a periodic systemd/cron run."
+            }
           ]
         },
-        "2.B.2": {
-          "name": "Wider Gateway Surface",
-          "items": [
-            { "name": "Discord", "status": "planned" },
-            { "name": "Slack", "status": "planned" },
-            { "name": "WhatsApp", "status": "planned" },
-            { "name": "Signal", "status": "planned" },
-            { "name": "Email", "status": "planned" },
-            { "name": "SMS", "status": "planned" }
-          ]
-        },
-        "2.E": {
-          "name": "Subagent System",
+        "2.E.0": {
+          "name": "OS-AI Spine: Deterministic Subagent Runtime",
           "priority": "P0",
           "items": [
-            { "name": "Execution isolation", "status": "planned" },
-            { "name": "Resource boundaries", "status": "planned" },
-            { "name": "Context isolation", "status": "planned" },
-            { "name": "Cancellation scopes", "status": "planned" }
+            {
+              "name": "Deterministic subagent runtime",
+              "status": "complete"
+            },
+            {
+              "name": "Max-depth guard + bounded batch execution",
+              "status": "complete"
+            },
+            {
+              "name": "Timeout + cancellation scopes",
+              "status": "complete"
+            },
+            {
+              "name": "Typed result envelope",
+              "status": "complete"
+            },
+            {
+              "name": "Append-only run log",
+              "status": "complete"
+            }
           ]
         },
-        "2.F": {
-          "name": "Hooks + Lifecycle",
+        "2.E.1": {
+          "name": "OS-AI Spine: Delegation Policy + Child Execution",
+          "priority": "P0",
           "items": [
-            { "name": "Per-event extension points", "status": "planned" },
-            { "name": "Managed restarts", "status": "planned" }
+            {
+              "name": "Runner-enforced tool allowlists + blocked-tool policy",
+              "status": "complete",
+              "note": "TDD landed: blocked-tool and allowlist tests now cover the runner execution seam before any child tool call reaches the executor."
+            },
+            {
+              "name": "Tool-call audit in typed child results",
+              "status": "complete",
+              "note": "TDD landed: manager/result and delegate_task output tests now require typed child tool-call events to survive into terminal result envelopes."
+            },
+            {
+              "name": "Real child Hermes stream loop",
+              "status": "complete",
+              "note": "TDD landed: HermesRunner now executes a real child OpenStream loop with token/output streaming, multi-iteration tool_calls continuation through executeChildTool, explicit stream-open error handling, and registry wiring that opts delegate_task into the real runner whenever a live Hermes client is available."
+            }
+          ]
+        },
+        "2.F.1": {
+          "name": "Slash Command Registry + Gateway Dispatch",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "Canonical CommandDef registry",
+              "status": "complete",
+              "note": "TDD landed: internal/gateway now owns one CommandRegistry with ResolveCommand, ParseInboundText, registry-derived help output, and canonical alias handling for /start -> /help."
+            },
+            {
+              "name": "Gateway slash dispatch + per-platform exposure",
+              "status": "complete",
+              "note": "TDD landed: Telegram and Discord parse through the shared gateway command layer, the manager welcome/help text is registry-driven, and deterministic Telegram/Slack exposure helpers now derive from the same source of truth."
+            }
+          ]
+        },
+        "2.F.2": {
+          "name": "Hook Registry + BOOT.md",
+          "priority": "P2",
+          "items": [
+            {
+              "name": "Gateway per-event hook registry",
+              "status": "complete",
+              "note": "TDD landed: manager lifecycle tests now lock before/after receive, direct and placeholder-backed before/after send, and on_error hook emission on the shared gateway boundary."
+            },
+            {
+              "name": "Hook manifest discovery + handler loading",
+              "status": "complete",
+              "note": "TDD landed: HOOK.yaml directories now load executable command handlers with exact, prefix-wildcard, and global event matching, and `gormes gateway` wires the XDG hooks root into the live manager."
+            },
+            {
+              "name": "Built-in BOOT.md startup hook",
+              "status": "complete",
+              "note": "TDD landed: gateway startup now reads $XDG_DATA_HOME/gormes/BOOT.md, runs it through an isolated background boot kernel, and treats missing files or boot execution failures as non-blocking startup conditions."
+            }
+          ]
+        },
+        "2.F.3": {
+          "name": "Restart / Pairing / Status",
+          "priority": "P2",
+          "items": [
+            {
+              "name": "Graceful restart drain + managed shutdown",
+              "status": "complete",
+              "note": "TDD landed: manager shutdown tests now lock drain-until-idle, shutdown timeout, submit rejection during shutdown, and signal-driven root-context cancellation only after the drain path returns."
+            },
+            {
+              "name": "Pairing read-model schema + atomic persistence",
+              "status": "planned",
+              "note": "TDD: port the minimal read model from upstream `gateway/pairing.py` into an XDG-backed `pairing.json` with atomic writes, deterministic ordering, and per-platform paired/unpaired state before any approval UX."
+            },
+            {
+              "name": "Pairing approval + rate-limit semantics",
+              "status": "planned",
+              "note": "TDD: freeze code generation, expiry, max-pending, failed-attempt lockout, and per-user request rate limiting from upstream PairingStore before adapters start issuing pairing codes."
+            },
+            {
+              "name": "`gormes gateway status` read-only command",
+              "status": "planned",
+              "note": "TDD: add a read-only `gormes gateway status` surface over the shared pairing/runtime model so operators can inspect configured channels plus paired/unpaired state without starting transports."
+            },
+            {
+              "name": "Runtime status JSON + PID/process validation",
+              "status": "planned",
+              "note": "TDD: port the upstream gateway_state.json/PID-file read model with stale PID cleanup and process identity checks before wiring live channel state."
+            },
+            {
+              "name": "Channel lifecycle writers into status model",
+              "status": "planned",
+              "note": "TDD: thread live channel lifecycle updates into the shared pairing/status surface and prove read-model coherence before adapter-specific pairing UX widens."
+            }
+          ]
+        },
+        "2.F.4": {
+          "name": "Home Channel + Operator Surfaces",
+          "priority": "P3",
+          "items": [
+            {
+              "name": "Home channel ownership rules",
+              "status": "planned",
+              "note": "TDD: define home-channel selection, explicit override precedence, and per-platform fallback rules before cross-platform delivery code."
+            },
+            {
+              "name": "Notify-to delivery routing",
+              "status": "planned",
+              "note": "TDD: prove delivery-target expansion from notify-to and home-channel settings before adapter dispatch starts consulting directory state."
+            },
+            {
+              "name": "Channel directory atomic persistence + lookup",
+              "status": "planned",
+              "note": "TDD: port upstream `gateway/channel_directory.py` as an atomic `channel_directory.json` read model with composite `chat_id:thread_id` keys and human name/type lookup before periodic refresh or operator UX."
+            },
+            {
+              "name": "Channel directory refresh + stale-target invalidation",
+              "status": "planned",
+              "note": "TDD: add deterministic refresh/stale-target behavior after manager-source persistence exists, so send-target resolution never depends on adapter-specific cache side effects."
+            },
+            {
+              "name": "Manager remember-source hook",
+              "status": "planned",
+              "note": "TDD: persist allowed inbound SessionSource records through gateway.Manager before periodic refresh or send-target resolution starts depending on the directory."
+            },
+            {
+              "name": "Mirror + sticker cache surfaces",
+              "status": "planned",
+              "note": "TDD: prove cache key and mirror-write contracts before adapter-specific caches land."
+            }
           ]
         },
         "2.G": {
-          "name": "Skills System",
+          "name": "OS-AI Spine: Skills Runtime",
           "priority": "P0",
           "items": [
-            { "name": "Learning loop foundation", "status": "planned" },
-            { "name": "Pattern extraction", "status": "planned" }
+            {
+              "name": "SKILL.md parsing + active store",
+              "status": "complete"
+            },
+            {
+              "name": "Deterministic selection + prompt block",
+              "status": "complete"
+            },
+            {
+              "name": "Kernel injection + usage log",
+              "status": "complete"
+            },
+            {
+              "name": "Inactive candidate drafting",
+              "status": "complete"
+            },
+            {
+              "name": "Explicit promotion flow",
+              "status": "complete"
+            }
           ]
         }
       }
     },
     "3": {
-      "name": "Phase 3 — The Black Box (Memory)",
-      "deliverable": "SQLite + FTS5 + ontological graph + semantic fusion in Go",
+      "name": "Phase 3 \u2014 The Black Box (Memory)",
+      "deliverable": "SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes session visibility, audit trails, decay, and cross-chat/session boundaries",
       "subphases": {
         "3.A": {
           "name": "SQLite + FTS5 Lattice",
           "items": [
-            { "name": "SqliteStore", "status": "complete" },
-            { "name": "FTS5 triggers", "status": "complete" },
-            { "name": "Schema migrations v3a->v3d", "status": "complete" }
+            {
+              "name": "SqliteStore",
+              "status": "complete"
+            },
+            {
+              "name": "FTS5 triggers",
+              "status": "complete"
+            },
+            {
+              "name": "Schema migrations v3a->v3d",
+              "status": "complete"
+            }
           ]
         },
         "3.B": {
           "name": "Ontological Graph + LLM Extractor",
           "items": [
-            { "name": "Extractor", "status": "complete" },
-            { "name": "Entity/relationship upsert", "status": "complete" },
-            { "name": "Dead-letter queue", "status": "complete" }
+            {
+              "name": "Extractor",
+              "status": "complete"
+            },
+            {
+              "name": "Entity/relationship upsert",
+              "status": "complete"
+            },
+            {
+              "name": "Dead-letter queue",
+              "status": "complete"
+            }
           ]
         },
         "3.C": {
           "name": "Neural Recall + Context Injection",
           "items": [
-            { "name": "RecallProvider", "status": "complete" },
-            { "name": "2-layer seed selection", "status": "complete" },
-            { "name": "CTE traversal", "status": "complete" },
-            { "name": "<memory-context> fence", "status": "complete" }
+            {
+              "name": "RecallProvider",
+              "status": "complete"
+            },
+            {
+              "name": "2-layer seed selection",
+              "status": "complete"
+            },
+            {
+              "name": "CTE traversal",
+              "status": "complete"
+            },
+            {
+              "name": "<memory-context> fence",
+              "status": "complete"
+            }
           ]
         },
         "3.D": {
           "name": "Semantic Fusion + Local Embeddings",
           "items": [
-            { "name": "Ollama embeddings", "status": "complete" },
-            { "name": "Vector cache", "status": "complete" },
-            { "name": "Cosine similarity recall", "status": "complete" },
-            { "name": "Hybrid fusion", "status": "complete" }
+            {
+              "name": "Ollama embeddings",
+              "status": "complete"
+            },
+            {
+              "name": "Vector cache",
+              "status": "complete"
+            },
+            {
+              "name": "Cosine similarity recall",
+              "status": "complete"
+            },
+            {
+              "name": "Hybrid fusion",
+              "status": "complete"
+            }
           ]
         },
         "3.D.5": {
           "name": "Memory Mirror (USER.md sync)",
           "items": [
-            { "name": "Async background export", "status": "complete" },
-            { "name": "SQLite as source of truth", "status": "complete" }
+            {
+              "name": "Async background export",
+              "status": "complete"
+            },
+            {
+              "name": "SQLite as source of truth",
+              "status": "complete"
+            }
           ]
         },
         "3.E.1": {
           "name": "Session Index Mirror",
+          "priority": "P0",
           "items": [
-            { "name": "bbolt sessions.yaml export", "status": "planned" }
+            {
+              "name": "Read-only bbolt sessions.db -> index.yaml mirror",
+              "status": "complete",
+              "note": "TDD: shipped internal/session SessionIndexMirror with fixed YAML shape, lexically ordered bbolt key export, and atomic temp-file rewrite semantics."
+            },
+            {
+              "name": "Deterministic mirror refresh without mutating session state",
+              "status": "complete",
+              "note": "TDD: shipped a deterministic background refresh loop plus TUI/gateway/telegram runtime wiring, skipping unchanged snapshots while keeping the bbolt session map read-only."
+            }
           ]
         },
         "3.E.2": {
           "name": "Tool Execution Audit Log",
+          "priority": "P0",
           "items": [
-            { "name": "JSONL audit trail", "status": "planned" }
+            {
+              "name": "Append-only JSONL writer + schema",
+              "status": "complete",
+              "note": "TDD: shipped internal/audit JSONL append writer with a stable envelope (timestamp/source/session_id/agent_id/tool/args/duration_ms/status/result_size_bytes/error) and order-preserving tests."
+            },
+            {
+              "name": "Kernel + delegate_task audit hooks",
+              "status": "complete",
+              "note": "TDD: kernel executeToolCalls now emits audit records, and delegated child-tool execution under delegate_task appends the same JSONL schema through the subagent runtime."
+            },
+            {
+              "name": "Outcome, duration, and error capture",
+              "status": "complete",
+              "note": "TDD: RED/GREEN coverage locks duration_ms, status, and error population for successful and failed tool executions, including delegated child-tool runs."
+            }
           ]
         },
         "3.E.3": {
           "name": "Transcript Export Command",
+          "priority": "P2",
           "items": [
-            { "name": "Markdown export", "status": "planned" }
+            {
+              "name": "gormes session export <id> --format=markdown",
+              "status": "complete",
+              "note": "Shipped with Cobra wiring and clean missing-session handling; tests pin CLI shape and not-found behavior."
+            },
+            {
+              "name": "Render turns, tool calls, and timestamps from SQLite",
+              "status": "complete",
+              "note": "Markdown export now reads SQLite turns, renders deterministic ordering/timestamps, and includes persisted tool-call metadata."
+            }
           ]
         },
         "3.E.4": {
           "name": "Extraction State Visibility",
+          "priority": "P1",
           "items": [
-            { "name": "gormes memory status", "status": "planned" }
+            {
+              "name": "gormes memory status command",
+              "status": "complete",
+              "note": "TDD: shipped `gormes memory status` with a SQLite-backed extractor summary, heuristic worker health, and recent dead-letter rendering."
+            },
+            {
+              "name": "Extractor queue depth + dead-letter summary",
+              "status": "complete",
+              "note": "TDD: added deterministic dead-letter error aggregation to `gormes memory status`, with fixture-backed queue, summary, and CLI rendering coverage."
+            }
           ]
         },
         "3.E.5": {
           "name": "Insights Audit Log",
+          "priority": "P3",
           "items": [
-            { "name": "Usage JSONL", "status": "planned" }
+            {
+              "name": "Append-only daily usage.jsonl writer",
+              "status": "complete",
+              "note": "TDD landed: internal/insights now appends normalized DailyRollup records to usage.jsonl with schema-locked JSONL lines and deterministic append ordering."
+            },
+            {
+              "name": "Session, token, and cost rollups from local runtime",
+              "status": "complete",
+              "note": "TDD: shipped fixture-driven daily rollups plus a telemetry.Snapshot bridge for session counts, token totals, cost sums, and per-model breakdowns."
+            }
           ]
         },
         "3.E.6": {
           "name": "Memory Decay",
+          "priority": "P1",
           "items": [
-            { "name": "Weight attenuation", "status": "planned" },
-            { "name": "last_seen tracking", "status": "planned" }
+            {
+              "name": "relationships.last_seen schema + backfill",
+              "status": "planned",
+              "note": "TDD: add a versioned migration for relationships.last_seen, backfill from updated_at, and keep recall using a COALESCE fallback until migrated rows are proven fresh."
+            },
+            {
+              "name": "Relationship writer freshness updates",
+              "status": "planned",
+              "note": "TDD: update graph write/upsert paths so each observed relationship advances last_seen independently of long-lived weight/updated_at semantics."
+            },
+            {
+              "name": "Deterministic weight attenuation at recall time",
+              "status": "complete",
+              "note": "TDD landed: recall-time decay is now wired through RecallDecayHorizonDays, fixed-clock recall_sql coverage, and ranking assertions that preserve raw fence weights while attenuating candidate ordering."
+            }
           ]
         },
         "3.E.7": {
           "name": "Cross-Chat Synthesis",
+          "priority": "P2",
           "items": [
-            { "name": "Graph unification across chats", "status": "planned" }
+            {
+              "name": "user_id concept above chat_id",
+              "status": "complete",
+              "note": "TDD landed: internal/session now persists per-session source/chat/user metadata, resolves canonical user_id bindings above chat_id, inherits known chat bindings for resumed sessions, and rejects conflicting chat-to-user merges."
+            },
+            {
+              "name": "Same-chat default recall fence",
+              "status": "complete",
+              "note": "TDD landed: internal/memory recall applies a same-chat default fence to exact, FTS, and semantic seed selection, so named entities from another chat do not leak without explicit scope widening."
+            },
+            {
+              "name": "Opt-in user-scope recall + source filters",
+              "status": "complete",
+              "note": "TDD landed: cross-chat recall widens only through canonical user_id bindings and optional source allowlists, with unresolved user scope falling back to same-chat behavior."
+            },
+            {
+              "name": "Honcho-compatible scope/source tool schema",
+              "status": "planned",
+              "note": "TDD: make honcho_search and honcho_context schemas advertise optional scope and sources while preserving external Honcho-compatible names and keeping omitted fields same-chat by default."
+            },
+            {
+              "name": "Cross-chat deny-path + operator evidence",
+              "status": "planned",
+              "note": "TDD: prove unknown/conflicting user_id bindings cannot widen recall, then add operator-readable evidence for allowed and denied cross-chat recall paths before marking 3.E.7 complete."
+            }
+          ]
+        },
+        "3.E.8": {
+          "name": "Session Lineage + Cross-Source Search",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "parent_session_id lineage for compression splits",
+              "status": "planned",
+              "note": "Execution plan frozen: add parent_session_id + lineage_kind to session.Metadata, keep roots null/primary by default, reject trivial loops, and surface orphan chains in mirrors/status instead of failing silently."
+            },
+            {
+              "name": "Source-filtered session/message search core",
+              "status": "complete",
+              "note": "TDD landed: internal/memory.SearchMessages and SearchSessions search canonical user_id-bound sessions with optional source allowlists, deterministic latest-turn ordering, and split source/chat key normalization."
+            },
+            {
+              "name": "GONCHO user-scope search/context parameters",
+              "status": "complete",
+              "note": "TDD landed: internal/goncho SearchParams and ContextParams accept scope=user plus sources[] and pass them into the session catalog; the Honcho-compatible tool schemas still need to advertise those fields."
+            },
+            {
+              "name": "Lineage-aware source-filtered search hits",
+              "status": "planned",
+              "note": "TDD: once parent_session_id exists, make SearchMessages/SearchSessions expose parent/child lineage context for matched sessions without changing default same-chat recall behavior."
+            },
+            {
+              "name": "Operator-auditable search evidence",
+              "status": "planned",
+              "note": "TDD: add CLI or mirror evidence that shows source filters, user scope, and lineage metadata for session/message search so operators can audit why a cross-source hit appeared."
+            }
           ]
         }
       }
     },
     "4": {
-      "name": "Phase 4 — The Brain Transplant",
+      "name": "Phase 4 \u2014 The Brain Transplant",
       "deliverable": "Native Go agent orchestrator + prompt builder",
-      "dependency_note": "Build priority: Skills (2.G) -> Subagents (2.E) -> Gateway -> Native Agent Loop",
+      "dependency_note": "Build priority: 2.E0 deterministic subagent runtime -> 2.G static skills + reviewed candidate flow -> runner-enforced delegation policy + wider gateway surface -> native agent loop",
       "subphases": {
         "4.A": {
           "name": "Provider Adapters",
           "items": [
-            { "name": "Anthropic", "status": "planned" },
-            { "name": "Bedrock", "status": "planned" },
-            { "name": "Gemini", "status": "planned" },
-            { "name": "OpenRouter", "status": "planned" },
-            { "name": "Google Code Assist", "status": "planned" },
-            { "name": "Codex", "status": "planned" }
+            {
+              "name": "Anthropic",
+              "status": "planned"
+            },
+            {
+              "name": "Bedrock",
+              "status": "planned"
+            },
+            {
+              "name": "Gemini",
+              "status": "planned"
+            },
+            {
+              "name": "OpenRouter",
+              "status": "planned"
+            },
+            {
+              "name": "Google Code Assist",
+              "status": "planned"
+            },
+            {
+              "name": "Codex",
+              "status": "planned"
+            }
           ]
         },
-        "4.B": { "name": "Context Engine + Compression", "items": [
-          { "name": "Long session management", "status": "planned" },
-          { "name": "Context compression", "status": "planned" }
-        ]},
-        "4.C": { "name": "Native Prompt Builder", "items": [
-          { "name": "System + memory + tools + history assembly", "status": "planned" }
-        ]},
-        "4.D": { "name": "Smart Model Routing", "items": [
-          { "name": "Per-turn model selection", "status": "planned" }
-        ]},
-        "4.E": { "name": "Trajectory + Insights", "items": [
-          { "name": "Self-monitoring telemetry", "status": "planned" }
-        ]},
-        "4.F": { "name": "Title Generation", "items": [
-          { "name": "Auto-naming sessions", "status": "planned" }
-        ]},
-        "4.G": { "name": "Credentials + OAuth", "items": [
-          { "name": "Token vault", "status": "planned" },
-          { "name": "Multi-account auth", "status": "planned" }
-        ]},
-        "4.H": { "name": "Rate / Retry / Caching", "items": [
-          { "name": "Provider-side resilience", "status": "planned" }
-        ]}
+        "4.B": {
+          "name": "Context Engine + Compression",
+          "items": [
+            {
+              "name": "Long session management",
+              "status": "planned"
+            },
+            {
+              "name": "Context compression",
+              "status": "planned"
+            }
+          ]
+        },
+        "4.C": {
+          "name": "Native Prompt Builder",
+          "items": [
+            {
+              "name": "System + memory + tools + history assembly",
+              "status": "planned"
+            }
+          ]
+        },
+        "4.D": {
+          "name": "Smart Model Routing",
+          "items": [
+            {
+              "name": "Per-turn model selection",
+              "status": "planned"
+            }
+          ]
+        },
+        "4.E": {
+          "name": "Trajectory + Insights",
+          "items": [
+            {
+              "name": "Self-monitoring telemetry",
+              "status": "planned"
+            }
+          ]
+        },
+        "4.F": {
+          "name": "Title Generation",
+          "items": [
+            {
+              "name": "Auto-naming sessions",
+              "status": "planned"
+            }
+          ]
+        },
+        "4.G": {
+          "name": "Credentials + OAuth",
+          "items": [
+            {
+              "name": "Token vault",
+              "status": "planned"
+            },
+            {
+              "name": "Multi-account auth",
+              "status": "planned"
+            }
+          ]
+        },
+        "4.H": {
+          "name": "Rate / Retry / Caching",
+          "items": [
+            {
+              "name": "Provider-side resilience",
+              "status": "planned"
+            }
+          ]
+        }
       }
     },
     "5": {
-      "name": "Phase 5 — The Final Purge",
+      "name": "Phase 5 \u2014 The Final Purge",
       "deliverable": "Python tool scripts ported to Go or WASM",
       "subphases": {
-        "5.A": { "name": "Tool Surface Port", "items": [
-          { "name": "61-tool registry port", "status": "planned" }
-        ]},
-        "5.B": { "name": "Sandboxing Backends", "items": [
-          { "name": "Docker", "status": "planned" },
-          { "name": "Modal", "status": "planned" },
-          { "name": "Daytona", "status": "planned" },
-          { "name": "Singularity", "status": "planned" }
-        ]},
-        "5.C": { "name": "Browser Automation", "items": [
-          { "name": "Chromedp", "status": "planned" },
-          { "name": "Rod", "status": "planned" }
-        ]},
-        "5.D": { "name": "Vision + Image Generation", "items": [
-          { "name": "Multimodal in/out", "status": "planned" }
-        ]},
-        "5.E": { "name": "TTS / Voice / Transcription", "items": [
-          { "name": "Voice mode port", "status": "planned" }
-        ]},
-        "5.F": { "name": "Skills System (Remaining)", "items": [
-          { "name": "Skills hub", "status": "planned" },
-          { "name": "Skill registries", "status": "planned" }
-        ]},
-        "5.G": { "name": "MCP Integration", "items": [
-          { "name": "MCP client", "status": "planned" },
-          { "name": "OAuth flows", "status": "planned" }
-        ]},
-        "5.H": { "name": "ACP Integration", "items": [
-          { "name": "ACP server side", "status": "planned" }
-        ]},
-        "5.I": { "name": "Plugins Architecture", "items": [
-          { "name": "Plugin SDK", "status": "planned" },
-          { "name": "Third-party extensions", "status": "planned" }
-        ]},
-        "5.J": { "name": "Approval / Security Guards", "items": [
-          { "name": "Dangerous action gating", "status": "planned" }
-        ]},
-        "5.K": { "name": "Code Execution", "items": [
-          { "name": "Sandboxed exec", "status": "planned" }
-        ]},
-        "5.L": { "name": "File Ops + Patches", "items": [
-          { "name": "Atomic checkpoints", "status": "planned" }
-        ]},
-        "5.M": { "name": "Mixture of Agents", "items": [
-          { "name": "Multi-model coordination", "status": "planned" }
-        ]},
-        "5.N": { "name": "Misc Operator Tools", "items": [
-          { "name": "Todo", "status": "planned" },
-          { "name": "Clarify", "status": "planned" },
-          { "name": "Session search", "status": "planned" },
-          { "name": "Debug helpers", "status": "planned" }
-        ]},
-        "5.O": { "name": "Hermes CLI Parity", "items": [
-          { "name": "49-file CLI tree port", "status": "planned" }
-        ]},
-        "5.P": { "name": "Docker / Packaging", "items": [
-          { "name": "OCI image", "status": "planned" },
-          { "name": "Homebrew", "status": "planned" }
-        ]},
-        "5.Q": { "name": "TUI Gateway Streaming", "items": [
-          { "name": "SSE streaming to Bubble Tea TUI", "status": "planned" }
-        ]}
+        "5.A": {
+          "name": "Tool Surface Port",
+          "items": [
+            {
+              "name": "61-tool registry port",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.B": {
+          "name": "Sandboxing Backends",
+          "items": [
+            {
+              "name": "Docker",
+              "status": "planned"
+            },
+            {
+              "name": "Modal",
+              "status": "planned"
+            },
+            {
+              "name": "Daytona",
+              "status": "planned"
+            },
+            {
+              "name": "Singularity",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.C": {
+          "name": "Browser Automation",
+          "items": [
+            {
+              "name": "Chromedp",
+              "status": "planned"
+            },
+            {
+              "name": "Rod",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.D": {
+          "name": "Vision + Image Generation",
+          "items": [
+            {
+              "name": "Multimodal in/out",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.E": {
+          "name": "TTS / Voice / Transcription",
+          "items": [
+            {
+              "name": "Voice mode port",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.F": {
+          "name": "Skills System (Remaining)",
+          "items": [
+            {
+              "name": "Skills hub",
+              "status": "planned"
+            },
+            {
+              "name": "Skill registries",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.G": {
+          "name": "MCP Integration",
+          "items": [
+            {
+              "name": "MCP client",
+              "status": "planned"
+            },
+            {
+              "name": "OAuth flows",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.H": {
+          "name": "ACP Integration",
+          "items": [
+            {
+              "name": "ACP server side",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.I": {
+          "name": "Plugins Architecture",
+          "items": [
+            {
+              "name": "Plugin SDK",
+              "status": "planned"
+            },
+            {
+              "name": "Third-party extensions",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.J": {
+          "name": "Approval / Security Guards",
+          "items": [
+            {
+              "name": "Dangerous action gating",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.K": {
+          "name": "Code Execution",
+          "items": [
+            {
+              "name": "Sandboxed exec",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.L": {
+          "name": "File Ops + Patches",
+          "items": [
+            {
+              "name": "Atomic checkpoints",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.M": {
+          "name": "Mixture of Agents",
+          "items": [
+            {
+              "name": "Multi-model coordination",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.N": {
+          "name": "Misc Operator Tools",
+          "items": [
+            {
+              "name": "Todo",
+              "status": "planned"
+            },
+            {
+              "name": "Clarify",
+              "status": "planned"
+            },
+            {
+              "name": "Session search",
+              "status": "planned"
+            },
+            {
+              "name": "Debug helpers",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.O": {
+          "name": "Hermes CLI Parity",
+          "items": [
+            {
+              "name": "49-file CLI tree port",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.P": {
+          "name": "Docker / Packaging",
+          "items": [
+            {
+              "name": "OCI image",
+              "status": "planned"
+            },
+            {
+              "name": "Homebrew",
+              "status": "planned"
+            }
+          ]
+        },
+        "5.Q": {
+          "name": "TUI Gateway Streaming",
+          "items": [
+            {
+              "name": "SSE streaming to Bubble Tea TUI",
+              "status": "planned"
+            }
+          ]
+        }
       }
     },
     "6": {
-      "name": "Phase 6 — The Learning Loop (Soul)",
+      "name": "Phase 6 \u2014 The Learning Loop (Soul)",
       "deliverable": "Native skill extraction. Compounding intelligence. The feature Hermes doesn't have.",
       "subphases": {
-        "6.A": { "name": "Complexity Detector", "items": [
-          { "name": "Heuristic or LLM-scored signal", "status": "planned" }
-        ]},
-        "6.B": { "name": "Skill Extractor", "items": [
-          { "name": "LLM-assisted pattern distillation", "status": "planned" }
-        ]},
-        "6.C": { "name": "Skill Storage Format", "items": [
-          { "name": "Portable SKILL.md format", "status": "planned" }
-        ]},
-        "6.D": { "name": "Skill Retrieval + Matching", "items": [
-          { "name": "Hybrid lexical + semantic lookup", "status": "planned" }
-        ]},
-        "6.E": { "name": "Feedback Loop", "items": [
-          { "name": "Skill effectiveness scoring", "status": "planned" }
-        ]},
-        "6.F": { "name": "Skill Surface", "items": [
-          { "name": "TUI + Telegram browsing", "status": "planned" }
-        ]}
+        "6.A": {
+          "name": "Complexity Detector",
+          "items": [
+            {
+              "name": "Heuristic or LLM-scored signal",
+              "status": "planned"
+            }
+          ]
+        },
+        "6.B": {
+          "name": "Skill Extractor",
+          "items": [
+            {
+              "name": "LLM-assisted pattern distillation",
+              "status": "planned"
+            }
+          ]
+        },
+        "6.C": {
+          "name": "Skill Storage Format",
+          "items": [
+            {
+              "name": "Portable SKILL.md format",
+              "status": "planned"
+            }
+          ]
+        },
+        "6.D": {
+          "name": "Skill Retrieval + Matching",
+          "items": [
+            {
+              "name": "Hybrid lexical + semantic lookup",
+              "status": "planned"
+            }
+          ]
+        },
+        "6.E": {
+          "name": "Feedback Loop",
+          "items": [
+            {
+              "name": "Skill effectiveness scoring",
+              "status": "planned"
+            }
+          ]
+        },
+        "6.F": {
+          "name": "Skill Surface",
+          "items": [
+            {
+              "name": "TUI + Telegram browsing",
+              "status": "planned"
+            }
+          ]
+        }
       }
     }
   }

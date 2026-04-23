@@ -25,4 +25,5 @@ Phase 1 should be read correctly: it is a tactical Strangler Fig bridge, not a p
 
 ## What's ongoing
 
-- Polish, bug fixes, TUI ergonomics. No formal sub-phases remain.
+- Polish, bug fixes, and TUI ergonomics stay on the maintenance lane.
+- Automation reliability now has its own progress-ledger lane (1.C) for planner/orchestrator operational fixes. Keep those slices TDD-first and do not treat them as product-dashboard scope.

@@ -2,7 +2,7 @@
 
 Server-rendered landing page for current Gormes trunk.
 
-The site should reflect the shipped moat layers truthfully: the zero-CGO Go shell, the Go-native tool registry, the built-in Telegram adapter, Route-B resilience, and the current Phase-2 shipping boundary. It should not regress into a Phase-1-only story or hardcode stale proof claims.
+The site should reflect the shipped moat layers truthfully: the zero-CGO Go shell, the Go-native tool registry, Telegram/Discord on the shared gateway, Route-B resilience, and the progress-driven Phase-2 shipping boundary. It should not regress into a Phase-1-only story or hardcode stale proof claims.
 
 The site is built in Go and serves the public homepage at `/` plus embedded static assets at `/static/*`. In this monorepo, the implementation lives under `gormes/www.gormes.ai/internal/site` so the templates and CSS can be embedded with `//go:embed`.
 

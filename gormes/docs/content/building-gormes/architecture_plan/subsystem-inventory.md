@@ -7,50 +7,51 @@ weight: 80
 
 The complete picture of what Gormes must absorb to retire the Python `hermes-agent` runtime. Each row is one upstream module or capability, mapped to its target phase. This inventory is the source of truth for "what's left" — when a subsystem is shipped in Go, mark it ✅ and link the spec.
 
-### Gateway platforms (16 connectors — 8 unshipped)
+### Gateway platforms (17 connectors — 10 unshipped)
 
 | Platform | Upstream file | Target phase | Status | Landed Go surface |
 |---|---|---|---|---|
 | Telegram | `gateway/platforms/telegram.py` | 2.B.1 | ✅ shipped | Shared gateway adapter with long-poll ingress and edit coalescing |
 | Discord | `gateway/platforms/discord.py` | 2.B.2 | ✅ shipped | Shared gateway adapter with mention-aware ingress and reply delivery |
-| Slack | `gateway/platforms/slack.py` | 2.B.3 | ✅ shipped | Shared gateway adapter with Socket Mode and threaded reply flow |
-| WhatsApp | `gateway/platforms/whatsapp.py` | 2.B.4 | ⏳ planned | |
-| Signal | `gateway/platforms/signal.py` | 2.B.6 | 🔨 in progress | Contract-tested ingress normalization and shared-chassis reply delivery live in `internal/channels/signal` |
+| Slack | `gateway/platforms/slack.py` | 2.B.3 | 🔨 in progress | `internal/slack` has Socket Mode ingress, threaded reply flow, placeholder updates, and session persistence; remaining slices are shared `CommandRegistry` parsing, a `gateway.Channel` shim, config/doctor loading, and `cmd/gormes gateway` registration |
+| WhatsApp | `gateway/platforms/whatsapp.py` | 2.B.4 | 🔨 in progress | Transport-neutral ingress normalization and command passthrough live in `internal/channels/whatsapp`; runtime selection and pairing/reconnect/send still remain |
+| Signal | `gateway/platforms/signal.py` | 2.B.6 | 🔨 in progress | Shared-chassis ingress normalization and reply delivery live in `internal/channels/signal`; transport/bootstrap follow-up remains |
 | Email | `gateway/platforms/email.py` | 2.B.7 | ✅ shipped | RFC 822 normalization and deterministic reply-thread targets live in `internal/channels/email` |
 | SMS | `gateway/platforms/sms.py` | 2.B.7 | ✅ shipped | Canonical phone-number session keys, generic command passthrough, and natural-boundary outbound segmentation live in `internal/channels/sms` |
-| Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ⏳ planned | |
-| Mattermost | `gateway/platforms/mattermost.py` | 2.B.8 | ⏳ planned | |
+| Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ⏳ planned | Shared `internal/channels/threadtext` contracts now freeze canonical thread IDs and reply-target behavior, but no Matrix-specific Go package is landed yet |
+| Mattermost | `gateway/platforms/mattermost.py` | 2.B.8 | ⏳ planned | Shared `internal/channels/threadtext` contracts now freeze canonical thread IDs and reply-target behavior, but no Mattermost-specific Go package is landed yet |
 | Webhook | `gateway/platforms/webhook.py` | 2.B.9 | ✅ shipped | Signed ingress/auth gates and typed prompt-to-delivery routing now live in `internal/channels/webhook` |
+| API Server | `gateway/platforms/api_server.py` | 5.Q | ⏳ planned | Phase 1 only consumes the Python donor over HTTP+SSE. Native Go still needs the OpenAI-compatible `/v1/chat/completions`, `/v1/responses`, `/v1/runs`, `/health/detailed`, and cron-admin HTTP surfaces before Python can leave the runtime path. |
 | BlueBubbles (iMessage) | `gateway/platforms/bluebubbles.py` | 2.B.10 | ✅ shipped | Webhook-auth, cached chat-GUID resolution, and home-channel send fallback live in `internal/channels/bluebubbles` |
 | HomeAssistant | `gateway/platforms/homeassistant.py` | 2.B.10 | ✅ shipped | Filtered state-change formatting, cooldown suppression, and persistent-notification delivery live in `internal/channels/homeassistant` |
-| Feishu | `gateway/platforms/feishu*.py` | 2.B.10 | 🔨 in progress | Contract-tested ingress and policy-gated delivery live in `internal/channels/feishu` |
-| WeChat (WeCom + WeiXin) | `gateway/platforms/wecom*.py`, `weixin.py` | 2.B.10 | 🔨 in progress | Contract-tested ingress and reply semantics live in `internal/channels/{wecom,weixin}` |
-| DingTalk | `gateway/platforms/dingtalk.py` | 2.B.10 | 🔨 in progress | Allow-list and session-webhook delivery contracts live in `internal/channels/dingtalk` |
-| QQ Bot | `gateway/platforms/qqbot/` | 2.B.10 | 🔨 in progress | Mention-gated ingress and passive-reply delivery contracts live in `internal/channels/qqbot` |
+| Feishu | `gateway/platforms/feishu*.py` | 2.B.10 | 🔨 in progress | Shared-bot ingress policy and reply-target preservation live in `internal/channels/feishu`; transport/bootstrap plus Drive comment rule/pairing and reply workflow follow-ups remain |
+| WeChat (WeCom + WeiXin) | `gateway/platforms/wecom*.py`, `weixin.py` | 2.B.10 | 🔨 in progress | Shared-bot ingress policy and reply-path contracts live in `internal/channels/{wecom,weixin}`; transport/bootstrap follow-up remains |
+| DingTalk | `gateway/platforms/dingtalk.py` | 2.B.10 | 🔨 in progress | Shared-bot ingress plus Stream Mode bootstrap, session-webhook refresh, and reply retry/error contracts now live in `internal/channels/dingtalk`; real SDK binding still remains |
+| QQ Bot | `gateway/platforms/qqbot/` | 2.B.10 | 🔨 in progress | Shared-bot DM/group policy, mention gating, and passive-reply contracts live in `internal/channels/qqbot`; transport/bootstrap follow-up remains |
 
 ### Operational layer (cross-cutting, mostly Phase 2.D–2.F)
 
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
-| Gateway runtime entry (main loop + slash-command dispatch) | `gateway/run.py` + `gateway/config.py` | 2.B/2.F | 🔨 shared gateway manager + multi-channel entrypoint landed; registry-backed slash dispatch, typed session-context prompt injection landed, typed delivery-target parsing landed, and deterministic frame fan-out landed; pairing/home-channel/webhook surfaces remain |
+| Gateway runtime entry (main loop + slash-command dispatch) | `gateway/run.py` + `gateway/config.py` | 2.B/2.F | 🔨 shared gateway manager + Telegram/Discord entrypoint landed; registry-backed slash dispatch, typed session-context prompt injection landed, typed delivery-target parsing landed, and deterministic frame fan-out landed; Slack registration plus pairing/home-channel/webhook surfaces remain |
 | Thin mapping persistence | `gateway/session.py` (minimal subset) | 2.C | ✅ shipped (`bbolt` `(platform, chat_id) -> session_id`; transcripts stay outside this layer) |
 | Gateway session store (conversation persistence across platforms) | `gateway/session.py` (`SessionStore`, `SessionEntry`, `SessionSource`, `SessionResetPolicy`) | 2.B/2.F | 🔨 partial — session-ID resolution + `SessionSource` parity landed; richer `SessionEntry` and reset-policy behavior still remains |
 | Gateway session context | `gateway/session_context.py` (`SessionContext`) | 2.B/2.F | ✅ shipped — typed session-context prompt injection landed in `internal/gateway/session_context.go` |
 | Delivery router (`--deliver <platform>` abstraction) | `gateway/delivery.py` (`DeliveryRouter`, `DeliveryTarget`) | 2.B/2.F | 🔨 typed delivery-target parsing landed in `internal/gateway/delivery.go`; full cross-channel resolution and home-channel semantics still remain |
 | Stream consumer (SSE agent-event fan-out to gateway) | `gateway/stream_consumer.py` (`GatewayStreamConsumer`, `StreamConsumerConfig`, `StreamingConfig`) | 2.B/2.F | 🔨 deterministic frame fan-out landed in `internal/gateway/stream_consumer.go`; richer upstream buffering/edit policy remains |
 | Home channel (operator's primary notify-to chat) | `gateway/*` — `HomeChannel` class | 2.F | ⏳ planned |
-| Channel / contact directory | `gateway/channel_directory.py` | 2.F | ⏳ planned |
+| Channel / contact directory | `gateway/channel_directory.py` | 2.F | ⏳ planned — upstream donor is still unported; start with atomic JSON persistence + lookup, then add manager-source refresh and stale-target invalidation before operator UX |
 | Platform enum + per-platform config | `gateway/*` — `Platform` (enum), `PlatformConfig` | 2.B | 🔨 Telegram/Discord/Slack config surfaces landed; canonical cross-platform enum parity remains |
-| Cron / scheduled automations | `cron/scheduler.py`, `cron/jobs.py`, `tools/cronjob_tools.py` | 2.D | ✅ shipped (scheduler + bbolt `cron_jobs` bucket + SQLite `cron_runs` audit + CRON.md mirror + Heartbeat prefix + exact-match `[SILENT]` suppression + kernel `PlatformEvent.SessionID/CronJobID` per-event override; upstream's file tick lock not needed — single-process) |
+| Cron / scheduled automations | `cron/scheduler.py`, `cron/jobs.py`, `tools/cronjob_tools.py` | 2.D / 5.N | 🔨 split — Phase 2.D shipped the scheduler + bbolt `cron_jobs` bucket + SQLite `cron_runs` audit + CRON.md mirror + Heartbeat prefix + exact-match `[SILENT]` suppression + kernel `PlatformEvent.SessionID/CronJobID` per-event override; upstream cronjob tool API, once/interval schedule parser, catch-up/fast-forward rules, prompt/script safety, multi-target delivery, media extraction, and live-adapter fallback are planned as 5.N slices |
 | Webhook subscription system (GitHub events / API triggers → prompt → deliver) | `hermes_cli/webhook.py` + gateway routing | 2.B.9 / 2.D | 🔨 signed ingress/auth gates plus the typed prompt-to-delivery bridge landed in `internal/channels/webhook`; runtime adapter wiring still remains |
 | Subagent delegation | `tools/delegate_tool.py` | 2.E | ✅ deterministic runtime, `delegate_task`, runner policy, typed child tool-call audit, append-only run logging, and real child stream execution landed |
 | Hooks system (`HookRegistry`) | `gateway/hooks.py`, `gateway/builtin_hooks/{boot_md}.py` | 2.F | ✅ in-process gateway hook points, live `HOOK.yaml` command loading, and built-in `BOOT.md` startup queuing with non-blocking failure semantics landed |
-| Restart / pairing / lifecycle | `gateway/{restart,pairing,status}.py` + `PairingStore` | 2.F | ⏳ planned |
+| Restart / pairing / lifecycle | `gateway/{restart,pairing,status}.py`, `gateway/platforms/base.py` + `PairingStore` | 2.F | 🔨 graceful drain is landed in `internal/gateway/manager.go`; remaining Go slices are adapter startup cleanup, active-turn follow-up/late-arrival drain policy, drain-timeout resume recovery, pairing persistence, approval/rate-limit semantics, status JSON/PID validation, token-scoped credential locks, `/restart` takeover/dedup markers, read-only status CLI, and live lifecycle writers |
 | Mirror / sticker cache | `gateway/{mirror,sticker_cache}.py` | 2.F | ⏳ planned |
 | Display config + KawaiiSpinner + tool preview formatting | `gateway/display_config.py`, `agent/display.py` (`KawaiiSpinner`) | 2.F / 5.Q | ⏳ planned |
 | Iteration budget tracker | `run_agent.py` (`iteration_budget`) — inline class | 4.C | ⏳ planned |
 
-### Memory + state (Phase 3 — 3.A–3.D.5 shipped; 3.E queued)
+### Memory + state (Phase 3 — 3.A–3.D.5 shipped; 3.E mixed closeout)
 
 Upstream splits memory across three stores that Gormes compresses into two:
 
@@ -70,10 +71,10 @@ Upstream splits memory across three stores that Gormes compresses into two:
 | Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ✅ shipped |
 | Extraction state visibility | None (debug visibility) | 3.E.4 | ✅ shipped — `gormes memory status` renders extractor queue, dead-letter summary, and worker-health heuristics |
 | Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | ✅ shipped — rollups from `telemetry.Snapshot` plus append-only `internal/insights` JSONL persistence are landed |
-| Memory decay | None (Gormes-original) | 3.E.6 | 🔨 partial — deterministic weight attenuation at recall time landed; `last_seen` tracking remains |
-| Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | ✅ shipped — canonical `user_id > chat_id > session_id` metadata now lives in `internal/session`, and recall widens across chats only when callers opt into canonical user scope with optional source filters |
+| Memory decay | None (Gormes-original) | 3.E.6 | 🔨 partial — deterministic weight attenuation at recall time landed; `relationships.last_seen` schema/backfill plus writer freshness updates remain |
+| Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | 🔨 in progress — canonical `user_id > chat_id > session_id` metadata, same-chat default fencing, and opt-in user/source-filtered recall are landed; Honcho-compatible tool schema exposure plus deny-path/operator evidence still remain |
 | Parent-session chains (compression splits) | `hermes_state.py` (`SessionDB.parent_session_id`) | 3.E.8 | ⏳ planned (pairs with 4.B context compression) |
-| Cross-source session search | `hermes_state.py` (FTS5 across source-tagged messages) | 3.E.8 | ✅ shipped — `internal/memory/session_catalog.go` plus Goncho `scope=user` / `sources[]` now search canonical user-bound sessions with deterministic latest-turn ordering |
+| Cross-source session search | `hermes_state.py` (FTS5 across source-tagged messages) | 3.E.8 | 🔨 in progress — `internal/memory/session_catalog.go` plus the internal GONCHO service's `scope=user` / `sources[]` path now search canonical user-bound sessions, but `parent_session_id`, lineage-aware hits, and operator-auditable evidence still remain |
 
 ### Cross-cutting registries (used by multiple phases)
 
@@ -81,7 +82,7 @@ These are single source-of-truth registries that drive multiple downstream consu
 
 | Subsystem | Upstream | Target phase | Status | Why it's cross-cutting |
 |---|---|---|---|---|
-| Slash command registry | `hermes_cli/commands.py` (`COMMAND_REGISTRY`, `CommandDef`, `resolve_command`, `gateway_help_lines`, `telegram_bot_commands`, `slack_subcommand_map`, `COMMANDS_BY_CATEGORY`, `SlashCommandCompleter`) | 2.F / 5.O | ⏳ planned | One `CommandDef` entry drives CLI dispatch, gateway dispatch, Telegram BotCommand menu, Slack `/hermes` subcommand map, autocomplete, and `/help` output |
+| Slash command registry | `hermes_cli/commands.py` (`COMMAND_REGISTRY`, `CommandDef`, `resolve_command`, `gateway_help_lines`, `telegram_bot_commands`, `slack_subcommand_map`, `COMMANDS_BY_CATEGORY`, `SlashCommandCompleter`) | 2.F / 5.O | 🔨 partial — gateway-side `CommandRegistry`, alias resolution, Telegram menu, and Slack subcommand map helpers are shipped; CLI autocomplete/dispatch parity remains Phase 5.O, and Slack runtime still needs to consume the shared parser | One `CommandDef` entry drives CLI dispatch, gateway dispatch, Telegram BotCommand menu, Slack `/hermes` subcommand map, autocomplete, and `/help` output |
 | Tool registry + dispatch orchestrator | `tools/registry.py` + `model_tools.py` (`get_tool_definitions`, `handle_function_call`, `TOOL_TO_TOOLSET_MAP`, `TOOLSET_REQUIREMENTS`, `check_toolset_requirements`) | 2.A (partial ✅) / 5.A | 🔨 Gormes `internal/tools` covers the core dispatch; toolset grouping + requirements check not ported | Every tool self-registers at import time; `model_tools` exposes the API consumed by run_agent, cli, batch_runner, RL environments, and doctor |
 | Toolset definitions (enabled/disabled groupings) | `toolsets.py` + `toolset_distributions.py` (`_HERMES_CORE_TOOLS` list) | 4.C / 5.A | ⏳ planned | Agent init accepts `enabled_toolsets` / `disabled_toolsets` lists — drives what tools the LLM sees per run |
 | Canonical OpenAI-format message schema | `run_agent.py` — `{role, content, tool_calls, reasoning}` | 4.C | 🔨 partial (kernel already uses this shape) | Every provider adapter in 4.A must translate to/from this shape |
@@ -121,10 +122,10 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Model metadata types | `agent/model_metadata.py` — `ModelCapabilities`, `ModelInfo` classes | 4.D | ⏳ planned |
 | Error classifier output type | `agent/error_classifier.py` — `ClassifiedError` class | 4.H | ⏳ planned |
 | Local edit snapshot | `agent/*` — `LocalEditSnapshot` (for checkpoint rewind) | 5.L | ⏳ planned |
-| Context engine | `agent/context_engine.py` | 4.B | ⏳ planned |
-| Context compressor | `agent/context_compressor.py` + `manual_compression_feedback.py` | 4.B | ⏳ planned |
-| Context references | `agent/context_references.py` | 4.B | ⏳ planned |
-| Prompt builder | `agent/prompt_builder.py` | 4.C | ⏳ planned |
+| Context engine | `agent/context_engine.py` | 4.B | ⏳ planned — split into interface/status-tool contract before compressor wiring |
+| Context compressor | `agent/context_compressor.py` + `manual_compression_feedback.py` | 4.B | ⏳ planned — split into token-budget trigger, protected head/tail summary, old tool-output pruning, and manual feedback |
+| Context references | `agent/context_references.py` | 4.B | ⏳ planned — keep separate from compression so reference handles can be tested without provider calls |
+| Prompt builder | `agent/prompt_builder.py` | 4.C | ⏳ planned — split into context-file discovery/injection scan, model-specific role guidance, skills prompt snapshots, and memory/session-search guidance |
 | Smart model routing | `agent/smart_model_routing.py` + `model_metadata.py` + `models_dev.py` | 4.D | ⏳ planned |
 | Trajectory | `agent/trajectory.py` | 4.E | ⏳ planned |
 | Insights | `agent/insights.py` | 4.E | ⏳ planned |
@@ -174,11 +175,11 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Memory plugin: RetainDB | `plugins/memory/retaindb/` | 5.I | ⏳ planned |
 | Memory plugin: Supermemory | `plugins/memory/supermemory/` | 5.I | ⏳ planned |
 | Memory tool (plugin gateway) | `tools/memory_tool.py` | 5.I | ⏳ planned |
-| Approval / security | `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py` + `_ApprovalEntry`, `ScanResult` classes | 5.J | ⏳ planned |
+| Approval / security | `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py` + `_ApprovalEntry`, `ScanResult` classes | 5.J | ⏳ planned — split into dangerous-command detection, approval-mode config normalization, cron `approvals.cron_mode` deny/approve behavior, and combined Tirith/path/URL/website policy decisions before dangerous tools ship |
 | Code execution | `tools/{code_execution_tool,process_registry}.py` + `ProcessRegistry`, `ProcessSession`, `ExecuteResult`, `DebugSession`, `RunState` classes | 5.K | ⏳ planned |
 | File operations | `tools/{file_operations,file_tools,fuzzy_match,checkpoint_manager,patch_parser,binary_extensions}.py` + `FileOperations`/`ShellFileOperations`/`PatchOperation`/`PatchResult`/`CheckpointManager`/`Hunk`/`HunkLine`/`SearchMatch`/`SearchResult`/`ReadResult`/`LintResult`/`Finding`/`OperationType`/`EnvironmentInfo` classes | 5.L | ⏳ planned |
 | Mixture of agents | `tools/mixture_of_agents_tool.py` | 5.M | ⏳ planned |
-| Operator tools | `tools/{todo_tool,clarify_tool,session_search_tool,send_message_tool,debug_helpers,interrupt,ansi_strip}.py` + `TodoStore`, `_ThreadAwareEventProxy` classes | 5.N | ⏳ planned |
+| Operator tools | `tools/{todo_tool,clarify_tool,session_search_tool,send_message_tool,cronjob_tools,debug_helpers,interrupt,ansi_strip}.py` + `TodoStore`, `_ThreadAwareEventProxy` classes | 5.N | ⏳ planned — cronjob parity is split into tool API/schedule parser, prompt/script safety, and multi-target/media/live-adapter delivery |
 | Auth storage (GitHub + Hermes token) | `tools/*` — `GitHubAuth`, `HermesTokenStorage` classes | 4.G / 5.O | ⏳ planned |
 | Budget config + provider entries | `tools/budget_config.py` — `BudgetConfig`, `_ProviderEntry` classes | 4.H / 5.A | ⏳ planned |
 | Tool entry metadata (registry row schema) | `tools/registry.py` — `ToolEntry` class | 5.A | ⏳ planned |

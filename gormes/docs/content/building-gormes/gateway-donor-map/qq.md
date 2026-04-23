@@ -9,7 +9,7 @@ QQ is one of the stronger donors in this task set because PicoClaw uses the offi
 
 ## Status
 
-`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now groups QQ Bot into the Phase `2.B.10` regional/device adapter tranche. Gormes has upstream Hermes operator docs for QQ Bot, but no Go QQ adapter yet.
+`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now groups QQ Bot into the Phase `2.B.10` regional/device adapter tranche. Gormes has a contract-tested shared-bot seam in `internal/channels/qqbot` for DM/group policy, mention gating, and passive-reply sequencing, but no real official QQ transport/bootstrap binding yet.
 
 Evidence level:
 
@@ -17,7 +17,7 @@ Evidence level:
 - The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - The upstream donor repo is `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
-- Current Gormes status and operator-facing behavior were verified in-tree against `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` and `gormes/docs/content/upstream-hermes/user-guide/messaging/qqbot.md`.
+- Current Gormes status and operator-facing behavior were verified in-tree against `gormes/internal/channels/qqbot/bot.go`, `gormes/internal/channels/qqbot/bot_test.go`, `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md`, and `gormes/docs/content/upstream-hermes/user-guide/messaging/qqbot.md`.
 
 Keep the boundary explicit: PicoClaw contributes official QQ Bot transport mechanics only. Gormes architecture remains authoritative for platform event shape, session mapping, and runtime ownership.
 
@@ -70,7 +70,7 @@ Rebuild in Gormes-native form:
 
 ## Gormes Mapping
 
-- `Start` maps directly to a future `internal/qq` adapter bootstrap.
+- `Start` maps directly to a future `internal/channels/qqbot` adapter bootstrap.
 - `handleC2CMessage` and `handleGroupATMessage` map to two primary ingress pipelines Gormes will need from day one.
 - `chatType` is a practical donor because outbound QQ sends need to know whether a chat ID is direct or group.
 - `applyPassiveReplyMetadata` is important: QQ reply behavior is tied to last inbound message ID plus `msg_seq`, so Gormes should preserve that state machine.

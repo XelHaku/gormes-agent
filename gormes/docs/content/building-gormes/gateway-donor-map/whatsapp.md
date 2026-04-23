@@ -5,11 +5,11 @@ weight: 40
 
 # WhatsApp
 
-WhatsApp is planned for Phase 2.B.4, but PicoClaw actually offers two distinct donors: a bridge-based adapter and an optional build-tagged native adapter. A future Gormes porter needs to treat those as different decisions, not one blended implementation.
+WhatsApp is partially ported for Phase 2.B.4, but PicoClaw actually offers two distinct donors: a bridge-based adapter and an optional build-tagged native adapter. A future Gormes porter needs to treat those as different decisions, not one blended implementation.
 
 ## Status
 
-Gormes does not yet ship WhatsApp. The upstream Hermes docs currently describe a built-in Baileys bridge flow, while PicoClaw supports:
+Gormes does not yet ship a runnable WhatsApp adapter. The current Go surface is a transport-neutral `internal/channels/whatsapp.NormalizeInbound` contract that normalizes direct/group peer IDs and passes generic slash commands through `gateway.ParseInboundText`; runtime selection, pairing, reconnect, and outbound send lifecycle are still planned. The upstream Hermes docs currently describe a built-in Baileys bridge flow, while PicoClaw supports:
 
 Evidence level:
 
@@ -17,7 +17,7 @@ Evidence level:
 - The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - The upstream donor repo is `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
-- Current Gormes status and operator-facing behavior were verified in-tree against `gormes/docs/content/upstream-hermes/user-guide/messaging/whatsapp.md`.
+- Current Gormes status and operator-facing behavior were verified in-tree against `gormes/internal/channels/whatsapp/inbound.go`, `gormes/internal/channels/whatsapp/inbound_test.go`, `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md`, and `gormes/docs/content/upstream-hermes/user-guide/messaging/whatsapp.md`.
 
 - a thin bridge-based WebSocket adapter in `picoclaw/pkg/channels/whatsapp/whatsapp.go`
 - an optional in-process `whatsmeow` adapter in `picoclaw/pkg/channels/whatsapp_native/whatsapp_native.go`, compiled behind the `whatsapp_native` build tag
@@ -64,9 +64,9 @@ Rebuild in Gormes-native form:
 
 ## Gormes Mapping
 
-- The bridge donor maps to a future `internal/whatsapp/bridge.go` if Gormes wants an external sidecar or embedded bridge process.
-- The native donor maps to a future `internal/whatsapp/native.go` if Gormes wants direct in-process ownership of WhatsApp connectivity.
-- `handleIncomingMessage` in the bridge path and `handleIncoming` in the native path both map conceptually to the same Gormes responsibility: sanitize inbound content, attach sender/chat metadata, preserve message ID, then hand off to the kernel-facing gateway layer.
+- The bridge donor maps to a future `internal/channels/whatsapp/bridge.go` if Gormes wants an external sidecar or embedded bridge process.
+- The native donor maps to a future `internal/channels/whatsapp/native.go` if Gormes wants direct in-process ownership of WhatsApp connectivity.
+- `handleIncomingMessage` in the bridge path and `handleIncoming` in the native path both map conceptually to the Gormes responsibility already started by `NormalizeInbound`: sanitize inbound content, attach sender/chat metadata, preserve message ID, then hand off to the kernel-facing gateway layer.
 - `reconnectWithBackoff`, `Stop`, and the QR-path startup logic are the most reusable parts of the native donor if Gormes adopts `whatsmeow`.
 - The stub file maps to a release decision, not a runtime design. If Gormes does not want build-tag fragmentation, do not port that pattern.
 
@@ -87,10 +87,10 @@ Rebuild in Gormes-native form:
 
 ## Port Order Recommendation
 
-1. Decide whether Gormes wants bridge-first or native-first ownership.
-2. If bridge-first, port only the thin adapter ideas from `picoclaw/pkg/channels/whatsapp/whatsapp.go` and keep the bridge contract explicitly external.
-3. If native-first, port lifecycle pieces from `picoclaw/pkg/channels/whatsapp_native/whatsapp_native.go` before worrying about parity extras.
-4. In either case, port the command-passthrough tests early.
+1. Decide whether Gormes wants bridge-first or native-first ownership and freeze that in a runtime-selection contract.
+2. Keep the existing `NormalizeInbound` command-passthrough tests as the invariant for both runtime paths.
+3. If bridge-first, port only the thin adapter ideas from `picoclaw/pkg/channels/whatsapp/whatsapp.go` and keep the bridge contract explicitly external.
+4. If native-first, port lifecycle pieces from `picoclaw/pkg/channels/whatsapp_native/whatsapp_native.go` before worrying about parity extras.
 5. Treat build-tag strategy as a product and release decision, not an automatic code reuse choice.
 
 ## Code References

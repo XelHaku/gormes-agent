@@ -27,10 +27,10 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		"What ships now, what doesn&#39;t.",
 		// Structural roadmap checks — no exact counts or item names,
 		// those come from progress.json and must not be locked in here.
-		"roadmap-status-shipped",
 		"roadmap-status-progress",
 		"roadmap-status-planned",
 		"roadmap-status-later",
+		"roadmap-item-shipped",
 		"roadmap-phase",
 		// Fuzzy phase-title presence — each phase renders, no subtitles
 		"Phase 1",

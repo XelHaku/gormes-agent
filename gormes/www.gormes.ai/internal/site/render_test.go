@@ -49,11 +49,12 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		"Phase 4",
 		"Phase 5",
 		"Phase 6",
-		// Status tone classes (every tone the template knows about)
-		"roadmap-status-shipped",
+		// Status tone classes driven by current phase-level data.
 		"roadmap-status-progress",
 		"roadmap-status-planned",
 		"roadmap-status-later",
+		// Complete work still appears at item level even when no whole phase is complete.
+		"roadmap-item-shipped",
 		// Structural class anchors
 		"roadmap-phase",
 		// Footer — brand text + company anchor + license

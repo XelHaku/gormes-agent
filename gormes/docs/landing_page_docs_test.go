@@ -351,7 +351,7 @@ func TestGatewayCoreDocReflectsSharedPhase2Surface(t *testing.T) {
 	raw := readDoc(t, "content/building-gormes/core-systems/gateway.md")
 	wants := []string{
 		"Discord adapter",
-		"Slack adapter",
+		"Slack Socket Mode bot",
 		"slash-command registry",
 		"SessionContext prompt injection",
 		"BOOT.md startup hook",

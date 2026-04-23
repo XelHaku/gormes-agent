@@ -26,15 +26,21 @@ Phase 5 is when Python disappears entirely from the runtime path. Each sub-phase
 | 5.G — MCP Integration | ⏳ planned | Port `tools/{mcp_tool,mcp_oauth,mcp_oauth_manager,managed_tool_gateway}.py`; Model Context Protocol client + OAuth flows |
 | 5.H — ACP Integration | ⏳ planned | Port `acp_adapter/` + `acp_registry/`; Agent Communication Protocol server side |
 | 5.I — Plugins Architecture | ⏳ planned | Port `plugins/{context_engine,memory,example-dashboard}` + the plugin SDK; let third parties extend Gormes without forking |
-| 5.J — Approval / Security Guards | ⏳ planned | Port `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py`; gate dangerous actions |
+| 5.J — Approval / Security Guards | ⏳ planned | Port `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py` as small guard slices: dangerous-command detection, approval-mode config, cron `approvals.cron_mode`, then combined Tirith/path/URL/website policy decisions |
 | 5.K — Code Execution | ⏳ planned | Port `tools/code_execution_tool.py` + `tools/process_registry.py`; sandboxed exec |
 | 5.L — File Ops + Patches | ⏳ planned | Port `tools/{file_operations,file_tools,checkpoint_manager,patch_parser}.py`; file editing with atomic checkpoints |
 | 5.M — Mixture of Agents | ⏳ planned | Port `tools/mixture_of_agents_tool.py`; multi-model coordination |
-| 5.N — Misc Operator Tools | ⏳ planned | Port `tools/{todo_tool,clarify_tool,session_search_tool,send_message_tool,cronjob_tools,debug_helpers,interrupt}.py` |
-| 5.O — Hermes CLI Parity | ⏳ planned | Port the 49-file `hermes_cli/` tree (auth, backup, banner, codex_models, profiles, platforms, pairing, webhook, models, providers, runtime_provider, skills_hub, mcp_config, plugins, …); replaces the upstream `hermes` binary |
+| 5.N — Misc Operator Tools | ⏳ planned | Port `tools/{todo_tool,clarify_tool,session_search_tool,send_message_tool,cronjob_tools,debug_helpers,interrupt}.py`; cron parity is now split into tool API/schedule parsing, prompt/script safety, and multi-target/media/live-adapter delivery follow-ups |
+| 5.O — Hermes CLI Parity | ⏳ planned | Port the 49-file `hermes_cli/` tree as dependency-aware command groups: registry/active-turn policy, config/profile/auth/setup, gateway/platform/webhook/cron management, diagnostics/backup/logs/status; replaces the upstream `hermes` binary |
 | 5.P — Docker / Packaging | ⏳ planned | Mirror `Dockerfile` + `docker/{entrypoint.sh,SOUL.md}` + `packaging/homebrew` + `scripts/{install.sh,install.cmd,install.ps1,release.py,build_skills_index.py}` for Gormes; OCI image with same volume layout as upstream |
-| 5.Q — TUI Gateway Streaming Surface | ⏳ planned | Port `tui_gateway/` (2,931-line `server.py` + `render.py`, `slash_worker.py`, `entry.py`) + `hermes_cli/skin_engine.py`; SSE streaming to the existing Bubble Tea TUI (shipped Phase 1) so remote TUIs see live agent state |
+| 5.Q — API Server + TUI Gateway Streaming Surface | ⏳ planned | Port `tui_gateway/` plus the upstream OpenAI-compatible `gateway/platforms/api_server.py` surface: Bubble Tea remote streaming, `/v1/chat/completions`, `/v1/responses`, `/v1/runs/{id}/events`, `/health/detailed`, and cron admin endpoints over the native Go runtime |
 
 ## Relationship to Phase 6
 
 Phase 5.F (Skills System port) is the mechanical work: porting the upstream Python skills plumbing. Phase 6 (The Learning Loop) is the algorithm on top — detecting complexity, distilling patterns, scoring feedback. Phase 5.F is a dependency of Phase 6, but they are not the same work.
+
+## Planning Notes
+
+Phase 2.D shipped the Go-native cron MVP: scheduler, job store, run audit, CRON.md mirror, and Heartbeat delivery rules. It did not port the full upstream cron operator surface. The remaining `cron/jobs.py`, `cron/scheduler.py`, and `tools/cronjob_tools.py` parity work belongs in 5.N as TDD slices so it can reuse the Phase 2.D store without reopening the shipped cron audit contract.
+
+The OpenAI-compatible API server is not the Phase 1 bridge. Phase 1 consumes Python's `api_server`; Phase 5.Q replaces that donor surface in Go. Keep its cron admin endpoints behind the 5.N cronjob parity slices so HTTP control, CLI control, and tool control all share one scheduler/store contract.

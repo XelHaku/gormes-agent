@@ -9,7 +9,7 @@ Feishu is a plausible Phase 2 adapter target because PicoClaw already split the 
 
 ## Status
 
-`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now groups Feishu into the Phase `2.B.10` regional/device adapter tranche. Gormes ships upstream Hermes operator docs for Feishu/Lark setup, but no Go adapter yet.
+`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now groups Feishu into the Phase `2.B.10` regional/device adapter tranche. Gormes has a contract-tested shared-bot seam in `internal/channels/feishu` for ingress policy and reply-target preservation, but no real Feishu transport/bootstrap binding yet.
 
 Evidence level:
 
@@ -17,7 +17,7 @@ Evidence level:
 - The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - The upstream donor repo is `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
-- Current Gormes status and target behavior were verified in-tree against `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` and `gormes/docs/content/upstream-hermes/user-guide/messaging/feishu.md`.
+- Current Gormes status and target behavior were verified in-tree against `gormes/internal/channels/feishu/bot.go`, `gormes/internal/channels/feishu/bot_test.go`, `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md`, and `gormes/docs/content/upstream-hermes/user-guide/messaging/feishu.md`.
 
 Keep the boundary explicit: PicoClaw donates Feishu edge mechanics only. Gormes remains authoritative for lifecycle ownership, session policy, and feature scope.
 
@@ -31,7 +31,7 @@ The donor is reusable because responsibilities are already separated in the way 
 - `feishu_reply.go` isolates the reply/thread context logic, including message lookup and wrapper formatting.
 - `token_cache.go` isolates a donor-specific workaround for stale tenant token caching in the upstream SDK.
 
-That file split makes Feishu useful not only as code, but also as a decomposition template for a future Gormes `internal/feishu` package.
+That file split makes Feishu useful not only as code, but also as a decomposition template for future Gormes `internal/channels/feishu` runtime files around the current contract seam.
 Only the inbound/runtime skeleton, media download path, and reply lookup logic are copy-worthy; send, edit, react, and card UX in `feishu_64.go` should be treated as pattern-only.
 
 ## Picoclaw Donor Files
@@ -68,7 +68,7 @@ Rebuild in Gormes-native form:
 
 ## Gormes Mapping
 
-- `feishu_64.go` is the donor for a future `internal/feishu/runtime.go` style file on the inbound side: start SDK client, fetch bot identity, receive messages, and download message resources cleanly.
+- `feishu_64.go` is the donor for a future `internal/channels/feishu/runtime.go` style file on the inbound side: start SDK client, fetch bot identity, receive messages, and download message resources cleanly.
 - `common.go` maps to adapter-local parsing helpers shared by inbound and outbound flows.
 - `feishu_reply.go` maps to Gormes thread/reply enrichment logic. It is especially useful because it handles both parent/root resolution and message fetch fallback.
 - `token_cache.go` should inform a very small adapter-local compatibility shim rather than a shared platform-agnostic cache abstraction.

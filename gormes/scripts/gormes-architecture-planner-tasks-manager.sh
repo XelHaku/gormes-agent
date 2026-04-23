@@ -1,5 +1,87 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+IFS=$'\n\t'
+shopt -s inherit_errexit 2>/dev/null || true
+
+# === STEP TIMING ===
+# Track elapsed time per step for performance monitoring
+STEP_TIMERS=()
+STEP_START_TIME=""
+
+start_step_timer() {
+  STEP_START_TIME=$(date +%s)
+}
+
+get_step_elapsed() {
+  local start="$1"
+  local end
+  end=$(date +%s)
+  echo $((end - start))
+}
+
+format_duration() {
+  local seconds=$1
+  if [[ $seconds -lt 60 ]]; then
+    echo "${seconds}s"
+  elif [[ $seconds -lt 3600 ]]; then
+    echo "$((seconds / 60))m $((seconds % 60))s"
+  else
+    echo "$((seconds / 3600))h $(((seconds % 3600) / 60))m"
+  fi
+}
+
+log_step_duration() {
+  local step_name="$1"
+  local start="$2"
+  local end
+  end=$(date +%s)
+  local elapsed=$((end - start))
+  log_info "Step '$step_name' completed in $(format_duration $elapsed)"
+}
+
+# === SIGNAL HANDLING ===
+# Graceful shutdown support
+SHUTDOWN_REQUESTED=false
+CLEANUP_HOOKS=()
+
+request_shutdown() {
+  SHUTDOWN_REQUESTED=true
+  log_warn "Shutdown requested - finishing gracefully..."
+}
+
+cleanup() {
+  local exit_code=$?
+  # Prevent re-entry
+  trap - EXIT INT TERM HUP
+
+  log_info "Shutdown complete (exit code: $exit_code)"
+
+  # Run cleanup hooks in reverse order (LIFO)
+  while [[ ${#CLEANUP_HOOKS[@]} -gt 0 ]]; do
+    local hook="${CLEANUP_HOOKS[-1]}"
+    unset 'CLEANUP_HOOKS[-1]'
+    log_debug "Running cleanup: $hook"
+    eval "$hook" 2>/dev/null || true
+  done
+
+  exit "$exit_code"
+}
+
+# Register signal handlers
+trap cleanup EXIT INT TERM HUP
+trap request_shutdown INT TERM
+
+# === ERROR HANDLER ===
+err_trap() {
+  local exit_code=$?
+  local line=${BASH_LINENO[0]}
+  local cmd="${BASH_COMMAND}"
+  echo "ERROR at line $line: exit $exit_code: $cmd" >&2
+  log_json "ERROR" "Script error at line $line: exit $exit_code: $cmd"
+  local i=0
+  while caller "$i" >&2; do ((i++)); done
+}
+trap err_trap ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${REPO_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -26,6 +108,15 @@ PLANNER_INTERVAL="${PLANNER_INTERVAL:-4h}"
 PLANNER_BOOT_DELAY="${PLANNER_BOOT_DELAY:-5m}"
 PLANNER_INSTALL_SCHEDULE="${PLANNER_INSTALL_SCHEDULE:-1}"
 
+# Verbosity and commit mode settings
+VERBOSE="${VERBOSE:-0}"
+AUTO_COMMIT="${AUTO_COMMIT:-0}"
+AUTO_PUSH="${AUTO_PUSH:-0}"
+MAIN_BRANCH="${MAIN_BRANCH:-main}"
+REMOTE_NAME="${REMOTE_NAME:-origin}"
+COMMIT_INTERVAL="${COMMIT_INTERVAL:-1}"
+JSON_LOG="${JSON_LOG:-}"
+
 mkdir -p "$PLANNER_ROOT" "$LOG_DIR"
 
 CODEXU_JSONL="$LOG_DIR/$RUN_STAMP.codexu.jsonl"
@@ -41,19 +132,199 @@ LOCAL_BRANCH=""
 ARCH_PLAN_JSON_PRESENT="false"
 SCHEDULE_METHOD="none"
 
+# ANSI color codes for colored output
+if [[ -t 1 ]] || [[ "${FORCE_COLOR:-0}" == "1" ]]; then
+  COLOR_RED='\033[0;31m'
+  COLOR_YELLOW='\033[1;33m'
+  COLOR_GREEN='\033[0;32m'
+  COLOR_BLUE='\033[0;34m'
+  COLOR_DIM='\033[2m'
+  COLOR_BOLD='\033[1m'
+  COLOR_RESET='\033[0m'
+else
+  COLOR_RED=''
+  COLOR_YELLOW=''
+  COLOR_GREEN=''
+  COLOR_BLUE=''
+  COLOR_DIM=''
+  COLOR_BOLD=''
+  COLOR_RESET=''
+fi
+
 log() {
   printf '[architecture-planner-tasks-manager] %s\n' "$*"
+}
+
+log_debug() {
+  if [[ "$VERBOSE" == "1" ]]; then
+    printf '%b[DEBUG]%b %s %s\n' "$COLOR_DIM" "$COLOR_RESET" "$(date '+%H:%M:%S')" "$*" >&2
+  fi
+}
+
+log_info() {
+  if [[ "$VERBOSE" == "1" ]]; then
+    printf '%b[INFO]%b  %s %s\n' "$COLOR_BLUE" "$COLOR_RESET" "$(date '+%H:%M:%S')" "$*"
+  fi
+}
+
+log_warn() {
+  printf '%b[WARN]%b  %s %s\n' "$COLOR_YELLOW" "$COLOR_RESET" "$(date '+%H:%M:%S')" "$*" >&2
+}
+
+log_error() {
+  printf '%b[ERROR]%b %s %s\n' "$COLOR_RED" "$COLOR_RESET" "$(date '+%H:%M:%S')" "$*" >&2
+}
+
+# Structured JSON logging
+log_json() {
+  local level="$1"
+  shift
+  if [[ -n "$JSON_LOG" ]]; then
+    jq -nc \
+      --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      --arg level "$level" \
+      --arg msg "$*" \
+      --arg script "architecture-planner-tasks-manager" \
+      '{ts:$ts,level:$level,msg:$msg,script:$script}' >> "$JSON_LOG"
+  fi
+}
+
+# Progress bar display
+show_progress() {
+  local current=$1
+  local total=$2
+  local label="${3:-Progress}"
+  local width=40
+  local percentage=$((current * 100 / total))
+  local filled=$((width * current / total))
+  local empty=$((width - filled))
+
+  printf "\r%s [%s%s] %3d%% (%d/%d)" \
+    "$label" \
+    "$(printf '%*s' "$filled" '' | tr ' ' '=')" \
+    "$(printf '%*s' "$empty" '' | tr ' ' ' ')" \
+    "$percentage" \
+    "$current" \
+    "$total"
 }
 
 progress() {
   local step="$1"
   shift
   printf '[architecture-planner-tasks-manager] %s/5 %s\n' "$step" "$*"
+  log_info "Progress step $step: $*"
 }
 
 fail() {
   printf '[architecture-planner-tasks-manager] ERROR: %s\n' "$*" >&2
+  log_error "$*"
   exit 1
+}
+
+# Git pre-flight checks before commits
+git_preflight_check() {
+  local repo="${1:-$REPO_ROOT}"
+
+  log_debug "Running git pre-flight checks for $repo"
+
+  if ! git -C "$repo" rev-parse --git-dir > /dev/null 2>&1; then
+    log_error "Not a git repository: $repo"
+    return 1
+  fi
+
+  local current_branch
+  current_branch=$(git -C "$repo" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+  if [[ "$current_branch" != "$MAIN_BRANCH" ]]; then
+    log_warn "Currently on branch '$current_branch', not '$MAIN_BRANCH'"
+  fi
+
+  if git -C "$repo" rev-parse --verify MERGE_HEAD > /dev/null 2>&1; then
+    log_error "Merge in progress in $repo - cannot commit"
+    return 1
+  fi
+
+  if git -C "$repo" rev-parse --verify REBASE_HEAD > /dev/null 2>&1; then
+    log_error "Rebase in progress in $repo - cannot commit"
+    return 1
+  fi
+
+  log_debug "Git pre-flight checks passed"
+  return 0
+}
+
+# Incremental commit functionality
+commit_changes() {
+  local message="${1:-Planner auto-commit}"
+  local repo="${2:-$REPO_ROOT}"
+
+  if [[ "$AUTO_COMMIT" != "1" ]]; then
+    log_debug "AUTO_COMMIT disabled, skipping commit"
+    return 0
+  fi
+
+  log_info "Checking for changes to commit in $repo"
+
+  if ! git_preflight_check "$repo"; then
+    log_warn "Git pre-flight check failed, skipping commit"
+    return 1
+  fi
+
+  if ! git -C "$repo" diff --quiet HEAD || ! git -C "$repo" diff --cached --quiet; then
+    log_info "Committing changes: $message"
+    git -C "$repo" add -A
+    if git -C "$repo" commit -m "$message" -m "Auto-generated by architecture-planner-tasks-manager" 2>/dev/null; then
+      local commit_hash
+      commit_hash=$(git -C "$repo" rev-parse --short HEAD)
+      log_info "Created commit $commit_hash"
+      log_json "INFO" "Committed changes: $message ($commit_hash)"
+
+      if [[ "$AUTO_PUSH" == "1" ]]; then
+        push_changes "$repo"
+      fi
+
+      return 0
+    else
+      log_warn "No changes to commit or commit failed"
+      return 1
+    fi
+  else
+    log_debug "No changes to commit"
+    return 0
+  fi
+}
+
+push_changes() {
+  local repo="${1:-$REPO_ROOT}"
+
+  if [[ "$AUTO_PUSH" != "1" ]]; then
+    return 0
+  fi
+
+  log_info "Pushing to $REMOTE_NAME/$MAIN_BRANCH"
+  if git -C "$repo" push "$REMOTE_NAME" "$MAIN_BRANCH"; then
+    log_info "Successfully pushed to remote"
+    log_json "INFO" "Pushed to $REMOTE_NAME/$MAIN_BRANCH"
+  else
+    log_error "Failed to push to remote"
+    return 1
+  fi
+}
+
+# Smart commit based on operation type
+smart_commit() {
+  local operation="$1"
+  local details="${2:-}"
+  local commit_msg="planner: $operation"
+
+  if [[ -n "$details" ]]; then
+    commit_msg="$commit_msg - $details"
+  fi
+
+  # Add timestamp for frequent commits
+  commit_msg="$commit_msg [$(date '+%H:%M:%S')]"
+
+  commit_changes "$commit_msg"
 }
 
 usage() {
@@ -81,6 +352,19 @@ Environment:
   PLANNER_INTERVAL          Default: $PLANNER_INTERVAL
   PLANNER_BOOT_DELAY        Default: $PLANNER_BOOT_DELAY
   UPSTREAM_HERMES_DIR       Optional explicit upstream Hermes checkout.
+
+  # New verbosity and commit options
+  VERBOSE                   Set to 1 for detailed progress logging
+  AUTO_COMMIT               Set to 1 to auto-commit changes after each stage
+  AUTO_PUSH                 Set to 1 to auto-push commits to remote
+  MAIN_BRANCH               Target branch for commits (default: main)
+  REMOTE_NAME               Git remote name (default: origin)
+  JSON_LOG                  Path to JSON log file for structured logging
+
+Examples:
+  VERBOSE=1 ./gormes-architecture-planner-tasks-manager.sh
+  AUTO_COMMIT=1 AUTO_PUSH=1 ./gormes-architecture-planner-tasks-manager.sh
+  VERBOSE=1 JSON_LOG=/tmp/planner.jsonl ./gormes-architecture-planner-tasks-manager.sh
 EOF
 }
 
@@ -379,9 +663,14 @@ verify_final_report() {
   [[ -f "$file" ]] || return 1
 
   local number title pattern
+  # The report format uses **bold markers** around section headers like **1. Scope Scanned**
+  # Pattern: optional whitespace, optional **, number, period, space, title, optional **
   while IFS='|' read -r number title; do
-    pattern="^[[:space:]]*(#+[[:space:]]*)?${number}[.)][[:space:]]*(\\*\\*)?${title}(\\*\\*)?[[:space:]]*$"
-    grep -Eiq "$pattern" "$file" || return 1
+    # Build pattern that matches **N. Title** or just N. Title (without bold markers)
+    # The ** markers can wrap the entire header: **1. Title** or just be absent
+    pattern="^[[:space:]]*(\\*\\*)?${number}[.)][[:space:]]+${title}(\\*\\*)?[[:space:]]*$"
+    # Use case-insensitive matching (-i) since report titles may have capital letters
+    grep -Ei "$pattern" "$file" > /dev/null || return 1
   done <<'EOF'
 1|Scope scanned
 2|Upstream Hermes delta summary
@@ -703,7 +992,16 @@ cmd_install_schedule_only() {
 cmd_run() {
   claim_lock
 
+  local total_run_start
+  total_run_start=$(date +%s)
+
+  log_info "Starting architecture planner run"
+  log_info "Configuration: VERBOSE=$VERBOSE, AUTO_COMMIT=$AUTO_COMMIT, AUTO_PUSH=$AUTO_PUSH"
+
   progress 1 "preflight"
+  local step_start
+  step_start=$(date +%s)
+  log_info "Step 1/5: Preflight checks"
   require_cmd jq
   require_cmd git
   require_cmd codexu
@@ -715,6 +1013,7 @@ cmd_run() {
 
   if [[ -f "$ARCH_PLAN_JSON" ]]; then
     ARCH_PLAN_JSON_PRESENT="true"
+    log_info "Found architecture plan JSON"
   fi
 
   UPSTREAM_HERMES_DIR="$(detect_upstream_hermes_dir)"
@@ -724,19 +1023,40 @@ cmd_run() {
   LOCAL_COMMIT="$(git_field "$REPO_ROOT" commit)"
   LOCAL_BRANCH="$(git_field "$REPO_ROOT" branch)"
 
+  log_info "Upstream: $UPSTREAM_HERMES_DIR ($UPSTREAM_BRANCH @ $UPSTREAM_COMMIT)"
+  log_info "Local: $LOCAL_GIT_ROOT ($LOCAL_BRANCH @ $LOCAL_COMMIT)"
+  log_step_duration "preflight" "$step_start"
+
   progress 2 "context"
+  step_start=$(date +%s)
+  log_info "Step 2/5: Building context bundle"
   write_context_bundle
+  smart_commit "context: bundle" "generated context bundle"
   write_tasks_markdown
+  smart_commit "context: tasks" "updated tasks markdown"
   log_context_summary
+  smart_commit "context: complete" "context generation complete"
+  log_step_duration "context" "$step_start"
 
   progress 3 "planning"
+  step_start=$(date +%s)
+  log_info "Step 3/5: Running codexu planner"
   run_codexu_planner
+  smart_commit "planner: codexu" "planner run complete"
+  log_step_duration "planning" "$step_start"
 
   progress 4 "validation"
+  step_start=$(date +%s)
+  log_info "Step 4/5: Running validation"
   run_validation
   log "Validation log: $VALIDATION_LOG"
+  log_info "Validation completed successfully"
+  smart_commit "validation: passed" "validation passed"
+  log_step_duration "validation" "$step_start"
 
   progress 5 "schedule"
+  step_start=$(date +%s)
+  log_info "Step 5/5: Installing schedule"
   if [[ "$PLANNER_INSTALL_SCHEDULE" == "1" ]]; then
     install_periodic_schedule
   else
@@ -745,11 +1065,26 @@ cmd_run() {
   log "Schedule method: $SCHEDULE_METHOD"
   write_report
   write_state_file
+  smart_commit "planner: complete" "planner run completed"
+  log_step_duration "schedule" "$step_start"
 
-  log "Planner report: $REPORT_FILE"
-  log "Task Markdown: $TASKS_MD_FILE"
-  log "Planner state: $STATE_FILE"
-  log "Periodic schedule: $SCHEDULE_METHOD"
+  local total_run_elapsed=$(( $(date +%s) - total_run_start ))
+
+  # Final summary
+  echo
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "              PLANNER RUN COMPLETED SUCCESSFULLY"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "  Report:      $REPORT_FILE"
+  echo "  Tasks:       $TASKS_MD_FILE"
+  echo "  State:       $STATE_FILE"
+  echo "  Schedule:    $SCHEDULE_METHOD"
+  echo "  Total time:  $(format_duration $total_run_elapsed)"
+  echo "  Auto-commit: $([[ "$AUTO_COMMIT" == "1" ]] && echo "${COLOR_GREEN}enabled ✓${COLOR_RESET}" || echo "disabled")"
+  echo "  Auto-push:   $([[ "$AUTO_PUSH" == "1" ]] && echo "${COLOR_GREEN}enabled ✓${COLOR_RESET}" || echo "disabled")"
+  echo "═══════════════════════════════════════════════════════════════"
+
+  log_info "Planner run completed successfully in $(format_duration $total_run_elapsed)"
 }
 
 main() {
