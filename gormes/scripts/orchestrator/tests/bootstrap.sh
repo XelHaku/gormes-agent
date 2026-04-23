@@ -20,6 +20,11 @@ fetch_and_extract() {
   local sha256="$3"
   local dest_name="$4"
 
+  if [[ "${BATS_OFFLINE:-0}" == "1" ]]; then
+    echo "ERROR: $name not vendored and BATS_OFFLINE=1" >&2
+    return 1
+  fi
+
   local url="https://github.com/bats-core/${name}/archive/refs/tags/v${version}.tar.gz"
   local tmp_tarball
   tmp_tarball="$(mktemp)"
