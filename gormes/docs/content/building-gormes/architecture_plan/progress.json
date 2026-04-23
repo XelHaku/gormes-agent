@@ -140,8 +140,8 @@
             },
             {
               "name": "Pairing, reconnect, and send contract",
-              "status": "planned",
-              "note": "TDD: prove QR or bridge startup, reconnect backoff, and outbound send behavior with adapter-focused integration tests."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/whatsapp.Bot now starts the bridge in bot or self-chat mode, reconnects on disconnect with a deterministic backoff schedule, and records original chat JIDs plus reply-to message IDs for shared-chassis sends."
             }
           ]
         },

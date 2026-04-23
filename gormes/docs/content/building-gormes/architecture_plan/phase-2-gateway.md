@@ -17,8 +17,8 @@ weight: 30
 | Phase 2.B.1 — Telegram Scout | ✅ complete | P1 | Telegram adapter over the existing kernel, long-poll ingress, edit coalescing at the messaging edge |
 | Phase 2.B.2 — Gateway Chassis + Discord | ✅ complete | P1 | Shared gateway manager, Telegram migrated onto the chassis, `gormes gateway` multi-channel entrypoint, and Discord as the second real adapter |
 | Phase 2.B.3 — Slack on Shared Chassis | ✅ complete | P1 | Slack Socket Mode adapter, threaded reply flow, and gateway command wiring on the same shared contracts |
-| Phase 2.B.4 — WhatsApp Adapter | ⏳ planned | P1 | Pick the bridge-vs-native runtime seam, then port inbound normalization, command passthrough, pairing, reconnect, and send contracts |
-| Phase 2.B.5 — Session Context + Delivery Routing | ⏳ planned | P1 | Port `gateway/session.py`, `session_context.py`, `delivery.py`, and `stream_consumer.py` into one tested routing layer |
+| Phase 2.B.4 — WhatsApp Adapter | ✅ complete | P1 | Bridge-first runtime selection, inbound normalization, command passthrough, and adapter-focused startup/reconnect/send contracts now live in `internal/channels/whatsapp` |
+| Phase 2.B.5 — Session Context + Delivery Routing | ✅ complete | P1 | `SessionSource`, `SessionContext`, `DeliveryTarget`, and stream-consumer contracts are now frozen in `internal/gateway` with TDD coverage before wider adapter rollout |
 | Phase 2.B.6 — Signal Adapter | ✅ complete | P2 | Signal ingress, session identity, and reply/send semantics on the shared chassis |
 | Phase 2.B.7 — Email + SMS Adapters | ✅ complete | P3 | RFC 822 email normalization plus SMS number/session normalization and segmented outbound delivery contracts now ride the shared gateway seam without special-casing the kernel |
 | Phase 2.B.8 — Matrix + Mattermost Adapters | 🔨 in progress | P4 | Shared threaded-text contract suite landed in `internal/channels/threadtext`; Matrix + Mattermost transport wiring remains |
@@ -29,7 +29,7 @@ weight: 30
 | **Phase 2.E.0 — Deterministic Subagent Runtime** | ✅ complete | **P0** | Runtime core landed: deterministic lifecycle manager, max-depth guard, bounded batch execution, timeout/cancellation scopes, typed result envelope, `[delegation]` config, Go-native `delegate_task`, and append-only run logging |
 | **Phase 2.E.1 — Delegation Policy + Child Execution** | ✅ complete | **P0** | Runner-enforced blocked-tool/allowlist policy, typed child tool-call audit, and a live Hermes child stream loop are now landed |
 | **Phase 2.G — OS-AI Spine: Skills Runtime** | ✅ complete | **P0** | Static skills runtime and the first reviewed learning-loop proof are in-tree: validated `SKILL.md` parsing, active-store snapshots, deterministic selection + prompt rendering, kernel injection, append-only usage logging, delegated candidate drafting into the inactive store, and explicit promotion into the active store. |
-| Phase 2.F.1 — Slash Command Registry + Gateway Dispatch | ⏳ planned | P1 | Port `hermes_cli/commands.py` as one canonical registry that drives gateway parsing, help, and per-platform exposure |
+| Phase 2.F.1 — Slash Command Registry + Gateway Dispatch | ✅ complete | P1 | One canonical gateway command registry now drives parsing, help text, Telegram menus, and Slack exposure without alias drift |
 | Phase 2.F.2 — Hook Registry + BOOT.md | ✅ complete | P2 | Shared gateway lifecycle hooks, live `HOOK.yaml` command loading, and the built-in `BOOT.md` startup hook with non-blocking failure semantics are landed |
 | Phase 2.F.3 — Restart / Pairing / Status | 🔨 in progress | P2 | Graceful shutdown drain is landed at the shared manager + signal-entrypoint seam; pairing-state storage and operator status surfaces remain |
 | Phase 2.F.4 — Home Channel + Operator Surfaces | 🔨 in progress | P3 | Home-channel ownership, platform-only notify-to routing, and channel/contact directory lookup now land in `internal/gateway`; mirror surfaces and sticker-cache equivalents remain |
@@ -40,20 +40,18 @@ Phase 2.C is intentionally not Phase 3. It stores only session handles in bbolt.
 
 ## TDD Priority Queue
 
-Phase 2 is no longer just "ship more adapters." The backlog is now dominated by cross-cutting contracts that future adapters depend on. The execution order is:
+Phase 2 is no longer just "ship more adapters." The highest-leverage remaining work is now the lifecycle control plane plus the last transport wiring gaps. The execution order is:
 
-1. **P1 — 2.B.5 Session Context + Delivery Routing**
-   Freeze `SessionSource`, `SessionContext`, `DeliveryTarget`, and stream-consumer contracts with tests before moving any more adapters onto them.
-2. **P1 — 2.F.1 Slash Command Registry + Gateway Dispatch**
-   Port `COMMAND_REGISTRY` as one tested registry so `/help`, gateway parsing, Telegram menus, and Slack subcommand exposure stop drifting.
-3. **P1 — 2.B.4 WhatsApp Adapter**
-   Decide bridge-first versus native-first in tests, then port only the chosen lifecycle and command-passthrough seam.
-4. **P2 — 2.F.3 Restart / Pairing / Status**
-   Land graceful restart drain, pairing-state persistence, and operator status surfaces now that hook and subagent seams are stable.
-5. **P2/P3/P4 — lifecycle and long-tail adapters**
-   Home-channel surfaces, then the remaining adapters, in that order.
+1. **P2 — 2.F.3 Restart / Pairing / Status**
+   Land pairing-state persistence and operator status surfaces now that graceful shutdown drain, hook wiring, subagent control, and WhatsApp reconnect contracts are stable.
+2. **P3 — 2.F.4 Home Channel + Operator Surfaces**
+   Finish mirror surfaces and sticker-cache equivalents on top of the already-landed ownership and notify-to routing contracts.
+3. **P4 — 2.B.8 Matrix + Mattermost Adapters**
+   Reuse the shipped `internal/channels/threadtext` ingress/reply contract for transport wiring only; do not reopen the shared threaded-text abstraction.
+4. **P4 — remaining runtime binding work**
+   Keep future adapter and lifecycle work on the fixed gateway contracts instead of letting each platform invent its own rules.
 
-The subagent runtime, shared gateway chassis, and reviewed procedural skill runtime now exist as stable substrates. The next leverage move is hardening the runtime seam and the gateway routing contracts, then widening adapters on top of those fixed contracts instead of letting each adapter invent its own behavior.
+The subagent runtime, shared gateway chassis, registry-backed command layer, and reviewed procedural skill runtime now exist as stable substrates. The next leverage move is finishing lifecycle/state surfaces on top of those contracts, then widening transports without reopening the shared routing seams.
 
 ## Adapter Migration Notes
 

@@ -20,12 +20,12 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 29/66 subphases shipped · 6 in progress · 31 planned
+**Overall:** 30/66 subphases shipped · 5 in progress · 31 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
-| Phase 2 — The Gateway | 🔨 | 16/20 subphases |
+| Phase 2 — The Gateway | 🔨 | 17/20 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
@@ -77,11 +77,11 @@ weight: 10
 - [x] Thread routing + coalesced reply flow
 - [x] Gateway command wiring
 
-### 2.B.4 — WhatsApp Adapter 🔨
+### 2.B.4 — WhatsApp Adapter ✅
 
 - [x] Bridge-vs-native runtime decision
 - [x] Inbound normalization + command passthrough
-- [ ] Pairing, reconnect, and send contract
+- [x] Pairing, reconnect, and send contract
 
 ### 2.B.5 — Session Context + Delivery Routing ✅
 

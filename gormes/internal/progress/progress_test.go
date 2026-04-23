@@ -223,8 +223,8 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if whatsApp.Priority != "P1" {
 		t.Fatalf("Phase 2.B.4 priority = %q, want P1", whatsApp.Priority)
 	}
-	if got := whatsApp.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.B.4 = %q, want in_progress", got)
+	if got := whatsApp.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.B.4 = %q, want complete", got)
 	}
 	whatsAppItems := itemsByName(whatsApp.Items)
 	decision := whatsAppItems["Bridge-vs-native runtime decision"]
@@ -237,6 +237,13 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	}
 	if !strings.Contains(inbound.Note, "NormalizeInbound") || !strings.Contains(inbound.Note, "ParseInboundText") {
 		t.Fatalf("Phase 2.B.4 inbound normalization note = %q, want NormalizeInbound/ParseInboundText detail", inbound.Note)
+	}
+	contract := whatsAppItems["Pairing, reconnect, and send contract"]
+	if contract.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.4 contract status = %q, want complete", contract.Status)
+	}
+	if !strings.Contains(contract.Note, "whatsapp.Bot") || !strings.Contains(contract.Note, "backoff") || !strings.Contains(contract.Note, "reply-to") {
+		t.Fatalf("Phase 2.B.4 contract note = %q, want whatsapp.Bot/backoff/reply-to detail", contract.Note)
 	}
 
 	signal := p.Phases["2"].Subphases["2.B.6"]

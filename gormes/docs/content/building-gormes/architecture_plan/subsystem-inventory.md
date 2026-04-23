@@ -14,7 +14,7 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Telegram | `gateway/platforms/telegram.py` | 2.B.1 | ✅ shipped | Shared gateway adapter with long-poll ingress and edit coalescing |
 | Discord | `gateway/platforms/discord.py` | 2.B.2 | ✅ shipped | Shared gateway adapter with mention-aware ingress and reply delivery |
 | Slack | `gateway/platforms/slack.py` | 2.B.3 | ✅ shipped | Shared gateway adapter with Socket Mode and threaded reply flow |
-| WhatsApp | `gateway/platforms/whatsapp.py` | 2.B.4 | ⏳ planned | |
+| WhatsApp | `gateway/platforms/whatsapp.py` | 2.B.4 | ✅ shipped | Bridge-first startup, reconnect backoff, and JID-aware shared-chassis send contracts live in `internal/channels/whatsapp` |
 | Signal | `gateway/platforms/signal.py` | 2.B.6 | 🔨 in progress | Contract-tested ingress normalization and shared-chassis reply delivery live in `internal/channels/signal` |
 | Email | `gateway/platforms/email.py` | 2.B.7 | ✅ shipped | RFC 822 normalization and deterministic reply-thread targets live in `internal/channels/email` |
 | SMS | `gateway/platforms/sms.py` | 2.B.7 | ✅ shipped | Canonical phone-number session keys, generic command passthrough, and natural-boundary outbound segmentation live in `internal/channels/sms` |
