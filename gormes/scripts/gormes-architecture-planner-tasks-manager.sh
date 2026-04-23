@@ -663,12 +663,21 @@ verify_final_report() {
   [[ -f "$file" ]] || return 1
 
   local number title pattern
-  # The report format uses **bold markers** around section headers like **1. Scope Scanned**
-  # Pattern: optional whitespace, optional **, number, period, space, title, optional **
+  # The report format uses various header styles:
+  #   **1. Scope Scanned**  (bold around whole line with period)
+  #   1) **Scope scanned**   (number with parenthesis, bold around title only)
+  #   1. Scope scanned       (plain format without bold)
+  # Pattern must handle all these variations
   while IFS='|' read -r number title; do
-    # Build pattern that matches **N. Title** or just N. Title (without bold markers)
-    # The ** markers can wrap the entire header: **1. Title** or just be absent
-    pattern="^[[:space:]]*(\\*\\*)?${number}[.)][[:space:]]+${title}(\\*\\*)?[[:space:]]*$"
+    # Build pattern that matches:
+    # - Optional ** at start of line
+    # - Number with . or )
+    # - Optional space
+    # - Optional ** around the title
+    # - The title text
+    # - Optional closing **
+    # - Optional trailing whitespace
+    pattern="^[[:space:]]*(\\*\\*)?${number}[.)][[:space:]]+(\\*\\*)?${title}(\\*\\*)?[[:space:]]*$"
     # Use case-insensitive matching (-i) since report titles may have capital letters
     grep -Ei "$pattern" "$file" > /dev/null || return 1
   done <<'EOF'
