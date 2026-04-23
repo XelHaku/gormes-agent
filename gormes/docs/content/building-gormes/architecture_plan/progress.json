@@ -1028,7 +1028,8 @@
           "items": [
             {
               "name": "Heuristic or LLM-scored signal",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD: `internal/learning/runtime.go` now scores successful turns on tool-call intensity, token volume, transcript size, and duration; `internal/kernel/kernel.go` records the signal after each completed turn, and the shared entrypoints append JSONL decisions to `${XDG_DATA_HOME}/gormes/learning/complexity.jsonl`."
             }
           ]
         },

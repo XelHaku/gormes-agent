@@ -11,6 +11,7 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/kernel"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/learning"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/store"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
@@ -24,6 +25,7 @@ type KernelSessionFactoryOptions struct {
 	ModelRouting      kernel.SmartModelRouting
 	Skills            kernel.SkillProvider
 	SkillUsage        kernel.SkillUsageRecorder
+	Learning          learning.Recorder
 	MaxToolIterations int
 	MaxToolDuration   time.Duration
 	Logger            *slog.Logger
@@ -64,6 +66,7 @@ func (f *KernelSessionFactory) NewSession(parent context.Context, cwd string) (S
 		Tools:             reg,
 		Skills:            f.opts.Skills,
 		SkillUsage:        f.opts.SkillUsage,
+		Learning:          f.opts.Learning,
 		MaxToolIterations: f.opts.MaxToolIterations,
 		MaxToolDuration:   f.opts.MaxToolDuration,
 	}, client, store.NewNoop(), telemetry.New(), log)

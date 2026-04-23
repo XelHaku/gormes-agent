@@ -54,7 +54,6 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		// Status tone classes driven by the live embedded progress data.
 		"roadmap-status-shipped",
 		"roadmap-status-progress",
-		"roadmap-status-planned",
 		// Structural class anchors
 		"roadmap-phase",
 		// Footer — brand text + company anchor + license

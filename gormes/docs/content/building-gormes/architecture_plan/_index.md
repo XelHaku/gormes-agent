@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 56/66 subphases shipped · 1 in progress · 9 planned
+**Overall:** 57/66 subphases shipped · 1 in progress · 8 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -29,7 +29,7 @@ weight: 10
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 13/17 subphases |
-| Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
+| Phase 6 — The Learning Loop (Soul) | 🔨 | 1/6 subphases |
 
 ---
 
@@ -375,13 +375,13 @@ weight: 10
 
 - [ ] SSE streaming to Bubble Tea TUI
 
-## Phase 6 — The Learning Loop (Soul) ⏳
+## Phase 6 — The Learning Loop (Soul) 🔨
 
 *Native skill extraction. Compounding intelligence. The feature Hermes doesn't have.*
 
-### 6.A — Complexity Detector ⏳
+### 6.A — Complexity Detector ✅
 
-- [ ] Heuristic or LLM-scored signal
+- [x] Heuristic or LLM-scored signal
 
 ### 6.B — Skill Extractor ⏳
 

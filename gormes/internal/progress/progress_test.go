@@ -856,6 +856,29 @@ func TestLoad_RealFile_Phase5AtomicCheckpoints(t *testing.T) {
 	}
 }
 
+func TestLoad_RealFile_Phase6ComplexityDetector(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	detector := p.Phases["6"].Subphases["6.A"]
+	if got := detector.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 6.A = %q, want complete", got)
+	}
+
+	items := itemsByName(detector.Items)
+	signal := items["Heuristic or LLM-scored signal"]
+	if signal.Status != StatusComplete {
+		t.Fatalf("Phase 6.A signal status = %q, want complete", signal.Status)
+	}
+	if !strings.Contains(signal.Note, "internal/learning/runtime.go") ||
+		!strings.Contains(signal.Note, "internal/kernel/kernel.go") ||
+		!strings.Contains(signal.Note, "${XDG_DATA_HOME}/gormes/learning/complexity.jsonl") {
+		t.Fatalf("Phase 6.A signal note = %q, want runtime.go/kernel.go/XDG log detail", signal.Note)
+	}
+}
+
 func TestLoad_RealFile_Phase5SandboxedExec(t *testing.T) {
 	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
 	if err != nil {

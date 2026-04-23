@@ -559,6 +559,15 @@ func TestSkillsRoot_HonorsXDG(t *testing.T) {
 	}
 }
 
+func TestLearningSignalLogPath_HonorsXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-test-learning")
+	got := LearningSignalLogPath()
+	want := "/tmp/gormes-test-learning/gormes/learning/complexity.jsonl"
+	if got != want {
+		t.Errorf("LearningSignalLogPath() = %q, want %q", got, want)
+	}
+}
+
 func TestHooksRoot_DefaultsToHomeLocalShare(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "")
 	home := t.TempDir()

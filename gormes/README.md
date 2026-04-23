@@ -80,7 +80,7 @@ GORMES_TELEGRAM_TOKEN=... GORMES_TELEGRAM_CHAT_ID=123456789 gormes telegram
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 13/17 subphases |
-| Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
+| Phase 6 — The Learning Loop (Soul) | 🔨 | 1/6 subphases |
 <!-- PROGRESS:END -->
 
 ## Landing Page

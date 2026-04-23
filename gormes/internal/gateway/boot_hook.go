@@ -9,6 +9,7 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/kernel"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/learning"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/store"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
@@ -22,6 +23,7 @@ type BootHookConfig struct {
 	Tools      *tools.Registry
 	Skills     kernel.SkillProvider
 	SkillUsage kernel.SkillUsageRecorder
+	Learning   learning.Recorder
 	Log        *slog.Logger
 }
 
@@ -72,6 +74,7 @@ func runBootHook(ctx context.Context, cfg BootHookConfig, prompt string) {
 		Admission:         kernel.Admission{MaxBytes: 200_000, MaxLines: 10_000},
 		Skills:            cfg.Skills,
 		SkillUsage:        cfg.SkillUsage,
+		Learning:          cfg.Learning,
 		Tools:             cfg.Tools,
 		MaxToolIterations: 10,
 		MaxToolDuration:   30 * time.Second,

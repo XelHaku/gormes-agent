@@ -28,6 +28,7 @@ func runACP(ctx context.Context) error {
 	}
 
 	skillsRuntime := configuredSkillsRuntime(cfg)
+	learningRuntime := configuredLearningRuntime(cfg)
 	factory := acp.NewKernelSessionFactory(acp.KernelSessionFactoryOptions{
 		Model:    cfg.Hermes.Model,
 		Endpoint: hermesEndpoint(cfg),
@@ -41,6 +42,7 @@ func runACP(ctx context.Context) error {
 		ModelRouting: smartModelRouting(cfg),
 		Skills:       skillsRuntime,
 		SkillUsage:   skillsRuntime,
+		Learning:     learningRuntime,
 	})
 
 	server := acp.NewServer(acp.Options{

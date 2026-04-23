@@ -557,6 +557,12 @@ func (c Config) SkillsPromptSnapshotPath() string {
 	return filepath.Join(xdgDataHome(), "gormes", ".skills_prompt_snapshot.json")
 }
 
+// LearningSignalLogPath returns the append-only JSONL path for Phase 6.A
+// learn-worth signals emitted after successful turns.
+func LearningSignalLogPath() string {
+	return filepath.Join(xdgDataHome(), "gormes", "learning", "complexity.jsonl")
+}
+
 // ToolAuditLogPath returns the append-only JSONL path for tool execution
 // audit records.
 func ToolAuditLogPath() string {

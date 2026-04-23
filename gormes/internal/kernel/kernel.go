@@ -11,12 +11,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/audit"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/contextengine"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/learning"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/store"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
@@ -57,6 +59,9 @@ type Config struct {
 	// SkillUsage records selected skill names for later analysis. Nil disables
 	// usage logging.
 	SkillUsage SkillUsageRecorder
+	// Learning records a heuristic learn-worth signal for successful turns.
+	// Nil disables the Phase 6.A detector.
+	Learning learning.Recorder
 	// ToolAudit records append-only JSONL tool execution events when non-nil.
 	ToolAudit audit.Recorder
 	// ContextEngine owns provider-free long-session planning and compression
@@ -487,7 +492,8 @@ toolLoop:
 		k.phase = PhaseCancelling
 		k.emitFrame("cancelled")
 	} else {
-		prov.LatencyMs = int(finishTelemetry(telemetry.TurnStatusCompleted) / time.Millisecond)
+		latency := finishTelemetry(telemetry.TurnStatusCompleted)
+		prov.LatencyMs = int(latency / time.Millisecond)
 		if k.draft != "" {
 			k.history = append(k.history, hermes.Message{Role: "assistant", Content: k.draft})
 			// Phase 3.A: finalize in the memory store. Fire-and-forget — the worker
@@ -508,11 +514,38 @@ toolLoop:
 			_, _ = k.store.Exec(finalCtx, store.Command{Kind: store.FinalizeAssistantTurn, Payload: finalPayload})
 			finalCancel()
 		}
+		if k.cfg.Learning != nil {
+			learnCtx, learnCancel := context.WithTimeout(ctx, StoreAckDeadline)
+			_, err := k.cfg.Learning.RecordTurn(learnCtx, learning.Turn{
+				SessionID:        k.sessionID,
+				UserMessage:      text,
+				AssistantMessage: k.draft,
+				ToolNames:        toolCallNames(toolCallsSeen),
+				TokensIn:         finalDelta.TokensIn,
+				TokensOut:        finalDelta.TokensOut,
+				Duration:         latency,
+				FinishedAt:       time.Now().UTC(),
+			})
+			learnCancel()
+			if err != nil {
+				k.log.Warn("kernel: record learning signal failed", "err", err)
+			}
+		}
 	}
 
 	prov.LogDone(k.log)
 	k.phase = PhaseIdle
 	k.emitFrame("idle")
+}
+
+func toolCallNames(calls []hermes.ToolCall) []string {
+	out := make([]string, 0, len(calls))
+	for _, call := range calls {
+		if name := strings.TrimSpace(call.Name); name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 type streamOutcome int

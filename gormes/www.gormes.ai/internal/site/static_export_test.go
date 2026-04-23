@@ -29,7 +29,6 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		// those come from progress.json and must not be locked in here.
 		"roadmap-status-shipped",
 		"roadmap-status-progress",
-		"roadmap-status-planned",
 		"roadmap-phase",
 		// Fuzzy phase-title presence — each phase renders, no subtitles
 		"Phase 1",

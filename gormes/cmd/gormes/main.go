@@ -120,6 +120,7 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 	tm := telemetry.New()
 	toolAudit := audit.NewJSONLWriter(config.ToolAuditLogPath())
 	skillsRuntime := configuredSkillsRuntime(cfg)
+	learningRuntime := configuredLearningRuntime(cfg)
 	k := kernel.New(kernel.Config{
 		Model:             cfg.Hermes.Model,
 		Endpoint:          endpoint,
@@ -127,6 +128,7 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		Admission:         kernel.Admission{MaxBytes: cfg.Input.MaxBytes, MaxLines: cfg.Input.MaxLines},
 		Skills:            skillsRuntime,
 		SkillUsage:        skillsRuntime,
+		Learning:          learningRuntime,
 		Tools:             buildDefaultRegistry(rootCtx, cfg.Delegation, cfg.SkillsRoot(), c, cfg.Hermes.Model),
 		MaxToolIterations: 10,
 		MaxToolDuration:   30 * time.Second,

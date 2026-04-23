@@ -122,6 +122,7 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 
 	tm := telemetry.New()
 	toolAudit := audit.NewJSONLWriter(config.ToolAuditLogPath())
+	learningRuntime := configuredLearningRuntime(cfg)
 
 	var recallProv kernel.RecallProvider
 
@@ -167,6 +168,7 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 		Admission:         kernel.Admission{MaxBytes: cfg.Input.MaxBytes, MaxLines: cfg.Input.MaxLines},
 		Skills:            skillsRuntime,
 		SkillUsage:        skillsRuntime,
+		Learning:          learningRuntime,
 		Tools:             reg,
 		MaxToolIterations: 10,
 		MaxToolDuration:   30 * time.Second,
