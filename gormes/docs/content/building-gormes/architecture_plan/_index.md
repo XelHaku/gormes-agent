@@ -159,7 +159,7 @@ weight: 10
 
 ### 2.F.4 — Home Channel + Operator Surfaces 🔨
 
-- [ ] Home channel ownership + notify-to routing
+- [x] Home channel ownership + notify-to routing
 - [x] Channel/contact directory
 - [ ] Mirror + sticker cache surfaces
 

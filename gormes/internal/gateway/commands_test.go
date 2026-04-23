@@ -12,9 +12,10 @@ func TestCommandRegistryContainsRequiredCommands(t *testing.T) {
 	}
 
 	required := map[string]bool{
-		"help": false,
-		"new":  false,
-		"stop": false,
+		"help":    false,
+		"new":     false,
+		"sethome": false,
+		"stop":    false,
 	}
 	for _, cmd := range CommandRegistry {
 		if _, ok := required[cmd.Name]; ok {
@@ -38,6 +39,8 @@ func TestResolveCommand(t *testing.T) {
 		{name: "help", raw: "/help", want: "help", ok: true},
 		{name: "new", raw: "/new", want: "new", ok: true},
 		{name: "stop", raw: "/stop", want: "stop", ok: true},
+		{name: "sethome", raw: "/sethome", want: "sethome", ok: true},
+		{name: "set-home alias", raw: "/set-home", want: "sethome", ok: true},
 		{name: "telegram alias", raw: "/start", want: "help", ok: true},
 		{name: "unknown", raw: "/xyzzy", want: "", ok: false},
 	}
@@ -67,6 +70,7 @@ func TestParseInboundText(t *testing.T) {
 		{name: "help", text: "/help", wantKind: EventStart, wantBody: ""},
 		{name: "new", text: "/new", wantKind: EventReset, wantBody: ""},
 		{name: "stop", text: "/stop", wantKind: EventCancel, wantBody: ""},
+		{name: "sethome", text: "/sethome", wantKind: EventSetHome, wantBody: ""},
 		{name: "unknown slash", text: "/wat", wantKind: EventUnknown, wantBody: ""},
 		{name: "submit", text: "hello there", wantKind: EventSubmit, wantBody: "hello there"},
 	}
@@ -87,7 +91,7 @@ func TestGatewayHelpLinesDerivedFromRegistry(t *testing.T) {
 	}
 
 	joined := strings.Join(lines, "\n")
-	for _, want := range []string{"/help", "/new", "/stop"} {
+	for _, want := range []string{"/help", "/new", "/sethome", "/stop"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("GatewayHelpLines missing %q in %q", want, joined)
 		}
@@ -109,7 +113,7 @@ func TestPlatformExposureDeterministic(t *testing.T) {
 	if !reflect.DeepEqual(slack1, slack2) {
 		t.Fatalf("SlackSubcommandMap unstable:\n%#v\n%#v", slack1, slack2)
 	}
-	for _, want := range []string{"help", "new", "stop"} {
+	for _, want := range []string{"help", "new", "sethome", "set-home", "stop"} {
 		if _, ok := slack1[want]; !ok {
 			t.Fatalf("SlackSubcommandMap missing %q", want)
 		}

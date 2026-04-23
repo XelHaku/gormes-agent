@@ -25,6 +25,7 @@ type ManagerConfig struct {
 	SessionMap       session.Map
 	Hooks            *Hooks
 	ChannelDirectory *ChannelDirectory
+	HomeChannels     *HomeChannels
 }
 
 type kernelSubmitter interface {
@@ -121,6 +122,9 @@ func newManagerInternal(cfg ManagerConfig, k kernelSubmitter, log *slog.Logger) 
 	}
 	if cfg.AllowDiscovery == nil {
 		cfg.AllowDiscovery = map[string]bool{}
+	}
+	if cfg.HomeChannels == nil {
+		cfg.HomeChannels = NewHomeChannels()
 	}
 	return &Manager{
 		cfg:      cfg,
@@ -326,6 +330,13 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) {
 			}
 		}
 		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Session reset. Next message starts fresh.")
+	case EventSetHome:
+		home, ok := m.cfg.HomeChannels.SetFromInbound(ev)
+		if !ok {
+			_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Failed to set home channel: missing platform or chat ID.")
+			return
+		}
+		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, homeChannelSetMessage(home))
 	case EventSubmit:
 		if m.kernel == nil {
 			return

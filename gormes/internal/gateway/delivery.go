@@ -12,6 +12,7 @@ type DeliveryTarget struct {
 	ThreadID   string
 	IsOrigin   bool
 	IsExplicit bool
+	IsHome     bool
 }
 
 func (t DeliveryTarget) String() string {
@@ -29,6 +30,33 @@ func (t DeliveryTarget) String() string {
 		return platform + ":" + t.ChatID
 	}
 	return platform + ":" + t.ChatID + ":" + t.ThreadID
+}
+
+// ResolveDeliveryTarget binds syntax-only delivery targets to concrete chat
+// destinations. A platform-only target means "that platform's home channel".
+func ResolveDeliveryTarget(target DeliveryTarget, homes *HomeChannels) (DeliveryTarget, error) {
+	target.Platform = strings.ToLower(strings.TrimSpace(target.Platform))
+	target.ChatID = strings.TrimSpace(target.ChatID)
+	target.ThreadID = strings.TrimSpace(target.ThreadID)
+
+	if !needsHomeChannel(target) {
+		return target, nil
+	}
+
+	home, ok := homes.Lookup(target.Platform)
+	if !ok {
+		return DeliveryTarget{}, errors.New("gateway: no home channel configured for " + target.Platform)
+	}
+	return DeliveryTarget{
+		Platform: home.Platform,
+		ChatID:   home.ChatID,
+		ThreadID: home.ThreadID,
+		IsHome:   true,
+	}, nil
+}
+
+func needsHomeChannel(target DeliveryTarget) bool {
+	return !target.IsOrigin && target.Platform != "" && target.Platform != "local" && target.ChatID == ""
 }
 
 // ParseDeliveryTarget converts a single --deliver token into a typed target.

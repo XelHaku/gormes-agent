@@ -32,7 +32,7 @@ weight: 30
 | Phase 2.F.1 — Slash Command Registry + Gateway Dispatch | ⏳ planned | P1 | Port `hermes_cli/commands.py` as one canonical registry that drives gateway parsing, help, and per-platform exposure |
 | Phase 2.F.2 — Hook Registry + BOOT.md | ✅ complete | P2 | Shared gateway lifecycle hooks, live `HOOK.yaml` command loading, and the built-in `BOOT.md` startup hook with non-blocking failure semantics are landed |
 | Phase 2.F.3 — Restart / Pairing / Status | 🔨 in progress | P2 | Graceful shutdown drain is landed at the shared manager + signal-entrypoint seam; pairing-state storage and operator status surfaces remain |
-| Phase 2.F.4 — Home Channel + Operator Surfaces | 🔨 in progress | P3 | Channel/contact directory lookup and rename invalidation landed in `internal/gateway`; home-channel routing, mirror surfaces, and sticker-cache equivalents remain |
+| Phase 2.F.4 — Home Channel + Operator Surfaces | 🔨 in progress | P3 | Home-channel ownership, platform-only notify-to routing, and channel/contact directory lookup now land in `internal/gateway`; mirror surfaces and sticker-cache equivalents remain |
 
 For channel-by-channel donor analysis against the all-Go PicoClaw repo, see [Gateway Donor Map](../gateway-donor-map/).
 

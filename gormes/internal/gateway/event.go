@@ -19,6 +19,9 @@ const (
 	EventReset
 	// EventStart is the help or welcome command.
 	EventStart
+	// EventSetHome marks the inbound chat as the platform home channel for
+	// proactive notifications and platform-only delivery targets.
+	EventSetHome
 )
 
 // String returns the stable log/test representation of an EventKind.
@@ -32,6 +35,8 @@ func (k EventKind) String() string {
 		return "reset"
 	case EventStart:
 		return "start"
+	case EventSetHome:
+		return "sethome"
 	default:
 		return "unknown"
 	}

@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-22",
+    "last_updated": "2026-04-23",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -392,8 +392,8 @@
           "items": [
             {
               "name": "Home channel ownership + notify-to routing",
-              "status": "planned",
-              "note": "TDD: define home-channel selection and fallback rules before cross-platform delivery code."
+              "status": "complete",
+              "note": "TDD landed: internal/gateway.HomeChannels now records /sethome ownership metadata, manager-owned acknowledgements, and platform-only delivery targets resolve to configured home channels for notify-to routing."
             },
             {
               "name": "Channel/contact directory",

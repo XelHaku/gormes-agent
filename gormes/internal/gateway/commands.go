@@ -39,6 +39,12 @@ var CommandRegistry = []CommandDef{
 		Description: "Cancel the active turn",
 		Kind:        EventCancel,
 	},
+	{
+		Name:        "sethome",
+		Description: "Set this chat as the home channel",
+		Kind:        EventSetHome,
+		Aliases:     []string{"set-home"},
+	},
 }
 
 var commandLookup = buildCommandLookup()
