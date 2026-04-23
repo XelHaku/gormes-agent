@@ -1292,8 +1292,8 @@
           "items": [
             {
               "name": "Sandboxed exec",
-              "status": "planned",
-              "note": "TDD: port `tools/code_execution_tool.py` on top of the Phase 5.B environment interface, proving language selection, stdout/stderr limits, timeout, and blocked filesystem/network behavior."
+              "status": "complete",
+              "note": "TDD landed: Go-native `execute_code` now runs guarded `sh`/`python` snippets through a local sandbox contract with runtime selection, stdout/stderr caps, timeout status, and pre-exec filesystem/network blocking while broader backend-specific sandboxes remain Phase 5.B work."
             }
           ]
         },

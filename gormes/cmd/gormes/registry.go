@@ -21,6 +21,7 @@ func buildDefaultRegistry(parentCtx context.Context, delegation config.Delegatio
 	reg.MustRegister(&tools.EchoTool{})
 	reg.MustRegister(&tools.NowTool{})
 	reg.MustRegister(&tools.RandIntTool{})
+	reg.MustRegister(tools.NewExecuteCodeTool())
 	if delegation.Enabled {
 		var drafter subagent.CandidateDrafter
 		if skillsRoot != "" {

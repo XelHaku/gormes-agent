@@ -309,7 +309,7 @@
     },
     "5": {
       "name": "Phase 5 \u2014 The Final Purge",
-      "status": "planned",
+      "status": "in_progress",
       "deliverable": "Python tool scripts ported to Go or WASM",
       "subphases": {
         "5.A": {
@@ -390,7 +390,7 @@
           ]
         },
         "5.K": {
-          "status": "planned",
+          "status": "complete",
           "name": "Code Execution",
           "items": [
             "Sandboxed exec"

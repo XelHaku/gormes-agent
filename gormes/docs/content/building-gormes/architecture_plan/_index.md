@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 26/67 subphases shipped · 12 in progress · 29 planned
+**Overall:** 27/67 subphases shipped · 12 in progress · 28 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -28,7 +28,7 @@ weight: 10
 | Phase 2 — The Gateway | 🔨 | 13/20 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
-| Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
+| Phase 5 — The Final Purge | 🔨 | 1/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 
 ---
@@ -350,7 +350,7 @@ weight: 10
 - [ ] Prompt-cache capability guard
 - [ ] Provider rate guard + budget telemetry
 
-## Phase 5 — The Final Purge ⏳
+## Phase 5 — The Final Purge 🔨
 
 *Python tool scripts ported to Go or WASM*
 
@@ -416,9 +416,9 @@ weight: 10
 - [ ] Cron dangerous-command approval mode
 - [ ] Tirith, path, URL, and website policy integration
 
-### 5.K — Code Execution ⏳
+### 5.K — Code Execution ✅
 
-- [ ] Sandboxed exec
+- [x] Sandboxed exec
 
 ### 5.L — File Ops + Patches ⏳
 

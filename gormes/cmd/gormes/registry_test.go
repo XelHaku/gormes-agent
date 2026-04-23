@@ -17,6 +17,9 @@ func TestBuildDefaultRegistryDelegationDisabled(t *testing.T) {
 	if _, ok := reg.Get("delegate_task"); ok {
 		t.Fatal("delegate_task unexpectedly registered")
 	}
+	if _, ok := reg.Get("execute_code"); !ok {
+		t.Fatal("execute_code not registered")
+	}
 }
 
 func TestBuildDefaultRegistryDelegationEnabled(t *testing.T) {

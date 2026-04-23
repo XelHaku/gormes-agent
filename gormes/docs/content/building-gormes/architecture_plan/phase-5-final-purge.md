@@ -5,7 +5,7 @@ weight: 60
 
 # Phase 5 — The Final Purge (100% Go)
 
-**Status:** ⏳ planned
+**Status:** 🔨 in progress
 
 **Deliverable:** Python tool scripts ported to Go or WASM. Python disappears entirely from the runtime path.
 
@@ -27,7 +27,7 @@ Phase 5 is when Python disappears entirely from the runtime path. Each sub-phase
 | 5.H — ACP Integration | ⏳ planned | Port `acp_adapter/` as an authenticated protocol server with session lifecycle, tool permission prompts, and event streaming tests |
 | 5.I — Plugins Architecture | ⏳ planned | Port plugin manifest loading, capability registration, version checks, isolation boundaries, then extension install/enable/disable flows |
 | 5.J — Approval / Security Guards | ⏳ planned | Port `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py` as small guard slices: dangerous-command detection, approval-mode config, cron `approvals.cron_mode`, then combined Tirith/path/URL/website policy decisions |
-| 5.K — Code Execution | ⏳ planned | Port `tools/code_execution_tool.py` + `tools/process_registry.py` on top of the Phase 5.B environment contract |
+| 5.K — Code Execution | ✅ complete | Go-native `execute_code` now runs guarded `sh`/`python` snippets with runtime selection, timeout/output caps, and filesystem/network blocking; broader backend-specific sandboxes remain Phase 5.B |
 | 5.L — File Ops + Patches | ⏳ planned | Port `tools/{file_operations,file_tools,checkpoint_manager,patch_parser}.py` as checkpoint-first write primitives with rollback and path-policy fixtures |
 | 5.M — Mixture of Agents | ⏳ planned | Port `tools/mixture_of_agents_tool.py` only after provider routing and subagent envelopes are stable |
 | 5.N — Misc Operator Tools | ⏳ planned | Port todo, clarify, session search, debug helpers, send_message, cronjob tools, and interrupt as small contracts; cron parity remains split into tool API/schedule parsing, prompt/script safety, and multi-target/media/live-adapter delivery follow-ups |
