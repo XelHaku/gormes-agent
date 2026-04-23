@@ -777,13 +777,13 @@
           "items": [
             {
               "name": "relationships.last_seen schema + backfill",
-              "status": "planned",
-              "note": "TDD: add a versioned migration for relationships.last_seen, backfill from updated_at, and keep recall using a COALESCE fallback until migrated rows are proven fresh."
+              "status": "complete",
+              "note": "TDD landed: schema v3g adds relationships.last_seen, backfills legacy rows from updated_at, and keeps recall decay on COALESCE(NULLIF(last_seen, 0), updated_at) so migrated and fresh rows rank deterministically."
             },
             {
               "name": "Relationship writer freshness updates",
-              "status": "planned",
-              "note": "TDD: update graph write/upsert paths so each observed relationship advances last_seen independently of long-lived weight/updated_at semantics."
+              "status": "complete",
+              "note": "TDD landed: graph relationship upserts now advance last_seen on every observation while preserving the legacy updated_at timestamp for structural freshness semantics."
             },
             {
               "name": "Deterministic weight attenuation at recall time",
@@ -817,9 +817,14 @@
               "note": "TDD: make honcho_search and honcho_context schemas advertise optional scope and sources while preserving external Honcho-compatible names and keeping omitted fields same-chat by default."
             },
             {
-              "name": "Cross-chat deny-path + operator evidence",
+              "name": "Cross-chat deny-path fixtures",
               "status": "planned",
-              "note": "TDD: prove unknown/conflicting user_id bindings cannot widen recall, then add operator-readable evidence for allowed and denied cross-chat recall paths before marking 3.E.7 complete."
+              "note": "TDD: prove unknown, unresolved, or conflicting user_id bindings cannot widen recall or session search, and pin same-chat fallback behavior with fixture-backed allow/deny cases before cross-chat access is exposed as shipped."
+            },
+            {
+              "name": "Cross-chat operator evidence",
+              "status": "planned",
+              "note": "TDD: add operator-readable evidence for allowed and denied cross-chat recall paths, including resolved user_id/source scope details, before marking 3.E.7 complete."
             }
           ]
         },
@@ -866,23 +871,23 @@
           "items": [
             {
               "name": "Provider interface + stream fixture harness",
-              "status": "planned",
-              "note": "TDD: define the provider-neutral request, stream-event, tool-call, usage, and finish-reason contracts with fixture-backed tests before any single vendor adapter is wired into the native agent loop."
+              "status": "in_progress",
+              "note": "TDD: `internal/hermes/client.go` already freezes shared ChatRequest/Message/Event/ToolCall contracts and Anthropic+Bedrock tests exercise them; the remaining closeout is a reusable fixture harness that replays provider transcripts, usage, and finish reasons across adapters before Gemini/OpenRouter/Codex land."
             },
             {
               "name": "Tool-call normalization + continuation contract",
-              "status": "planned",
-              "note": "TDD: freeze streamed tool_calls accumulation, tool-result continuation payloads, and provider-specific role mapping so Anthropic, Gemini, OpenAI-compatible, and Codex adapters cannot diverge silently."
+              "status": "in_progress",
+              "note": "TDD: streamed tool-call accumulation and tool-result continuation payload mapping are already shared across Anthropic/Bedrock; the remaining closeout is cross-provider fixture coverage that locks assistant tool-call messages, tool replies, and continuation-safe finish reasons so later adapters cannot diverge silently."
             },
             {
               "name": "Anthropic",
-              "status": "planned",
-              "note": "TDD: port `agent/anthropic_adapter.py` after the shared stream harness exists, including prompt-cache metadata, tool-use deltas, stop reasons, and rate-limit/error fixtures without requiring live credentials."
+              "status": "complete",
+              "note": "TDD landed in `internal/hermes`: direct Anthropic Messages API request shaping now preserves cache-control metadata on system/tool-result blocks, streams `thinking`/`text`/`input_json_delta` events into the shared event model, maps Anthropic stop reasons to continuation-safe finish reasons, and covers 429/rate-limit fixtures with `httptest` instead of live credentials."
             },
             {
               "name": "Bedrock",
-              "status": "planned",
-              "note": "TDD: port `agent/bedrock_adapter.py` as an Anthropic-compatible transport variant with AWS request signing, region/config validation, and Bedrock-specific error envelopes covered by fixtures."
+              "status": "complete",
+              "note": "TDD landed in `internal/hermes`: the native Bedrock ConverseStream adapter now resolves region defaults, delegates AWS credential loading and SigV4 request signing to the AWS SDK, maps canonical system/user/assistant/tool messages into Bedrock tool-aware conversation payloads, streams reasoning/text/tool-use deltas back into the shared event model, and translates Bedrock API error codes into retry-safe `HTTPError` classifications without requiring live AWS credentials in tests."
             },
             {
               "name": "Gemini",
@@ -986,8 +991,8 @@
             },
             {
               "name": "Per-turn model selection",
-              "status": "planned",
-              "note": "TDD: wire the selector into the native agent loop only after provider adapters expose stable capabilities, and prove prompt-cache/toolset context is not rebuilt mid-conversation."
+              "status": "complete",
+              "note": "TDD landed a turn-scoped `PlatformEvent.Model` override in `internal/kernel`, carrying the selected model across tool iterations while request/frame/telemetry state reflects the active turn and `cfg.Model` remains the fallback for later turns."
             }
           ]
         },
@@ -1046,18 +1051,18 @@
           "items": [
             {
               "name": "Provider-side resilience",
-              "status": "planned",
-              "note": "Umbrella only: split into classified errors, Retry-After/backoff, rate guard, and prompt-cache capability tasks before enabling native provider failover."
+              "status": "complete",
+              "note": "TDD landed in `internal/hermes` + `internal/kernel`: provider HTTP failures now classify rate-limit/auth/context signals from status + body, surface capped `Retry-After` hints on `HTTPError`, and feed the kernel's open-stream retry delay selection so 429/slowdown responses back off deterministically without live provider credentials in tests."
             },
             {
               "name": "Classified provider-error taxonomy",
-              "status": "planned",
-              "note": "TDD: port `agent/error_classifier.py` classifications for retryable, rate-limit, auth, context-overflow, and non-retryable client errors with table-driven HTTP/provider fixtures."
+              "status": "in_progress",
+              "note": "TDD: `internal/hermes/errors.go` already classifies retryable vs fatal HTTP/auth/context/rate-limit conditions for kernel retries; the remaining closeout is a richer structured taxonomy comparable to `agent/error_classifier.py`, including explicit rate-limit/auth/context/non-retryable envelopes and broader provider fixture tables."
             },
             {
               "name": "Retry-After + jittered backoff policy",
-              "status": "planned",
-              "note": "TDD: port `agent/retry_utils.py` jitter plus `Retry-After` capping behavior before any native agent loop retries failed provider calls."
+              "status": "complete",
+              "note": "TDD landed in `internal/hermes/errors.go` + `internal/kernel/retry.go`: Retry-After hints parse from headers/body, delays are capped, the reconnect budget uses 1s/2s/4s/8s/16s backoff with +/-20% jitter, and kernel open-stream retries combine provider hints with that schedule under tests."
             },
             {
               "name": "Prompt-cache capability guard",

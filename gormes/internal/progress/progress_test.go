@@ -69,9 +69,9 @@ func TestLoad_RealFile(t *testing.T) {
 	if got := p.Phases["3"].DerivedStatus(); got != StatusInProgress {
 		t.Errorf("Phase 3 = %q, want in_progress", got)
 	}
-	// Phase 4 is entirely planned.
-	if got := p.Phases["4"].DerivedStatus(); got != StatusPlanned {
-		t.Errorf("Phase 4 = %q, want planned", got)
+	// Phase 4 has the Anthropic adapter landed while the rest stays planned.
+	if got := p.Phases["4"].DerivedStatus(); got != StatusInProgress {
+		t.Errorf("Phase 4 = %q, want in_progress", got)
 	}
 	// Floor counts — catches mass-deletion regressions without pinning exact values.
 	if n := len(p.Phases); n < 6 {
@@ -83,6 +83,26 @@ func TestLoad_RealFile(t *testing.T) {
 	}
 	if s.Items.Total < 100 {
 		t.Errorf("item total = %d, want >= 100", s.Items.Total)
+	}
+}
+
+func TestLoad_RealFile_Phase4Anthropic(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	adapters := p.Phases["4"].Subphases["4.A"]
+	if got := adapters.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 4.A = %q, want in_progress", got)
+	}
+	items := itemsByName(adapters.Items)
+	anthropic := items["Anthropic"]
+	if anthropic.Status != StatusComplete {
+		t.Fatalf("Phase 4.A Anthropic status = %q, want complete", anthropic.Status)
+	}
+	if !strings.Contains(anthropic.Note, "cache-control metadata") || !strings.Contains(anthropic.Note, "rate-limit fixtures") {
+		t.Fatalf("Phase 4.A Anthropic note = %q, want landed adapter detail", anthropic.Note)
 	}
 }
 
@@ -723,14 +743,23 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	if decay.Priority != "P1" {
 		t.Fatalf("Phase 3.E.6 priority = %q, want P1", decay.Priority)
 	}
+	if got := decay.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 3.E.6 = %q, want complete", got)
+	}
 	decayItems := itemsByName(decay.Items)
 	lastSeen := decayItems["relationships.last_seen schema + backfill"]
-	if !strings.Contains(lastSeen.Note, "TDD") {
+	if lastSeen.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.6 last_seen status = %q, want complete", lastSeen.Status)
+	}
+	if !strings.Contains(lastSeen.Note, "COALESCE") {
 		t.Fatalf("Phase 3.E.6 last_seen note = %q, want TDD guidance", lastSeen.Note)
 	}
 	writerFreshness := decayItems["Relationship writer freshness updates"]
-	if writerFreshness.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.6 writer freshness status = %q, want planned", writerFreshness.Status)
+	if writerFreshness.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.6 writer freshness status = %q, want complete", writerFreshness.Status)
+	}
+	if !strings.Contains(writerFreshness.Note, "last_seen") {
+		t.Fatalf("Phase 3.E.6 writer freshness note = %q, want last_seen detail", writerFreshness.Note)
 	}
 
 	export := p.Phases["3"].Subphases["3.E.3"]

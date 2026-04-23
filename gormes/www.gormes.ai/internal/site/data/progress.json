@@ -777,13 +777,13 @@
           "items": [
             {
               "name": "relationships.last_seen schema + backfill",
-              "status": "planned",
-              "note": "TDD: add a versioned migration for relationships.last_seen, backfill from updated_at, and keep recall using a COALESCE fallback until migrated rows are proven fresh."
+              "status": "complete",
+              "note": "TDD landed: schema v3g adds relationships.last_seen, backfills legacy rows from updated_at, and keeps recall decay on COALESCE(NULLIF(last_seen, 0), updated_at) so migrated and fresh rows rank deterministically."
             },
             {
               "name": "Relationship writer freshness updates",
-              "status": "planned",
-              "note": "TDD: update graph write/upsert paths so each observed relationship advances last_seen independently of long-lived weight/updated_at semantics."
+              "status": "complete",
+              "note": "TDD landed: graph relationship upserts now advance last_seen on every observation while preserving the legacy updated_at timestamp for structural freshness semantics."
             },
             {
               "name": "Deterministic weight attenuation at recall time",
@@ -876,13 +876,13 @@
             },
             {
               "name": "Anthropic",
-              "status": "planned",
-              "note": "TDD: port `agent/anthropic_adapter.py` after the shared stream harness exists, including prompt-cache metadata, tool-use deltas, stop reasons, and rate-limit/error fixtures without requiring live credentials."
+              "status": "complete",
+              "note": "TDD landed in `internal/hermes`: direct Anthropic Messages API request shaping now preserves cache-control metadata on system/tool-result blocks, streams `thinking`/`text`/`input_json_delta` events into the shared event model, maps Anthropic stop reasons to continuation-safe finish reasons, and covers 429/rate-limit fixtures with `httptest` instead of live credentials."
             },
             {
               "name": "Bedrock",
-              "status": "planned",
-              "note": "TDD: port `agent/bedrock_adapter.py` as an Anthropic-compatible transport variant with AWS request signing, region/config validation, and Bedrock-specific error envelopes covered by fixtures."
+              "status": "complete",
+              "note": "TDD landed in `internal/hermes`: the native Bedrock ConverseStream adapter now resolves region defaults, delegates AWS credential loading and SigV4 request signing to the AWS SDK, maps canonical system/user/assistant/tool messages into Bedrock tool-aware conversation payloads, streams reasoning/text/tool-use deltas back into the shared event model, and translates Bedrock API error codes into retry-safe `HTTPError` classifications without requiring live AWS credentials in tests."
             },
             {
               "name": "Gemini",
@@ -986,8 +986,8 @@
             },
             {
               "name": "Per-turn model selection",
-              "status": "planned",
-              "note": "TDD: wire the selector into the native agent loop only after provider adapters expose stable capabilities, and prove prompt-cache/toolset context is not rebuilt mid-conversation."
+              "status": "complete",
+              "note": "TDD landed a turn-scoped `PlatformEvent.Model` override in `internal/kernel`, carrying the selected model across tool iterations while request/frame/telemetry state reflects the active turn and `cfg.Model` remains the fallback for later turns."
             }
           ]
         },
@@ -1046,8 +1046,8 @@
           "items": [
             {
               "name": "Provider-side resilience",
-              "status": "planned",
-              "note": "Umbrella only: split into classified errors, Retry-After/backoff, rate guard, and prompt-cache capability tasks before enabling native provider failover."
+              "status": "complete",
+              "note": "TDD landed in `internal/hermes` + `internal/kernel`: provider HTTP failures now classify rate-limit/auth/context signals from status + body, surface capped `Retry-After` hints on `HTTPError`, and feed the kernel's open-stream retry delay selection so 429/slowdown responses back off deterministically without live provider credentials in tests."
             },
             {
               "name": "Classified provider-error taxonomy",

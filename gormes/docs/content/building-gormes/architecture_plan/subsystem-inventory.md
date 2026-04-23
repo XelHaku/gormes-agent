@@ -71,8 +71,8 @@ Upstream splits memory across three stores that Gormes compresses into two:
 | Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ✅ shipped |
 | Extraction state visibility | None (debug visibility) | 3.E.4 | ✅ shipped — `gormes memory status` renders extractor queue, dead-letter summary, and worker-health heuristics |
 | Insights audit log (lightweight) | `agent/insights.py` (preview; full port in 4.E) | 3.E.5 | ✅ shipped — rollups from `telemetry.Snapshot` plus append-only `internal/insights` JSONL persistence are landed |
-| Memory decay | None (Gormes-original) | 3.E.6 | 🔨 partial — deterministic weight attenuation at recall time landed; `relationships.last_seen` schema/backfill plus writer freshness updates remain |
-| Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | 🔨 in progress — canonical `user_id > chat_id > session_id` metadata, same-chat default fencing, and opt-in user/source-filtered recall are landed; Honcho-compatible tool schema exposure plus deny-path/operator evidence still remain |
+| Memory decay | None (Gormes-original) | 3.E.6 | ✅ shipped — deterministic recall-time attenuation now runs against `COALESCE(NULLIF(last_seen, 0), updated_at)`, schema v3g backfills legacy rows, and relationship writers advance `last_seen` independently of `updated_at` |
+| Cross-chat synthesis | `agent/memory_manager.py` (cross-session) | 3.E.7 | 🔨 in progress — canonical `user_id > chat_id > session_id` metadata, same-chat default fencing, and opt-in user/source-filtered recall are landed; Honcho-compatible tool schema exposure plus deny-path fixtures and operator evidence still remain |
 | Parent-session chains (compression splits) | `hermes_state.py` (`SessionDB.parent_session_id`) | 3.E.8 | ⏳ planned (pairs with 4.B context compression) |
 | Cross-source session search | `hermes_state.py` (FTS5 across source-tagged messages) | 3.E.8 | 🔨 in progress — `internal/memory/session_catalog.go` plus the internal GONCHO service's `scope=user` / `sources[]` path now search canonical user-bound sessions, but `parent_session_id`, lineage-aware hits, and operator-auditable evidence still remain |
 
@@ -109,8 +109,8 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
-| Anthropic adapter | `agent/anthropic_adapter.py` | 4.A | ⏳ planned |
-| Bedrock adapter | `agent/bedrock_adapter.py` | 4.A | ⏳ planned |
+| Anthropic adapter | `agent/anthropic_adapter.py` | 4.A | ✅ complete |
+| Bedrock adapter | `agent/bedrock_adapter.py` | 4.A | ✅ complete |
 | Gemini Cloud Code adapter | `agent/gemini_cloudcode_adapter.py` | 4.A | ⏳ planned |
 | OpenRouter client | `agent/openrouter_client.py` | 4.A | ⏳ planned |
 | Google Code Assist | `agent/google_code_assist.py` | 4.A | ⏳ planned |
@@ -120,13 +120,13 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Billing + cost + usage types | `agent/*` — `BillingRoute`, `CanonicalUsage`, `CostResult` classes | 4.E / 4.H | ⏳ planned |
 | Provider failover | `agent/*` — `FailoverReason` enum + routing logic | 4.H | ⏳ planned |
 | Model metadata types | `agent/model_metadata.py` — `ModelCapabilities`, `ModelInfo` classes | 4.D | ⏳ planned |
-| Error classifier output type | `agent/error_classifier.py` — `ClassifiedError` class | 4.H | ⏳ planned |
+| Error classifier output type | `agent/error_classifier.py` — `ClassifiedError` class | 4.H | 🔨 partial — `internal/hermes/errors.go` now exposes retryable/fatal/unknown classes plus Retry-After hint plumbing; upstream-style structured `ClassifiedError` fields remain unported |
 | Local edit snapshot | `agent/*` — `LocalEditSnapshot` (for checkpoint rewind) | 5.L | ⏳ planned |
 | Context engine | `agent/context_engine.py` | 4.B | ⏳ planned — split into interface/status-tool contract before compressor wiring |
 | Context compressor | `agent/context_compressor.py` + `manual_compression_feedback.py` | 4.B | ⏳ planned — split into token-budget trigger, protected head/tail summary, old tool-output pruning, and manual feedback |
 | Context references | `agent/context_references.py` | 4.B | ⏳ planned — keep separate from compression so reference handles can be tested without provider calls |
 | Prompt builder | `agent/prompt_builder.py` | 4.C | ⏳ planned — split into context-file discovery/injection scan, model-specific role guidance, skills prompt snapshots, and memory/session-search guidance |
-| Smart model routing | `agent/smart_model_routing.py` + `model_metadata.py` + `models_dev.py` | 4.D | ⏳ planned |
+| Smart model routing | `agent/smart_model_routing.py` + `model_metadata.py` + `models_dev.py` | 4.D | 🔨 partial — `internal/kernel` already supports turn-scoped model overrides across tool iterations without mutating the default model; metadata registry + pure selector remain planned |
 | Trajectory | `agent/trajectory.py` | 4.E | ⏳ planned |
 | Insights | `agent/insights.py` | 4.E | ⏳ planned |
 | Title generator | `agent/title_generator.py` | 4.F | ⏳ planned |
@@ -134,11 +134,11 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Credential pool | `agent/credential_pool.py` | 4.G | ⏳ planned |
 | Credential files | `tools/credential_files.py` | 4.G | ⏳ planned |
 | Rate limit tracker | `agent/rate_limit_tracker.py` + `nous_rate_guard.py` | 4.H | ⏳ planned |
-| Retry utils | `agent/retry_utils.py` | 4.H | ⏳ planned |
+| Retry utils | `agent/retry_utils.py` | 4.H | ✅ shipped — `internal/kernel/retry.go` now applies 1s/2s/4s/8s/16s reconnect backoff with +/-20% jitter, and `internal/hermes/errors.go` caps provider Retry-After hints before kernel retries |
 | Prompt caching | `agent/prompt_caching.py` | 4.H | ⏳ planned |
 | Subdirectory hints | `agent/subdirectory_hints.py` | 4.B | ⏳ planned |
 | Skill commands / utils | `agent/skill_commands.py`, `agent/skill_utils.py` | 4.C | ⏳ planned |
-| Error classifier | `agent/error_classifier.py` | 4.H | ⏳ planned |
+| Error classifier | `agent/error_classifier.py` | 4.H | 🔨 partial — `internal/hermes/errors.go` already classifies retryable vs fatal HTTP/auth/context/rate-limit failures for kernel retries; richer provider-specific tables and structured envelopes still remain |
 | Redaction | `agent/redact.py` | 4.B | ⏳ planned |
 | Usage / pricing | `agent/usage_pricing.py` | 4.E | ⏳ planned |
 

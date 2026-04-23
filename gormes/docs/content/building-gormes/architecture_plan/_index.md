@@ -20,14 +20,14 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 25/67 subphases shipped · 10 in progress · 32 planned
+**Overall:** 26/67 subphases shipped · 12 in progress · 29 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | 🔨 | 2/3 subphases |
 | Phase 2 — The Gateway | 🔨 | 13/20 subphases |
-| Phase 3 — The Black Box (Memory) | 🔨 | 10/13 subphases |
-| Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
+| Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 
@@ -265,10 +265,10 @@ weight: 10
 - [x] Append-only daily usage.jsonl writer
 - [x] Session, token, and cost rollups from local runtime
 
-### 3.E.6 — Memory Decay 🔨
+### 3.E.6 — Memory Decay ✅
 
-- [ ] relationships.last_seen schema + backfill
-- [ ] Relationship writer freshness updates
+- [x] relationships.last_seen schema + backfill
+- [x] Relationship writer freshness updates
 - [x] Deterministic weight attenuation at recall time
 
 ### 3.E.7 — Cross-Chat Synthesis 🔨
@@ -277,7 +277,8 @@ weight: 10
 - [x] Same-chat default recall fence
 - [x] Opt-in user-scope recall + source filters
 - [ ] Honcho-compatible scope/source tool schema
-- [ ] Cross-chat deny-path + operator evidence
+- [ ] Cross-chat deny-path fixtures
+- [ ] Cross-chat operator evidence
 
 ### 3.E.8 — Session Lineage + Cross-Source Search 🔨
 
@@ -287,16 +288,16 @@ weight: 10
 - [ ] Lineage-aware source-filtered search hits
 - [ ] Operator-auditable search evidence
 
-## Phase 4 — The Brain Transplant ⏳
+## Phase 4 — The Brain Transplant 🔨
 
 *Native Go agent orchestrator + prompt builder*
 
-### 4.A — Provider Adapters ⏳
+### 4.A — Provider Adapters 🔨
 
 - [ ] Provider interface + stream fixture harness
 - [ ] Tool-call normalization + continuation contract
-- [ ] Anthropic
-- [ ] Bedrock
+- [x] Anthropic
+- [x] Bedrock
 - [ ] Gemini
 - [ ] OpenRouter
 - [ ] Google Code Assist
@@ -319,11 +320,11 @@ weight: 10
 - [ ] Toolset-aware skills prompt snapshot
 - [ ] Memory and session-search guidance assembly
 
-### 4.D — Smart Model Routing ⏳
+### 4.D — Smart Model Routing 🔨
 
 - [ ] Model metadata registry + context limits
 - [ ] Routing policy and fallback selector
-- [ ] Per-turn model selection
+- [x] Per-turn model selection
 
 ### 4.E — Trajectory + Insights ⏳
 
@@ -341,11 +342,11 @@ weight: 10
 - [ ] Multi-account auth
 - [ ] Google OAuth flow + refresh seam
 
-### 4.H — Rate / Retry / Caching ⏳
+### 4.H — Rate / Retry / Caching 🔨
 
-- [ ] Provider-side resilience
+- [x] Provider-side resilience
 - [ ] Classified provider-error taxonomy
-- [ ] Retry-After + jittered backoff policy
+- [x] Retry-After + jittered backoff policy
 - [ ] Prompt-cache capability guard
 - [ ] Provider rate guard + budget telemetry
 

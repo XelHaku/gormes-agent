@@ -1,5 +1,7 @@
-// Package hermes speaks HTTP+SSE to Python's api_server on port 8642.
-// It is the ONLY Gormes package that opens HTTP connections.
+// Package hermes owns the outbound chat-stream client contracts used by the
+// kernel. It ships transport adapters for Hermes-compatible servers and
+// provider-native APIs, and it is the ONLY Gormes package that opens HTTP
+// connections.
 //
 // Task 5 (this file) declares the interfaces and types.
 // Task 6 implements NewHTTPClient / OpenStream / Health.
@@ -36,6 +38,7 @@ type RunEventStream interface {
 
 type ChatRequest struct {
 	Model     string
+	MaxTokens int
 	Messages  []Message
 	SessionID string
 	Stream    bool
@@ -68,11 +71,18 @@ func (d ToolDescriptor) MarshalJSON() ([]byte, error) {
 }
 
 type Message struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`   // set only on assistant messages that requested tools
-	ToolCallID string     `json:"tool_call_id,omitempty"` // set only on "tool" role messages replying to a call
-	Name       string     `json:"name,omitempty"`         // set only on "tool" role messages; echoes the tool name
+	Role         string        `json:"role"`
+	Content      string        `json:"content"`
+	CacheControl *CacheControl `json:"cache_control,omitempty"`
+	ToolCalls    []ToolCall    `json:"tool_calls,omitempty"`   // set only on assistant messages that requested tools
+	ToolCallID   string        `json:"tool_call_id,omitempty"` // set only on "tool" role messages replying to a call
+	Name         string        `json:"name,omitempty"`         // set only on "tool" role messages; echoes the tool name
+}
+
+// CacheControl carries provider-specific prompt-caching hints on content
+// blocks. Providers that do not support cache markers ignore it.
+type CacheControl struct {
+	Type string `json:"type"`
 }
 
 // ToolCall is one function-call request made by the LLM.

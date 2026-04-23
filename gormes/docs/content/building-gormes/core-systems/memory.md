@@ -22,8 +22,8 @@ Persistent, searchable state that outlives the process. Structured enough for gr
 ## Phase 3 closeout queue
 
 - **Shipped visibility spine** (3.E.1–3.E.5) — session index mirror, tool audit, transcript export, memory status, and daily insights logging are landed.
-- **`last_seen` closeout** (3.E.6) — recall-time attenuation is landed; remaining TDD slices are the `relationships.last_seen` migration/backfill and relationship-writer freshness updates.
-- **Cross-chat identity closeout** (3.E.7) — GONCHO identity hierarchy is `user_id > chat_id > session_id`; `internal/session` persists canonical chat-to-user bindings, and `internal/memory` now has the same-chat default fence plus opt-in canonical user/source-filtered recall. The internal GONCHO service accepts those parameters, but Honcho-compatible tool schema exposure plus deny-path/operator evidence still remain.
+- **`last_seen` closeout** (3.E.6) — shipped: schema v3g backfills `relationships.last_seen`, repeated relationship observations advance it without rewriting legacy `updated_at`, and recall attenuation uses `COALESCE(NULLIF(last_seen, 0), updated_at)`.
+- **Cross-chat identity closeout** (3.E.7) — GONCHO identity hierarchy is `user_id > chat_id > session_id`; `internal/session` persists canonical chat-to-user bindings, and `internal/memory` now has the same-chat default fence plus opt-in canonical user/source-filtered recall. The internal GONCHO service accepts those parameters, but Honcho-compatible tool schema exposure plus deny-path fixtures and operator evidence still remain.
 - **Session lineage + cross-source search closeout** (3.E.8) — source-filtered search spans one canonical `user_id` across chats inside `internal/memory` and the internal GONCHO service; `parent_session_id`, lineage-aware hits, and operator-auditable search evidence still remain.
 
 ## Identity + lineage contract
