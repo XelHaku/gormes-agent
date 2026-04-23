@@ -958,7 +958,8 @@
           "items": [
             {
               "name": "Multi-model coordination",
-              "status": "planned"
+              "status": "complete",
+              "note": "`internal/tools/mixture_of_agents.go` now ships the Go-native `mixture_of_agents` tool with concurrent reference-model fanout, deterministic aggregation prompt construction, structured partial-failure reporting, and default-registry wiring under the `moa` toolset in `cmd/gormes/registry.go`. Availability follows OpenRouter credentials from `OPENROUTER_API_KEY` or `GORMES_PROVIDER=openrouter` + `GORMES_API_KEY`; retry/backoff tuning and deeper multi-layer MoA variants remain future follow-on scope."
             }
           ]
         },
@@ -980,7 +981,8 @@
             },
             {
               "name": "Debug helpers",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/tools/debug_helpers.go` now ports the shared `DebugSession` helper with opt-in env gating, recursive redaction for sensitive fields, explicit `Save()` writes under `${XDG_DATA_HOME}/gormes/logs`, and no hidden filesystem writes before persistence."
             }
           ]
         },

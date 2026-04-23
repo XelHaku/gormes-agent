@@ -981,7 +981,8 @@
             },
             {
               "name": "Debug helpers",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/tools/debug_helpers.go` now ports the shared `DebugSession` helper with opt-in env gating, recursive redaction for sensitive fields, explicit `Save()` writes under `${XDG_DATA_HOME}/gormes/logs`, and no hidden filesystem writes before persistence."
             }
           ]
         },

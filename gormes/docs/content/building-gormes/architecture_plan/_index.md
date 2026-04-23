@@ -360,7 +360,7 @@ weight: 10
 - [ ] Todo
 - [x] Clarify
 - [ ] Session search
-- [ ] Debug helpers
+- [x] Debug helpers
 
 ### 5.O — Hermes CLI Parity ⏳
 
