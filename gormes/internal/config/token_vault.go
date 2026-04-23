@@ -20,8 +20,12 @@ type vaultCredential struct {
 
 type providerTokenFile struct {
 	AccessToken string `json:"access_token"`
+	Access      string `json:"access"`
 	APIKey      string `json:"api_key"`
 	Token       string `json:"token"`
+	Refresh     string `json:"refresh"`
+	Expires     int64  `json:"expires"`
+	Email       string `json:"email"`
 }
 
 // AuthTokenVaultPath returns the JSON token-vault path used for provider-wide
@@ -72,7 +76,10 @@ func loadProviderToken(provider string) (string, error) {
 	if err := readJSONFile(path, &tokenFile); err != nil {
 		return "", err
 	}
-	return firstNonEmpty(tokenFile.AccessToken, tokenFile.APIKey, tokenFile.Token), nil
+	if normalizeTokenVaultProvider(provider) == "google-gemini-cli" {
+		return loadGoogleOAuthProviderToken(path, tokenFile)
+	}
+	return firstNonEmpty(tokenFile.AccessToken, tokenFile.Access, tokenFile.APIKey, tokenFile.Token), nil
 }
 
 func loadAuthVaultToken(provider string) (string, error) {

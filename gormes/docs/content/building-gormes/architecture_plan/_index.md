@@ -281,10 +281,10 @@ weight: 10
 
 - [x] Auto-naming sessions
 
-### 4.G — Credentials + OAuth 🔨
+### 4.G — Credentials + OAuth ✅
 
 - [x] Token vault
-- [ ] OAuth browser flow
+- [x] OAuth browser flow
 - [x] Multi-account auth
 
 ### 4.H — Rate / Retry / Caching ✅

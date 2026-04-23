@@ -130,7 +130,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Trajectory | `agent/trajectory.py` | 4.E | ⏳ planned |
 | Insights | `agent/insights.py` | 4.E | ⏳ planned |
 | Title generator | `agent/title_generator.py` | 4.F | ✅ complete — `internal/session/title.go` derives deterministic first-exchange titles, and the gateway/TUI session persistence paths store them in metadata plus the audit mirror |
-| Google OAuth | `agent/google_oauth.py` | 4.G | ⏳ planned |
+| Google OAuth | `agent/google_oauth.py` | 4.G | ✅ complete — `internal/config/google_oauth.go` now ships the Google Code Assist PKCE browser callback flow, persists refreshable `${XDG_DATA_HOME}/gormes/auth/google_oauth.json` credentials, and `cmd/gormes/auth.go` exposes `gormes auth login google-gemini-cli --accept-google-oauth-risk` |
 | Credential pool | `agent/credential_pool.py` | 4.G | ⏳ planned |
 | Credential files | `tools/credential_files.py` | 4.G | ✅ complete — `internal/config/token_vault.go` now resolves `${XDG_DATA_HOME}/gormes/auth.json` and `${XDG_DATA_HOME}/gormes/auth/*.json` before env/flag overrides so persisted provider tokens reach the live adapters |
 | Rate limit tracker | `agent/rate_limit_tracker.py` + `nous_rate_guard.py` | 4.H | ⏳ planned |
@@ -180,7 +180,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | File operations | `tools/{file_operations,file_tools,fuzzy_match,checkpoint_manager,patch_parser,binary_extensions}.py` + `FileOperations`/`ShellFileOperations`/`PatchOperation`/`PatchResult`/`CheckpointManager`/`Hunk`/`HunkLine`/`SearchMatch`/`SearchResult`/`ReadResult`/`LintResult`/`Finding`/`OperationType`/`EnvironmentInfo` classes | 5.L | ⏳ planned |
 | Mixture of agents | `tools/mixture_of_agents_tool.py` | 5.M | ⏳ planned |
 | Operator tools | `tools/{todo_tool,clarify_tool,session_search_tool,send_message_tool,debug_helpers,interrupt,ansi_strip}.py` + `TodoStore`, `_ThreadAwareEventProxy` classes | 5.N | ⏳ planned |
-| Auth storage (GitHub + Hermes token) | `tools/*` — `GitHubAuth`, `HermesTokenStorage` classes | 4.G / 5.O | 🔨 in progress — the provider token vault now lives under `${XDG_DATA_HOME}/gormes/auth{.json,/}` via `internal/config/token_vault.go`; tool-specific auth managers remain future work |
+| Auth storage (GitHub + Hermes token) | `tools/*` — `GitHubAuth`, `HermesTokenStorage` classes | 4.G / 5.O | 🔨 in progress — the provider token vault now lives under `${XDG_DATA_HOME}/gormes/auth{.json,/}` via `internal/config/token_vault.go`, and Google Code Assist now owns a refreshable `google_oauth.json` login path via `internal/config/google_oauth.go`; tool-specific auth managers remain future work |
 | Budget config + provider entries | `tools/budget_config.py` — `BudgetConfig`, `_ProviderEntry` classes | 4.H / 5.A | ⏳ planned |
 | Tool entry metadata (registry row schema) | `tools/registry.py` — `ToolEntry` class | 5.A | ✅ shipped — `internal/tools.ToolEntry` stores the Go tool pointer, toolset name, required env vars, and optional availability check |
 | Web tools / search (Parallel + Firecrawl providers) | `tools/web_tools.py` | 5.A | ⏳ planned |

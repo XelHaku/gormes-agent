@@ -69,9 +69,9 @@ func TestLoad_RealFile(t *testing.T) {
 	if got := p.Phases["3"].DerivedStatus(); got != StatusComplete {
 		t.Errorf("Phase 3 = %q, want complete", got)
 	}
-	// Phase 4 is in progress once the first provider adapter lands.
-	if got := p.Phases["4"].DerivedStatus(); got != StatusInProgress {
-		t.Errorf("Phase 4 = %q, want in_progress", got)
+	// Phase 4 is complete once Credentials + OAuth ships.
+	if got := p.Phases["4"].DerivedStatus(); got != StatusComplete {
+		t.Errorf("Phase 4 = %q, want complete", got)
 	}
 	// Floor counts — catches mass-deletion regressions without pinning exact values.
 	if n := len(p.Phases); n < 6 {
@@ -280,8 +280,8 @@ func TestLoad_RealFile_Phase4TokenVault(t *testing.T) {
 	}
 
 	credentials := p.Phases["4"].Subphases["4.G"]
-	if got := credentials.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 4.G = %q, want in_progress", got)
+	if got := credentials.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 4.G = %q, want complete", got)
 	}
 	items := itemsByName(credentials.Items)
 	tokenVault := items["Token vault"]
@@ -295,8 +295,14 @@ func TestLoad_RealFile_Phase4TokenVault(t *testing.T) {
 		t.Fatalf("Phase 4.G token vault note = %q, want package/vault/test detail", tokenVault.Note)
 	}
 	oauthFlow := items["OAuth browser flow"]
-	if oauthFlow.Status != StatusPlanned {
-		t.Fatalf("Phase 4.G OAuth browser flow status = %q, want planned", oauthFlow.Status)
+	if oauthFlow.Status != StatusComplete {
+		t.Fatalf("Phase 4.G OAuth browser flow status = %q, want complete", oauthFlow.Status)
+	}
+	if !strings.Contains(oauthFlow.Note, "internal/config/google_oauth.go") ||
+		!strings.Contains(oauthFlow.Note, "cmd/gormes/auth.go") ||
+		!strings.Contains(oauthFlow.Note, "cmd/gormes/auth_test.go") ||
+		!strings.Contains(oauthFlow.Note, "go test ./internal/config ./cmd/gormes") {
+		t.Fatalf("Phase 4.G OAuth browser flow note = %q, want login/test detail", oauthFlow.Note)
 	}
 }
 

@@ -48,3 +48,11 @@ max_lines = 500
 | `${XDG_DATA_HOME}/gormes/crash-*.log` | Crash dumps |
 
 Vault-backed credentials are loaded after `config.toml` account selection and before env/CLI overrides, so persisted tokens work by default while `GORMES_API_KEY` and other runtime overrides still win when set.
+
+For Google Code Assist OAuth (`google-gemini-cli`), run:
+
+```bash
+gormes auth login google-gemini-cli --accept-google-oauth-risk
+```
+
+Add `--no-browser` if you want Gormes to print the authorization URL instead of opening it automatically. The resulting `${XDG_DATA_HOME}/gormes/auth/google_oauth.json` file stores refreshable credentials, and Gormes refreshes the access token automatically when it reloads that provider token file.

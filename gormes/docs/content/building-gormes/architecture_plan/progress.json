@@ -768,7 +768,8 @@
             },
             {
               "name": "OAuth browser flow",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD: `internal/config/google_oauth.go` now runs the Google Code Assist PKCE browser callback flow, persists refreshable `${XDG_DATA_HOME}/gormes/auth/google_oauth.json` credentials, and refreshes expired access tokens when `internal/config/token_vault.go` resolves provider tokens; `cmd/gormes/auth.go` adds `gormes auth login google-gemini-cli --accept-google-oauth-risk`, with coverage in `internal/config/google_oauth_test.go` and `cmd/gormes/auth_test.go` via `go test ./internal/config ./cmd/gormes`."
             },
             {
               "name": "Multi-account auth",
