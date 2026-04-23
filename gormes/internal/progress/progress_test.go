@@ -269,6 +269,29 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.B.6 reply/send note = %q, want signal.Bot/native group IDs detail", replySend.Note)
 	}
 
+	threadedText := p.Phases["2"].Subphases["2.B.8"]
+	if threadedText.Priority != "P4" {
+		t.Fatalf("Phase 2.B.8 priority = %q, want P4", threadedText.Priority)
+	}
+	if got := threadedText.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.B.8 = %q, want complete", got)
+	}
+	threadedTextItems := itemsByName(threadedText.Items)
+	threadContract := threadedTextItems["Threaded text adapter contract suite"]
+	if threadContract.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.8 contract status = %q, want complete", threadContract.Status)
+	}
+	if !strings.Contains(threadContract.Note, "threadtext") {
+		t.Fatalf("Phase 2.B.8 contract note = %q, want threadtext detail", threadContract.Note)
+	}
+	transportWiring := threadedTextItems["Matrix + Mattermost transport wiring"]
+	if transportWiring.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.8 transport wiring status = %q, want complete", transportWiring.Status)
+	}
+	if !strings.Contains(transportWiring.Note, "internal/channels/matrix") || !strings.Contains(transportWiring.Note, "internal/channels/mattermost") {
+		t.Fatalf("Phase 2.B.8 transport wiring note = %q, want Matrix/Mattermost implementation detail", transportWiring.Note)
+	}
+
 	routing := p.Phases["2"].Subphases["2.B.5"]
 	if routing.Priority != "P1" {
 		t.Fatalf("Phase 2.B.5 priority = %q, want P1", routing.Priority)

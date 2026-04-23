@@ -21,7 +21,7 @@ weight: 30
 | Phase 2.B.5 — Session Context + Delivery Routing | ✅ complete | P1 | `SessionSource`, `SessionContext`, `DeliveryTarget`, and stream-consumer contracts are now frozen in `internal/gateway` with TDD coverage before wider adapter rollout |
 | Phase 2.B.6 — Signal Adapter | ✅ complete | P2 | Signal ingress, session identity, and reply/send semantics on the shared chassis |
 | Phase 2.B.7 — Email + SMS Adapters | ✅ complete | P3 | RFC 822 email normalization plus SMS number/session normalization and segmented outbound delivery contracts now ride the shared gateway seam without special-casing the kernel |
-| Phase 2.B.8 — Matrix + Mattermost Adapters | 🔨 in progress | P4 | Shared threaded-text contract suite landed in `internal/channels/threadtext`; Matrix + Mattermost transport wiring remains |
+| Phase 2.B.8 — Matrix + Mattermost Adapters | ✅ complete | P4 | Shared threaded-text contract suite plus Matrix and Mattermost transport seams now live in `internal/channels/{threadtext,matrix,mattermost}` |
 | Phase 2.B.9 — Webhook + Trigger Ingress | ✅ complete | P4 | Signed ingress/auth parsing plus the typed prompt-to-delivery bridge now live together in `internal/channels/webhook`, leaving only future runtime binding work |
 | Phase 2.B.10 — Regional + Device Adapter Flood | ✅ complete | P4 | BlueBubbles, HomeAssistant, Feishu, WeChat/WeCom, DingTalk, and QQ Bot now have contract-tested shared-gateway adapter seams |
 | Phase 2.C — Thin Mapping Persistence | ✅ complete | P0 | bbolt-backed `(platform, chat_id) -> session_id` resume; no transcript ownership moved into Go |
@@ -46,9 +46,7 @@ Phase 2 is no longer just "ship more adapters." The highest-leverage remaining w
    Land pairing-state persistence and operator status surfaces now that graceful shutdown drain, hook wiring, subagent control, and WhatsApp reconnect contracts are stable.
 2. **P3 — 2.F.4 Home Channel + Operator Surfaces**
    Finish mirror surfaces and sticker-cache equivalents on top of the already-landed ownership and notify-to routing contracts.
-3. **P4 — 2.B.8 Matrix + Mattermost Adapters**
-   Reuse the shipped `internal/channels/threadtext` ingress/reply contract for transport wiring only; do not reopen the shared threaded-text abstraction.
-4. **P4 — remaining runtime binding work**
+3. **P4 — remaining runtime binding work**
    Keep future adapter and lifecycle work on the fixed gateway contracts instead of letting each platform invent its own rules.
 
 The subagent runtime, shared gateway chassis, registry-backed command layer, and reviewed procedural skill runtime now exist as stable substrates. The next leverage move is finishing lifecycle/state surfaces on top of those contracts, then widening transports without reopening the shared routing seams.

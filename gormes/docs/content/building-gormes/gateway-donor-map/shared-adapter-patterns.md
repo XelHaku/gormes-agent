@@ -111,8 +111,11 @@ Do not pull these pieces over wholesale:
   `gormes/cmd/gormes/telegram.go`
   → `gormes/cmd/gormes/gateway_runtime.go`
 
-- Gormes-only threaded text contract freeze ahead of Matrix/Mattermost:
+- Gormes-only threaded text contract plus first Matrix/Mattermost adapter seams:
   `gormes/internal/slack/bot.go`
   → `gormes/internal/gateway/event.go`
   → `gormes/internal/gateway/delivery.go`
   → `gormes/internal/channels/threadtext/contract.go`
+  → `gormes/internal/channels/threadtext/reply_tracker.go`
+  → `gormes/internal/channels/matrix/bot.go`
+  → `gormes/internal/channels/mattermost/bot.go`

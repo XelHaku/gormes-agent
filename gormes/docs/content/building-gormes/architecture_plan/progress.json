@@ -214,8 +214,8 @@
             },
             {
               "name": "Matrix + Mattermost transport wiring",
-              "status": "planned",
-              "note": "TDD: make both adapters satisfy the shared ingress/reply contract before feature extras."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/matrix.Bot and internal/channels/mattermost.Bot now normalize threaded-text ingress into gateway.InboundEvent, ignore self/empty transport events, and preserve Matrix thread roots plus Mattermost root-post metadata for outbound replies via internal/channels/threadtext.ReplyTracker."
             }
           ]
         },

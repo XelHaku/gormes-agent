@@ -20,12 +20,12 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 30/66 subphases shipped · 5 in progress · 31 planned
+**Overall:** 31/66 subphases shipped · 4 in progress · 31 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
-| Phase 2 — The Gateway | 🔨 | 17/20 subphases |
+| Phase 2 — The Gateway | 🔨 | 18/20 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
@@ -100,10 +100,10 @@ weight: 10
 - [x] Email ingress + outbound delivery contract
 - [x] SMS ingress + outbound delivery contract
 
-### 2.B.8 — Matrix + Mattermost Adapters 🔨
+### 2.B.8 — Matrix + Mattermost Adapters ✅
 
 - [x] Threaded text adapter contract suite
-- [ ] Matrix + Mattermost transport wiring
+- [x] Matrix + Mattermost transport wiring
 
 ### 2.B.9 — Webhook + Trigger Ingress ✅
 

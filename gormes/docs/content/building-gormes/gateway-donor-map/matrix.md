@@ -9,7 +9,7 @@ Matrix is a plausible future Gormes adapter, but PicoClaw should be treated as a
 
 ## Status
 
-`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` marks Matrix as planned for Phase 2.B.8. Gormes currently mirrors upstream Hermes operator docs for Matrix, but there is no Go Matrix adapter yet.
+`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now marks Matrix as shipped for Phase 2.B.8. Gormes has a Go Matrix transport seam in `internal/channels/matrix`, but auth/sync/media/E2EE/runtime extras still remain future work.
 
 Evidence level:
 

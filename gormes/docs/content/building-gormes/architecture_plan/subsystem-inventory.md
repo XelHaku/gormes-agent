@@ -7,7 +7,7 @@ weight: 80
 
 The complete picture of what Gormes must absorb to retire the Python `hermes-agent` runtime. Each row is one upstream module or capability, mapped to its target phase. This inventory is the source of truth for "what's left" — when a subsystem is shipped in Go, mark it ✅ and link the spec.
 
-### Gateway platforms (16 connectors — 8 unshipped)
+### Gateway platforms (16 connectors — 5 unshipped or partial)
 
 | Platform | Upstream file | Target phase | Status | Landed Go surface |
 |---|---|---|---|---|
@@ -18,8 +18,8 @@ The complete picture of what Gormes must absorb to retire the Python `hermes-age
 | Signal | `gateway/platforms/signal.py` | 2.B.6 | 🔨 in progress | Contract-tested ingress normalization and shared-chassis reply delivery live in `internal/channels/signal` |
 | Email | `gateway/platforms/email.py` | 2.B.7 | ✅ shipped | RFC 822 normalization and deterministic reply-thread targets live in `internal/channels/email` |
 | SMS | `gateway/platforms/sms.py` | 2.B.7 | ✅ shipped | Canonical phone-number session keys, generic command passthrough, and natural-boundary outbound segmentation live in `internal/channels/sms` |
-| Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ⏳ planned | |
-| Mattermost | `gateway/platforms/mattermost.py` | 2.B.8 | ⏳ planned | |
+| Matrix | `gateway/platforms/matrix.py` | 2.B.8 | ✅ shipped | Shared threaded-text ingress plus Matrix-native thread reply metadata live in `internal/channels/matrix` |
+| Mattermost | `gateway/platforms/mattermost.py` | 2.B.8 | ✅ shipped | Shared threaded-text ingress plus Mattermost root-post reply metadata live in `internal/channels/mattermost` |
 | Webhook | `gateway/platforms/webhook.py` | 2.B.9 | ✅ shipped | Signed ingress/auth gates and typed prompt-to-delivery routing now live in `internal/channels/webhook` |
 | BlueBubbles (iMessage) | `gateway/platforms/bluebubbles.py` | 2.B.10 | ✅ shipped | Webhook-auth, cached chat-GUID resolution, and home-channel send fallback live in `internal/channels/bluebubbles` |
 | HomeAssistant | `gateway/platforms/homeassistant.py` | 2.B.10 | ✅ shipped | Filtered state-change formatting, cooldown suppression, and persistent-notification delivery live in `internal/channels/homeassistant` |
