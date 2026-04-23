@@ -488,6 +488,25 @@ esac
 	if !strings.Contains(string(out), "Documentation state:") {
 		t.Fatalf("output missing state path:\n%s", string(out))
 	}
+	for _, want := range []string{
+		"Run UTC:",
+		"Repo root:",
+		"Doc root:",
+		"Step 1/7: checking prerequisites",
+		"Step 2/7: collecting documentation context",
+		"Step 3/7: writing Codex prompt",
+		"Step 4/7: running Codex documentation pass",
+		"Step 5/7: validating docs/progress artifacts",
+		"Step 6/7: writing final report",
+		"Step 7/7: writing state",
+		"Codex session: thread-docs-123",
+		"Validation log:",
+		"Complete.",
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Fatalf("verbose output missing %q:\n%s", want, string(out))
+		}
+	}
 
 	docRoot := filepath.Join(gormesRepo, ".codex", "doc-improver")
 	statePath := filepath.Join(docRoot, "documentation_state.json")

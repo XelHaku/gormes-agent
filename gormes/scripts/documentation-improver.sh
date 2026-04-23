@@ -35,6 +35,12 @@ log() {
   printf '[documentation-improver] %s\n' "$*"
 }
 
+log_kv() {
+  local label="$1"
+  local value="$2"
+  log "$(printf '%-22s %s' "$label:" "$value")"
+}
+
 fail() {
   printf '[documentation-improver] ERROR: %s\n' "$*" >&2
   exit 1
@@ -304,8 +310,8 @@ extract_session_id() {
 }
 
 run_codexu_docs_pass() {
-  write_prompt_file
-
+  log "Codex stdout JSONL: $CODEXU_JSONL"
+  log "Codex stderr: $CODEXU_STDERR"
   (
     cd "$REPO_ROOT"
     exec </dev/null
@@ -326,6 +332,11 @@ run_codexu_docs_pass() {
 run_validation() {
   : > "$VALIDATION_LOG"
 
+  log "Validation log: $VALIDATION_LOG"
+  log "Validation command: go run ./cmd/progress-gen -write"
+  log "Validation command: go run ./cmd/progress-gen -validate"
+  log "Validation command: go test ./internal/progress -count=1"
+  log "Validation command: go test ./docs -count=1"
   (
     cd "$REPO_ROOT"
     go run ./cmd/progress-gen -write
@@ -413,6 +424,15 @@ cmd_doctor() {
 cmd_run() {
   claim_lock "$@"
 
+  log "Starting documentation improver run"
+  log_kv "Run UTC" "$RUN_AT_UTC"
+  log_kv "Repo root" "$REPO_ROOT"
+  log_kv "Doc root" "$DOC_ROOT"
+  log_kv "Lock" "$LOCK_DIR"
+  log_kv "Report" "$REPORT_FILE"
+  log_kv "State" "$STATE_FILE"
+
+  log "Step 1/7: checking prerequisites"
   require_cmd jq
   require_cmd git
   require_cmd codexu
@@ -424,14 +444,37 @@ cmd_run() {
   require_file "$PROGRESS_JSON"
   require_file "$SITE_PROGRESS_JSON"
 
+  log "Step 2/7: collecting documentation context"
   write_context_bundle
+  log "Context bundle: $CONTEXT_FILE"
+
+  log "Step 3/7: writing Codex prompt"
+  write_prompt_file
+  log "Prompt file: $PROMPT_FILE"
+
+  log "Step 4/7: running Codex documentation pass"
   run_codexu_docs_pass
+
+  local session_id
+  session_id="$(extract_session_id "$CODEXU_JSONL" || true)"
+  if [[ -n "$session_id" ]]; then
+    log "Codex session: $session_id"
+  else
+    log "Codex session: unavailable"
+  fi
+
+  log "Step 5/7: validating docs/progress artifacts"
   run_validation
+
+  log "Step 6/7: writing final report"
   write_report
+
+  log "Step 7/7: writing state"
   write_state_file
 
   log "Documentation report: $REPORT_FILE"
   log "Documentation state: $STATE_FILE"
+  log "Complete."
 }
 
 main() {
