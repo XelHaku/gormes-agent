@@ -7,6 +7,13 @@ import (
 	"strings"
 )
 
+// relationshipFreshnessExpr returns the timestamp expression recall decay
+// should age against. last_seen is preferred when present; updated_at
+// remains the fallback for migrated legacy rows.
+func relationshipFreshnessExpr() string {
+	return "COALESCE(NULLIF(r.last_seen, 0), r.updated_at)"
+}
+
 // weightExpr returns the SQL expression that substitutes for r.weight
 // in WHERE / ORDER BY clauses. When horizonDays <= 0, decay is
 // disabled and the raw column reference is returned. Otherwise a
@@ -19,12 +26,13 @@ import (
 //     the day boundary).
 //   - MAX(0, ...) clamps rows older than horizon to exactly zero;
 //     no wrap-around in ORDER BY.
-//   - Uses r.updated_at (existing column); no schema change.
+//   - Uses relationshipFreshnessExpr() so post-v3g last_seen drives
+//     decay while legacy rows still fall back to updated_at.
 func weightExpr(horizonDays int) string {
 	if horizonDays <= 0 {
 		return "r.weight"
 	}
-	return "MAX(0, r.weight * (1 - CAST(strftime('%s','now') - r.updated_at AS REAL) / ?))"
+	return "MAX(0, r.weight * (1 - CAST(strftime('%s','now') - " + relationshipFreshnessExpr() + " AS REAL) / ?))"
 }
 
 // seedsExactName returns up to `limit` entity IDs whose name (lower-fold)

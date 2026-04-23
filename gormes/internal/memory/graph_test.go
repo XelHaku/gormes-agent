@@ -109,6 +109,47 @@ func TestGraph_UpsertRelationshipWeightCapAt10(t *testing.T) {
 	}
 }
 
+func TestGraph_UpsertRelationshipBumpsLastSeenWithoutRewritingUpdatedAt(t *testing.T) {
+	s := openGraph(t)
+	batch := ValidatedOutput{
+		Entities: []ValidatedEntity{
+			{Name: "A", Type: "PERSON"},
+			{Name: "B", Type: "PROJECT"},
+		},
+		Relationships: []ValidatedRelationship{
+			{Source: "A", Target: "B", Predicate: "WORKS_ON", Weight: 1.0},
+		},
+	}
+
+	if err := writeGraphBatch(context.Background(), s.db, batch, nil); err != nil {
+		t.Fatalf("first writeGraphBatch: %v", err)
+	}
+	if _, err := s.db.Exec(
+		`UPDATE relationships
+		 SET updated_at = 100, last_seen = 100
+		 WHERE predicate = 'WORKS_ON'`,
+	); err != nil {
+		t.Fatalf("pin relationship timestamps: %v", err)
+	}
+
+	if err := writeGraphBatch(context.Background(), s.db, batch, nil); err != nil {
+		t.Fatalf("second writeGraphBatch: %v", err)
+	}
+
+	var updatedAt, lastSeen int64
+	if err := s.db.QueryRow(
+		`SELECT updated_at, last_seen FROM relationships WHERE predicate = 'WORKS_ON'`,
+	).Scan(&updatedAt, &lastSeen); err != nil {
+		t.Fatalf("read relationship timestamps: %v", err)
+	}
+	if updatedAt != 100 {
+		t.Fatalf("updated_at = %d, want preserved structural timestamp 100", updatedAt)
+	}
+	if lastSeen <= 100 {
+		t.Fatalf("last_seen = %d, want observation freshness > 100", lastSeen)
+	}
+}
+
 func TestGraph_MarkTurnsExtracted(t *testing.T) {
 	s := openGraph(t)
 	_, _ = s.db.Exec(`INSERT INTO turns(session_id, role, content, ts_unix) VALUES

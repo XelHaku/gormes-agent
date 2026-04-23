@@ -56,11 +56,11 @@ func writeGraphBatch(ctx context.Context, db *sql.DB, v ValidatedOutput, turnIDs
 			continue // defensive; validator should have dropped these
 		}
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO relationships(source_id, target_id, predicate, weight, updated_at)
-			 VALUES(?, ?, ?, ?, strftime('%s','now'))
+			`INSERT INTO relationships(source_id, target_id, predicate, weight, updated_at, last_seen)
+			 VALUES(?, ?, ?, ?, strftime('%s','now'), strftime('%s','now'))
 			 ON CONFLICT(source_id, target_id, predicate) DO UPDATE SET
 			   weight = MIN(relationships.weight + excluded.weight, 10.0),
-			   updated_at = excluded.updated_at`,
+			   last_seen = excluded.last_seen`,
 			src, tgt, r.Predicate, r.Weight); err != nil {
 			return fmt.Errorf("upsert rel %d-%s->%d: %w", src, r.Predicate, tgt, err)
 		}

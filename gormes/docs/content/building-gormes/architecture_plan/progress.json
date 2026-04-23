@@ -619,8 +619,8 @@
           "items": [
             {
               "name": "Relationship last_seen tracking",
-              "status": "planned",
-              "note": "TDD: execution order is frozen in docs/superpowers/plans/2026-04-22-gormes-phase3-identity-lineage-execution-plan.md; land schema + backfill + relationship-writer coverage before treating freshness-sensitive cross-chat recall/search as fully closed."
+              "status": "complete",
+              "note": "TDD landed: schema v3g adds relationships.last_seen, backfills legacy rows from updated_at, graph upserts advance last_seen without rewriting updated_at, and recall decay now ages edges via COALESCE(NULLIF(last_seen, 0), updated_at)."
             },
             {
               "name": "Deterministic weight attenuation at recall time",

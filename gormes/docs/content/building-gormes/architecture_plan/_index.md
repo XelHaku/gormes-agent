@@ -20,13 +20,13 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 34/66 subphases shipped · 1 in progress · 31 planned
+**Overall:** 35/66 subphases shipped · 0 in progress · 31 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 2/2 subphases |
 | Phase 2 — The Gateway | ✅ | 20/20 subphases |
-| Phase 3 — The Black Box (Memory) | 🔨 | 12/13 subphases |
+| Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ⏳ | 0/8 subphases |
 | Phase 5 — The Final Purge | ⏳ | 0/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
@@ -171,7 +171,7 @@ weight: 10
 - [x] Inactive candidate drafting
 - [x] Explicit promotion flow
 
-## Phase 3 — The Black Box (Memory) 🔨
+## Phase 3 — The Black Box (Memory) ✅
 
 *SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes session visibility, audit trails, decay, and cross-chat/session boundaries*
 
@@ -232,9 +232,9 @@ weight: 10
 - [x] Append-only daily usage.jsonl writer
 - [x] Session, token, and cost rollups from local runtime
 
-### 3.E.6 — Memory Decay 🔨
+### 3.E.6 — Memory Decay ✅
 
-- [ ] Relationship last_seen tracking
+- [x] Relationship last_seen tracking
 - [x] Deterministic weight attenuation at recall time
 
 ### 3.E.7 — Cross-Chat Synthesis ✅

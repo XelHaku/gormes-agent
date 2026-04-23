@@ -5,11 +5,11 @@ weight: 40
 
 # Phase 3 — The Black Box (Memory)
 
-**Status:** 🔨 3.A–3.E.5 and 3.E.7–3.E.8 shipped; 3.E.6 remains
+**Status:** ✅ 3.A–3.E.8 shipped
 
 **Deliverable:** SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes auditability, decay, cross-chat synthesis, and the GONCHO-shaped session/user boundaries the future plugin layer will depend on while preserving Honcho-compatible interfaces.
 
-Phase 3 (The Black Box) is substantially delivered as of 2026-04-23: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. The 3.E closeout queue now has one remaining gap: session index mirror (3.E.1), tool audit (3.E.2), transcript export (3.E.3), extraction visibility (3.E.4), the lightweight insights writer (3.E.5), cross-chat recall fencing over canonical `user_id > chat_id > session_id` bindings (3.E.7), and the full `3.E.8` lineage/search bundle are shipped; only `last_seen`-based decay completion (3.E.6) still remains. Architecturally, this is the phase where Gormes finishes the memory substrate that a GONCHO-style integration would stand on, without yet claiming full Honcho provider or plugin parity.
+Phase 3 (The Black Box) is delivered as of 2026-04-23: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. The 3.E closeout queue is now fully shipped as well: session index mirror (3.E.1), tool audit (3.E.2), transcript export (3.E.3), extraction visibility (3.E.4), the lightweight insights writer (3.E.5), `last_seen`-based decay completion (3.E.6), cross-chat recall fencing over canonical `user_id > chat_id > session_id` bindings (3.E.7), and the full `3.E.8` lineage/search bundle are all landed. Architecturally, this is the phase where Gormes finishes the memory substrate that a GONCHO-style integration would stand on, without yet claiming full Honcho provider or plugin parity.
 
 ## Phase 3 sub-status (as of 2026-04-23)
 
@@ -18,7 +18,7 @@ Phase 3 (The Black Box) is substantially delivered as of 2026-04-23: the SQLite 
 - **3.C — Neural Recall + Context Injection** — ✅ implemented (`RecallProvider`, 2-layer seed selection, CTE traversal, `<memory-context>` fence matching Python's `build_memory_context_block`)
 - **3.D — Semantic Fusion + Local Embeddings** — ✅ implemented (`entity_embeddings` table with L2-normalized float32 LE BLOBs; `Embedder` background worker calls Ollama `/v1/embeddings` with labeled template `Entity: {Name}. Type: {Type}. Context: {Description}`; in-memory vector cache with monotonic graph-version counter; `semanticSeeds` flat cosine scan (dot product on normalized vectors); hybrid fusion in `Provider.GetContext` chains lexical → FTS5 → semantic with dedup + MaxSeeds cap; opt-in via `semantic_enabled=true` + `semantic_model="<tag>"`; empty model is a complete no-op — zero HTTP calls, zero goroutine, zero cache RAM. Ship criterion proven live against Ollama: query `"tell me about my projects"` (no lexical match) surfaces the seeded project entity via cosine in 7s.)
 - **3.D.5 — Memory Mirror (USER.md sync)** — ✅ implemented (async background goroutine exports SQLite entities/rels → Markdown every 30s; configurable path; atomic writes; SQLite remains source of truth; zero impact on 250ms latency moat)
-- **3.E — Decay + Cross-Chat + Operational Mirrors** — 🔨 mixed closeout (3.E.1–3.E.5 and 3.E.7–3.E.8 are shipped; only 3.E.6 `last_seen` tracking remains)
+- **3.E — Decay + Cross-Chat + Operational Mirrors** — ✅ complete (session index, tool audit, transcript export, extraction visibility, insights logging, `last_seen` decay, cross-chat recall fencing, and lineage/search closeout are all shipped)
 
 ## Phase 3.E Ledger
 
@@ -31,24 +31,24 @@ Phase 3.E is the final Black Box milestone. It closes four orthogonal gaps: **op
 | 3.E.3 — Transcript Export Command | ✅ shipped | P2 | Exceeds Hermes (no upstream equivalent) | `gormes session export <id> --format=markdown` renders SQLite turns as human-readable Markdown; snapshot for sharing/backup |
 | 3.E.4 — Extraction State Visibility | ✅ shipped | P1 | None (debug only) | `gormes memory status` shows extractor queue depth, dead-letter summaries, and worker-health heuristics |
 | 3.E.5 — Insights Audit Log | ✅ shipped | P3 | `agent/insights.py` (preview) | Local `telemetry.Snapshot` rollups plus append-only `usage.jsonl` persistence are landed |
-| 3.E.6 — Memory Decay | 🔨 in progress | P1 | None (Gormes-original) | Deterministic recall-time weight attenuation is landed; `last_seen` tracking still remains so stale facts can age out without deletion |
+| 3.E.6 — Memory Decay | ✅ shipped | P1 | None (Gormes-original) | Relationship freshness now tracks `last_seen` through schema v3g/backfill, writer upserts advance it independently of `updated_at`, and recall-time attenuation uses `COALESCE(NULLIF(last_seen, 0), updated_at)` |
 | 3.E.7 — Cross-Chat Synthesis | ✅ shipped | P2 | `agent/memory_manager.py` (cross-session) + `SessionDB.user_id` | `internal/session` persists canonical `user_id > chat_id > session_id` metadata, and `internal/memory` recall stays same-chat by default unless callers opt into canonical user scope with optional source filters |
 | 3.E.8 — Session Lineage + Cross-Source Search | ✅ shipped | P4 | `hermes_state.py` (`parent_session_id`, `search_messages`, `search_sessions`) | `internal/session.Metadata` now persists `parent_session_id` + `lineage_kind`, rejects trivial lineage loops, and the bbolt session mirror exposes lineage audit fields alongside the already-landed source-filtered search path in `internal/memory/session_catalog.go` and Goncho `scope=user` / `sources[]` |
 
 The 3.E ship criterion: the operator runs `cat ~/.local/share/gormes/sessions/index.yaml` and sees every active chat/session mapping in plain YAML; runs `cat ~/.local/share/gormes/tools/audit.jsonl` and sees a full history of tool invocations; a fact mentioned once six months ago and never again no longer dominates recall results; asking the same question across two different chats surfaces the same entity graph; and context-compressed branches no longer disappear into opaque IDs because lineage and source-filtered search are queryable.
 
-## TDD Priority Queue
+## Phase 3.E Closeout Order
 
-The Phase 3 queue is not one flat backlog. The order matters because later memory features need operator visibility and stable identity seams before they can be debugged safely.
+Phase 3.E landed in deterministic TDD slices rather than one large merge:
 
-1. **P0 — 3.E.1 Session Index Mirror closeout**
-   Freeze the runtime refresh semantics with failing golden tests first. The YAML shape is already shipped; the remaining risk is wiring refresh without mutating session state or blocking the hot path.
-2. **P1 — 3.E.6 `last_seen` closeout**
-   The read model, append-only insights writer, and recall-time attenuation are already present. Add tests around fixed-clock decay math and `last_seen` updates before touching live workers or ranking.
-3. **Delivered — 3.E.7 Cross-Chat Synthesis**
-   The `user_id` merge rules are pinned in `internal/session`, and `internal/memory/recall.go` now widens recall across chats only when callers opt into a canonical user scope with optional source filters.
-4. **Delivered — 3.E.8 Session lineage + cross-source search**
-   `internal/session` now carries durable `parent_session_id` + `lineage_kind` metadata, the session mirror exposes orphan-aware lineage audit fields, and the earlier source-filtered session/message search work closes the remaining donor seam from Hermes `SessionDB`.
+1. **3.E.1 Session Index Mirror**
+   The runtime refresh semantics were locked with golden tests so the read-only YAML mirror stayed deterministic and did not mutate bbolt session state.
+2. **3.E.6 `last_seen` closeout**
+   Schema v3g backfills `relationships.last_seen`, relationship upserts advance it without rewriting legacy `updated_at`, and recall decay now ages edges via `COALESCE(NULLIF(last_seen, 0), updated_at)`.
+3. **3.E.7 Cross-Chat Synthesis**
+   The `user_id` merge rules are pinned in `internal/session`, and `internal/memory/recall.go` widens recall across chats only when callers opt into a canonical user scope with optional source filters.
+4. **3.E.8 Session lineage + cross-source search**
+   `internal/session` carries durable `parent_session_id` + `lineage_kind` metadata, the session mirror exposes orphan-aware lineage audit fields, and source-filtered session/message search closes the remaining donor seam from Hermes `SessionDB`.
 
 ## Execution blueprint (2026-04-22)
 
@@ -56,18 +56,18 @@ The delivery sequence is frozen in `docs/superpowers/plans/2026-04-22-gormes-pha
 
 `3.E.6.1 -> 3.E.7.2 -> 3.E.8.1 -> 3.E.8.2`
 
-That order is intentional even though some enabling code is already landed:
+That order is now reflected in the shipped slices:
 
-- `3.E.6.1` goes first so `last_seen` freshness exists before cross-chat/session widening is treated as reliable.
-- `3.E.7.2` remains a closeout gate, not just a code-presence check: recall and goncho helpers exist, but tool-schema exposure and deny-path evidence still gate completion.
-- `3.E.8.1` adds `parent_session_id` and lineage semantics only after the recall fence is proven safe.
-- `3.E.8.2` closes the remaining lineage-aware session search and operator evidence work last.
+- `3.E.6.1` landed first via schema v3g, relationship `last_seen` backfill, writer freshness updates, and recall fallback coverage.
+- `3.E.7.2` then closed same-chat-by-default recall with opt-in canonical user scope and deterministic source filters.
+- `3.E.8.1` persisted `parent_session_id` lineage only after the recall fence semantics were stable.
+- `3.E.8.2` closed the remaining source-filtered session/message search path and its Goncho wiring last.
 
-Current code is ahead of the old narrative in `internal/memory/recall.go`, `internal/memory/session_catalog.go`, and `internal/goncho/service.go`; the ledger stays conservative until freshness, lineage metadata, and operator-auditable surfaces all line up.
+The ledger now matches the code in `internal/memory/recall.go`, `internal/memory/session_catalog.go`, and `internal/goncho/service.go`; the freshness, lineage, and operator-facing closeout surfaces are all aligned.
 
 ## Identity + lineage architecture freeze (2026-04-22)
 
-Before this plan, `3.E.7` and `3.E.8` were only coarse placeholders in the ledger and this page: current code had `chat_id` plus `session_id`, but no durable `user_id` or `parent_session_id` contract, and `internal/memory/recall.go` still allowed exact-name recall to cross chat boundaries when an entity was named directly. The architecture target frozen in `docs/superpowers/plans/2026-04-22-gormes-phase3-identity-lineage-plan.md` is now landed: the `user_id`, recall-fence, source-filtered search, and `parent_session_id` lineage halves are implemented via `internal/session`, `internal/memory`, and `internal/goncho`; the remaining 3.E implementation target is `last_seen` freshness in `3.E.6`.
+Before this plan, `3.E.7` and `3.E.8` were only coarse placeholders in the ledger and this page: current code had `chat_id` plus `session_id`, but no durable `user_id` or `parent_session_id` contract, and `internal/memory/recall.go` still allowed exact-name recall to cross chat boundaries when an entity was named directly. The architecture target frozen in `docs/superpowers/plans/2026-04-22-gormes-phase3-identity-lineage-plan.md` is now fully landed: the `user_id`, recall-fence, source-filtered search, `parent_session_id` lineage, and `last_seen` freshness halves are implemented via `internal/session`, `internal/memory`, and `internal/goncho`.
 
 The frozen contract is:
 

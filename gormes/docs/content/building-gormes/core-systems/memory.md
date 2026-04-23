@@ -19,10 +19,10 @@ Persistent, searchable state that outlives the process. Structured enough for gr
 - **Operator visibility** (3.E.4, 3.E.5) — `gormes memory status` is shipped, and the local insights layer now persists append-only daily `usage.jsonl` records from `telemetry.Snapshot` rollups.
 - **GONCHO compatibility seam** — internal memory work lives behind the `goncho` service, while the exported tool surface remains Honcho-compatible (`honcho_*`).
 
-## Remaining Phase 3 queue
+## Phase 3 closeout summary
 
 - **Session mirror closeout** (3.E.1) — the `SessionIndexMirror` writer plus deterministic runtime refresh wiring are now landed, giving operators a stable `sessions/index.yaml` audit surface.
-- **`last_seen` closeout** (3.E.6) — append-only `usage.jsonl` persistence is now landed; the remaining open half is timestamp-tracking for decay.
+- **`last_seen` closeout** (3.E.6) — schema v3g now backfills `relationships.last_seen`, repeated relationship observations advance it without rewriting legacy `updated_at`, and recall decay uses `COALESCE(NULLIF(last_seen, 0), updated_at)`.
 - **Cross-chat identity** (3.E.7) — GONCHO identity hierarchy is `user_id > chat_id > session_id`; `internal/session` persists canonical chat-to-user bindings, and `internal/memory` recall stays same-chat by default unless callers opt into canonical user-scoped cross-chat recall with optional source filters.
 - **Session lineage + cross-source search** (3.E.8) — `parent_session_id` marks compression/fork descendants, and source-filtered search spans one canonical `user_id` across chats instead of bypassing transport boundaries blindly.
 

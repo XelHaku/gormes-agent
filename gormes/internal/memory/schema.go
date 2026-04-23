@@ -3,7 +3,7 @@ package memory
 // schemaVersion is the canonical target version for this binary. OpenSqlite
 // migrates any earlier supported version up to this value, and refuses to
 // open DBs with an unknown version (future schemas).
-const schemaVersion = "3f"
+const schemaVersion = "3g"
 
 // schemaV3a is the baseline schema installed on a fresh DB. It matches
 // exactly what Phase 3.A shipped — any change to this string is a schema
@@ -208,4 +208,14 @@ CREATE TRIGGER IF NOT EXISTS goncho_conclusions_au AFTER UPDATE ON goncho_conclu
 END;
 
 UPDATE schema_meta SET v = '3f' WHERE k = 'version' AND v = '3e';
+`
+
+// migration3fTo3g closes Phase 3.E.6 freshness tracking:
+//   - relationships gains last_seen for observation freshness
+//   - legacy rows backfill from updated_at so decay remains deterministic
+const migration3fTo3g = `
+ALTER TABLE relationships ADD COLUMN last_seen INTEGER NOT NULL DEFAULT 0;
+UPDATE relationships SET last_seen = updated_at WHERE last_seen = 0;
+
+UPDATE schema_meta SET v = '3g' WHERE k = 'version' AND v = '3f';
 `

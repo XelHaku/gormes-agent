@@ -463,6 +463,50 @@ func TestEnumerateRelationships_DecayOrdersByEffectiveWeight(t *testing.T) {
 	}
 }
 
+func TestEnumerateRelationships_DecayUsesLastSeenWhenPresent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	s, _ := OpenSqlite(path, 0, nil)
+	defer s.Close(context.Background())
+
+	now := time.Now().Unix()
+	stale := now - 400*86400
+	fresh := now - 60
+
+	if _, err := s.db.Exec(`INSERT INTO entities(name, type, updated_at) VALUES
+		('FreshnessSrc', 'PERSON', ?),
+		('FreshnessTgt', 'PROJECT', ?)`, stale, stale); err != nil {
+		t.Fatalf("insert entities: %v", err)
+	}
+
+	var srcID, tgtID int64
+	if err := s.db.QueryRow(`SELECT id FROM entities WHERE name = 'FreshnessSrc'`).Scan(&srcID); err != nil {
+		t.Fatalf("resolve source id: %v", err)
+	}
+	if err := s.db.QueryRow(`SELECT id FROM entities WHERE name = 'FreshnessTgt'`).Scan(&tgtID); err != nil {
+		t.Fatalf("resolve target id: %v", err)
+	}
+
+	if _, err := s.db.Exec(
+		`INSERT INTO relationships(source_id, target_id, predicate, weight, updated_at, last_seen)
+		 VALUES(?, ?, 'WORKS_ON', 5.0, ?, ?)`,
+		srcID, tgtID, stale, fresh,
+	); err != nil {
+		t.Fatalf("insert relationship: %v", err)
+	}
+
+	rels, err := enumerateRelationships(context.Background(), s.db,
+		[]int64{srcID, tgtID}, 0.5, 10, 180)
+	if err != nil {
+		t.Fatalf("enumerateRelationships: %v", err)
+	}
+	if len(rels) != 1 {
+		t.Fatalf("got %d rels, want 1 because fresh last_seen should keep the edge alive", len(rels))
+	}
+	if rels[0].Source != "FreshnessSrc" || rels[0].Target != "FreshnessTgt" {
+		t.Fatalf("got %s -> %s, want FreshnessSrc -> FreshnessTgt", rels[0].Source, rels[0].Target)
+	}
+}
+
 func TestRecall_DecayRawWeightInFenceUnchanged(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory.db")
 	s, _ := OpenSqlite(path, 0, nil)

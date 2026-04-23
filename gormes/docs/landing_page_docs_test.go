@@ -425,7 +425,7 @@ func TestSubsystemInventoryReflectsShippedPhase2AndPhase3Reality(t *testing.T) {
 		"Tool execution audit log | None (exceeds Hermes) | 3.E.2 | ✅ shipped",
 		"Transcript export command | None (exceeds Hermes; Hermes has no text export) | 3.E.3 | ✅ shipped",
 		"Extraction state visibility | None (debug visibility) | 3.E.4 | ✅ shipped",
-		"Memory decay | None (Gormes-original) | 3.E.6 | 🔨 partial",
+		"Memory decay | None (Gormes-original) | 3.E.6 | ✅ shipped",
 	}
 	for _, want := range wants {
 		if !strings.Contains(raw, want) {

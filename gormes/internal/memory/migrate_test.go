@@ -9,6 +9,34 @@ import (
 	"testing"
 )
 
+func openLegacyV3fDB(t *testing.T) *sql.DB {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "memory-v3f.db")
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	if err := applyPragmas(db); err != nil {
+		t.Fatalf("applyPragmas: %v", err)
+	}
+	for _, ddl := range []string{
+		schemaV3a,
+		migration3aTo3b,
+		migration3bTo3c,
+		migration3cTo3d,
+		migration3dTo3e,
+		migration3eTo3f,
+	} {
+		if _, err := db.Exec(ddl); err != nil {
+			t.Fatalf("apply legacy schema: %v", err)
+		}
+	}
+	return db
+}
+
 func TestOpenSqlite_FreshDBIsV3b(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory.db")
 	s, err := OpenSqlite(path, 0, nil)
@@ -19,8 +47,8 @@ func TestOpenSqlite_FreshDBIsV3b(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3f" {
-		t.Errorf("schema version = %q, want 3f", v)
+	if v != schemaVersion {
+		t.Errorf("schema version = %q, want %s", v, schemaVersion)
 	}
 }
 
@@ -61,7 +89,7 @@ func TestMigrate_Idempotent(t *testing.T) {
 	}
 	s.Close(context.Background())
 
-	// Re-open — migration runs against v3f, should no-op.
+	// Re-open — migration runs against the current schema, should no-op.
 	s2, err := OpenSqlite(path, 0, nil)
 	if err != nil {
 		t.Fatalf("re-open failed: %v", err)
@@ -70,8 +98,8 @@ func TestMigrate_Idempotent(t *testing.T) {
 
 	var v string
 	_ = s2.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3f" {
-		t.Errorf("version = %q after re-open, want 3f", v)
+	if v != schemaVersion {
+		t.Errorf("version = %q after re-open, want %s", v, schemaVersion)
 	}
 }
 
@@ -94,8 +122,8 @@ func TestOpenSqlite_FreshDBIsV3c(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3f" {
-		t.Errorf("schema version = %q, want 3f", v)
+	if v != schemaVersion {
+		t.Errorf("schema version = %q, want %s", v, schemaVersion)
 	}
 }
 
@@ -160,8 +188,8 @@ func TestOpenSqlite_FreshDBIsV3d(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3f" {
-		t.Errorf("schema version = %q, want 3f", v)
+	if v != schemaVersion {
+		t.Errorf("schema version = %q, want %s", v, schemaVersion)
 	}
 }
 
@@ -251,20 +279,66 @@ func TestOpenSqlite_FreshDBIsV3e(t *testing.T) {
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3f" {
-		t.Errorf("schema version = %q, want 3f", v)
+	if v != schemaVersion {
+		t.Errorf("schema version = %q, want %s", v, schemaVersion)
 	}
 }
 
-func TestOpenSqlite_FreshDBIsV3f(t *testing.T) {
+func TestOpenSqlite_FreshDBIsV3g(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory.db")
 	s, _ := OpenSqlite(path, 0, nil)
 	defer s.Close(context.Background())
 
 	var v string
 	_ = s.db.QueryRow("SELECT v FROM schema_meta WHERE k = 'version'").Scan(&v)
-	if v != "3f" {
-		t.Errorf("schema version = %q, want 3f", v)
+	if v != schemaVersion {
+		t.Errorf("schema version = %q, want %s", v, schemaVersion)
+	}
+}
+
+func TestMigrate_3fTo3g_AddsRelationshipLastSeenColumnAndBackfillsLegacyRows(t *testing.T) {
+	db := openLegacyV3fDB(t)
+
+	if _, err := db.Exec(`INSERT INTO entities(name, type, updated_at) VALUES
+		('A', 'PERSON', 11),
+		('B', 'PROJECT', 12)`); err != nil {
+		t.Fatalf("insert entities: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO relationships(source_id, target_id, predicate, weight, updated_at)
+		VALUES(1, 2, 'WORKS_ON', 1.5, 123)`); err != nil {
+		t.Fatalf("insert legacy relationship: %v", err)
+	}
+
+	if err := migrate(db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	var v string
+	if err := db.QueryRow(`SELECT v FROM schema_meta WHERE k = 'version'`).Scan(&v); err != nil {
+		t.Fatalf("read version: %v", err)
+	}
+	if v != "3g" {
+		t.Fatalf("schema version = %q, want 3g", v)
+	}
+
+	var name string
+	if err := db.QueryRow(
+		`SELECT name FROM pragma_table_info('relationships') WHERE name = 'last_seen'`,
+	).Scan(&name); err != nil {
+		t.Fatalf("relationships.last_seen missing: %v", err)
+	}
+
+	var updatedAt, lastSeen int64
+	if err := db.QueryRow(
+		`SELECT updated_at, last_seen FROM relationships WHERE predicate = 'WORKS_ON'`,
+	).Scan(&updatedAt, &lastSeen); err != nil {
+		t.Fatalf("read migrated relationship: %v", err)
+	}
+	if updatedAt != 123 {
+		t.Fatalf("updated_at = %d, want 123", updatedAt)
+	}
+	if lastSeen != updatedAt {
+		t.Fatalf("last_seen = %d, want backfill from updated_at=%d", lastSeen, updatedAt)
 	}
 }
 
