@@ -175,7 +175,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Memory plugin: RetainDB | `plugins/memory/retaindb/` | 5.I | ⏳ planned |
 | Memory plugin: Supermemory | `plugins/memory/supermemory/` | 5.I | ⏳ planned |
 | Memory tool (plugin gateway) | `tools/memory_tool.py` | 5.I | ⏳ planned |
-| Approval / security | `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py` + `_ApprovalEntry`, `ScanResult` classes | 5.J | ⏳ planned |
+| Approval / security | `tools/{approval,path_security,url_safety,tirith_security,website_policy}.py` + `_ApprovalEntry`, `ScanResult` classes | 5.J | ✅ complete — `internal/tools/approval.go` now detects dangerous shell payloads in command-like tool inputs and `internal/tools/executor.go` plus `internal/kernel/toolexec.go` fail closed before execution; interactive terminal approval UX remains follow-on scope under 5.K |
 | Code execution | `tools/{code_execution_tool,process_registry}.py` + `ProcessRegistry`, `ProcessSession`, `ExecuteResult`, `DebugSession`, `RunState` classes | 5.K | ⏳ planned |
 | File operations | `tools/{file_operations,file_tools,fuzzy_match,checkpoint_manager,patch_parser,binary_extensions}.py` + `FileOperations`/`ShellFileOperations`/`PatchOperation`/`PatchResult`/`CheckpointManager`/`Hunk`/`HunkLine`/`SearchMatch`/`SearchResult`/`ReadResult`/`LintResult`/`Finding`/`OperationType`/`EnvironmentInfo` classes | 5.L | ⏳ planned |
 | Mixture of agents | `tools/mixture_of_agents_tool.py` | 5.M | ⏳ planned |

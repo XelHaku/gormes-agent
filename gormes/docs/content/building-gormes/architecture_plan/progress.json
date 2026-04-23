@@ -928,7 +928,8 @@
           "items": [
             {
               "name": "Dangerous action gating",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/tools/approval.go` now scans command-like JSON fields for dangerous shell payloads (`rm -rf`, shell `-c`, `curl|sh`) and fails closed with `ErrDangerousAction`; both `internal/tools/executor.go` and `internal/kernel/toolexec.go` now block execution before `Tool.Execute`, so direct kernel calls and delegated child tools share the same gate."
             }
           ]
         },

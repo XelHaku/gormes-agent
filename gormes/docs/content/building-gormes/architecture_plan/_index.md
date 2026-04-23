@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 51/66 subphases shipped · 1 in progress · 14 planned
+**Overall:** 53/66 subphases shipped · 0 in progress · 13 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -28,7 +28,7 @@ weight: 10
 | Phase 2 — The Gateway | ✅ | 20/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
-| Phase 5 — The Final Purge | 🔨 | 8/17 subphases |
+| Phase 5 — The Final Purge | 🔨 | 10/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 
 ---
@@ -339,9 +339,9 @@ weight: 10
 - [x] Plugin SDK
 - [x] Third-party extensions
 
-### 5.J — Approval / Security Guards ⏳
+### 5.J — Approval / Security Guards ✅
 
-- [ ] Dangerous action gating
+- [x] Dangerous action gating
 
 ### 5.K — Code Execution ⏳
 

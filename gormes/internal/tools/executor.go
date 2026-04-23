@@ -51,6 +51,11 @@ func (e *InProcessToolExecutor) Execute(ctx context.Context, req ToolRequest) (<
 
 		ch <- ToolEvent{Type: "started"}
 
+		if err := GuardDangerousInput(req.ToolName, req.Input); err != nil {
+			ch <- ToolEvent{Type: "failed", Err: err}
+			return
+		}
+
 		execCtx := ctx
 		if timeout := tool.Timeout(); timeout > 0 {
 			var cancel context.CancelFunc

@@ -83,6 +83,17 @@ func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCal
 			recordAudit("failed", nil, fmt.Errorf("unknown tool: %q", call.Name))
 			continue
 		}
+		if err := tools.GuardDangerousInput(call.Name, call.Arguments); err != nil {
+			results[i] = toolResult{
+				ID:      call.ID,
+				Name:    call.Name,
+				Content: fmt.Sprintf(`{"error":%q}`, err.Error()),
+			}
+			k.addSoul("tool blocked: " + call.Name + ": " + err.Error())
+			k.tm.RecordToolCall(telemetry.ToolStatusFailed)
+			recordAudit("blocked", nil, err)
+			continue
+		}
 
 		timeout := tool.Timeout()
 		if timeout <= 0 {

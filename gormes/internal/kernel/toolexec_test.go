@@ -143,3 +143,29 @@ func TestExecuteToolCalls_CancelBetweenCalls(t *testing.T) {
 		}
 	}
 }
+
+func TestExecuteToolCalls_DangerousCommandBlockedBeforeToolExecute(t *testing.T) {
+	reg := tools.NewRegistry()
+	executed := false
+	reg.MustRegister(&tools.MockTool{
+		NameStr: "terminal",
+		ExecuteFn: func(_ context.Context, _ json.RawMessage) (json.RawMessage, error) {
+			executed = true
+			return json.RawMessage(`{"ok":true}`), nil
+		},
+	})
+	k := newKernelWithRegistry(t, reg)
+
+	res := k.executeToolCalls(context.Background(), []hermes.ToolCall{
+		{ID: "c1", Name: "terminal", Arguments: json.RawMessage(`{"command":"rm -rf /tmp/cache"}`)},
+	})
+	if len(res) != 1 {
+		t.Fatalf("len = %d, want 1", len(res))
+	}
+	if !strings.Contains(res[0].Content, "dangerous action blocked") {
+		t.Fatalf("content = %q, want dangerous-action block message", res[0].Content)
+	}
+	if executed {
+		t.Fatal("tool Execute called, want dangerous input blocked before execution")
+	}
+}
