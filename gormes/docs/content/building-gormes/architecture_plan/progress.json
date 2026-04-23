@@ -283,6 +283,11 @@
             {
               "name": "Heartbeat [SYSTEM:] + [SILENT] delivery contract",
               "status": "complete"
+            },
+            {
+              "name": "Architecture task manager script",
+              "status": "complete",
+              "note": "TDD landed: scripts/gormes-architecture-task-manager.sh is the tracked replacement for architectureplanneragent.sh, keeps the legacy wrapper, writes .codex/planner/tasks.md/report/state artifacts, logs verbose repo/upstream/progress/validation/schedule context, and installs a periodic systemd/cron run."
             }
           ]
         },

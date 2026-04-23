@@ -439,6 +439,31 @@ write_tasks_markdown() {
   ' "$PROGRESS_JSON" > "$TASKS_MD_FILE"
 }
 
+log_context_summary() {
+  local phase_count subphase_count item_count planned in_progress complete missing_notes arch_doc_count core_doc_count
+
+  phase_count="$(jq -r '.progress_summary.phase_count // 0' "$CONTEXT_FILE")"
+  subphase_count="$(jq -r '.progress_summary.subphase_count // 0' "$CONTEXT_FILE")"
+  item_count="$(jq -r '.progress_summary.item_count // 0' "$CONTEXT_FILE")"
+  planned="$(jq -r '.progress_summary.planned_items // 0' "$CONTEXT_FILE")"
+  in_progress="$(jq -r '.progress_summary.in_progress_items // 0' "$CONTEXT_FILE")"
+  complete="$(jq -r '.progress_summary.complete_items // 0' "$CONTEXT_FILE")"
+  missing_notes="$(jq -r '.progress_summary.items_missing_notes // 0' "$CONTEXT_FILE")"
+  arch_doc_count="$(jq -r '(.architecture_docs // []) | length' "$CONTEXT_FILE")"
+  core_doc_count="$(jq -r '(.core_system_docs // []) | length' "$CONTEXT_FILE")"
+
+  log "Repo root: $REPO_ROOT"
+  log "Local git root: $LOCAL_GIT_ROOT"
+  log "Local branch: $LOCAL_BRANCH"
+  log "Local commit: $LOCAL_COMMIT"
+  log "Upstream Hermes: $UPSTREAM_HERMES_DIR"
+  log "Upstream branch: $UPSTREAM_BRANCH"
+  log "Upstream commit: $UPSTREAM_COMMIT"
+  log "Progress items: phases=$phase_count subphases=$subphase_count total=$item_count planned=$planned in_progress=$in_progress complete=$complete missing_notes=$missing_notes"
+  log "Architecture docs: $arch_doc_count; core system docs: $core_doc_count"
+  log "Task Markdown: $TASKS_MD_FILE"
+}
+
 report_validation_error() {
   local file="$1"
   if [[ -f "$file" ]]; then
@@ -636,8 +661,16 @@ cmd_status() {
 
   printf 'Last run UTC: %s\n' "$(jq -r '.last_run_utc // "unknown"' "$STATE_FILE")"
   printf 'Upstream Hermes: %s\n' "$(jq -r '.upstream_hermes_dir // "unknown"' "$STATE_FILE")"
+  printf 'Upstream branch: %s\n' "$(jq -r '.upstream_branch // "unknown"' "$STATE_FILE")"
+  printf 'Upstream commit: %s\n' "$(jq -r '.upstream_commit // "unknown"' "$STATE_FILE")"
+  printf 'Local git root: %s\n' "$(jq -r '.local_git_root // "unknown"' "$STATE_FILE")"
+  printf 'Local branch: %s\n' "$(jq -r '.local_branch // "unknown"' "$STATE_FILE")"
+  printf 'Local commit: %s\n' "$(jq -r '.local_commit // "unknown"' "$STATE_FILE")"
   printf 'Report: %s\n' "$(jq -r '.report_path // "unknown"' "$STATE_FILE")"
+  printf 'Raw report: %s\n' "$(jq -r '.raw_report_path // "unknown"' "$STATE_FILE")"
+  printf 'Context: %s\n' "$(jq -r '.context_path // "unknown"' "$STATE_FILE")"
   printf 'Tasks: %s\n' "$(jq -r '.tasks_md_path // "unknown"' "$STATE_FILE")"
+  printf 'Validation log: %s\n' "$(jq -r '.validation_log_path // "unknown"' "$STATE_FILE")"
   printf 'Schedule: %s\n' "$(jq -r '.schedule_method // "unknown"' "$STATE_FILE")"
   printf 'Scanned items: %s\n' "$(jq -r '.scanned_progress_item_count // "unknown"' "$STATE_FILE")"
 }
@@ -694,12 +727,14 @@ cmd_run() {
   progress 2 "context"
   write_context_bundle
   write_tasks_markdown
+  log_context_summary
 
   progress 3 "planning"
   run_codexu_planner
 
   progress 4 "validation"
   run_validation
+  log "Validation log: $VALIDATION_LOG"
 
   progress 5 "schedule"
   if [[ "$PLANNER_INSTALL_SCHEDULE" == "1" ]]; then
@@ -707,6 +742,7 @@ cmd_run() {
   else
     SCHEDULE_METHOD="disabled"
   fi
+  log "Schedule method: $SCHEDULE_METHOD"
   write_report
   write_state_file
 

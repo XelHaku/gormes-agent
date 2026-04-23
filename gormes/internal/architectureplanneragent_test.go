@@ -204,10 +204,19 @@ exit 0
 	outputText := string(out)
 	for _, want := range []string{
 		"1/5 preflight",
+		"Repo root:",
+		"Upstream Hermes:",
+		"Upstream commit:",
+		"Local commit:",
 		"2/5 context",
+		"Progress items:",
+		"Architecture docs:",
+		"Task Markdown:",
 		"3/5 planning",
 		"4/5 validation",
+		"Validation log:",
 		"5/5 schedule",
+		"Schedule method: systemd",
 	} {
 		if !strings.Contains(outputText, want) {
 			t.Fatalf("output missing progress checkpoint %q:\n%s", want, outputText)
@@ -221,9 +230,6 @@ exit 0
 	}
 	if !strings.Contains(string(out), "Periodic schedule: systemd") {
 		t.Fatalf("output missing periodic schedule line:\n%s", string(out))
-	}
-	if strings.Contains(outputText, "Upstream commit:") || strings.Contains(outputText, "Local commit:") {
-		t.Fatalf("output too verbose for normal progress mode:\n%s", outputText)
 	}
 
 	rawCodexuLog, err := os.ReadFile(logPath)
