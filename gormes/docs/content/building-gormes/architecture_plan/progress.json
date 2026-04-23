@@ -742,7 +742,8 @@
           "items": [
             {
               "name": "Self-monitoring telemetry",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD: shipped per-session turn outcome counters, tool execution totals/failures/cancellations, and TUI sidebar rendering from the live telemetry snapshot."
             }
           ]
         },

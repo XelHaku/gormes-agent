@@ -9,6 +9,7 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/audit"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
@@ -55,6 +56,7 @@ func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCal
 				ID: call.ID, Name: call.Name,
 				Content: `{"error":"cancelled before execution"}`,
 			}
+			k.tm.RecordToolCall(telemetry.ToolStatusCancelled)
 			recordAudit("cancelled", nil, errors.New("cancelled before execution"))
 			continue
 		default:
@@ -65,6 +67,7 @@ func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCal
 				ID: call.ID, Name: call.Name,
 				Content: `{"error":"no tool registry configured"}`,
 			}
+			k.tm.RecordToolCall(telemetry.ToolStatusFailed)
 			recordAudit("failed", nil, errors.New("no tool registry configured"))
 			continue
 		}
@@ -76,6 +79,7 @@ func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCal
 				Content: fmt.Sprintf(`{"error":"unknown tool: %q"}`, call.Name),
 			}
 			k.addSoul("tool unknown: " + call.Name)
+			k.tm.RecordToolCall(telemetry.ToolStatusFailed)
 			recordAudit("failed", nil, fmt.Errorf("unknown tool: %q", call.Name))
 			continue
 		}
@@ -102,11 +106,13 @@ func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCal
 				Content: fmt.Sprintf(`{"error":%q}`, err.Error()),
 			}
 			k.addSoul("tool error: " + call.Name + ": " + err.Error())
+			k.tm.RecordToolCall(telemetry.ToolStatusFailed)
 			recordAudit("failed", nil, err)
 			continue
 		}
 		results[i] = toolResult{ID: call.ID, Name: call.Name, Content: string(payload)}
 		k.addSoul("tool done: " + call.Name)
+		k.tm.RecordToolCall(telemetry.ToolStatusCompleted)
 		recordAudit("completed", payload, nil)
 	}
 	return results

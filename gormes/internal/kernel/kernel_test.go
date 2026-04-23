@@ -125,6 +125,52 @@ func TestKernel_ProviderOutpacesTUI_Coalesces(t *testing.T) {
 	}
 }
 
+func TestKernel_CompletedTurnUpdatesTelemetryOutcome(t *testing.T) {
+	mc := hermes.NewMockClient()
+	tm := telemetry.New()
+	k := New(Config{
+		Model:     "hermes-agent",
+		Endpoint:  "http://mock",
+		Admission: Admission{MaxBytes: 200_000, MaxLines: 10_000},
+	}, mc, store.NewNoop(), tm, nil)
+
+	mc.Script([]hermes.Event{
+		{Kind: hermes.EventToken, Token: "ok", TokensOut: 2},
+		{Kind: hermes.EventDone, FinishReason: "stop", TokensIn: 7, TokensOut: 2},
+	}, "sess-1")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go k.Run(ctx)
+
+	initial := <-k.Render()
+	if err := k.Submit(PlatformEvent{Kind: PlatformEventSubmit, Text: "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	_, final := drainUntilIdle(t, k.Render(), initial.Seq, 3*time.Second)
+
+	if final.Telemetry.TurnsTotal != 1 {
+		t.Fatalf("frame turns_total = %d, want 1", final.Telemetry.TurnsTotal)
+	}
+	if final.Telemetry.TurnsCompleted != 1 {
+		t.Fatalf("frame turns_completed = %d, want 1", final.Telemetry.TurnsCompleted)
+	}
+	if final.Telemetry.LastTurnStatus != telemetry.TurnStatusCompleted {
+		t.Fatalf("frame last_turn_status = %q, want %q", final.Telemetry.LastTurnStatus, telemetry.TurnStatusCompleted)
+	}
+
+	snap := tm.Snapshot()
+	if snap.TurnsTotal != 1 {
+		t.Fatalf("snapshot turns_total = %d, want 1", snap.TurnsTotal)
+	}
+	if snap.TurnsCompleted != 1 {
+		t.Fatalf("snapshot turns_completed = %d, want 1", snap.TurnsCompleted)
+	}
+	if snap.LastTurnStatus != telemetry.TurnStatusCompleted {
+		t.Fatalf("snapshot last_turn_status = %q, want %q", snap.LastTurnStatus, telemetry.TurnStatusCompleted)
+	}
+}
+
 // Test 2: Cancel mid-stream leaves zero goroutine leak.
 func TestKernel_CancelLeakFreedom(t *testing.T) {
 	// Settle the harness.

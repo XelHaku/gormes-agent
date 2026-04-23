@@ -19,7 +19,7 @@ Phase 4 is when Hermes becomes optional. Each sub-phase is a separable spec.
 | 4.B — Context Engine + Compression | ✅ complete | `internal/contextengine` now owns provider-free budget/status planning while `internal/kernel` trims old history on the request path, preserving system context and newest turn groups before provider calls |
 | 4.C — Native Prompt Builder | ✅ complete | `internal/kernel/prompt_builder.go` now assembles session context + recall output + skill blocks ahead of accumulated history and tool descriptors inside `hermes.ChatRequest` |
 | 4.D — Smart Model Routing | ⏳ planned | Port `agent/smart_model_routing.py` + `agent/model_metadata.py` + `agent/models_dev.py`; pick the right model per turn |
-| 4.E — Trajectory + Insights | ⏳ planned | Port `agent/trajectory.py` + `agent/insights.py`; self-monitoring telemetry surface |
+| 4.E — Trajectory + Insights | ✅ complete | `internal/telemetry` now tracks per-session turn outcomes plus tool execution totals/failures/cancellations, and the TUI renders that live self-monitoring surface for later trajectory/insights work |
 | 4.F — Title Generation | ⏳ planned | Port `agent/title_generator.py`; auto-name new sessions |
 | 4.G — Credentials + OAuth | ⏳ planned | Port `agent/google_oauth.py`, `agent/credential_pool.py`, `tools/credential_files.py`; token vault + multi-account auth |
 | 4.H — Rate / Retry / Caching | ⏳ planned | Port `agent/{rate_limit_tracker,retry_utils,nous_rate_guard,prompt_caching}.py`; provider-side resilience |
@@ -31,6 +31,8 @@ Phase 4.A is now complete. Anthropic, Bedrock, Gemini, OpenRouter, Codex, and Go
 4.B is now started as well: `internal/contextengine/compressor_budget.go` ports the donor compressor's threshold floor, summary-budget sizing, context-length probe step-down, and anti-thrashing cooldown into a pure Go slice with fixed-token tests, without wiring live history mutation into the kernel yet.
 
 4.C is now complete as well: `internal/kernel/prompt_builder.go` lifts prompt assembly into a dedicated helper that prepends per-turn system blocks (session context, recall output, and any skill block), preserves accumulated multi-turn history, and carries the registered tool surface into `hermes.ChatRequest`. `internal/kernel/prompt_builder_test.go` locks the missing second-turn behavior so follow-up turns keep prior user/assistant context instead of collapsing to the latest message only.
+
+4.E is now complete as well: `internal/telemetry` now records per-session turn outcomes, total tool executions, failed/cancelled tool calls, and the last completed turn state alongside the existing token/latency counters. `internal/kernel` wires those counters into live render frames and `internal/tui/view.go` surfaces them in the sidebar, giving operators a built-in self-monitoring view before the historical `trajectory.py` / `insights.py` donor ports land.
 
 ## Build Priority Context
 

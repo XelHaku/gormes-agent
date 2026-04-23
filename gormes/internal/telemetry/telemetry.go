@@ -5,12 +5,29 @@ package telemetry
 
 import "time"
 
+type TurnStatus string
+
+const (
+	TurnStatusCompleted TurnStatus = "completed"
+	TurnStatusFailed    TurnStatus = "failed"
+	TurnStatusCancelled TurnStatus = "cancelled"
+)
+
+type ToolStatus string
+
+const (
+	ToolStatusCompleted ToolStatus = "completed"
+	ToolStatusFailed    ToolStatus = "failed"
+	ToolStatusCancelled ToolStatus = "cancelled"
+)
+
 // Telemetry is the interface for per-session metrics collection.
 type Telemetry interface {
 	SetModel(m string)
 	StartTurn()
 	Tick(tokensOut int)
-	FinishTurn(latency time.Duration)
+	FinishTurn(latency time.Duration, status TurnStatus)
+	RecordToolCall(status ToolStatus)
 	SetTokensIn(n int)
 	Snapshot() Snapshot
 }
@@ -18,11 +35,19 @@ type Telemetry interface {
 var _ Telemetry = (*telemetry)(nil)
 
 type Snapshot struct {
-	Model          string
-	TokensInTotal  int
-	TokensOutTotal int
-	LatencyMsLast  int
-	TokensPerSec   float64
+	Model              string
+	TokensInTotal      int
+	TokensOutTotal     int
+	LatencyMsLast      int
+	TokensPerSec       float64
+	TurnsTotal         int
+	TurnsCompleted     int
+	TurnsFailed        int
+	TurnsCancelled     int
+	ToolCallsTotal     int
+	ToolCallsFailed    int
+	ToolCallsCancelled int
+	LastTurnStatus     TurnStatus
 }
 
 // telemetry is NOT goroutine-safe. The kernel holds it on its single owner
@@ -42,6 +67,7 @@ func (t *telemetry) SetModel(m string) { t.snap.Model = m }
 func (t *telemetry) StartTurn() {
 	t.turnStart = time.Now()
 	t.turnTokens = 0
+	t.snap.TurnsTotal++
 }
 
 func (t *telemetry) Tick(tokensOut int) {
@@ -59,8 +85,35 @@ func (t *telemetry) Tick(tokensOut int) {
 	}
 }
 
-func (t *telemetry) FinishTurn(latency time.Duration) {
+func (t *telemetry) FinishTurn(latency time.Duration, status TurnStatus) {
 	t.snap.LatencyMsLast = int(latency / time.Millisecond)
+	t.snap.LastTurnStatus = status
+	t.bumpTurnStatus(status)
+}
+
+func (t *telemetry) bumpTurnStatus(status TurnStatus) {
+	switch status {
+	case TurnStatusCompleted:
+		t.snap.TurnsCompleted++
+	case TurnStatusFailed:
+		t.snap.TurnsFailed++
+	case TurnStatusCancelled:
+		t.snap.TurnsCancelled++
+	}
+}
+
+func (t *telemetry) RecordToolCall(status ToolStatus) {
+	t.snap.ToolCallsTotal++
+	t.bumpToolStatus(status)
+}
+
+func (t *telemetry) bumpToolStatus(status ToolStatus) {
+	switch status {
+	case ToolStatusFailed:
+		t.snap.ToolCallsFailed++
+	case ToolStatusCancelled:
+		t.snap.ToolCallsCancelled++
+	}
 }
 
 func (t *telemetry) SetTokensIn(n int) { t.snap.TokensInTotal += n }

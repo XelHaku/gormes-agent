@@ -817,4 +817,19 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	if lineage.Priority != "P4" {
 		t.Fatalf("Phase 3.E.8 priority = %q, want P4", lineage.Priority)
 	}
+
+	telemetry := p.Phases["4"].Subphases["4.E"]
+	if got := telemetry.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 4.E = %q, want complete", got)
+	}
+	telemetryItems := itemsByName(telemetry.Items)
+	selfMonitoring := telemetryItems["Self-monitoring telemetry"]
+	if selfMonitoring.Status != StatusComplete {
+		t.Fatalf("Phase 4.E telemetry status = %q, want complete", selfMonitoring.Status)
+	}
+	if !strings.Contains(selfMonitoring.Note, "turn outcome counters") ||
+		!strings.Contains(selfMonitoring.Note, "tool execution") ||
+		!strings.Contains(selfMonitoring.Note, "TUI sidebar") {
+		t.Fatalf("Phase 4.E telemetry note = %q, want turn/tool/sidebar detail", selfMonitoring.Note)
+	}
 }

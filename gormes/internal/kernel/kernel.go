@@ -312,6 +312,11 @@ func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID st
 
 	start := time.Now()
 	k.tm.StartTurn()
+	finishTelemetry := func(status telemetry.TurnStatus) time.Duration {
+		latency := time.Since(start)
+		k.tm.FinishTurn(latency, status)
+		return latency
+	}
 
 toolLoop:
 	for {
@@ -341,6 +346,7 @@ toolLoop:
 				}
 				prov.ErrorClass = hermes.Classify(err).String()
 				prov.ErrorText = err.Error()
+				prov.LatencyMs = int(finishTelemetry(telemetry.TurnStatusFailed) / time.Millisecond)
 				prov.LogError(k.log)
 				k.phase = PhaseFailed
 				k.lastError = err.Error()
@@ -367,6 +373,7 @@ toolLoop:
 				break toolLoop
 			case streamOutcomeRetryable:
 				if retryBudget.Exhausted() {
+					prov.LatencyMs = int(finishTelemetry(telemetry.TurnStatusFailed) / time.Millisecond)
 					k.phase = PhaseFailed
 					k.lastError = "reconnect budget exhausted"
 					k.emitFrame("reconnect budget exhausted")
@@ -399,6 +406,7 @@ toolLoop:
 		// tool_calls round. Execute tools and append results to the request.
 		toolIteration++
 		if toolIteration > maxIter {
+			prov.LatencyMs = int(finishTelemetry(telemetry.TurnStatusFailed) / time.Millisecond)
 			k.phase = PhaseFailed
 			k.lastError = fmt.Sprintf("tool iteration limit exceeded (%d)", maxIter)
 			k.emitFrame(k.lastError)
@@ -436,12 +444,8 @@ toolLoop:
 		k.emitFrame("executing tools")
 	}
 
-	// 5. Finalisation (unchanged shape from Route-B).
-	latency := time.Since(start)
-	k.tm.FinishTurn(latency)
-	prov.LatencyMs = int(latency / time.Millisecond)
-
 	if fatalErr != nil {
+		prov.LatencyMs = int(finishTelemetry(telemetry.TurnStatusFailed) / time.Millisecond)
 		prov.ErrorClass = hermes.Classify(fatalErr).String()
 		prov.ErrorText = fatalErr.Error()
 		prov.LogError(k.log)
@@ -473,27 +477,31 @@ toolLoop:
 	}
 
 	if cancelled {
+		prov.LatencyMs = int(finishTelemetry(telemetry.TurnStatusCancelled) / time.Millisecond)
 		k.phase = PhaseCancelling
 		k.emitFrame("cancelled")
-	} else if k.draft != "" {
-		k.history = append(k.history, hermes.Message{Role: "assistant", Content: k.draft})
-		// Phase 3.A: finalize in the memory store. Fire-and-forget — the worker
-		// handles I/O off the hot path. 250ms context bound kept as a safety net
-		// in case someone injects a synchronous store in the future.
-		payload := map[string]any{
-			"session_id": k.sessionID,
-			"content":    k.draft,
-			"ts_unix":    time.Now().Unix(),
-			"chat_id":    k.cfg.ChatKey,
+	} else {
+		prov.LatencyMs = int(finishTelemetry(telemetry.TurnStatusCompleted) / time.Millisecond)
+		if k.draft != "" {
+			k.history = append(k.history, hermes.Message{Role: "assistant", Content: k.draft})
+			// Phase 3.A: finalize in the memory store. Fire-and-forget — the worker
+			// handles I/O off the hot path. 250ms context bound kept as a safety net
+			// in case someone injects a synchronous store in the future.
+			payload := map[string]any{
+				"session_id": k.sessionID,
+				"content":    k.draft,
+				"ts_unix":    time.Now().Unix(),
+				"chat_id":    k.cfg.ChatKey,
+			}
+			if len(toolCallsSeen) > 0 {
+				meta, _ := json.Marshal(map[string]any{"tool_calls": toolCallsSeen})
+				payload["meta_json"] = string(meta)
+			}
+			finalPayload, _ := json.Marshal(payload)
+			finalCtx, finalCancel := context.WithTimeout(ctx, StoreAckDeadline)
+			_, _ = k.store.Exec(finalCtx, store.Command{Kind: store.FinalizeAssistantTurn, Payload: finalPayload})
+			finalCancel()
 		}
-		if len(toolCallsSeen) > 0 {
-			meta, _ := json.Marshal(map[string]any{"tool_calls": toolCallsSeen})
-			payload["meta_json"] = string(meta)
-		}
-		finalPayload, _ := json.Marshal(payload)
-		finalCtx, finalCancel := context.WithTimeout(ctx, StoreAckDeadline)
-		_, _ = k.store.Exec(finalCtx, store.Command{Kind: store.FinalizeAssistantTurn, Payload: finalPayload})
-		finalCancel()
 	}
 
 	prov.LogDone(k.log)

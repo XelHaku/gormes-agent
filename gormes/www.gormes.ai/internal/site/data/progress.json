@@ -688,11 +688,13 @@
             },
             {
               "name": "OpenRouter",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/hermes.NewClient now routes openrouter providers to a native OpenRouter chat-completions adapter that preserves canonical system/user/assistant/tool history plus assistant tool_calls into /api/v1/chat/completions requests, reuses the OpenAI-compatible stream parser for reasoning/text/tool_calls events, and wires cmd/gormes health checks plus provider labeling through /api/v1/models."
             },
             {
               "name": "Google Code Assist",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/hermes.NewClient now routes google-gemini-cli/google-code-assist providers to a native Cloud Code Assist adapter that reuses Gemini request translation inside the cloudcode-pa project/model envelope, authenticates with bearer tokens, unwraps streamed text/functionCall chunks back into canonical Event values, resolves the legacy cloudcode-pa://google marker to Google's live endpoint, and wires cmd/gormes health checks through loadCodeAssist with optional project IDs from GORMES_GEMINI_PROJECT_ID, HERMES_GEMINI_PROJECT_ID, or GOOGLE_CLOUD_PROJECT."
             },
             {
               "name": "Codex",
@@ -706,7 +708,8 @@
           "items": [
             {
               "name": "Long session management",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/contextengine now freezes UpdateModelContext + get_status state, tracks last prompt/completion totals, and plans request history by preserving system context plus newest turn groups within the threshold; internal/kernel applies that planner before provider calls. Verified with go test ./internal/contextengine ./internal/kernel."
             },
             {
               "name": "Context compression",
@@ -720,7 +723,8 @@
           "items": [
             {
               "name": "System + memory + tools + history assembly",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/kernel/prompt_builder.go now assembles per-turn system blocks (session context, recall output, and any skill block), stable tool descriptors, and accumulated multi-turn history into hermes.ChatRequest values, with second-turn coverage locked in internal/kernel/prompt_builder_test.go and go test ./internal/kernel."
             }
           ]
         },
@@ -738,7 +742,8 @@
           "items": [
             {
               "name": "Self-monitoring telemetry",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD: shipped per-session turn outcome counters, tool execution totals/failures/cancellations, and TUI sidebar rendering from the live telemetry snapshot."
             }
           ]
         },

@@ -11,6 +11,7 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/kernel"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
 )
 
 // TestSubmitRoutesToSubmitter: typing text and pressing Enter invokes the
@@ -148,4 +149,35 @@ func TestResizeDoesNotPanic(t *testing.T) {
 	}
 	tm.Send(tea.KeyMsg{Type: tea.KeyCtrlD})
 	tm.WaitFinished(t, teatest.WithFinalTimeout(2*time.Second))
+}
+
+func TestRenderSidebarIncludesSelfMonitoringCounters(t *testing.T) {
+	out := renderSidebar(kernel.RenderFrame{
+		Telemetry: telemetry.Snapshot{
+			Model:              "gormes-agent",
+			TokensPerSec:       12.5,
+			LatencyMsLast:      44,
+			TokensInTotal:      21,
+			TokensOutTotal:     34,
+			TurnsTotal:         3,
+			TurnsCompleted:     2,
+			TurnsFailed:        1,
+			ToolCallsTotal:     5,
+			ToolCallsFailed:    2,
+			ToolCallsCancelled: 1,
+			LastTurnStatus:     telemetry.TurnStatusFailed,
+		},
+	}, 28)
+
+	for _, want := range []string{
+		"turns: 3",
+		"ok/f/c: 2/1/0",
+		"tools: 5",
+		"fail/c: 2/1",
+		"last: failed",
+	} {
+		if !bytes.Contains([]byte(out), []byte(want)) {
+			t.Fatalf("sidebar = %q, want substring %q", out, want)
+		}
+	}
 }

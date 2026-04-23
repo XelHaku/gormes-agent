@@ -20,10 +20,10 @@ var (
 
 // View renders the Dashboard. Three size regimes:
 //
-//   width ≥ 100: full layout, sidebar width 28
-//   80 ≤ width < 100: full layout, sidebar width 24
-//   20 ≤ width < 80: sidebar collapses into a one-line status strip
-//   width < 20 OR height < 10: single-line fallback banner
+//	width ≥ 100: full layout, sidebar width 28
+//	80 ≤ width < 100: full layout, sidebar width 24
+//	20 ≤ width < 80: sidebar collapses into a one-line status strip
+//	width < 20 OR height < 10: single-line fallback banner
 //
 // View never panics on any non-negative (width, height) input.
 func (m Model) View() string {
@@ -135,6 +135,15 @@ func renderSidebar(f kernel.RenderFrame, width int) string {
 	b.WriteString(fmt.Sprintf(" tok/s: %.1f\n", f.Telemetry.TokensPerSec))
 	b.WriteString(fmt.Sprintf(" latency: %d ms\n", f.Telemetry.LatencyMsLast))
 	b.WriteString(fmt.Sprintf(" in/out: %d/%d\n", f.Telemetry.TokensInTotal, f.Telemetry.TokensOutTotal))
+	b.WriteString(fmt.Sprintf(" turns: %d · ok/f/c: %d/%d/%d\n",
+		f.Telemetry.TurnsTotal, f.Telemetry.TurnsCompleted, f.Telemetry.TurnsFailed, f.Telemetry.TurnsCancelled))
+	b.WriteString(fmt.Sprintf(" tools: %d · fail/c: %d/%d\n",
+		f.Telemetry.ToolCallsTotal, f.Telemetry.ToolCallsFailed, f.Telemetry.ToolCallsCancelled))
+	lastStatus := string(f.Telemetry.LastTurnStatus)
+	if lastStatus == "" {
+		lastStatus = "n/a"
+	}
+	b.WriteString(fmt.Sprintf(" last: %s\n", lastStatus))
 	b.WriteString(sep + "\n")
 	b.WriteString(header.Render("Soul Monitor") + "\n")
 	if len(f.SoulEvents) == 0 {

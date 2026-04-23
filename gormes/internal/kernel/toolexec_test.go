@@ -39,6 +39,46 @@ func TestExecuteToolCalls_UnknownToolReturnsErrorResult(t *testing.T) {
 	}
 }
 
+func TestExecuteToolCalls_RecordsTelemetryCounters(t *testing.T) {
+	reg := tools.NewRegistry()
+	reg.MustRegister(&tools.MockTool{NameStr: "ok"})
+	reg.MustRegister(&tools.MockTool{
+		NameStr: "boom",
+		ExecuteFn: func(_ context.Context, _ json.RawMessage) (json.RawMessage, error) {
+			return nil, context.DeadlineExceeded
+		},
+	})
+	tm := telemetry.New()
+	k := New(Config{
+		Model:             "hermes-agent",
+		Endpoint:          "http://mock",
+		Admission:         Admission{MaxBytes: 200_000, MaxLines: 10_000},
+		Tools:             reg,
+		MaxToolIterations: 10,
+		MaxToolDuration:   30 * time.Second,
+	}, hermes.NewMockClient(), store.NewNoop(), tm, nil)
+
+	res := k.executeToolCalls(context.Background(), []hermes.ToolCall{
+		{ID: "1", Name: "ok", Arguments: json.RawMessage(`{}`)},
+		{ID: "2", Name: "boom", Arguments: json.RawMessage(`{}`)},
+		{ID: "3", Name: "missing", Arguments: json.RawMessage(`{}`)},
+	})
+	if len(res) != 3 {
+		t.Fatalf("len = %d, want 3", len(res))
+	}
+
+	snap := tm.Snapshot()
+	if snap.ToolCallsTotal != 3 {
+		t.Fatalf("tool_calls_total = %d, want 3", snap.ToolCallsTotal)
+	}
+	if snap.ToolCallsFailed != 2 {
+		t.Fatalf("tool_calls_failed = %d, want 2", snap.ToolCallsFailed)
+	}
+	if snap.ToolCallsCancelled != 0 {
+		t.Fatalf("tool_calls_cancelled = %d, want 0", snap.ToolCallsCancelled)
+	}
+}
+
 func TestExecuteToolCalls_PanicRecovered(t *testing.T) {
 	reg := tools.NewRegistry()
 	reg.MustRegister(&tools.MockTool{
