@@ -678,11 +678,13 @@
             },
             {
               "name": "Bedrock",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/hermes.NewClient now selects a native Bedrock ConverseStream adapter that resolves AWS region defaults, delegates credential loading and SigV4 request signing to the AWS SDK, maps canonical system/user/assistant/tool messages into Bedrock tool-aware payloads, streams reasoning/text/tool_calls back into canonical Event values, and classifies Bedrock throttling/service failures as retry-safe HTTPError results without live AWS credentials in tests."
             },
             {
               "name": "Gemini",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/hermes.NewClient now routes gemini/google-gemini providers to a native Gemini API adapter that folds system prompts into system_instruction parts, translates assistant functionCall plus user functionResponse history into streamGenerateContent payloads, maps streamed text/functionCall chunks back into canonical Event values, and wires cmd/gormes health checks through the Gemini models endpoint with provider-aware labeling."
             },
             {
               "name": "OpenRouter",
@@ -694,7 +696,8 @@
             },
             {
               "name": "Codex",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/hermes.NewClient now routes codex/openai-codex providers to a native OpenAI Responses API adapter that folds system prompts into instructions, translates assistant function_call + function_call_output history and tool descriptors into /v1/responses input items, streams output_text/reasoning/function-call deltas back into canonical Event values, and wires cmd/gormes health checks through /v1/models with codex-aware provider labels."
             }
           ]
         },

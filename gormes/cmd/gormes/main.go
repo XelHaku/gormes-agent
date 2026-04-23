@@ -68,11 +68,16 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		healthCtx, healthCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		if err := c.Health(healthCtx); err != nil {
 			healthCancel()
-			if llmProviderLabel(cfg.Hermes.Provider) == "anthropic" {
+			switch llmProviderLabel(cfg.Hermes.Provider) {
+			case "anthropic":
 				fmt.Fprintf(os.Stderr,
 					"Anthropic Messages API not reachable at %s: %v\n\nSet GORMES_PROVIDER=anthropic and GORMES_API_KEY, or pass --offline to render the TUI without a live provider (dev only).\n",
 					endpoint, err)
-			} else {
+			case "gemini":
+				fmt.Fprintf(os.Stderr,
+					"Gemini API not reachable at %s: %v\n\nSet GORMES_PROVIDER=gemini and GORMES_API_KEY, or pass --offline to render the TUI without a live provider (dev only).\n",
+					endpoint, err)
+			default:
 				fmt.Fprintf(os.Stderr,
 					"api_server not reachable at %s: %v\n\nStart it with:\n  API_SERVER_ENABLED=true hermes gateway start\n\nOr pass --offline to render the TUI without a live server (dev only).\n",
 					endpoint, err)

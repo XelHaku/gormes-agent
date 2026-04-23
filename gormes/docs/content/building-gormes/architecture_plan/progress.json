@@ -683,7 +683,8 @@
             },
             {
               "name": "Gemini",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/hermes.NewClient now routes gemini/google-gemini providers to a native Gemini API adapter that folds system prompts into system_instruction parts, translates assistant functionCall plus user functionResponse history into streamGenerateContent payloads, maps streamed text/functionCall chunks back into canonical Event values, and wires cmd/gormes health checks through the Gemini models endpoint with provider-aware labeling."
             },
             {
               "name": "OpenRouter",

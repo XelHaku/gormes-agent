@@ -255,7 +255,7 @@ weight: 10
 
 - [x] Anthropic
 - [x] Bedrock
-- [ ] Gemini
+- [x] Gemini
 - [ ] OpenRouter
 - [ ] Google Code Assist
 - [x] Codex

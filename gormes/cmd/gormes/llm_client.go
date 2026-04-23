@@ -13,11 +13,14 @@ func newLLMClient(cfg config.Config) (hermes.Client, string) {
 }
 
 func llmProviderLabel(provider string) string {
-	if strings.EqualFold(strings.TrimSpace(provider), "anthropic") {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "anthropic":
 		return "anthropic"
-	}
-	if strings.EqualFold(strings.TrimSpace(provider), "codex") || strings.EqualFold(strings.TrimSpace(provider), "openai-codex") {
+	case "gemini", "google-gemini":
+		return "gemini"
+	case "codex", "openai-codex":
 		return "codex"
+	default:
+		return "api_server"
 	}
-	return "api_server"
 }

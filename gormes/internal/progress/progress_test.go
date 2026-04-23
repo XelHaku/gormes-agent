@@ -235,6 +235,25 @@ func TestLoad_RealFile_Phase4Bedrock(t *testing.T) {
 	}
 }
 
+func TestLoad_RealFile_Phase4Gemini(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	providers := p.Phases["4"].Subphases["4.A"]
+	items := itemsByName(providers.Items)
+	gemini := items["Gemini"]
+	if gemini.Status != StatusComplete {
+		t.Fatalf("Phase 4.A Gemini status = %q, want complete", gemini.Status)
+	}
+	if !strings.Contains(gemini.Note, "streamGenerateContent") ||
+		!strings.Contains(gemini.Note, "functionCall") ||
+		!strings.Contains(gemini.Note, "cmd/gormes") {
+		t.Fatalf("Phase 4.A Gemini note = %q, want streamGenerateContent/functionCall/cmd wiring detail", gemini.Note)
+	}
+}
+
 func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
 	if err != nil {

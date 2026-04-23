@@ -5,6 +5,7 @@ import "strings"
 const (
 	defaultOpenAIEndpoint   = "http://127.0.0.1:8642"
 	defaultAnthropicBaseURL = "https://api.anthropic.com"
+	defaultGeminiBaseURL    = "https://generativelanguage.googleapis.com/v1beta"
 )
 
 // NewClient returns a provider-aware Client that preserves the canonical
@@ -16,6 +17,8 @@ func NewClient(provider, endpoint, apiKey string) Client {
 		return newAnthropicClient(EffectiveEndpoint(provider, endpoint), apiKey)
 	case "bedrock":
 		return newBedrockClient(EffectiveEndpoint(provider, endpoint))
+	case "gemini":
+		return newGeminiClient(EffectiveEndpoint(provider, endpoint), apiKey)
 	case "codex":
 		return newCodexClient(EffectiveEndpoint(provider, endpoint), apiKey)
 	default:
@@ -35,6 +38,10 @@ func EffectiveEndpoint(provider, endpoint string) string {
 	case "bedrock":
 		if base == "" || base == defaultOpenAIEndpoint {
 			return defaultBedrockBaseURL("")
+		}
+	case "gemini":
+		if base == "" || base == defaultOpenAIEndpoint {
+			return defaultGeminiBaseURL
 		}
 	case "codex":
 		if base == "" || base == defaultOpenAIEndpoint {
@@ -56,6 +63,8 @@ func normalizedProvider(provider string) string {
 		return "anthropic"
 	case "bedrock", "aws-bedrock", "amazon-bedrock":
 		return "bedrock"
+	case "gemini", "google-gemini", "google_gemini":
+		return "gemini"
 	case "codex", "openai-codex", "openai_codex":
 		return "codex"
 	default:
