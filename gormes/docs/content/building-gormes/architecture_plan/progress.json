@@ -868,12 +868,17 @@
           "items": [
             {
               "name": "Skills hub",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/skills/hub.go` now syncs materialized `.hub/catalogs/<source>/.../SKILL.md` trees into the local `.hub/cache` + `lock.json`, installs hub refs into `active/`, and `cmd/gormes/skills.go` exposes `gormes skills sync`, `gormes skills list [--source=hub]`, and `gormes skills install <ref>` against `${XDG_DATA_HOME}/gormes/skills/`."
             },
             {
               "name": "Skill registries",
               "status": "complete",
               "note": "TDD landed: `internal/skills/registry.go` now defines `SkillMeta`, `SkillBundle`, `SkillReadinessStatus`, and `HubLockFile`, adds deterministic `FilesystemSource` + `StaticSource` discovery behind one `SkillSource` / `SourceRegistry` seam, and publishes the canonical bundled/official/Claude Marketplace/ClawHub/GitHub/Hermes Index/LobeHub/skills.sh registry catalog for future hub flows."
+            },
+            {
+              "name": "Skill auto-discovery",
+              "status": "planned"
             }
           ]
         },

@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 48/66 subphases shipped · 1 in progress · 17 planned
+**Overall:** 48/66 subphases shipped · 2 in progress · 16 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -321,8 +321,9 @@ weight: 10
 
 ### 5.F — Skills System (Remaining) 🔨
 
-- [ ] Skills hub
+- [x] Skills hub
 - [x] Skill registries
+- [ ] Skill auto-discovery
 
 ### 5.G — MCP Integration 🔨
 
