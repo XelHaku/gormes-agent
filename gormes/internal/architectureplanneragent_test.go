@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,7 @@ const (
 	architecturePlannerTasksManagerScript = "gormes-architecture-planner-tasks-manager.sh"
 	architectureTaskManagerWrapperScript  = "gormes-architecture-task-manager.sh"
 	legacyPlannerWrapperScript            = "architectureplanneragent.sh"
+	documentationImproverScript           = "documentation-improver.sh"
 	architectureTaskManagerUnit           = "gormes-architecture-planner-tasks-manager"
 )
 
@@ -386,6 +388,200 @@ exit 0
 				t.Fatalf("%s output missing %q:\n%s", tc.name, tc.want, string(out))
 			}
 		})
+	}
+}
+
+func TestDocumentationImproverRunsAndWritesState(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot determine test file location")
+	}
+	repoRoot := filepath.Dir(filepath.Dir(file))
+
+	tmpRoot := t.TempDir()
+	gormesRepo := filepath.Join(tmpRoot, "gormes")
+
+	copyPlannerTestFile(t,
+		filepath.Join(repoRoot, "scripts", documentationImproverScript),
+		filepath.Join(gormesRepo, "scripts", documentationImproverScript),
+		0o755,
+	)
+
+	writePlannerTestFile(t,
+		filepath.Join(gormesRepo, "docs", "content", "building-gormes", "architecture_plan", "progress.json"),
+		[]byte("{\n  \"phases\": {\n    \"2\": {\n      \"name\": \"Phase 2\",\n      \"subphases\": {\n        \"2.F\": {\n          \"items\": [{\"name\": \"Channel directory persistence + lookup contract\", \"status\": \"in_progress\"}]\n        }\n      }\n    }\n  }\n}\n"),
+		0o644,
+	)
+	writePlannerTestFile(t, filepath.Join(gormesRepo, "docs", "content", "building-gormes", "architecture_plan", "_index.md"), []byte("# Architecture Plan\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(gormesRepo, "docs", "content", "building-gormes", "core-systems", "gateway.md"), []byte("# Gateway\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(gormesRepo, "www.gormes.ai", "content", "_index.md"), []byte("# Gormes site\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(gormesRepo, "www.gormes.ai", "internal", "site", "data", "progress.json"), []byte("{}\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(gormesRepo, "cmd", "progress-gen", "main.go"), []byte("package main\nfunc main() {}\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(gormesRepo, "internal", "progress", "doc.go"), []byte("package progress\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(gormesRepo, "docs", "doc.go"), []byte("package docs\n"), 0o644)
+
+	runPlannerTestCommand(t, gormesRepo, "git", "init")
+	runPlannerTestCommand(t, gormesRepo, "git", "config", "user.name", "Test User")
+	runPlannerTestCommand(t, gormesRepo, "git", "config", "user.email", "test@example.com")
+	runPlannerTestCommand(t, gormesRepo, "git", "add", ".")
+	runPlannerTestCommand(t, gormesRepo, "git", "commit", "-m", "init")
+
+	binDir := filepath.Join(tmpRoot, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("mkdir bin: %v", err)
+	}
+
+	writePlannerTestFile(t, filepath.Join(binDir, "codexu"), []byte(`#!/usr/bin/env bash
+set -euo pipefail
+log_file="${CODEXU_LOG:?}"
+printf '%q ' "$@" >> "$log_file"
+printf '\n' >> "$log_file"
+final_file=""
+for ((i=1; i<=$#; i++)); do
+  if [[ "${!i}" == "--output-last-message" ]]; then
+    next=$((i + 1))
+    final_file="${!next}"
+    break
+  fi
+done
+if [[ -z "$final_file" ]]; then
+  echo "missing --output-last-message" >&2
+  exit 1
+fi
+cat > "$final_file" <<'EOF'
+1) Scope and baseline
+2) Feature/doc drift found
+3) Documentation updates applied
+4) Website updates applied
+5) Validation evidence
+6) Risks / follow-ups
+EOF
+printf '{"type":"thread.started","thread_id":"thread-docs-123"}\n'
+`), 0o755)
+
+	writePlannerTestFile(t, filepath.Join(binDir, "go"), []byte(`#!/usr/bin/env bash
+set -euo pipefail
+log_file="${GO_LOG:?}"
+printf '%q ' "$@" >> "$log_file"
+printf '\n' >> "$log_file"
+case "$*" in
+  "run ./cmd/progress-gen -write") echo "progress-gen: _index.md regenerated" ;;
+  "run ./cmd/progress-gen -validate") echo "progress-gen: validated 2 phases" ;;
+  "test ./internal/progress -count=1") echo "ok github.com/example/internal/progress 0.001s" ;;
+  "test ./docs -count=1") echo "ok github.com/example/docs 0.001s" ;;
+  *) echo "unexpected go invocation: $*" >&2; exit 1 ;;
+esac
+`), 0o755)
+
+	logPath := filepath.Join(tmpRoot, "codexu.log")
+	goLogPath := filepath.Join(tmpRoot, "go.log")
+
+	out := runPlannerTestCommandEnv(t, gormesRepo, []string{
+		"PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"CODEXU_LOG=" + logPath,
+		"GO_LOG=" + goLogPath,
+	}, "bash", "scripts/"+documentationImproverScript)
+
+	if !strings.Contains(string(out), "Documentation report:") {
+		t.Fatalf("output missing report path:\n%s", string(out))
+	}
+	if !strings.Contains(string(out), "Documentation state:") {
+		t.Fatalf("output missing state path:\n%s", string(out))
+	}
+
+	docRoot := filepath.Join(gormesRepo, ".codex", "doc-improver")
+	statePath := filepath.Join(docRoot, "documentation_state.json")
+	stateData, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatalf("read documentation_state.json: %v", err)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(stateData, &state); err != nil {
+		t.Fatalf("parse documentation_state.json: %v", err)
+	}
+	if got := state["session_id"]; got != "thread-docs-123" {
+		t.Fatalf("session_id = %#v, want %q", got, "thread-docs-123")
+	}
+
+	reportPath := filepath.Join(docRoot, "latest_documentation_report.md")
+	reportData, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	reportText := string(reportData)
+	if !strings.Contains(reportText, "# Documentation Improver Run") {
+		t.Fatalf("report missing header:\n%s", reportText)
+	}
+	if !strings.Contains(reportText, "1) Scope and baseline") {
+		t.Fatalf("report missing required section:\n%s", reportText)
+	}
+
+	rawCodexuLog, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read codexu log: %v", err)
+	}
+	if !strings.Contains(string(rawCodexuLog), "--output-last-message") {
+		t.Fatalf("codexu log missing output-last-message:\n%s", string(rawCodexuLog))
+	}
+
+	goLogData, err := os.ReadFile(goLogPath)
+	if err != nil {
+		t.Fatalf("read go log: %v", err)
+	}
+	goLog := string(goLogData)
+	for _, want := range []string{
+		"run ./cmd/progress-gen -write",
+		"run ./cmd/progress-gen -validate",
+		"test ./internal/progress -count=1",
+		"test ./docs -count=1",
+	} {
+		if !strings.Contains(goLog, want) {
+			t.Fatalf("go log missing %q:\n%s", want, goLog)
+		}
+	}
+}
+
+func TestDocumentationImproverReportsActiveLockOwner(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot determine test file location")
+	}
+	repoRoot := filepath.Dir(filepath.Dir(file))
+
+	tmpRoot := t.TempDir()
+	gormesRepo := filepath.Join(tmpRoot, "gormes")
+
+	copyPlannerTestFile(t,
+		filepath.Join(repoRoot, "scripts", documentationImproverScript),
+		filepath.Join(gormesRepo, "scripts", documentationImproverScript),
+		0o755,
+	)
+
+	lockDir := filepath.Join(gormesRepo, ".codex", "doc-improver", "run.lock")
+	if err := os.MkdirAll(lockDir, 0o755); err != nil {
+		t.Fatalf("mkdir lock: %v", err)
+	}
+	pid := strconv.Itoa(os.Getpid())
+	writePlannerTestFile(t, filepath.Join(lockDir, "pid"), []byte(pid+"\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(lockDir, "started_at"), []byte("2026-04-23T00:00:00Z\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(lockDir, "command"), []byte("documentation-improver.sh run\n"), 0o644)
+
+	cmd := exec.Command("bash", "scripts/"+documentationImproverScript)
+	cmd.Dir = gormesRepo
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("documentation improver unexpectedly acquired active lock:\n%s", string(out))
+	}
+	output := string(out)
+	for _, want := range []string{
+		"active documentation-improver run",
+		"PID: " + pid,
+		"Started: 2026-04-23T00:00:00Z",
+		"Command: documentation-improver.sh run",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("active-lock output missing %q:\n%s", want, output)
+		}
 	}
 }
 
