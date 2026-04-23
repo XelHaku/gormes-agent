@@ -838,7 +838,8 @@
             },
             {
               "name": "Rod",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/tools/browser_rod.go` now adds a Rod-backed `browser_navigate` path selected via `driver=rod` or `$BROWSER_DRIVER`, covering local launch plus remote `BROWSER_CDP_URL` attach parity through the shared browser tool contract."
             }
           ]
         },

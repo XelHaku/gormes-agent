@@ -729,8 +729,8 @@ func TestLoad_RealFile_Phase5BrowserAutomation(t *testing.T) {
 	}
 
 	browser := p.Phases["5"].Subphases["5.C"]
-	if got := browser.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 5.C = %q, want in_progress", got)
+	if got := browser.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 5.C = %q, want complete", got)
 	}
 
 	items := itemsByName(browser.Items)
@@ -743,8 +743,11 @@ func TestLoad_RealFile_Phase5BrowserAutomation(t *testing.T) {
 	}
 
 	rod := items["Rod"]
-	if rod.Status != StatusPlanned {
-		t.Fatalf("Phase 5.C Rod status = %q, want planned", rod.Status)
+	if rod.Status != StatusComplete {
+		t.Fatalf("Phase 5.C Rod status = %q, want complete", rod.Status)
+	}
+	if !strings.Contains(rod.Note, "browser_navigate") || !strings.Contains(rod.Note, "BROWSER_DRIVER") {
+		t.Fatalf("Phase 5.C Rod note = %q, want browser_navigate/BROWSER_DRIVER detail", rod.Note)
 	}
 }
 

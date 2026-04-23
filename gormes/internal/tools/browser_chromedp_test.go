@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -83,6 +84,9 @@ func TestBrowserNavigateToolExecuteUsesFactoryAndDefaults(t *testing.T) {
 	if got := factory.cfgs[0].CDPURL; got != "" {
 		t.Fatalf("factory cfg cdp_url = %q, want empty", got)
 	}
+	if got := factory.cfgs[0].Driver; got != browserDriverChromedp {
+		t.Fatalf("factory cfg driver = %q, want %q", got, browserDriverChromedp)
+	}
 	if got := session.navigateURL; got != "https://example.com" {
 		t.Fatalf("Navigate url = %q, want https://example.com", got)
 	}
@@ -101,12 +105,13 @@ func TestBrowserNavigateToolExecuteUsesFactoryAndDefaults(t *testing.T) {
 		Title       string `json:"title"`
 		HTML        string `json:"html"`
 		BrowserMode string `json:"browser_mode"`
+		Driver      string `json:"browser_driver"`
 	}
 	if err := json.Unmarshal(out, &got); err != nil {
 		t.Fatalf("json.Unmarshal(output): %v", err)
 	}
-	if got.URL != "https://example.com/" || got.Title != "Example Domain" || got.HTML != "<html>example</html>" || got.BrowserMode != "local" {
-		t.Fatalf("output = %+v, want location/title/html/browser_mode populated", got)
+	if got.URL != "https://example.com/" || got.Title != "Example Domain" || got.HTML != "<html>example</html>" || got.BrowserMode != "local" || got.Driver != browserDriverChromedp {
+		t.Fatalf("output = %+v, want location/title/html/browser_mode/browser_driver populated", got)
 	}
 }
 
@@ -127,21 +132,54 @@ func TestBrowserNavigateToolExecuteUsesEnvCDPURLWhenArgMissing(t *testing.T) {
 	if got := factory.cfgs[0].CDPURL; got != "ws://127.0.0.1:9222/devtools/browser/test" {
 		t.Fatalf("factory cfg cdp_url = %q, want env value", got)
 	}
+	if got := factory.cfgs[0].Driver; got != browserDriverChromedp {
+		t.Fatalf("factory cfg driver = %q, want %q", got, browserDriverChromedp)
+	}
 }
 
-func TestBrowserNavigateToolExecutePrefersExplicitCDPURL(t *testing.T) {
+func TestBrowserNavigateToolExecutePrefersExplicitCDPURLAndDriver(t *testing.T) {
 	t.Setenv(browserCDPURLEnv, "ws://127.0.0.1:9222/devtools/browser/env")
+	t.Setenv(browserDriverEnv, browserDriverChromedp)
 
 	session := &fakeBrowserSession{mode: "remote"}
 	factory := &fakeBrowserSessionFactory{session: session}
 	tool := &BrowserNavigateTool{Factory: factory}
 
-	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"url":"https://example.com","cdp_url":"ws://127.0.0.1:9222/devtools/browser/arg"}`)); err != nil {
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"url":"https://example.com","cdp_url":"ws://127.0.0.1:9222/devtools/browser/arg","driver":"rod"}`)); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
 	if got := factory.cfgs[0].CDPURL; got != "ws://127.0.0.1:9222/devtools/browser/arg" {
 		t.Fatalf("factory cfg cdp_url = %q, want explicit arg", got)
+	}
+	if got := factory.cfgs[0].Driver; got != browserDriverRod {
+		t.Fatalf("factory cfg driver = %q, want explicit arg", got)
+	}
+}
+
+func TestBrowserNavigateToolExecuteUsesEnvDriverWhenArgMissing(t *testing.T) {
+	t.Setenv(browserDriverEnv, browserDriverRod)
+
+	session := &fakeBrowserSession{mode: "remote"}
+	factory := &fakeBrowserSessionFactory{session: session}
+	tool := &BrowserNavigateTool{Factory: factory}
+
+	out, err := tool.Execute(context.Background(), json.RawMessage(`{"url":"https://example.com"}`))
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := factory.cfgs[0].Driver; got != browserDriverRod {
+		t.Fatalf("factory cfg driver = %q, want env value", got)
+	}
+
+	var got struct {
+		Driver string `json:"browser_driver"`
+	}
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("json.Unmarshal(output): %v", err)
+	}
+	if got.Driver != browserDriverRod {
+		t.Fatalf("output browser_driver = %q, want %q", got.Driver, browserDriverRod)
 	}
 }
 
@@ -150,5 +188,17 @@ func TestBrowserNavigateToolExecuteRejectsMissingURL(t *testing.T) {
 
 	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"url":"   "}`)); err == nil {
 		t.Fatal("Execute() error = nil, want missing URL error")
+	}
+}
+
+func TestBrowserNavigateToolExecuteRejectsUnknownDriver(t *testing.T) {
+	tool := &BrowserNavigateTool{Factory: &fakeBrowserSessionFactory{session: &fakeBrowserSession{}}}
+
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"url":"https://example.com","driver":"webkit"}`))
+	if err == nil {
+		t.Fatal("Execute() error = nil, want unsupported driver error")
+	}
+	if !strings.Contains(err.Error(), "unsupported driver") {
+		t.Fatalf("Execute() error = %v, want unsupported driver detail", err)
 	}
 }

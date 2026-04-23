@@ -15,6 +15,9 @@ import (
 
 const (
 	browserCDPURLEnv           = "BROWSER_CDP_URL"
+	browserDriverEnv           = "BROWSER_DRIVER"
+	browserDriverChromedp      = "chromedp"
+	browserDriverRod           = "rod"
 	defaultBrowserWaitSelector = "body"
 	defaultBrowserHTMLSelector = "html"
 )
@@ -22,6 +25,7 @@ const (
 // BrowserSessionConfig controls how a browser session is opened.
 type BrowserSessionConfig struct {
 	CDPURL string
+	Driver string
 }
 
 // BrowserSessionFactory opens browser sessions for tools.
@@ -40,13 +44,13 @@ type BrowserSession interface {
 	Close() error
 }
 
-// RegisterBrowserTools adds the initial Chromedp-backed browser toolset.
+// RegisterBrowserTools adds the browser toolset with driver-selectable backends.
 func RegisterBrowserTools(reg *Registry) {
 	if reg == nil {
 		panic("tools: nil registry")
 	}
 	reg.MustRegisterEntry(ToolEntry{
-		Tool:    &BrowserNavigateTool{Factory: NewChromedpSessionFactory()},
+		Tool:    &BrowserNavigateTool{Factory: NewDefaultBrowserSessionFactory()},
 		Toolset: "browser",
 		CheckFn: browserToolAvailable,
 	})
@@ -59,16 +63,17 @@ type BrowserNavigateTool struct {
 
 func (*BrowserNavigateTool) Name() string { return "browser_navigate" }
 func (*BrowserNavigateTool) Description() string {
-	return "Navigate to a URL with a local Chrome/Chromium session or an existing CDP browser and return page metadata plus raw HTML."
+	return "Navigate to a URL with a local Chrome/Chromium session or an existing CDP browser using Chromedp or Rod, then return page metadata plus raw HTML."
 }
 func (*BrowserNavigateTool) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"url":{"type":"string","description":"absolute URL to open"},"cdp_url":{"type":"string","description":"optional Chrome DevTools websocket URL; defaults to $BROWSER_CDP_URL when set"},"wait_visible":{"type":"string","description":"CSS selector to wait for before capture; defaults to body"},"outer_html_selector":{"type":"string","description":"CSS selector to capture via OuterHTML; defaults to html"}},"required":["url"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"url":{"type":"string","description":"absolute URL to open"},"driver":{"type":"string","description":"optional browser driver: chromedp or rod; defaults to $BROWSER_DRIVER or chromedp"},"cdp_url":{"type":"string","description":"optional Chrome DevTools websocket URL; defaults to $BROWSER_CDP_URL when set"},"wait_visible":{"type":"string","description":"CSS selector to wait for before capture; defaults to body"},"outer_html_selector":{"type":"string","description":"CSS selector to capture via OuterHTML; defaults to html"}},"required":["url"]}`)
 }
 func (*BrowserNavigateTool) Timeout() time.Duration { return 45 * time.Second }
 
 func (t *BrowserNavigateTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
 	var in struct {
 		URL               string `json:"url"`
+		Driver            string `json:"driver"`
 		CDPURL            string `json:"cdp_url"`
 		WaitVisible       string `json:"wait_visible"`
 		OuterHTMLSelector string `json:"outer_html_selector"`
@@ -82,12 +87,18 @@ func (t *BrowserNavigateTool) Execute(ctx context.Context, args json.RawMessage)
 		return nil, fmt.Errorf("browser_navigate: url is required")
 	}
 
+	driver, err := normalizeBrowserDriver(firstNonEmpty(strings.TrimSpace(in.Driver), strings.TrimSpace(os.Getenv(browserDriverEnv))))
+	if err != nil {
+		return nil, fmt.Errorf("browser_navigate: %w", err)
+	}
+
 	cfg := BrowserSessionConfig{
 		CDPURL: firstNonEmpty(strings.TrimSpace(in.CDPURL), strings.TrimSpace(os.Getenv(browserCDPURLEnv))),
+		Driver: driver,
 	}
 	factory := t.Factory
 	if factory == nil {
-		factory = NewChromedpSessionFactory()
+		factory = NewDefaultBrowserSessionFactory()
 	}
 
 	session, err := factory.Open(ctx, cfg)
@@ -121,15 +132,17 @@ func (t *BrowserNavigateTool) Execute(ctx context.Context, args json.RawMessage)
 	}
 
 	out := struct {
-		URL         string `json:"url"`
-		Title       string `json:"title"`
-		HTML        string `json:"html"`
-		BrowserMode string `json:"browser_mode"`
+		URL           string `json:"url"`
+		Title         string `json:"title"`
+		HTML          string `json:"html"`
+		BrowserMode   string `json:"browser_mode"`
+		BrowserDriver string `json:"browser_driver"`
 	}{
-		URL:         location,
-		Title:       title,
-		HTML:        html,
-		BrowserMode: session.Mode(),
+		URL:           location,
+		Title:         title,
+		HTML:          html,
+		BrowserMode:   session.Mode(),
+		BrowserDriver: driver,
 	}
 	return json.Marshal(out)
 }
@@ -278,4 +291,17 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func normalizeBrowserDriver(value string) (string, error) {
+	driver := strings.ToLower(strings.TrimSpace(value))
+	if driver == "" {
+		return browserDriverChromedp, nil
+	}
+	switch driver {
+	case browserDriverChromedp, browserDriverRod:
+		return driver, nil
+	default:
+		return "", fmt.Errorf("unsupported driver %q", value)
+	}
 }
