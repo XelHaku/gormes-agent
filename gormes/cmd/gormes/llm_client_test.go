@@ -138,6 +138,45 @@ func TestNewLLMClient_GoogleCodeAssistRewritesMarkerEndpoint(t *testing.T) {
 	}
 }
 
+func TestNewLLMClient_OpenRouterUsesModelsHealthEndpoint(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/models" {
+			t.Fatalf("path = %s, want /api/v1/models", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
+			t.Fatalf("Authorization = %q, want Bearer test-key", got)
+		}
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	client, endpoint := newLLMClient(config.Config{
+		Hermes: config.HermesCfg{
+			Provider: "openrouter",
+			Endpoint: srv.URL + "/api/v1",
+			APIKey:   "test-key",
+		},
+	})
+	if endpoint != srv.URL+"/api/v1" {
+		t.Fatalf("endpoint = %q, want %q", endpoint, srv.URL+"/api/v1")
+	}
+	if err := client.Health(context.Background()); err != nil {
+		t.Fatalf("Health() error = %v", err)
+	}
+}
+
+func TestNewLLMClient_OpenRouterRewritesLegacyDefaultEndpoint(t *testing.T) {
+	_, endpoint := newLLMClient(config.Config{
+		Hermes: config.HermesCfg{
+			Provider: "openrouter",
+			Endpoint: "http://127.0.0.1:8642",
+		},
+	})
+	if endpoint != "https://openrouter.ai/api/v1" {
+		t.Fatalf("endpoint = %q, want https://openrouter.ai/api/v1", endpoint)
+	}
+}
+
 func TestLLMProviderLabel_Codex(t *testing.T) {
 	if got := llmProviderLabel("codex"); got != "codex" {
 		t.Fatalf("label = %q, want codex", got)
@@ -153,5 +192,11 @@ func TestLLMProviderLabel_Gemini(t *testing.T) {
 func TestLLMProviderLabel_GoogleGeminiCLI(t *testing.T) {
 	if got := llmProviderLabel("google-gemini-cli"); got != "google-gemini-cli" {
 		t.Fatalf("label = %q, want google-gemini-cli", got)
+	}
+}
+
+func TestLLMProviderLabel_OpenRouter(t *testing.T) {
+	if got := llmProviderLabel("openrouter"); got != "openrouter" {
+		t.Fatalf("label = %q, want openrouter", got)
 	}
 }

@@ -16,6 +16,8 @@ func llmProviderLabel(provider string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "anthropic":
 		return "anthropic"
+	case "openrouter":
+		return "openrouter"
 	case "gemini", "google-gemini":
 		return "gemini"
 	case "google-gemini-cli", "gemini-cli", "gemini-oauth", "google-code-assist", "google_code_assist":

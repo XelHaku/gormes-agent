@@ -15,7 +15,7 @@ Phase 4 is when Hermes becomes optional. Each sub-phase is a separable spec.
 
 | Subphase | Status | Deliverable |
 |---|---|---|
-| 4.A — Provider Adapters | 🔨 in progress | Native Go adapters for Anthropic, Bedrock, Gemini, OpenRouter, Google Code Assist, Codex (mirrors `agent/{anthropic,bedrock,gemini_cloudcode,openrouter_client,google_code_assist}_adapter.py`) |
+| 4.A — Provider Adapters | ✅ complete | Native Go adapters for Anthropic, Bedrock, Gemini, OpenRouter, Google Code Assist, Codex (mirrors the upstream provider-adapter surfaces plus `tools/openrouter_client.py`) |
 | 4.B — Context Engine + Compression | 🔨 in progress | Provider-free context-compression budgeting landed in `internal/contextengine`; long-session management and the wider context-engine wiring still remain |
 | 4.C — Native Prompt Builder | ⏳ planned | Port `agent/prompt_builder.py`; assemble system + memory + tool + history into a model-ready prompt |
 | 4.D — Smart Model Routing | ⏳ planned | Port `agent/smart_model_routing.py` + `agent/model_metadata.py` + `agent/models_dev.py`; pick the right model per turn |
@@ -26,7 +26,7 @@ Phase 4 is when Hermes becomes optional. Each sub-phase is a separable spec.
 
 Once 4.A–4.D are shipped Gormes can call LLMs directly. The `:8642` health check becomes optional.
 
-Anthropic, Bedrock, Gemini, Codex, and Google Code Assist now have native provider paths in `internal/hermes.NewClient`. Each adapter preserves the kernel's canonical `ChatRequest`/`Event` contract while speaking the provider's native wire format: Anthropic via Messages, Bedrock via ConverseStream, Gemini via `streamGenerateContent`, Codex via Responses, and Google Code Assist via `cloudcode-pa`'s wrapped `streamGenerateContent` plus `loadCodeAssist` health checks. The new Google Code Assist path intentionally stops at the provider-adapter seam for Phase 4.A: it accepts an already-issued bearer token, resolves optional project IDs from environment overrides, translates canonical tool-aware history through the Gemini request mapper, and leaves the OAuth/browser login port to Phase 4.G.
+Phase 4.A is now complete. Anthropic, Bedrock, Gemini, OpenRouter, Codex, and Google Code Assist all have native provider paths in `internal/hermes.NewClient`. Each adapter preserves the kernel's canonical `ChatRequest`/`Event` contract while speaking the provider's native wire format: Anthropic via Messages, Bedrock via ConverseStream, Gemini via `streamGenerateContent`, OpenRouter via `/api/v1/chat/completions` plus `/api/v1/models`, Codex via Responses, and Google Code Assist via `cloudcode-pa`'s wrapped `streamGenerateContent` plus `loadCodeAssist` health checks. The new Google Code Assist path intentionally stops at the provider-adapter seam for Phase 4.A: it accepts an already-issued bearer token, resolves optional project IDs from environment overrides, translates canonical tool-aware history through the Gemini request mapper, and leaves the OAuth/browser login port to Phase 4.G.
 
 4.B is now started as well: `internal/contextengine/compressor_budget.go` ports the donor compressor's threshold floor, summary-budget sizing, context-length probe step-down, and anti-thrashing cooldown into a pure Go slice with fixed-token tests, without wiring live history mutation into the kernel yet.
 

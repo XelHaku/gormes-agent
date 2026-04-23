@@ -182,8 +182,8 @@ func TestLoad_RealFile_Phase4Anthropic(t *testing.T) {
 	}
 
 	providers := p.Phases["4"].Subphases["4.A"]
-	if got := providers.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 4.A = %q, want in_progress", got)
+	if got := providers.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 4.A = %q, want complete", got)
 	}
 	items := itemsByName(providers.Items)
 	anthropic := items["Anthropic"]
@@ -251,6 +251,25 @@ func TestLoad_RealFile_Phase4Gemini(t *testing.T) {
 		!strings.Contains(gemini.Note, "functionCall") ||
 		!strings.Contains(gemini.Note, "cmd/gormes") {
 		t.Fatalf("Phase 4.A Gemini note = %q, want streamGenerateContent/functionCall/cmd wiring detail", gemini.Note)
+	}
+}
+
+func TestLoad_RealFile_Phase4OpenRouter(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	providers := p.Phases["4"].Subphases["4.A"]
+	items := itemsByName(providers.Items)
+	openrouter := items["OpenRouter"]
+	if openrouter.Status != StatusComplete {
+		t.Fatalf("Phase 4.A OpenRouter status = %q, want complete", openrouter.Status)
+	}
+	if !strings.Contains(openrouter.Note, "/api/v1/chat/completions") ||
+		!strings.Contains(openrouter.Note, "tool_calls") ||
+		!strings.Contains(openrouter.Note, "cmd/gormes") {
+		t.Fatalf("Phase 4.A OpenRouter note = %q, want chat-completions/tool_calls/cmd wiring detail", openrouter.Note)
 	}
 }
 

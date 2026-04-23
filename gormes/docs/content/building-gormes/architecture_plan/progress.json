@@ -688,7 +688,8 @@
             },
             {
               "name": "OpenRouter",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: internal/hermes.NewClient now routes openrouter providers to a native OpenRouter chat-completions adapter that preserves canonical system/user/assistant/tool history plus assistant tool_calls into /api/v1/chat/completions requests, reuses the OpenAI-compatible stream parser for reasoning/text/tool_calls events, and wires cmd/gormes health checks plus provider labeling through /api/v1/models."
             },
             {
               "name": "Google Code Assist",

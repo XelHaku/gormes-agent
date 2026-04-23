@@ -153,7 +153,7 @@ func translateCodexMessages(messages []Message) (string, []codexInputItem, error
 				input = append(input, codexInputItem{Role: "assistant", Content: msg.Content})
 			}
 			for _, tc := range msg.ToolCalls {
-				args, err := normalizeCodexArguments(tc.Arguments)
+				args, err := normalizeJSONArguments(tc.Arguments)
 				if err != nil {
 					return "", nil, fmt.Errorf("codex assistant tool %q: %w", tc.Name, err)
 				}
@@ -181,7 +181,7 @@ func translateCodexMessages(messages []Message) (string, []codexInputItem, error
 	return strings.Join(systemParts, "\n\n"), input, nil
 }
 
-func normalizeCodexArguments(raw json.RawMessage) (string, error) {
+func normalizeJSONArguments(raw json.RawMessage) (string, error) {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
 		return "{}", nil
