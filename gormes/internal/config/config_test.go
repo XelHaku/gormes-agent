@@ -211,6 +211,105 @@ api_key = "personal-key"
 	}
 }
 
+func TestLoad_HermesTokenVaultAuthJSONFallback(t *testing.T) {
+	cfgHome := t.TempDir()
+	dataHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	t.Setenv("XDG_DATA_HOME", dataHome)
+
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[hermes]
+provider = "anthropic"
+endpoint = "https://api.anthropic.com"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	authDir := filepath.Dir(AuthTokenVaultPath())
+	if err := os.MkdirAll(authDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(AuthTokenVaultPath(), []byte(`{
+  "version": 1,
+  "credential_pool": {
+    "anthropic": [
+      {
+        "access_token": "vault-anthropic-key"
+      }
+    ]
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Hermes.APIKey != "vault-anthropic-key" {
+		t.Fatalf("APIKey = %q, want vault-anthropic-key from auth.json token vault", cfg.Hermes.APIKey)
+	}
+}
+
+func TestLoad_HermesTokenVaultProviderFileWins(t *testing.T) {
+	cfgHome := t.TempDir()
+	dataHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	t.Setenv("XDG_DATA_HOME", dataHome)
+
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[hermes]
+provider = "google-gemini-cli"
+endpoint = "https://cloudcode-pa.googleapis.com"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	authDir := filepath.Dir(AuthTokenVaultPath())
+	if err := os.MkdirAll(authDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(AuthTokenVaultPath(), []byte(`{
+  "version": 1,
+  "credential_pool": {
+    "google-gemini-cli": [
+      {
+        "access_token": "vault-google-token"
+      }
+    ]
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	providerPath := ProviderTokenPath("google-gemini-cli")
+	if err := os.MkdirAll(filepath.Dir(providerPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(providerPath, []byte(`{
+  "access_token": "provider-file-token",
+  "refresh_token": "refresh-token"
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Hermes.APIKey != "provider-file-token" {
+		t.Fatalf("APIKey = %q, want provider-file-token from provider token file", cfg.Hermes.APIKey)
+	}
+}
+
 func TestLoad_FlagOverridesEnv(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("GORMES_ENDPOINT", "http://env:8642")
@@ -391,6 +490,24 @@ func TestPairingStatePath_HonorsXDG(t *testing.T) {
 	want := "/tmp/gormes-test-pairing/gormes/pairing/state.json"
 	if got != want {
 		t.Errorf("PairingStatePath() = %q, want %q", got, want)
+	}
+}
+
+func TestAuthTokenVaultPath_HonorsXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-test-auth-vault")
+	got := AuthTokenVaultPath()
+	want := "/tmp/gormes-test-auth-vault/gormes/auth.json"
+	if got != want {
+		t.Errorf("AuthTokenVaultPath() = %q, want %q", got, want)
+	}
+}
+
+func TestProviderTokenPath_HonorsXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-test-provider-token")
+	got := ProviderTokenPath("google-gemini-cli")
+	want := "/tmp/gormes-test-provider-token/gormes/auth/google_oauth.json"
+	if got != want {
+		t.Errorf("ProviderTokenPath() = %q, want %q", got, want)
 	}
 }
 

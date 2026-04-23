@@ -763,6 +763,11 @@
           "items": [
             {
               "name": "Token vault",
+              "status": "complete",
+              "note": "TDD: `internal/config/token_vault.go` now loads `${XDG_DATA_HOME}/gormes/auth.json` credential-pool entries plus provider token files under `${XDG_DATA_HOME}/gormes/auth/*.json` before env/flag overrides, and coverage lives in `internal/config/config_test.go` plus `cmd/gormes/llm_client_test.go` with `go test ./internal/config ./cmd/gormes`."
+            },
+            {
+              "name": "OAuth browser flow",
               "status": "planned"
             },
             {

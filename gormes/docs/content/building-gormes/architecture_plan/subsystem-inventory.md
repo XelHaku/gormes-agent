@@ -132,7 +132,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Title generator | `agent/title_generator.py` | 4.F | ✅ complete — `internal/session/title.go` derives deterministic first-exchange titles, and the gateway/TUI session persistence paths store them in metadata plus the audit mirror |
 | Google OAuth | `agent/google_oauth.py` | 4.G | ⏳ planned |
 | Credential pool | `agent/credential_pool.py` | 4.G | ⏳ planned |
-| Credential files | `tools/credential_files.py` | 4.G | ⏳ planned |
+| Credential files | `tools/credential_files.py` | 4.G | ✅ complete — `internal/config/token_vault.go` now resolves `${XDG_DATA_HOME}/gormes/auth.json` and `${XDG_DATA_HOME}/gormes/auth/*.json` before env/flag overrides so persisted provider tokens reach the live adapters |
 | Rate limit tracker | `agent/rate_limit_tracker.py` + `nous_rate_guard.py` | 4.H | ⏳ planned |
 | Retry utils | `agent/retry_utils.py` | 4.H | ⏳ planned |
 | Prompt caching | `agent/prompt_caching.py` | 4.H | ⏳ planned |
@@ -180,7 +180,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | File operations | `tools/{file_operations,file_tools,fuzzy_match,checkpoint_manager,patch_parser,binary_extensions}.py` + `FileOperations`/`ShellFileOperations`/`PatchOperation`/`PatchResult`/`CheckpointManager`/`Hunk`/`HunkLine`/`SearchMatch`/`SearchResult`/`ReadResult`/`LintResult`/`Finding`/`OperationType`/`EnvironmentInfo` classes | 5.L | ⏳ planned |
 | Mixture of agents | `tools/mixture_of_agents_tool.py` | 5.M | ⏳ planned |
 | Operator tools | `tools/{todo_tool,clarify_tool,session_search_tool,send_message_tool,debug_helpers,interrupt,ansi_strip}.py` + `TodoStore`, `_ThreadAwareEventProxy` classes | 5.N | ⏳ planned |
-| Auth storage (GitHub + Hermes token) | `tools/*` — `GitHubAuth`, `HermesTokenStorage` classes | 4.G / 5.O | ⏳ planned |
+| Auth storage (GitHub + Hermes token) | `tools/*` — `GitHubAuth`, `HermesTokenStorage` classes | 4.G / 5.O | 🔨 in progress — the provider token vault now lives under `${XDG_DATA_HOME}/gormes/auth{.json,/}` via `internal/config/token_vault.go`; tool-specific auth managers remain future work |
 | Budget config + provider entries | `tools/budget_config.py` — `BudgetConfig`, `_ProviderEntry` classes | 4.H / 5.A | ⏳ planned |
 | Tool entry metadata (registry row schema) | `tools/registry.py` — `ToolEntry` class | 5.A | ✅ shipped — `internal/tools.ToolEntry` stores the Go tool pointer, toolset name, required env vars, and optional availability check |
 | Web tools / search (Parallel + Firecrawl providers) | `tools/web_tools.py` | 5.A | ⏳ planned |
@@ -257,8 +257,8 @@ Equally important as the code inventory above is the **runtime contract surface*
 |---|---|---|---|
 | `~/.hermes/config.yaml` | YAML | `hermes_cli/config.py` (`DEFAULT_CONFIG`, 117 top-level keys; `_config_version` for migrations) | `~/.config/gormes/config.toml` (TOML, simpler schema; `internal/config/config.go`; named multi-account auth now selects `[hermes].account` from `[[hermes.accounts]]`) |
 | `~/.hermes/.env` | `KEY=value` pairs | `hermes_cli/env_loader.py` (read on startup) | `GORMES_*` env vars + stdlib `os.Getenv` (no dotenv by default) |
-| `~/.hermes/auth.json` | JSON | `hermes_cli/auth.py` + `agent/credential_pool.py` | Planned 4.G — token vault |
-| `~/.hermes/.anthropic_oauth.json` | JSON | `hermes_cli/auth.py` | Planned 4.G — per-provider token files |
+| `~/.hermes/auth.json` | JSON | `hermes_cli/auth.py` + `agent/credential_pool.py` | `${XDG_DATA_HOME}/gormes/auth.json` token vault loaded by `internal/config/token_vault.go` |
+| `~/.hermes/.anthropic_oauth.json` | JSON | `hermes_cli/auth.py` | `${XDG_DATA_HOME}/gormes/auth/anthropic_oauth.json` (and provider peers such as `google_oauth.json`) loaded by `internal/config/token_vault.go` |
 | `~/.hermes/context_length_cache.yaml` | YAML | `agent/model_metadata.py` | Planned 4.D — replace YAML with embedded `models_dev_cache.go` |
 | `~/.hermes/models_dev_cache.json` | JSON | `agent/models_dev.py` | Planned 4.D |
 | `~/.hermes/ollama_cloud_models_cache.json` | JSON | `agent/models_dev.py` / Ollama adapter | Planned 4.D |
@@ -283,7 +283,7 @@ Upstream uses `~/.hermes/` as the state root (overridable via `HERMES_HOME`). Go
 |---|---|---|---|
 | `~/.hermes/state.db` | SessionDB (SQLite + FTS5 for session history) | 3.A (partial ✅), 3.E.8 | `~/.local/share/gormes/memory/memory.db` (turns + entities) + `~/.local/share/gormes/sessions.db` (bbolt) |
 | `~/.hermes/sessions/` | Per-session exports + transcripts (JSONL) | 3.E.3 | Planned — Transcript Export Command |
-| `~/.hermes/auth/` | Per-provider OAuth tokens | 4.G | Planned — token vault |
+| `~/.hermes/auth/` | Per-provider OAuth tokens | 4.G | ✅ Shipped as Gormes equivalent: `${XDG_DATA_HOME}/gormes/auth/` now stores provider token files consumed by `internal/config/token_vault.go` |
 | `~/.hermes/memories/` | Per-backend memory plugin storage (8 backends) | 5.I | Planned — plugin directories |
 | `~/.hermes/skills/` | Installed skills (26 upstream categories) | 5.F | Planned — `~/.local/share/gormes/skills/` |
 | `~/.hermes/optional-skills/` | Optional skill packs (10+ categories) | 5.F | Planned |

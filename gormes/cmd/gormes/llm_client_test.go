@@ -88,6 +88,66 @@ endpoint = "`+srv.URL+`"
 	}
 }
 
+func TestNewLLMClient_UsesTokenVaultCredential(t *testing.T) {
+	cfgHome := t.TempDir()
+	dataHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	t.Setenv("XDG_DATA_HOME", dataHome)
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("path = %s, want /v1/models", r.URL.Path)
+		}
+		if got := r.Header.Get("x-api-key"); got != "vault-key" {
+			t.Fatalf("x-api-key = %q, want vault-key", got)
+		}
+		w.WriteHeader(200)
+	}))
+	defer srv.Close()
+
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[hermes]
+provider = "anthropic"
+endpoint = "`+srv.URL+`"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	authPath := config.AuthTokenVaultPath()
+	if err := os.MkdirAll(filepath.Dir(authPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(authPath, []byte(`{
+  "version": 1,
+  "credential_pool": {
+    "anthropic": [
+      {
+        "access_token": "vault-key"
+      }
+    ]
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, endpoint := newLLMClient(cfg)
+	if endpoint != srv.URL {
+		t.Fatalf("endpoint = %q, want %q", endpoint, srv.URL)
+	}
+	if err := client.Health(context.Background()); err != nil {
+		t.Fatalf("Health() error = %v", err)
+	}
+}
+
 func TestNewLLMClient_AnthropicRewritesLegacyDefaultEndpoint(t *testing.T) {
 	_, endpoint := newLLMClient(config.Config{
 		Hermes: config.HermesCfg{

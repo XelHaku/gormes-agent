@@ -204,6 +204,9 @@ func Load(args []string) (Config, error) {
 	if err := resolveHermesAccount(&cfg, os.Getenv("GORMES_ACCOUNT")); err != nil {
 		return cfg, err
 	}
+	if err := resolveTokenVault(&cfg); err != nil {
+		return cfg, err
+	}
 	loadEnv(&cfg)
 	if err := loadFlags(&cfg, args); err != nil {
 		return cfg, err

@@ -273,6 +273,33 @@ func TestLoad_RealFile_Phase4OpenRouter(t *testing.T) {
 	}
 }
 
+func TestLoad_RealFile_Phase4TokenVault(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	credentials := p.Phases["4"].Subphases["4.G"]
+	if got := credentials.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 4.G = %q, want in_progress", got)
+	}
+	items := itemsByName(credentials.Items)
+	tokenVault := items["Token vault"]
+	if tokenVault.Status != StatusComplete {
+		t.Fatalf("Phase 4.G token vault status = %q, want complete", tokenVault.Status)
+	}
+	if !strings.Contains(tokenVault.Note, "internal/config/token_vault.go") ||
+		!strings.Contains(tokenVault.Note, "auth.json") ||
+		!strings.Contains(tokenVault.Note, "cmd/gormes/llm_client_test.go") ||
+		!strings.Contains(tokenVault.Note, "go test ./internal/config ./cmd/gormes") {
+		t.Fatalf("Phase 4.G token vault note = %q, want package/vault/test detail", tokenVault.Note)
+	}
+	oauthFlow := items["OAuth browser flow"]
+	if oauthFlow.Status != StatusPlanned {
+		t.Fatalf("Phase 4.G OAuth browser flow status = %q, want planned", oauthFlow.Status)
+	}
+}
+
 func TestLoad_RealFile_Phase4ContextCompression(t *testing.T) {
 	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
 	if err != nil {

@@ -40,7 +40,11 @@ max_lines = 500
 
 | Path | Contents |
 |---|---|
-| `~/.gormes/sessions.db` | bbolt session resume map |
-| `~/.hermes/memory/memory.db` | SQLite memory store |
-| `~/.hermes/memory/USER.md` | Human-readable entity/relationship mirror |
-| `~/.hermes/crash-*.log` | Crash dumps |
+| `${XDG_DATA_HOME}/gormes/sessions.db` | bbolt session resume map |
+| `${XDG_DATA_HOME}/gormes/memory.db` | SQLite memory store |
+| `${XDG_DATA_HOME}/gormes/memory/USER.md` | Human-readable entity/relationship mirror |
+| `${XDG_DATA_HOME}/gormes/auth.json` | Shared token vault for persisted provider credentials |
+| `${XDG_DATA_HOME}/gormes/auth/` | Per-provider OAuth/device token files such as `google_oauth.json` |
+| `${XDG_DATA_HOME}/gormes/crash-*.log` | Crash dumps |
+
+Vault-backed credentials are loaded after `config.toml` account selection and before env/CLI overrides, so persisted tokens work by default while `GORMES_API_KEY` and other runtime overrides still win when set.

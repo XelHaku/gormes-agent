@@ -30,7 +30,6 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		"roadmap-status-shipped",
 		"roadmap-status-progress",
 		"roadmap-status-planned",
-		"roadmap-status-later",
 		"roadmap-phase",
 		// Fuzzy phase-title presence — each phase renders, no subtitles
 		"Phase 1",

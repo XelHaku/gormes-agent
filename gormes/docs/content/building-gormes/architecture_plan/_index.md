@@ -283,7 +283,8 @@ weight: 10
 
 ### 4.G — Credentials + OAuth 🔨
 
-- [ ] Token vault
+- [x] Token vault
+- [ ] OAuth browser flow
 - [x] Multi-account auth
 
 ### 4.H — Rate / Retry / Caching ⏳
