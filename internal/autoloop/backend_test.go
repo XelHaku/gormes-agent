@@ -18,6 +18,18 @@ func TestBuildBackendCommandCodexuSafe(t *testing.T) {
 	}
 }
 
+func TestBuildBackendCommandDefaultsToCodexuSafe(t *testing.T) {
+	got, err := BuildBackendCommand("", "")
+	if err != nil {
+		t.Fatalf("BuildBackendCommand() error = %v", err)
+	}
+
+	want := []string{"codexu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
+	}
+}
+
 func TestBuildBackendCommandCodexuFull(t *testing.T) {
 	got, err := BuildBackendCommand("codexu", "full")
 	if err != nil {
@@ -30,15 +42,39 @@ func TestBuildBackendCommandCodexuFull(t *testing.T) {
 	}
 }
 
+func TestBuildBackendCommandCodexuUnattendedUsesWorkspaceWrite(t *testing.T) {
+	got, err := BuildBackendCommand("codexu", "unattended")
+	if err != nil {
+		t.Fatalf("BuildBackendCommand() error = %v", err)
+	}
+
+	want := []string{"codexu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
+	}
+}
+
 func TestBuildBackendCommandClaudeuUsesShimShape(t *testing.T) {
 	got, err := BuildBackendCommand("claudeu", "safe")
 	if err != nil {
 		t.Fatalf("BuildBackendCommand() error = %v", err)
 	}
 
-	wantPrefix := []string{"claudeu", "exec", "--json"}
-	if len(got) < len(wantPrefix) || !reflect.DeepEqual(got[:len(wantPrefix)], wantPrefix) {
-		t.Fatalf("BuildBackendCommand() = %#v, want prefix %#v", got, wantPrefix)
+	want := []string{"claudeu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
+	}
+}
+
+func TestBuildBackendCommandOpencode(t *testing.T) {
+	got, err := BuildBackendCommand("opencode", "safe")
+	if err != nil {
+		t.Fatalf("BuildBackendCommand() error = %v", err)
+	}
+
+	want := []string{"opencode", "run", "--no-interactive"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
 	}
 }
 
@@ -50,5 +86,16 @@ func TestBuildBackendCommandRejectsInvalidMode(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "invalid MODE") {
 		t.Fatalf("BuildBackendCommand() error = %q, want invalid MODE message", err)
+	}
+}
+
+func TestBuildBackendCommandRejectsInvalidBackend(t *testing.T) {
+	_, err := BuildBackendCommand("unknown", "safe")
+	if err == nil {
+		t.Fatal("BuildBackendCommand() error = nil, want error")
+	}
+
+	if !strings.Contains(err.Error(), "invalid BACKEND") {
+		t.Fatalf("BuildBackendCommand() error = %q, want invalid BACKEND message", err)
 	}
 }
