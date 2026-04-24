@@ -31,6 +31,52 @@ log_msg() { printf '[%s] %s\n' "$(date -u +%H:%M:%SZ)" "$*" >> "$log"; }
 log_msg "claudeu invoked argv-count=$#"
 log_msg "cwd=$(pwd)"
 
+# Preserve the full original argv so we can exec a fallback backend
+# (codexu) transparently if claude reports credit exhaustion.
+ORIG_ARGV=("$@")
+
+# Resolve a real codexu binary for fallback. Prefer $CLAUDEU_FALLBACK_BIN;
+# else scan PATH skipping any bin-shim entry (so we don't loop back to
+# ourselves via the codexu->claudeu symlink).
+resolve_fallback_bin() {
+  if [[ -n "${CLAUDEU_FALLBACK_BIN:-}" && -x "$CLAUDEU_FALLBACK_BIN" ]]; then
+    printf '%s' "$CLAUDEU_FALLBACK_BIN"
+    return 0
+  fi
+  local part
+  IFS=':' read -r -a _parts <<<"$PATH"
+  for part in "${_parts[@]}"; do
+    [[ -z "$part" ]] && continue
+    [[ "$part" == *bin-shim* ]] && continue
+    if [[ -x "$part/codexu" ]]; then
+      printf '%s' "$part/codexu"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Match output that indicates claude is out of credits / rate-limited in a
+# way where retrying with the same backend will keep failing.
+# Patterns cover Anthropic's credit-low message, 429 rate limits, and
+# "insufficient" balance wording across Claude Code CLI and API variants.
+is_credit_exhausted() {
+  local out_file="$1" err_file="$2"
+  grep -iqE \
+    -e 'credit balance is too low' \
+    -e 'credit_balance_too_low' \
+    -e 'insufficient[_ ]credits' \
+    -e 'billing_hard_limit_reached' \
+    -e 'billing[_ ]hard[_ ]limit' \
+    -e 'out of credits' \
+    -e 'rate_limit_exceeded' \
+    -e '429 Too Many Requests' \
+    -e 'exceeded your.*usage limit' \
+    -e 'monthly usage limit' \
+    -e 'quota exceeded' \
+    "$out_file" "$err_file" 2>/dev/null
+}
+
 final_file=""
 prompt=""
 
@@ -80,9 +126,6 @@ if ! command -v claude >/dev/null 2>&1; then
   exit 127
 fi
 
-thread_id="claudeu-$$-$(date +%s)"
-printf '{"type":"thread.started","thread_id":"%s"}\n' "$thread_id"
-
 tmp_stdout="$(mktemp "$CLAUDEU_LOG_DIR/${stamp}-$$.stdout.XXXXXX")"
 tmp_stderr="$(mktemp "$CLAUDEU_LOG_DIR/${stamp}-$$.stderr.XXXXXX")"
 trap 'rm -f "$tmp_stdout" "$tmp_stderr"' EXIT
@@ -103,6 +146,38 @@ rc=$?
 set -e
 
 log_msg "claude exited rc=$rc stdout-bytes=$(wc -c <"$tmp_stdout") stderr-bytes=$(wc -c <"$tmp_stderr")"
+
+# If claude failed and the failure matches credit-exhaustion patterns,
+# transparently exec codexu with the original argv so the orchestrator
+# keeps making progress overnight without manual intervention.
+if (( rc != 0 )) && [[ "${CLAUDEU_NO_FALLBACK:-0}" != "1" ]] && is_credit_exhausted "$tmp_stdout" "$tmp_stderr"; then
+  log_msg "credit-exhaustion pattern matched in claude output; attempting codexu fallback"
+  if fallback_bin="$(resolve_fallback_bin)"; then
+    log_msg "FALLBACK TO codexu: $fallback_bin with ${#ORIG_ARGV[@]} original argv"
+    # Record fallback for audit visibility (stderr lands in orchestrator's
+    # stderr file per-worker).
+    printf 'claudeu: credit exhausted; falling back to %s\n' "$fallback_bin" >&2
+    # Persist stderr/stdout before trap cleanup removes tempfiles.
+    {
+      echo "=== claude stderr (pre-fallback) ==="
+      cat "$tmp_stderr"
+      echo "=== end stderr ==="
+    } >> "$log"
+    # exec replaces this process; trap rm -f still fires via EXIT handler
+    # before exec if we explicitly clean up. To avoid losing tempfiles
+    # during the exec, clear the trap.
+    trap - EXIT
+    rm -f "$tmp_stdout" "$tmp_stderr" 2>/dev/null || true
+    exec "$fallback_bin" "${ORIG_ARGV[@]}"
+  else
+    log_msg "WARN: credit exhausted but no codexu fallback binary resolvable; propagating rc=$rc"
+    printf 'claudeu: credit exhausted, no codexu fallback on PATH (set CLAUDEU_FALLBACK_BIN)\n' >&2
+  fi
+fi
+
+# Emit thread.started now that we know we're staying with claude.
+thread_id="claudeu-$$-$(date +%s)"
+printf '{"type":"thread.started","thread_id":"%s"}\n' "$thread_id"
 
 # Persist stderr content into the log for post-mortem before cleanup trap fires.
 if [[ -s "$tmp_stderr" ]]; then
