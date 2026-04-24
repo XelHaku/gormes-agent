@@ -95,6 +95,9 @@ CONTEXT_FILE="$PLANNER_ROOT/context.json"
 PROMPT_FILE="$PLANNER_ROOT/latest_prompt.txt"
 TASKS_MD_FILE="$PLANNER_ROOT/architecture-planner-tasks.md"
 LOCK_DIR="$PLANNER_ROOT/run.lock"
+LOCK_PID_FILE="$LOCK_DIR/pid"
+LOCK_STARTED_FILE="$LOCK_DIR/started_at"
+LOCK_COMMAND_FILE="$LOCK_DIR/command"
 
 PROGRESS_JSON="$REPO_ROOT/docs/content/building-gormes/architecture_plan/progress.json"
 ARCH_PLAN_DIR="$REPO_ROOT/docs/content/building-gormes/architecture_plan"
@@ -369,13 +372,83 @@ EOF
 }
 
 release_lock() {
-  [[ -d "$LOCK_DIR" ]] && rmdir "$LOCK_DIR" 2>/dev/null || true
+  if [[ -d "$LOCK_DIR" ]]; then
+    rm -f "$LOCK_PID_FILE" "$LOCK_STARTED_FILE" "$LOCK_COMMAND_FILE"
+    rmdir "$LOCK_DIR" 2>/dev/null || true
+  fi
+}
+
+write_lock_metadata() {
+  printf '%s\n' "$$" > "$LOCK_PID_FILE"
+  printf '%s\n' "$RUN_AT_UTC" > "$LOCK_STARTED_FILE"
+  printf '%q ' "$0" "$@" > "$LOCK_COMMAND_FILE"
+  printf '\n' >> "$LOCK_COMMAND_FILE"
+}
+
+read_lock_file() {
+  local file="$1"
+  if [[ -f "$file" ]]; then
+    head -n1 "$file"
+  fi
+}
+
+process_is_running() {
+  local pid="$1"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+remove_stale_lock() {
+  rm -f "$LOCK_PID_FILE" "$LOCK_STARTED_FILE" "$LOCK_COMMAND_FILE"
+  rmdir "$LOCK_DIR" 2>/dev/null || fail "stale lock could not be removed safely: $LOCK_DIR"
+}
+
+find_legacy_lock_owner() {
+  ps -eo pid=,etime=,stat=,args= 2>/dev/null \
+    | awk -v self="$$" '
+        $1 != self && $0 ~ /gormes-architecture-planner-tasks-manager[.]sh/ {
+          print
+          exit
+        }
+      '
 }
 
 claim_lock() {
-  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    fail "another planner run is already in progress: $LOCK_DIR"
+  local lock_pid lock_started lock_command legacy_owner
+
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    write_lock_metadata "$@"
+    trap release_lock EXIT
+    return 0
   fi
+
+  lock_pid="$(read_lock_file "$LOCK_PID_FILE" || true)"
+  lock_started="$(read_lock_file "$LOCK_STARTED_FILE" || true)"
+  lock_command="$(read_lock_file "$LOCK_COMMAND_FILE" || true)"
+
+  if process_is_running "$lock_pid"; then
+    fail "active planner run owns $LOCK_DIR
+PID: $lock_pid
+Started: ${lock_started:-unknown}
+Command: ${lock_command:-unknown}"
+  fi
+
+  if [[ -z "$lock_pid" ]]; then
+    legacy_owner="$(find_legacy_lock_owner || true)"
+    if [[ -n "$legacy_owner" ]]; then
+      fail "active legacy planner run owns $LOCK_DIR
+Process: $legacy_owner
+This run started before lock owner metadata existed; wait for it to finish."
+    fi
+
+    fail "planner lock has no owner metadata: $LOCK_DIR
+No active planner process was detected. Remove the stale lock with: rmdir '$LOCK_DIR'"
+  fi
+
+  log "Removing stale planner lock: $LOCK_DIR (PID: $lock_pid, Started: ${lock_started:-unknown})"
+  remove_stale_lock
+  mkdir "$LOCK_DIR" 2>/dev/null || fail "another planner run claimed the lock: $LOCK_DIR"
+  write_lock_metadata "$@"
   trap release_lock EXIT
 }
 
@@ -999,7 +1072,7 @@ cmd_install_schedule_only() {
 }
 
 cmd_run() {
-  claim_lock
+  claim_lock "$@"
 
   local total_run_start
   total_run_start=$(date +%s)
