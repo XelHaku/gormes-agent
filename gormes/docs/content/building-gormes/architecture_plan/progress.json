@@ -1007,7 +1007,8 @@
             },
             {
               "name": "Homebrew",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `gormes/packaging/homebrew/gormes.rb` ports the upstream `hermes-agent.rb` to a Go-native formula that declares `depends_on \"go\" => :build`, builds `./cmd/gormes` from the `gormes/` module with `CGO_ENABLED=0 go build -trimpath -ldflags=\"-s -w\"` so the brew-installed binary matches `make build`, installs the wrapped binary via `write_env_script` with `GORMES_MANAGED=homebrew` plus `GORMES_BUNDLED_SOUL=<pkgshare>/SOUL.md` (mirroring the upstream `HERMES_MANAGED` managed-install contract), ships the `docker/SOUL.md` persona template under `pkgshare`, and pins a `brew test` smoke check against `gormes version`. `gormes/packaging/homebrew/README.md` captures the bump + `brew audit --new --strict` / `brew test` runbook and explicitly flags that Python virtualenv plumbing must never be reintroduced. `gormes/internal/homebrew_test.go` guards the formula+README invariants (class name, Go build toolchain, static-binary flags, absence of `Language::Python::Virtualenv` / `pypi_packages` / `pip_install`, GORMES_MANAGED wrapper, and the `gormes version` smoke assertion)."
             }
           ]
         },
