@@ -55,6 +55,29 @@ This page is generated from the Go progress model and validation rules.
 - `fixture_ready` rows must name a concrete fixture package or path.
 - complete rows with contract metadata must use `contract_status: validated`.
 
+## Planning Metrics
+
+Progress is measured from derived status counts, not from free-form narrative.
+`Progress.Stats()` walks phases, subphases, and items and tallies
+`complete`, `in_progress`, and `planned`. A subphase is
+`complete` only when every item is complete, `in_progress` when any
+item has started, and `planned` when no item has started. README and the
+architecture-plan index use those derived counts for shipped/subphase totals.
+
+Future work is measured from contract-bearing rows. A row becomes assignable
+when it is not `complete`, has no `blocked_by` dependency, is not
+`slice_size: umbrella`, and declares the handoff fields autoloop needs:
+`source_refs`, `write_scope`, `test_commands`,
+`acceptance`, `ready_when`, `not_ready_when`, and
+`done_signal` whenever applicable. `agent-queue.md` is the
+assignable-work view; `blocked-slices.md` is the deferred-work view; and
+`umbrella-cleanup.md` is the work that must be split before assignment.
+
+Planner quality is measured by reducing ambiguity for autoloop: exact upstream
+refs, local file paths, fixture names, validation commands, dependency edges,
+and degraded-mode behavior count as useful planning; generic notes without
+bounded tests or write scope do not.
+
 ## Generated Agent Surfaces
 
 - `autoloop-handoff.md` lists shared unattended-loop entrypoint, plan, candidate source, generated docs, test command, and candidate policy.
