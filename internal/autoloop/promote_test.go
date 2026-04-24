@@ -200,6 +200,27 @@ func TestPromoteMissingRequiredFieldsReturnsErrorBeforeCommands(t *testing.T) {
 	}
 }
 
+func TestPromoteInvalidModeReturnsErrorBeforeCommands(t *testing.T) {
+	runner := &FakeRunner{}
+
+	err := PromoteWorker(context.Background(), PromoteOptions{
+		Runner:        runner,
+		RepoRoot:      "/tmp/repo",
+		WorkerBranch:  "codexu/run/worker1",
+		WorkerCommit:  "abc123",
+		PromotionMode: "merge",
+	})
+	if err == nil {
+		t.Fatal("PromoteWorker() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "invalid promotion mode") {
+		t.Fatalf("PromoteWorker() error = %q, want containing %q", err, "invalid promotion mode")
+	}
+	if len(runner.Commands) != 0 {
+		t.Fatalf("Commands = %#v, want none", runner.Commands)
+	}
+}
+
 func TestPromoteReturnsCherryPickFailure(t *testing.T) {
 	wantErr := errors.New("cherry-pick failed")
 	runner := &FakeRunner{

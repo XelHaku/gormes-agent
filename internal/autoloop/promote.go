@@ -3,6 +3,7 @@ package autoloop
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 type PromoteOptions struct {
@@ -32,6 +33,9 @@ func PromoteWorker(ctx context.Context, opts PromoteOptions) error {
 	}
 	if opts.WorkerCommit == "" {
 		return errors.New("worker commit is required")
+	}
+	if mode != "pr" && mode != "cherry-pick" {
+		return fmt.Errorf("invalid promotion mode: %s", mode)
 	}
 
 	if mode == "cherry-pick" {
