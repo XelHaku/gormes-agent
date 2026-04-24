@@ -119,3 +119,36 @@ setup() {
   len="$(jq -r '.last_final_errors | length' <<<"$output")"
   assert_equal "$len" "2"
 }
+
+@test "failure_record_write defaults invalid final_errors_json to [] (no zero-byte)" {
+  # Production bug repro: caller piped invalid JSON (two values concatenated).
+  run failure_record_write "task-invalid" "1" "contract_or_test_failure" "" '["a"]
+[]'
+  assert_success
+  local p="$STATE_DIR/task-failures/task-invalid.json"
+  [[ -f "$p" && -s "$p" ]]
+  run jq -r '.last_final_errors | length' "$p"
+  assert_output "0"
+}
+
+@test "failure_record_write with empty string defaults to [] and writes content" {
+  run failure_record_write "task-empty" "1" "timeout" "" ""
+  assert_success
+  local p="$STATE_DIR/task-failures/task-empty.json"
+  [[ -f "$p" && -s "$p" ]]
+}
+
+@test "failure_record_write writes atomically: no partial file on jq failure" {
+  # Malformed --argjson input would kill jq; we should return non-zero AND not
+  # leave a zero-byte record behind.
+  local p="$STATE_DIR/task-failures/task-atomic.json"
+  # Pre-populate a valid record
+  failure_record_write "task-atomic" "1" "timeout" "" '[]'
+  local before_size; before_size="$(wc -c <"$p")"
+  # Corrupt-JSON case: caller gave non-array JSON. Defensive validation should
+  # swap in [] and succeed; OR if any other jq -n failure occurs, the file
+  # must be left intact.
+  run failure_record_write "task-atomic" "1" "timeout" "" 'this-is-not-json'
+  local after_size; after_size="$(wc -c <"$p")"
+  (( after_size >= before_size ))  # never truncated
+}

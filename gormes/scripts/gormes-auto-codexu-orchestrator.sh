@@ -741,8 +741,10 @@ run_worker() {
         echo "worker[$worker_id]: timeout(${WORKER_TIMEOUT_SECONDS}s) -> $slug" | tee "$LOGS_DIR/worker_${worker_id}.status"
         save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'failed' --arg slug "$slug" --arg reason 'timeout' '{run_id:$run_id,status:$status,slug:$slug,reason:$reason}')"
         log_event "worker_failed" "$worker_id" "$slug" "timeout"
-        local timeout_final_errors_json
-        timeout_final_errors_json="$(collect_final_report_issues "$final_file" 2>/dev/null | jq -Rnc '[inputs | select(length > 0)]' 2>/dev/null || echo '[]')"
+        local timeout_final_errors_raw timeout_final_errors_json
+        timeout_final_errors_raw="$(collect_final_report_issues "$final_file" 2>/dev/null || true)"
+        timeout_final_errors_json="$(printf '%s' "$timeout_final_errors_raw" | jq -Rnc '[inputs | select(length > 0)]' 2>/dev/null || true)"
+        [[ -z "$timeout_final_errors_json" ]] && timeout_final_errors_json='[]'
         failure_record_write "$slug" "$rc" "timeout" "$stderr_file" "$timeout_final_errors_json"
       else
         local failure_reason
@@ -757,8 +759,10 @@ run_worker() {
         echo "worker[$worker_id]: failed($rc) -> $slug" | tee "$LOGS_DIR/worker_${worker_id}.status"
         save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'failed' --arg slug "$slug" --arg reason "$failure_reason" --arg rc "$rc" '{run_id:$run_id,status:$status,slug:$slug,reason:$reason,rc:($rc|tonumber)}')"
         log_event "worker_failed" "$worker_id" "$slug" "$failure_reason"
-        local final_errors_json
-        final_errors_json="$(collect_final_report_issues "$final_file" 2>/dev/null | jq -Rnc '[inputs | select(length > 0)]' 2>/dev/null || echo '[]')"
+        local final_errors_raw final_errors_json
+        final_errors_raw="$(collect_final_report_issues "$final_file" 2>/dev/null || true)"
+        final_errors_json="$(printf '%s' "$final_errors_raw" | jq -Rnc '[inputs | select(length > 0)]' 2>/dev/null || true)"
+        [[ -z "$final_errors_json" ]] && final_errors_json='[]'
         failure_record_write "$slug" "$rc" "$failure_reason" "$stderr_file" "$final_errors_json"
       fi
 
