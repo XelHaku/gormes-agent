@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const systemdPathEnvironment = "Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
+
 type ServiceUnitOptions struct {
 	AutoloopPath string
 	WorkDir      string
@@ -30,13 +32,14 @@ Description=Gormes autoloop
 
 [Service]
 Type=simple
+%s
 WorkingDirectory=%s
 ExecStart=%s
 Restart=on-failure
 
 [Install]
 WantedBy=default.target
-`, systemdPathValue(opts.WorkDir), execStart)
+`, systemdPathEnvironment, systemdPathValue(opts.WorkDir), execStart)
 }
 
 type ServiceInstallOptions struct {
@@ -134,29 +137,17 @@ func InstallAuditService(ctx context.Context, opts AuditServiceInstallOptions) e
 	}
 
 	servicePath := filepath.Join(opts.UnitDir, opts.UnitName)
-	timerPath := filepath.Join(opts.UnitDir, opts.TimerName)
-	for _, path := range []string{servicePath, timerPath} {
-		if opts.Force {
-			continue
-		}
-		if _, err := os.Stat(path); err == nil {
-			return fmt.Errorf("systemd unit %s already exists", path)
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-	}
-
-	service := RenderAuditServiceUnit(AuditServiceUnitOptions{
+	if err := writeAuditUnitFile(servicePath, opts.Force, RenderAuditServiceUnit(AuditServiceUnitOptions{
 		AuditPath: opts.AuditPath,
 		WorkDir:   opts.WorkDir,
-	})
-	if err := os.WriteFile(servicePath, []byte(service), 0o644); err != nil {
+	})); err != nil {
 		return err
 	}
-	timer := RenderAuditTimerUnit(AuditTimerUnitOptions{
+
+	timerPath := filepath.Join(opts.UnitDir, opts.TimerName)
+	if err := writeAuditUnitFile(timerPath, opts.Force, RenderAuditTimerUnit(AuditTimerUnitOptions{
 		ServiceUnitName: opts.UnitName,
-	})
-	if err := os.WriteFile(timerPath, []byte(timer), 0o644); err != nil {
+	})); err != nil {
 		return err
 	}
 
@@ -176,6 +167,17 @@ func InstallAuditService(ctx context.Context, opts AuditServiceInstallOptions) e
 	return nil
 }
 
+func writeAuditUnitFile(path string, force bool, contents string) error {
+	if !force {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return os.WriteFile(path, []byte(contents), 0o644)
+}
+
 type AuditServiceUnitOptions struct {
 	AuditPath string
 	WorkDir   string
@@ -187,9 +189,10 @@ Description=Gormes orchestrator audit
 
 [Service]
 Type=oneshot
+%s
 WorkingDirectory=%s
 ExecStart=%s
-`, systemdPathValue(opts.WorkDir), systemdPathValue(opts.AuditPath))
+`, systemdPathEnvironment, systemdPathValue(opts.WorkDir), systemdPathValue(opts.AuditPath))
 }
 
 type AuditTimerUnitOptions struct {

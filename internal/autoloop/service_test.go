@@ -20,6 +20,7 @@ func TestRenderServiceUnitInjectsPaths(t *testing.T) {
 		"[Unit]",
 		"[Service]",
 		"[Install]",
+		"Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin",
 		"WorkingDirectory=/srv/gormes",
 		"ExecStart=/opt/gormes/bin/autoloop run",
 	} {
@@ -181,6 +182,7 @@ func TestInstallAuditServiceWritesServiceAndTimerAndEnablesTimer(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Type=oneshot",
+		"Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin",
 		"WorkingDirectory=/srv/gormes",
 		"ExecStart=/srv/gormes/scripts/orchestrator/audit.sh",
 	} {
@@ -205,6 +207,48 @@ func TestInstallAuditServiceWritesServiceAndTimerAndEnablesTimer(t *testing.T) {
 		if !strings.Contains(string(timer), want) {
 			t.Fatalf("timer unit = %q, want %q", timer, want)
 		}
+	}
+
+	wantCommands := []Command{
+		{Name: "systemctl", Args: []string{"--user", "daemon-reload"}},
+		{Name: "systemctl", Args: []string{"--user", "enable", "--now", "gormes-orchestrator-audit.timer"}},
+	}
+	if !reflect.DeepEqual(runner.Commands, wantCommands) {
+		t.Fatalf("commands = %#v, want %#v", runner.Commands, wantCommands)
+	}
+}
+
+func TestInstallAuditServicePreservesExistingServiceAndWritesMissingTimer(t *testing.T) {
+	unitDir := t.TempDir()
+	servicePath := filepath.Join(unitDir, "gormes-orchestrator-audit.service")
+	if err := os.WriteFile(servicePath, []byte("existing service\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(service) error = %v", err)
+	}
+	runner := &FakeRunner{
+		Results: []Result{{}, {}},
+	}
+
+	if err := InstallAuditService(context.Background(), AuditServiceInstallOptions{
+		Runner:    runner,
+		UnitDir:   unitDir,
+		UnitName:  "gormes-orchestrator-audit.service",
+		TimerName: "gormes-orchestrator-audit.timer",
+		AuditPath: "/srv/gormes/scripts/orchestrator/audit.sh",
+		WorkDir:   "/srv/gormes",
+		AutoStart: true,
+	}); err != nil {
+		t.Fatalf("InstallAuditService() error = %v", err)
+	}
+
+	service, err := os.ReadFile(servicePath)
+	if err != nil {
+		t.Fatalf("ReadFile(service) error = %v", err)
+	}
+	if got, want := string(service), "existing service\n"; got != want {
+		t.Fatalf("service = %q, want preserved %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(unitDir, "gormes-orchestrator-audit.timer")); err != nil {
+		t.Fatalf("Stat(timer) error = %v", err)
 	}
 
 	wantCommands := []Command{
