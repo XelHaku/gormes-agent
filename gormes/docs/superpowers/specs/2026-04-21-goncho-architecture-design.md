@@ -41,6 +41,22 @@ This document only covers Goncho.
 
 Goncho is an internal subsystem layered on top of the existing SQLite-backed Gormes memory runtime.
 
+Packaging decision, 2026-04-24:
+
+- Build Goncho in-tree inside Gormes first.
+- Keep the package boundary extraction-ready, but do not publish a standalone Goncho repo before the observation table, deriver, dialectic, and tool-schema contract are stable.
+- If extracted later, Goncho must be a Go library imported by Gormes, not a required service, daemon, sidecar, loopback API, second database, or separate migration command.
+- `go build ./cmd/gormes` remains the deployable artifact.
+
+The extraction-ready boundary is:
+
+- `Service`: Honcho-shaped application API.
+- `Store`: persistence over the same SQLite database and migration runner Gormes owns.
+- `LLM`: adapter over the existing Gormes/Hermes model pipeline.
+- `Embedder`: adapter over the existing memory embedder.
+- `Clock` and `Logger`: injectable runtime utilities.
+- `migrations`, prompt fixtures, and tool-schema fixtures embedded into the Gormes build.
+
 The binary shape is:
 
 1. `internal/store` and `internal/memory`
