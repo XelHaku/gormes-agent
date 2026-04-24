@@ -4,10 +4,11 @@
 
 **Goal:** Replace production shell automation with typed Go tools named `repoctl` and `autoloop`, while retaining legacy shell only as temporary parity fixtures or tiny wrappers.
 
-**Status:** Implemented; `cmd/repoctl` and `cmd/autoloop` are the production
-automation entrypoints, long-form legacy shell is vendored under
-`testdata/legacy-shell`, and live `scripts/` entrypoints are compatibility
-wrappers.
+**Status:** `repoctl` is cut over. `cmd/autoloop` now provides Go wrappers, CLI
+commands, and typed primitives, but full `autoloop run` runtime parity remains
+staged follow-up work. Long-form legacy orchestrator shell is vendored under
+`testdata/legacy-shell`; repoctl/orchestrator entrypoints under `scripts/` are
+compatibility wrappers while the three companion scripts remain live shell.
 
 **Architecture:** `repoctl` owns deterministic repo maintenance commands and should land first. `autoloop` owns self-development orchestration, preserving the current shell contract through typed config, injectable command execution, fixture parity tests, and staged cutover. Long legacy shell is moved under vendored parity fixtures before production scripts are replaced.
 
@@ -17,10 +18,14 @@ wrappers.
 
 ## File Structure
 
-Implementation note: the port has been cut over at this structure. `cmd/repoctl`
-and `internal/repoctl` own repo maintenance, `cmd/autoloop` and
-`internal/autoloop` own self-development automation, `testdata/legacy-shell`
-retains parity fixtures, and remaining shell under `scripts/` is wrapper-only.
+Implementation note: the repoctl side has been cut over at this structure.
+`cmd/repoctl` and `internal/repoctl` own repo maintenance. `cmd/autoloop` and
+`internal/autoloop` own the Go CLI surface plus typed autoloop primitives; full
+legacy runtime parity remains staged. `testdata/legacy-shell` retains parity
+fixtures. Repoctl/orchestrator shell entrypoints under `scripts/` are wrappers,
+but `scripts/gormes-architecture-planner-tasks-manager.sh`,
+`scripts/documentation-improver.sh`, and `scripts/landingpage-improver.sh`
+remain live shell outside this cutover.
 
 Create these files:
 
@@ -3132,9 +3137,10 @@ git commit -m "chore(autoloop): wrap orchestrator entrypoints with Go"
 
 ### Task 15: Final Verification And Docs Update
 
-Cutover note: this task documents the completed Go cutover rather than changing
-automation behavior. Verification covers `repoctl`, `autoloop`, docs tests,
-`cmd/gormes`, language-shape scan, and whitespace checks.
+Cutover note: this task documents the completed repoctl cutover and staged
+autoloop cutover rather than changing automation behavior. Verification covers
+`repoctl`, `autoloop` packages/CLI, docs tests, `cmd/gormes`,
+language-shape scan, and whitespace checks.
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-04-24-autoloop-repoctl-go-port-design.md`
@@ -3149,9 +3155,10 @@ In `scripts/orchestrator/README.md`, replace the opening paragraph with:
 ```markdown
 # Autoloop Internals
 
-The production implementation now lives in Go under `cmd/autoloop` and
-`internal/autoloop`. This directory contains transitional wrappers, systemd
-templates, and historical notes for the old shell entrypoints.
+The orchestrator wrapper and CLI implementation now live in Go under
+`cmd/autoloop` and `internal/autoloop`. This directory contains transitional
+wrappers, systemd templates, and historical notes for the old shell
+entrypoints; full `autoloop run` runtime parity remains staged.
 ```
 
 In `scripts/orchestrator/FROZEN.md`, add this freeze exception:
@@ -3173,7 +3180,7 @@ git ls-files '*.sh' '*.bash' '*.bats' | xargs -r wc -l | tail -1
 git ls-files '*.sh' '*.bash' '*.bats'
 ```
 
-Expected: remaining live shell files are wrappers or test harnesses, and long legacy shell is under `testdata/legacy-shell/`.
+Expected: repoctl/orchestrator entrypoints are wrappers or test harnesses, long legacy shell is under `testdata/legacy-shell/`, and the companion scripts remain live shell pending a later port.
 
 - [ ] **Step 3: Run full targeted verification**
 

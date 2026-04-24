@@ -1,6 +1,6 @@
 # Autoloop + Repoctl Go Port Design
 
-**Status:** Implemented; final verification in progress
+**Status:** Repoctl cut over; autoloop Go CLI/primitives staged
 **Author:** Codex
 **Date:** 2026-04-24
 
@@ -52,22 +52,32 @@ the Go replacement proves equivalent.
 
 ## Decision Summary
 
-The accepted design has been cut over:
+The accepted design is partially cut over:
 
-1. `cmd/autoloop` replaces the orchestrator, audit, digest, systemd install,
-   and companion scheduling scripts.
+1. `cmd/autoloop` provides the autoloop CLI, wrappers, audit/digest/service
+   commands, and typed primitives for candidates, locks, worktrees, promotion,
+   companions, and backends.
 2. `cmd/repoctl` replaces build/progress/README/compat maintenance scripts.
-3. `internal/autoloop` owns the loop runtime, ledger, candidates, locks,
-   worktrees, promotion, backend adapters, companions, audit, digest, and
-   systemd rendering.
-4. `internal/repoctl` owns benchmark, progress, README, and compatibility
+3. Full `autoloop run` runtime parity is still staged follow-up work: the
+   current Go command is a run skeleton over candidate/backend invocation and
+   does not yet wire the full legacy loop, worktree, claim, ledger, promotion,
+   and companion runtime end-to-end.
+4. `internal/autoloop` owns typed building blocks for the loop runtime, ledger,
+   candidates, locks, worktrees, promotion, backend adapters, companions, audit,
+   digest, and systemd rendering.
+5. `internal/repoctl` owns benchmark, progress, README, and compatibility
    maintenance logic.
-5. `scripts/*.sh` and `scripts/orchestrator/**/*.sh` now remain as tiny
-   compatibility wrappers or test harnesses, not production shell logic.
-6. Long legacy shell lives under `testdata/legacy-shell/` as parity fixtures and
+6. Repoctl and orchestrator entrypoints under `scripts/` are tiny compatibility
+   wrappers or test harnesses. The long-form companion scripts
+   `scripts/gormes-architecture-planner-tasks-manager.sh`,
+   `scripts/documentation-improver.sh`, and `scripts/landingpage-improver.sh`
+   remain live shell outside this cutover and need a later port.
+7. Long legacy shell lives under `testdata/legacy-shell/` as parity fixtures and
    is marked `linguist-vendored` in `.gitattributes`.
-7. The production target is now Go-first automation. Remaining shell under
-   `scripts/` must stay a tiny wrapper that execs a Go command.
+8. The production target remains Go-first automation. New or changed
+   orchestrator/repoctl shell under `scripts/` must stay a tiny wrapper that
+   execs a Go command unless it is one of the explicitly pending companion
+   scripts.
 
 ## Command Surface
 
@@ -84,11 +94,13 @@ autoloop audit
 autoloop digest [--output FILE]
 autoloop service install [--force] [--no-start]
 autoloop service install-audit [--force] [--no-start]
-autoloop service disable-legacy-timers
+autoloop service disable legacy-timers
 ```
 
-`autoloop run` replaces `scripts/gormes-auto-codexu-orchestrator.sh` and the
-functions currently sourced from `scripts/orchestrator/lib/*.sh`.
+`autoloop run` currently replaces the shell entrypoint with a Go wrapper/CLI and
+run skeleton. Full replacement of the legacy orchestrator loop remains staged
+until the Go command wires worktree creation, claims, ledger recording,
+promotion, and companion execution end-to-end.
 
 `autoloop audit` and `autoloop digest` replace `scripts/orchestrator/audit.sh`
 and `scripts/orchestrator/daily-digest.sh`.
@@ -211,8 +223,8 @@ testdata/legacy-shell/scripts/...
 testdata/legacy-shell/** linguist-vendored
 ```
 
-Live scripts under `scripts/` are small wrappers after their Go replacements
-passed targeted parity checks:
+Repoctl and orchestrator entrypoints under `scripts/` are small wrappers after
+their Go replacements passed targeted parity checks:
 
 ```sh
 #!/usr/bin/env sh
@@ -220,8 +232,12 @@ exec go run ./cmd/autoloop run "$@"
 ```
 
 Wrappers are transitional. They must not contain production logic beyond path
-resolution and exec. The final cleanup can delete wrappers once Makefile,
-systemd templates, docs, and operator habits point at Go binaries directly.
+resolution and exec. The companion scripts
+`scripts/gormes-architecture-planner-tasks-manager.sh`,
+`scripts/documentation-improver.sh`, and `scripts/landingpage-improver.sh`
+remain live shell outside this cutover. The final cleanup can delete wrappers
+once Makefile, systemd templates, docs, and operator habits point at Go binaries
+directly.
 
 ## Parity Strategy
 
@@ -288,10 +304,12 @@ timer install, and legacy timer disable behavior under `autoloop service`.
 
 ### Phase 6: Cutover + Shell Reduction
 
-Completed for this port. Docs, Makefile targets, systemd rendering, and
-operator entrypoints now route through `cmd/repoctl` or `cmd/autoloop`. Live
-shell scripts are wrappers; legacy long-form shell remains only as vendored
-parity fixtures under `testdata/legacy-shell/`.
+Completed for `repoctl` and the orchestrator wrapper/CLI surface. Docs,
+Makefile targets, systemd rendering, and orchestrator/repoctl operator
+entrypoints now route through `cmd/repoctl` or `cmd/autoloop`. Full autoloop
+runtime parity and the three live companion scripts remain staged follow-up
+work. Legacy long-form orchestrator shell remains as vendored parity fixtures
+under `testdata/legacy-shell/`.
 
 ## Testing Requirements
 
@@ -339,14 +357,16 @@ production validation.
 ## Acceptance Criteria
 
 1. `repoctl` replaces all Makefile calls to repo-maintenance shell scripts.
-2. `autoloop run` can execute the same dry-run and fixture scenarios as the
-   current orchestrator.
+2. `autoloop run` has a Go CLI/skeleton and typed primitives; full dry-run and
+   fixture parity with the current orchestrator remains staged follow-up work.
 3. `autoloop audit` and `autoloop digest` reproduce current ledger reports for
    fixtures.
 4. `autoloop service ...` renders and installs the same user service/timer
    units as the current shell scripts.
-5. Long-form production shell no longer exists under `scripts/`.
-6. Any remaining shell under `scripts/` is a short compatibility wrapper.
+5. Long-form orchestrator shell no longer exists under `scripts/`.
+6. Repoctl and orchestrator shell entrypoints under `scripts/` are short
+   compatibility wrappers; the three companion scripts remain live shell pending
+   a later port.
 7. Legacy shell retained for parity lives under `testdata/legacy-shell/` and is
    marked vendored for GitHub language reporting.
 8. `go test ./internal/repoctl ./cmd/repoctl ./internal/autoloop ./cmd/autoloop`

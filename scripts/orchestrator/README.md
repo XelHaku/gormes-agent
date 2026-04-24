@@ -1,8 +1,9 @@
 # Autoloop Internals
 
-The production implementation now lives in Go under `cmd/autoloop` and
-`internal/autoloop`. This directory contains transitional wrappers, systemd
-templates, and historical notes for the old shell entrypoints.
+The orchestrator wrapper and CLI implementation now live in Go under
+`cmd/autoloop` and `internal/autoloop`. This directory contains transitional
+wrappers, systemd templates, and historical notes for the old shell entrypoints.
+Full `autoloop run` runtime parity remains staged follow-up work.
 
 ## Layout
 
@@ -22,6 +23,10 @@ Long-form frozen shell retained for parity lives under
 `testdata/legacy-shell/scripts/orchestrator/` and is marked vendored for
 language reporting.
 
+The live companion scripts `scripts/gormes-architecture-planner-tasks-manager.sh`,
+`scripts/documentation-improver.sh`, and `scripts/landingpage-improver.sh`
+remain shell outside this cutover.
+
 ## Backends
 
 `internal/autoloop` owns backend adapters. `BACKEND` (env var) or the equivalent
@@ -38,7 +43,9 @@ Switch via env (`BACKEND=claudeu $0`) or flag (`$0 --claudeu`). CLI flag wins.
 
 ## Companion scheduling
 
-The orchestrator's forever loop interleaves three companion scripts between cycles:
+The legacy orchestrator loop interleaves three companion scripts between cycles.
+The Go port has typed companion scheduling primitives, but full runtime wiring
+remains staged:
 
 | Companion | Predicate | Typical cadence |
 |---|---|---|
