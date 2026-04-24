@@ -207,6 +207,17 @@ Gormes should prove compatibility with behavior, not file structure.
 - Do not hide degraded memory, provider, tool, or plugin states.
 - Do not make optional cloud/backends mandatory for the base binary.
 
+## Latest Sync Lessons
+
+The 2026-04-24 upstream sync adds several contract slices, not new monoliths:
+
+- Interrupted or cancelled turns must not flush partial observations into GONCHO or external Honcho-compatible memory.
+- Bedrock needs a stale-client eviction/retry-classification slice after request mapping, stream decoding, and SigV4 seams exist.
+- Codex should start with pure Responses conversion fixtures before OAuth state, stale-token relogin, and stream/tool-call repair.
+- The API server now carries disconnect/cancel snapshot persistence and proxy-mode behavior; the React dashboard is endpoint/stream contract inventory, not a Node runtime target.
+- Skill preprocessing, dynamic slash commands, pluginized Spotify, and PTY bridge behavior should all land as narrow Phase 5 fixtures.
+- Honcho integration docs for OpenCode and SillyTavern reinforce external `honcho_*` compatibility while Gormes keeps the internal package named `goncho`.
+
 ## Phase Alignment
 
 Near-term Gormes work can use this study directly:

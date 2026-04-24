@@ -261,6 +261,51 @@
               "note": "TDD: port the runtime-selection seam from upstream `gateway/platforms/whatsapp.py` into a Go contract that freezes bridge-first vs native-first startup, session-path ownership, and bot/self-chat policy before transport wiring. Current tree only lands `internal/channels/whatsapp.NormalizeInbound`."
             },
             {
+              "name": "WhatsApp identity resolution + self-chat guard",
+              "status": "planned",
+              "contract": "WhatsApp bot identity, self-chat suppression, and peer mapping stay deterministic across bridge and native runtimes",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator"
+              ],
+              "degraded_mode": "Gateway status reports unresolved WhatsApp bot identity instead of accepting self-chat loops or ambiguous peer mappings.",
+              "fixture": "internal/channels/whatsapp identity fixtures",
+              "source_refs": [
+                "../hermes-agent/gateway/whatsapp_identity.py",
+                "../hermes-agent/gateway/platforms/whatsapp.py",
+                "../hermes-agent/tests/gateway/test_session.py",
+                "docs/content/building-gormes/architecture_plan/phase-2-gateway.md"
+              ],
+              "blocked_by": [
+                "Bridge-vs-native runtime decision"
+              ],
+              "ready_when": [
+                "The bridge-vs-native runtime decision identifies which identity source owns the bot/self peer for a session."
+              ],
+              "not_ready_when": [
+                "Identity rules are hidden inside send/reconnect code instead of fixture-tested before transport wiring."
+              ],
+              "acceptance": [
+                "Bridge and native identity inputs produce stable gateway peer IDs.",
+                "Messages from the bot's own identity are ignored or surfaced as self-chat suppression, not routed back into the kernel.",
+                "Group and DM peers preserve raw platform IDs needed for outbound delivery."
+              ],
+              "note": "Hermes now has `gateway/whatsapp_identity.py`; Gormes should freeze identity resolution as its own WhatsApp slice before pairing/reconnect/send broadens the adapter.",
+              "write_scope": [
+                "internal/channels/whatsapp/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/channels/whatsapp -count=1"
+              ],
+              "done_signal": [
+                "WhatsApp identity fixtures prove bridge/native peer IDs and self-chat suppression before transport sends land."
+              ]
+            },
+            {
               "name": "Inbound normalization + command passthrough",
               "status": "complete",
               "note": "TDD landed: internal/channels/whatsapp.NormalizeInbound normalizes bridge/native peer IDs and routes generic slash commands through gateway.ParseInboundText."
@@ -644,6 +689,51 @@
               "note": "TDD: freeze code generation, expiry, max-pending, failed-attempt lockout, and per-user request rate limiting from upstream PairingStore before adapters start issuing pairing codes. Must cover the upstream PR #1a9a2d7f trap: when Telegram `message.from_user` is None (forwarded messages, anonymous admin mode, certain client edge cases) the pairing flow must fall back to `chat.id` for DMs (Telegram guarantees `chat.id == user.id` for private chats) so the allowlist check and pairing-code key do not collapse to a literal 'null' and permanently lock the real user out. Fixture tests must pin (a) DM with from_user=None resolves user_id from chat.id, (b) non-DM (group/channel) with from_user=None must NOT synthesize a user_id, (c) allowlist-denied users still hit the existing failed-attempt lockout path."
             },
             {
+              "name": "Unauthorized DM pairing response contract",
+              "status": "planned",
+              "contract": "Unknown direct-message users receive the configured deny, pair, or ignore response without leaking authorized-session state",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator"
+              ],
+              "degraded_mode": "Gateway status and logs show denied or pending-pair users without starting agent sessions.",
+              "fixture": "internal/gateway unauthorized DM pairing fixtures",
+              "source_refs": [
+                "../hermes-agent/tests/gateway/test_unauthorized_dm_behavior.py",
+                "../hermes-agent/gateway/platforms/base.py",
+                "../hermes-agent/gateway/config.py",
+                "docs/content/building-gormes/architecture_plan/phase-2-gateway.md"
+              ],
+              "blocked_by": [
+                "Pairing approval + rate-limit semantics"
+              ],
+              "ready_when": [
+                "Pairing approval, rate limiting, and allowlist checks are fixture-locked."
+              ],
+              "not_ready_when": [
+                "Unknown DMs fall through to normal agent execution or share session state with authorized users."
+              ],
+              "acceptance": [
+                "Configured deny mode sends a deterministic denial without creating a session.",
+                "Configured pair mode sends one bounded pairing prompt and records pending state.",
+                "Configured ignore mode produces no platform reply and no agent run."
+              ],
+              "note": "Hermes gateway tests now pin unauthorized DM behavior. Keep this as a small policy slice after pairing semantics, before adapter-specific authorization UX is marked complete.",
+              "write_scope": [
+                "internal/gateway/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -count=1"
+              ],
+              "done_signal": [
+                "Unauthorized-DM fixtures prove deny, pair, and ignore modes never start an agent session for unknown users."
+              ]
+            },
+            {
               "name": "`gormes gateway status` read-only command",
               "status": "planned",
               "note": "TDD: add a read-only `gormes gateway status` surface over the shared pairing/runtime model so operators can inspect configured channels plus paired/unpaired state without starting transports."
@@ -1017,10 +1107,145 @@
               "note": "TDD landed: cross-chat recall widens only through canonical user_id bindings and optional source allowlists, with unresolved user scope falling back to same-chat behavior."
             },
             {
+              "name": "Interrupted-turn memory sync suppression",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Interrupted or cancelled turns cannot flush partial observations into GONCHO or external Honcho-compatible memory",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "memory",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Memory status reports skipped or interrupted sync attempts without promoting partial facts to recall.",
+              "fixture": "internal/memory/interrupted_sync_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/memory_manager.py",
+                "../hermes-agent/tests/run_agent/test_memory_sync_interrupted.py",
+                "docs/content/building-gormes/architecture_plan/phase-3-memory.md"
+              ],
+              "ready_when": [
+                "The turn-finalization path can tell a normal completion from an interrupt, cancellation, or client disconnect."
+              ],
+              "not_ready_when": [
+                "The slice rewrites extraction, recall, or provider-plugin storage instead of only gating sync/finalization on interrupted turns."
+              ],
+              "unblocks": [
+                "Honcho host integration compatibility fixtures",
+                "Cross-chat operator evidence"
+              ],
+              "acceptance": [
+                "Interrupted turns record a skipped-sync reason and do not create new GONCHO conclusions.",
+                "Completed turns still sync/extract normally.",
+                "Operator status can distinguish skipped interrupted sync from extractor failures."
+              ],
+              "note": "TDD: mirror upstream Hermes commit 00c3d848 by proving cancelled or interrupted turns do not flush partial memory observations. Keep this as a finalization gate over the existing GONCHO/SQLite path; do not add an external Honcho provider in this slice.",
+              "write_scope": [
+                "internal/kernel/",
+                "internal/memory/",
+                "internal/goncho/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/kernel ./internal/memory ./internal/goncho -count=1"
+              ],
+              "done_signal": [
+                "Interrupted-turn fixtures prove partial memory observations are skipped while completed turns still sync."
+              ]
+            },
+            {
               "name": "Honcho-compatible scope/source tool schema",
               "priority": "P2",
               "status": "planned",
-              "note": "TDD (small, dependency-isolated slice): the Go plumbing is already landed — `internal/goncho/types.go` (SearchParams:48-55 and ContextParams:74-81) advertises `Scope` and `Sources` JSON fields and `internal/goncho/service.go` (Search/Context at :129,:162, fallback at :251) already routes `scope=user` and `sources[]` through the session catalog. The remaining closeout is purely at the tool-registry JSON Schema boundary: the `Schema()` literals returned by `HonchoSearchTool` (`internal/tools/honcho_tools.go:72-74`) and `HonchoContextTool` (`internal/tools/honcho_tools.go:96-98`) still hardcode only `peer`/`query`/`max_tokens`/`session_key` and must add optional `scope` (string, omitempty) and `sources` (array of strings, omitempty). Preserve the external `honcho_search`/`honcho_context` tool names so Honcho compatibility holds. Red→green: extend `internal/tools/honcho_tools_test.go` with a schema-introspection test per tool that asserts (a) `scope` and `sources` appear in `properties`, (b) neither is added to `required`, (c) omitting both still routes same-chat (round-trip through a fake service). Do not touch `internal/goncho/*` — the Go params already accept these fields. Do not advance 3.E.7 past this slice: deny-path fixtures and operator evidence remain separate slices below."
+              "contract": "Honcho-compatible tool schemas expose GONCHO scope and source allowlist controls without renaming public tools",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "memory",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Memory status and tool schema evidence show when user-scope or source-filtered recall is unavailable.",
+              "fixture": "internal/tools/honcho_tools_test.go",
+              "source_refs": [
+                "docs/content/upstream-hermes/gormes-takeaways.md",
+                "docs/content/building-gormes/architecture_plan/phase-3-memory.md",
+                "../honcho/docs/v3/guides/integrations/hermes.mdx"
+              ],
+              "ready_when": [
+                "internal/goncho SearchParams and ContextParams already accept scope and sources fields."
+              ],
+              "not_ready_when": [
+                "The slice renames public honcho_* tools, changes internal goncho storage, or bundles deny-path/operator evidence work."
+              ],
+              "unblocks": [
+                "Cross-chat deny-path fixtures",
+                "Honcho host integration compatibility fixtures"
+              ],
+              "acceptance": [
+                "honcho_search and honcho_context JSON Schemas include optional scope and sources fields.",
+                "scope and sources are not required and omitted calls preserve same-chat default behavior.",
+                "The internal implementation package and tables remain named goncho while external tool names remain honcho_*."
+              ],
+              "note": "TDD (small, dependency-isolated slice): the Go plumbing is already landed — `internal/goncho/types.go` (SearchParams:48-55 and ContextParams:74-81) advertises `Scope` and `Sources` JSON fields and `internal/goncho/service.go` (Search/Context at :129,:162, fallback at :251) already routes `scope=user` and `sources[]` through the session catalog. The remaining closeout is purely at the tool-registry JSON Schema boundary: the `Schema()` literals returned by `HonchoSearchTool` (`internal/tools/honcho_tools.go:72-74`) and `HonchoContextTool` (`internal/tools/honcho_tools.go:96-98`) still hardcode only `peer`/`query`/`max_tokens`/`session_key` and must add optional `scope` (string, omitempty) and `sources` (array of strings, omitempty). Preserve the external `honcho_search`/`honcho_context` tool names so Honcho compatibility holds. Red→green: extend `internal/tools/honcho_tools_test.go` with a schema-introspection test per tool that asserts (a) `scope` and `sources` appear in `properties`, (b) neither is added to `required`, (c) omitting both still routes same-chat (round-trip through a fake service). Do not touch `internal/goncho/*` — the Go params already accept these fields. Do not advance 3.E.7 past this slice: deny-path fixtures and operator evidence remain separate slices below.",
+              "write_scope": [
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools ./internal/goncho -count=1"
+              ],
+              "done_signal": [
+                "Honcho-compatible tool schema tests prove scope and sources are optional, discoverable, and routed through existing GONCHO params."
+              ]
+            },
+            {
+              "name": "Honcho host integration compatibility fixtures",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "GONCHO preserves host-facing Honcho session, peer, and tool semantics needed by current OpenCode and SillyTavern integrations",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "memory",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Doctor and memory status explain which Honcho-compatible host mappings are unsupported instead of silently accepting incompatible config.",
+              "fixture": "internal/goncho host integration mapping fixtures",
+              "source_refs": [
+                "../honcho/docs/v3/guides/integrations/opencode.mdx",
+                "../honcho/docs/v3/guides/integrations/sillytavern.mdx",
+                "../honcho/docs/v3/guides/integrations/hermes.mdx",
+                "docs/content/building-gormes/architecture_plan/phase-3-memory.md"
+              ],
+              "blocked_by": [
+                "Honcho-compatible scope/source tool schema",
+                "Interrupted-turn memory sync suppression"
+              ],
+              "ready_when": [
+                "Public honcho_* schemas expose scope/source controls and interrupted turns cannot persist partial memory observations."
+              ],
+              "not_ready_when": [
+                "The slice adds a cloud Honcho client or changes internal package names instead of fixture-locking host-facing compatibility."
+              ],
+              "acceptance": [
+                "Fixtures cover per-directory, per-repo, per-session, chat-instance, and global session strategies as mapping inputs.",
+                "Host-scoped config keys do not mutate another host's settings.",
+                "GONCHO keeps internal names while generated tool schemas and docs preserve honcho_* external compatibility."
+              ],
+              "note": "Honcho upstream added OpenCode and SillyTavern integration docs in e659b6b. Gormes should not adopt their Node/Bun plugins, but the internal GONCHO contract must remain compatible with the shared Honcho concepts they depend on: workspace, peer, session strategy, host-scoped config, context-only/tool-only/hybrid recall, and durable conclusion/search tools.",
+              "write_scope": [
+                "internal/goncho/",
+                "internal/memory/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/goncho ./internal/memory -count=1"
+              ],
+              "done_signal": [
+                "Host integration fixtures prove GONCHO maps current Honcho host/session concepts without renaming external honcho_* tools."
+              ]
             },
             {
               "name": "Cross-chat deny-path fixtures",
@@ -1223,7 +1448,46 @@
             {
               "name": "Bedrock Converse payload mapping (no AWS SDK)",
               "status": "planned",
-              "note": "TDD first slice: port Bedrock Converse request-payload shaping plus canonical Message->Bedrock tool-aware mapping with pure fixtures and no AWS SDK dependency. Land alongside a request-body golden file that pins role/tool-result block order, reasoning/cache-control passthrough, and max_tokens/temperature translation. Gates the next two slices."
+              "contract": "Pure Bedrock Converse request mapping over the shared provider message/tool contract",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports Bedrock as unavailable until request mapping fixtures pass and credential wiring lands.",
+              "fixture": "internal/hermes/bedrock_converse_mapping_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/bedrock_adapter.py",
+                "../hermes-agent/agent/transports/bedrock.py",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py",
+                "docs/content/building-gormes/architecture_plan/phase-4-brain-transplant.md"
+              ],
+              "ready_when": [
+                "Provider interface + stream fixture harness and tool-call continuation contract are complete."
+              ],
+              "not_ready_when": [
+                "The slice imports AWS SDK clients or signs live requests before pure request-body mapping is fixture-locked."
+              ],
+              "unblocks": [
+                "Bedrock stream event decoding (SSE fixtures)"
+              ],
+              "acceptance": [
+                "System, user, assistant, and tool-result messages map to Bedrock Converse roles and content blocks.",
+                "Tool definitions map to Bedrock toolSpec inputSchema without dropping required fields.",
+                "Golden request fixtures pin max_tokens, temperature, cache/reasoning passthrough, and empty-content placeholders."
+              ],
+              "note": "TDD first slice: port Bedrock Converse request-payload shaping plus canonical Message->Bedrock tool-aware mapping with pure fixtures and no AWS SDK dependency. Land alongside a request-body golden file that pins role/tool-result block order, reasoning/cache-control passthrough, and max_tokens/temperature translation. Gates the next two slices.",
+              "write_scope": [
+                "internal/hermes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -count=1"
+              ],
+              "done_signal": [
+                "Bedrock request-body golden fixtures prove Converse mapping without AWS credentials or SDK clients."
+              ]
             },
             {
               "name": "Bedrock stream event decoding (SSE fixtures)",
@@ -1234,6 +1498,49 @@
               "name": "Bedrock SigV4 + credential seam",
               "status": "planned",
               "note": "TDD third slice: land minimal SigV4 signing plus a narrow credential seam behind a dep-isolated helper so regional/error handling and eventual full AWS SDK adoption stay off the kernel hot path. Requires the payload-mapping and stream-decoding fixtures to be green first; unit tests must cover signing-determinism, missing-credential failure, and region-override selection without network calls."
+            },
+            {
+              "name": "Bedrock stale-client eviction + retry classification",
+              "status": "planned",
+              "contract": "Bedrock runtime clients evict stale transport state without hiding request or validation failures",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider logs and status distinguish stale transport recovery from non-retryable Bedrock request failures.",
+              "fixture": "internal/hermes/bedrock_stale_client_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/bedrock_adapter.py",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py",
+                "../hermes-agent/tests/agent/test_bedrock_integration.py"
+              ],
+              "blocked_by": [
+                "Bedrock SigV4 + credential seam"
+              ],
+              "ready_when": [
+                "A Bedrock client/cache seam exists behind the provider adapter and can be exercised without live AWS credentials."
+              ],
+              "not_ready_when": [
+                "Non-stale validation/auth failures are retried or evicted as if they were transport-pool corruption."
+              ],
+              "acceptance": [
+                "ConnectionClosed/ProtocolError-style failures evict only the affected region client.",
+                "Library-internal assertion failures from transport stacks are classified as stale, while application assertions are not.",
+                "Validation/auth failures leave the cache intact and surface as provider errors."
+              ],
+              "note": "Upstream Hermes now evicts cached Bedrock runtime clients on stale boto3/botocore/urllib3 transport failures. Gormes should port the behavior only after its Bedrock credential/client seam exists, keeping stale-client recovery separate from payload and stream decoding.",
+              "write_scope": [
+                "internal/hermes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -count=1"
+              ],
+              "done_signal": [
+                "Bedrock stale-client tests prove stale transport errors evict cached clients and non-stale provider errors do not."
+              ]
             },
             {
               "name": "Gemini",
@@ -1253,12 +1560,206 @@
             {
               "name": "Codex",
               "status": "planned",
+              "slice_size": "umbrella",
+              "execution_owner": "provider",
+              "not_ready_when": [
+                "The row is assigned as one large Codex provider implementation instead of the Responses conversion, auth, and stream-repair slices below."
+              ],
+              "unblocks": [
+                "Codex Responses pure conversion harness",
+                "Codex OAuth state + stale-token relogin",
+                "Codex stream repair + tool-call leak sanitizer"
+              ],
               "note": "Not landed on main. Four codexu/* worker attempts on 2026-04-23 (`a93551c9` / `a4c433f2` / `c9bc6d8d` / `a057f47c`) produced candidate Codex adapters but none merged — no `codex_*.go` file is tracked in `internal/hermes/` and `grep -i codex` over that package returns zero matches. TDD scope: upstream Codex is an OpenAI-Codex OAuth surface over the Responses API (not standard chat.completions), so the adapter must wrap `/v1/responses` at `https://chatgpt.com/backend-api/codex` — upstream surface lives at `agent/auxiliary_client.py:483 CodexAuxiliaryClient` / `:313 _CodexCompletionsAdapter` / `:501 _AsyncCodexCompletionsAdapter` / `:1038 _try_codex` (Responses→chat-completions shim, empty-output backfill from stream events, `gpt-5.2-codex` vs `gpt-5.3-codex` fallback), and the auth seam lives at `hermes_cli/auth.py:1451 refresh_codex_oauth_pure` / `:1546 _refresh_codex_auth_tokens` / `:1567 _import_codex_cli_tokens` / `:1601 resolve_codex_runtime_credentials` / `:3023 _codex_device_code_login`, with model enumeration at `hermes_cli/codex_models.py:147 get_codex_model_ids`. Pin behavior via fake-auth fixture tests: developer-message role handling, tool-call deltas, Responses→chat-completions envelope parity (including stream-event backfill when `response.output` arrives empty), `gpt-5.3-codex` rejection fallback, and explicit unsupported-feature errors. Upstream PR #12360 requires Codex auth state to live under Gormes's own home rather than touching `~/.codex/auth.json`, and upstream PR #2a2e5c0f requires 401/403 token-refresh failures to force a relogin rather than silently retrying with a stale token — freeze both behaviors as fake-auth unit tests before any live Codex request can fire. Land after `Provider interface + stream fixture harness`, `Tool-call normalization + continuation contract`, and `4.G Token vault` + `Multi-account auth` so the Codex adapter consumes a frozen credential seam rather than touching OS home paths directly."
+            },
+            {
+              "name": "Codex Responses pure conversion harness",
+              "status": "planned",
+              "contract": "OpenAI Responses request/response conversion for Codex-compatible providers without live OAuth",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports Codex unavailable until Responses conversion fixtures pass and auth wiring is configured.",
+              "fixture": "internal/hermes/codex_responses_adapter_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/codex_responses_adapter.py",
+                "../hermes-agent/tests/run_agent/test_run_agent_codex_responses.py",
+                "../hermes-agent/tests/run_agent/test_tool_call_args_sanitizer.py",
+                "docs/content/building-gormes/architecture_plan/phase-4-brain-transplant.md"
+              ],
+              "ready_when": [
+                "Shared provider transcript and tool-call continuation fixtures are complete."
+              ],
+              "not_ready_when": [
+                "The slice performs OAuth/device login, imports ~/.codex/auth.json, or opens a live Responses request."
+              ],
+              "unblocks": [
+                "Codex stream repair + tool-call leak sanitizer",
+                "Codex OAuth state + stale-token relogin"
+              ],
+              "acceptance": [
+                "Chat messages and multimodal content parts convert to Responses input items deterministically.",
+                "Function tools convert to Responses function-tool schemas with deterministic call IDs.",
+                "Responses output items normalize back to shared provider events, messages, usage, and tool calls."
+              ],
+              "note": "Upstream extracted `agent/codex_responses_adapter.py` as pure conversion logic. Port that shape first so Codex-compatible Responses behavior is fixture-backed before OAuth, model fallback, or live chatgpt.com backend calls are introduced.",
+              "write_scope": [
+                "internal/hermes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -count=1"
+              ],
+              "done_signal": [
+                "Codex Responses fixtures convert chat input, tool schemas, output items, usage, and tool calls without live credentials."
+              ]
+            },
+            {
+              "name": "Codex OAuth state + stale-token relogin",
+              "status": "planned",
+              "contract": "Codex OAuth state is Gormes-owned and stale refresh failures force explicit relogin",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Auth status explains missing, stale, imported, or relogin-required Codex credentials without touching ~/.codex.",
+              "fixture": "internal/hermes/codex_oauth_state_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/auth.py",
+                "../hermes-agent/tests/hermes_cli/test_anthropic_model_flow_stale_oauth.py",
+                "../hermes-agent/tests/run_agent/test_run_agent_codex_responses.py"
+              ],
+              "blocked_by": [
+                "Token vault",
+                "Multi-account auth",
+                "Codex Responses pure conversion harness"
+              ],
+              "ready_when": [
+                "Gormes has an XDG-scoped token vault and account-selection seam for provider credentials."
+              ],
+              "not_ready_when": [
+                "The slice reads or writes ~/.codex/auth.json as the primary state store."
+              ],
+              "acceptance": [
+                "Codex tokens persist under Gormes home with provider/account metadata.",
+                "401/403 refresh failures return relogin-required status and do not silently retry stale tokens.",
+                "Optional import from Codex CLI state is explicit and rejects expired tokens."
+              ],
+              "note": "Keep Codex auth separate from Responses conversion. Upstream Hermes now stores OpenAI Codex auth in its own auth store and treats stale refresh failures as relogin-required; Gormes needs the same guarantee once 4.G token storage exists.",
+              "write_scope": [
+                "internal/hermes/",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes ./internal/config -count=1"
+              ],
+              "done_signal": [
+                "Fake-auth fixtures prove Codex OAuth state is Gormes-owned and stale refresh failures require relogin."
+              ]
+            },
+            {
+              "name": "Codex stream repair + tool-call leak sanitizer",
+              "status": "planned",
+              "contract": "Codex Responses streams repair empty output and reject leaked function-call text before parent history is updated",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider logs explain repaired empty output, leaked tool-call text, and unsupported Codex stream items.",
+              "fixture": "internal/hermes/codex_stream_repair_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/codex_responses_adapter.py",
+                "../hermes-agent/tests/run_agent/test_streaming_tool_call_repair.py",
+                "../hermes-agent/tests/run_agent/test_repair_tool_call_arguments.py",
+                "../hermes-agent/tests/run_agent/test_tool_call_args_sanitizer.py"
+              ],
+              "blocked_by": [
+                "Codex Responses pure conversion harness"
+              ],
+              "ready_when": [
+                "Codex Responses conversion fixtures can replay streamed and non-streamed output without live credentials."
+              ],
+              "not_ready_when": [
+                "Malformed tool calls are stored in assistant history as ordinary text or a repair path hides unsupported API features."
+              ],
+              "acceptance": [
+                "Empty response.output with streamed output_text backfills final assistant content.",
+                "Leaked to=functions.* text is rejected or repaired before it reaches parent history.",
+                "Tool-call arguments are sanitized to valid JSON without inventing missing required values."
+              ],
+              "note": "Upstream Codex Responses support now includes repair paths for empty output, streaming tool-call argument issues, and tool-call text leakage. Keep these as a fixture-only provider slice after pure conversion, before live Codex routing.",
+              "write_scope": [
+                "internal/hermes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -count=1"
+              ],
+              "done_signal": [
+                "Codex stream repair fixtures prove empty output, leaked tool-call text, and malformed arguments do not corrupt history."
+              ]
             },
             {
               "name": "Cross-provider reasoning-tag sanitization",
               "status": "planned",
               "note": "TDD: port upstream PRs #ec48ec55 (strip `<think>` blocks from stored assistant content), #9489d157 (strip unterminated `<think>` blocks from visible content), and #bd01ec78 (strip all reasoning-tag variants from `/resume` recap) as one shared sanitization contract over `internal/hermes` event/assistant-content boundaries. Pure fixture-driven tests must cover closed `<think>...</think>` blocks, unterminated `<think>...` at stream EOF, and mixed reasoning-tag variants (`<think>`, `<reasoning>`, `<thought>`) without mutating the raw SSE transcript, and must separate (a) what is stored into assistant history, (b) what is rendered to operators, and (c) what `/resume`-style recap surfaces expose. Land before Codex/Gemini/OpenRouter/Bedrock bring new reasoning-model surfaces through the shared harness so each adapter inherits the same storage-vs-render behavior rather than reinventing it."
+            },
+            {
+              "name": "Tool-call argument repair + schema sanitizer",
+              "status": "planned",
+              "contract": "Provider tool-call arguments are repaired or rejected against available tool schemas before execution",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system",
+                "child-agent"
+              ],
+              "degraded_mode": "Tool execution status reports schema-repair failures before a malformed provider call reaches the executor.",
+              "fixture": "internal/hermes/tool_call_argument_repair_test.go",
+              "source_refs": [
+                "../hermes-agent/tests/run_agent/test_repair_tool_call_arguments.py",
+                "../hermes-agent/tests/run_agent/test_streaming_tool_call_repair.py",
+                "../hermes-agent/tests/run_agent/test_tool_call_args_sanitizer.py",
+                "../hermes-agent/tools/schema_sanitizer.py"
+              ],
+              "ready_when": [
+                "Shared provider tool-call continuation fixtures are complete and tool descriptors expose required argument schemas."
+              ],
+              "not_ready_when": [
+                "The slice silently invents missing required arguments or changes tool executor behavior instead of validating provider output."
+              ],
+              "unblocks": [
+                "Codex stream repair + tool-call leak sanitizer",
+                "OpenRouter",
+                "Bedrock stream event decoding (SSE fixtures)"
+              ],
+              "acceptance": [
+                "Malformed JSON argument fragments from streamed tool calls are repaired only when the repair is deterministic.",
+                "Impossible repairs return a provider/tool-call error before execution.",
+                "Repair decisions use the current advertised tool schema so disabled or unavailable tools cannot be hallucinated into execution."
+              ],
+              "note": "Hermes added focused regression tests for tool-call argument repair and schema sanitization. Port this as a shared provider boundary so Codex, OpenRouter, Bedrock, and child-agent trust classes do not each implement their own repair rules.",
+              "write_scope": [
+                "internal/hermes/",
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes ./internal/tools -count=1"
+              ],
+              "done_signal": [
+                "Tool-call repair fixtures prove malformed arguments are repaired or rejected before execution using the advertised schema."
+              ]
             }
           ]
         },
@@ -1437,6 +1938,52 @@
               "name": "Token vault",
               "status": "planned",
               "note": "TDD: port credential-file discovery and storage from `tools/credential_files.py` into XDG-scoped paths with permission, missing-file, and profile-isolation tests before providers read tokens."
+            },
+            {
+              "name": "Anthropic OAuth/keychain credential discovery",
+              "status": "planned",
+              "contract": "Anthropic credential discovery prefers OS keychain when present and preserves corrupt local auth state for operator recovery",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Auth status reports keychain unavailable, corrupt auth backup, or relogin-required without deleting credentials.",
+              "fixture": "internal/hermes/anthropic_auth_state_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/anthropic_adapter.py",
+                "../hermes-agent/tests/agent/test_anthropic_keychain.py",
+                "../hermes-agent/hermes_cli/auth.py",
+                "../hermes-agent/tests/hermes_cli/test_anthropic_model_flow_stale_oauth.py"
+              ],
+              "blocked_by": [
+                "Token vault"
+              ],
+              "ready_when": [
+                "Token vault owns XDG-scoped credential files and can expose provider auth status without live credentials."
+              ],
+              "not_ready_when": [
+                "The slice silently resets corrupt auth state or reads platform keychains during ordinary unit tests."
+              ],
+              "acceptance": [
+                "Fake keychain entries take precedence over JSON auth files when valid.",
+                "Malformed auth JSON is preserved to a recoverable backup and surfaces a warning.",
+                "Stale OAuth failures return relogin-required status instead of retrying indefinitely."
+              ],
+              "note": "Hermes added Anthropic keychain and stale-OAuth coverage during this upstream sync. Gormes should port the behavior as credential-state fixtures after the token vault exists, not inside the Anthropic request adapter.",
+              "write_scope": [
+                "internal/hermes/",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes ./internal/config -count=1"
+              ],
+              "done_signal": [
+                "Anthropic auth fixtures prove keychain precedence, corrupt-state preservation, and stale-OAuth relogin status."
+              ]
             },
             {
               "name": "Multi-account auth",
@@ -1766,6 +2313,55 @@
               "name": "Skill registries",
               "status": "planned",
               "note": "TDD: port clawhub/lobehub/hermes-index registry metadata with cache, signature, and unavailable-network fixtures before write-capable install flows."
+            },
+            {
+              "name": "Skill preprocessing + dynamic slash commands",
+              "status": "planned",
+              "contract": "Skill content preprocessing and skill-backed slash commands are deterministic, disabled-skill aware, and prompt-safe",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Skill status reports disabled, missing-prerequisite, or preprocessing-failed skills without injecting them into prompts.",
+              "fixture": "internal/skills/preprocessing_commands_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/skill_preprocessing.py",
+                "../hermes-agent/agent/skill_commands.py",
+                "../hermes-agent/tools/skills_tool.py",
+                "../hermes-agent/tests/tools/test_skills_tool.py",
+                "../hermes-agent/tests/agent/test_skill_commands.py"
+              ],
+              "ready_when": [
+                "Phase 2.G parser/store and inactive candidate flow are complete."
+              ],
+              "not_ready_when": [
+                "Inline shell preprocessing can execute during prompt assembly or disabled skills remain invokable through slash commands."
+              ],
+              "unblocks": [
+                "Toolset-aware skills prompt snapshot",
+                "TUI + Telegram browsing"
+              ],
+              "acceptance": [
+                "Template variable preprocessing is deterministic and fixture-covered.",
+                "Inline shell preprocessing is disabled by default and bounded when explicitly enabled.",
+                "Skill slash commands skip disabled/incompatible skills and build stable user-message content."
+              ],
+              "note": "Hermes split shared SKILL.md preprocessing into `agent/skill_preprocessing.py` and expanded skill slash command scanning. Gormes has the core Phase 2.G store; this slice adds the remaining prompt/command preprocessing contract without widening automatic skill execution.",
+              "write_scope": [
+                "internal/skills/",
+                "internal/gateway/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/skills ./internal/gateway -count=1"
+              ],
+              "done_signal": [
+                "Skill preprocessing and slash-command fixtures prove disabled/incompatible skills do not enter prompt or command surfaces."
+              ]
             }
           ]
         },
@@ -1811,6 +2407,53 @@
               "name": "Third-party extensions",
               "status": "planned",
               "note": "TDD: add extension install/enable/disable flows only after the SDK contract is stable, with fixture plugins proving failure containment and no implicit runtime code execution."
+            },
+            {
+              "name": "First-party Spotify plugin fixture",
+              "status": "planned",
+              "contract": "First-party plugin manifests and tool packages load through the plugin SDK without reverting to built-in tool registration",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Plugin status reports missing environment or auth setup without registering broken prompt-visible tools.",
+              "fixture": "internal/plugins/spotify_plugin_test.go",
+              "source_refs": [
+                "../hermes-agent/plugins/spotify/plugin.yaml",
+                "../hermes-agent/plugins/spotify/tools.py",
+                "../hermes-agent/plugins/spotify/client.py",
+                "../hermes-agent/tests/tools/test_spotify_client.py",
+                "../hermes-agent/website/docs/user-guide/skills/bundled/media/media-spotify.md"
+              ],
+              "blocked_by": [
+                "Plugin SDK"
+              ],
+              "ready_when": [
+                "Plugin manifest loading and capability registration are fixture-locked by the Plugin SDK slice."
+              ],
+              "not_ready_when": [
+                "Spotify is ported as a built-in core tool instead of a plugin-backed capability."
+              ],
+              "acceptance": [
+                "The Spotify manifest declares required env/auth and tool capabilities before handlers load.",
+                "Missing credentials keep Spotify disabled with visible status.",
+                "Tool schemas and result envelopes match the upstream plugin fixture without live Spotify calls."
+              ],
+              "note": "Upstream moved Spotify from `tools/spotify_tool.py` into `plugins/spotify/`. Track it as the first first-party plugin fixture so Gormes validates the plugin boundary with a real donor before third-party extension execution.",
+              "write_scope": [
+                "internal/tools/",
+                "internal/plugins/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools ./internal/plugins -count=1"
+              ],
+              "done_signal": [
+                "Spotify plugin fixtures load manifest/tool metadata and degrade visibly when auth is missing, without registering as a built-in tool."
+              ]
             }
           ]
         },
@@ -1940,9 +2583,97 @@
               "note": "TDD-first prerequisite slice for the larger 5.O command-group slices below. Port the pure-function helper surface from upstream hermes_cli as foundational primitives before any command-group or active-turn policy work lands on top: `hermes_cli/banner.py` -> `internal/cli/banner.go` (FormatContextLength, DisplayToolsetName, FormatBannerVersionLabel), `hermes_cli/cli_output.py` -> `internal/cli/output.go` (shared print/prompt helpers), `hermes_cli/tips.py` -> `internal/cli/tips.go` (tip corpus + GetRandomTip/PickRandomTip selector), `hermes_cli/webhook.py` -> `internal/cli/webhook.go` (deterministic helpers), `hermes_cli/dump.py` -> `internal/cli/dump.go` (deterministic helpers). Each helper file lands behind pure-function unit tests with fixed inputs/outputs — no terminal/TTY coupling, no config file reads, no time-of-day non-determinism. Evidence of granularity mismatch on main: as of planner run 2026-04-24, `git log --all --since='2026-04-23' --oneline | grep -cE 'feat\\(cli\\)|feat\\(tuigateway\\)'` reports **54 worker commits** across codexu/* branches attempting these helper ports with **zero** merged to main, and `internal/cli/` currently contains only `parity.go`/`root_test.go` — the larger command-group slices (`CLI command registry parity + active-turn busy policy`, `Config/profile/auth/setup`, `Gateway/platform/webhook/cron`, `Diagnostics/backup/logs/status`) are too big a jump from the current tree and must not consume the helper-file ports. Keep this slice strictly additive and pure-function — no command-registry wiring in this slice."
             },
             {
+              "name": "PTY bridge protocol adapter",
+              "status": "planned",
+              "contract": "Dashboard/TUI PTY sessions expose bounded read, write, resize, close, and unavailable-state behavior through a testable adapter",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator"
+              ],
+              "degraded_mode": "Dashboard or CLI status reports PTY unavailable instead of falling back to unsafe shell execution.",
+              "fixture": "internal/cli/pty_bridge_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/pty_bridge.py",
+                "../hermes-agent/tests/hermes_cli/test_pty_bridge.py",
+                "../hermes-agent/hermes_cli/web_server.py"
+              ],
+              "ready_when": [
+                "Deterministic CLI helper ports are understood and PTY behavior can be isolated from the web dashboard transport."
+              ],
+              "not_ready_when": [
+                "The slice starts the web dashboard, opens network listeners, or binds to a real TUI process in unit tests."
+              ],
+              "unblocks": [
+                "SSE streaming to Bubble Tea TUI",
+                "Dashboard PTY chat sidecar contract"
+              ],
+              "acceptance": [
+                "Reads are bounded by timeout and chunk size.",
+                "Writes and resize messages validate input before reaching the PTY.",
+                "Unsupported platforms return PtyUnavailable-style errors without starting a shell."
+              ],
+              "note": "Upstream added `hermes_cli/pty_bridge.py` plus dashboard `/api/pty` wiring. Port the PTY adapter as a small protocol slice before any dashboard or remote TUI transport work consumes it.",
+              "write_scope": [
+                "internal/cli/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -count=1"
+              ],
+              "done_signal": [
+                "PTY bridge fixtures prove read/write/resize/close/unavailable behavior without network or live dashboard dependencies."
+              ]
+            },
+            {
               "name": "CLI command registry parity + active-turn busy policy",
               "status": "planned",
               "note": "TDD: expand the Go command registry toward upstream hermes_cli/commands.py and prove every recognized gateway slash command either has a safe running-agent handler or returns a visible busy response without interrupting or queuing discardable command text."
+            },
+            {
+              "name": "Busy command guard for compression and long CLI actions",
+              "status": "planned",
+              "contract": "Long-running CLI commands set busy input state and reject overlapping user input until the command exits",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator"
+              ],
+              "degraded_mode": "CLI/TUI status reports command-busy state instead of accepting overlapping input that can corrupt turn state.",
+              "fixture": "internal/cli/busy_command_test.go",
+              "source_refs": [
+                "../hermes-agent/cli.py",
+                "../hermes-agent/tests/cli/test_busy_input_mode_command.py",
+                "../hermes-agent/hermes_cli/commands.py"
+              ],
+              "blocked_by": [
+                "CLI command registry parity + active-turn busy policy"
+              ],
+              "ready_when": [
+                "The CLI command registry has a shared active-turn/busy policy surface."
+              ],
+              "not_ready_when": [
+                "Busy state is implemented only for /compress or only in the visual TUI without a command-layer invariant."
+              ],
+              "acceptance": [
+                "/compress and other long-running command handlers set and clear busy state even on error.",
+                "User input during busy command execution returns a visible busy response.",
+                "The guard does not block gateway-safe commands that explicitly declare active-turn bypass."
+              ],
+              "note": "Hermes now wraps `/compress` in a busy command guard. Track the behavior as a CLI policy slice so Gormes does not accept overlapping input while compression or other long-running commands mutate context.",
+              "write_scope": [
+                "internal/cli/",
+                "internal/tui/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli ./internal/tui -count=1"
+              ],
+              "done_signal": [
+                "Busy-command fixtures prove overlapping input is rejected while long-running CLI commands execute and busy state clears on every exit path."
+              ]
             },
             {
               "name": "Config, profile, auth, and setup command surfaces",
@@ -2007,12 +2738,283 @@
             {
               "name": "OpenAI-compatible chat-completions API server",
               "status": "planned",
-              "note": "TDD: port the upstream gateway/platforms/api_server.py /v1/chat/completions surface with API-key auth, body-size limits, OpenAI content-part normalization, X-Hermes-Session-Id continuity, and streaming/non-streaming error-envelope fixtures before exposing the native Go brain over HTTP."
+              "contract": "OpenAI-compatible chat.completions HTTP surface over the native Gormes turn loop",
+              "contract_status": "fixture_ready",
+              "slice_size": "medium",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway"
+              ],
+              "degraded_mode": "API health and error envelopes report auth, body-size, content-normalization, and streaming failures without starting hidden sessions.",
+              "fixture": "internal/apiserver/chat_completions_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/api_server.py",
+                "../hermes-agent/tests/gateway/test_api_server.py",
+                "docs/content/upstream-hermes/user-guide/features/api-server.md",
+                "docs/content/building-gormes/architecture_plan/phase-5-final-purge.md"
+              ],
+              "ready_when": [
+                "Native kernel turn loop, gateway session handles, and provider event streaming are stable enough for HTTP replay fixtures."
+              ],
+              "not_ready_when": [
+                "The server shells out to Python api_server or creates a second session store instead of using native Gormes state."
+              ],
+              "unblocks": [
+                "Responses API store + run event stream",
+                "Gateway proxy mode forwarding contract",
+                "Dashboard API client contract"
+              ],
+              "acceptance": [
+                "Bearer/API-key auth, request body limits, and OpenAI error envelopes are fixture-covered.",
+                "Chat content parts normalize to the same user-message shape used by gateway sessions.",
+                "Streaming and non-streaming responses include stable X-Hermes-Session-Id continuity."
+              ],
+              "note": "TDD: port the upstream gateway/platforms/api_server.py /v1/chat/completions surface with API-key auth, body-size limits, OpenAI content-part normalization, X-Hermes-Session-Id continuity, and streaming/non-streaming error-envelope fixtures before exposing the native Go brain over HTTP.",
+              "write_scope": [
+                "internal/gateway/",
+                "internal/kernel/",
+                "internal/apiserver/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway ./internal/kernel ./internal/apiserver -count=1"
+              ],
+              "done_signal": [
+                "Chat-completions HTTP fixtures prove auth, body limits, content normalization, streaming envelopes, and session continuity over native Gormes state."
+              ]
             },
             {
               "name": "Responses API store + run event stream",
               "status": "planned",
-              "note": "TDD: port ResponseStore as a bounded persistent read model, previous_response_id chaining, GET/DELETE /v1/responses, POST /v1/runs, GET /v1/runs/{run_id}/events SSE, and orphaned-run cleanup as fixtures before external OpenAI-compatible clients depend on stateful runs."
+              "contract": "Stateful OpenAI Responses and runs APIs over the same native session chain as chat completions",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway"
+              ],
+              "degraded_mode": "API status reports response-store disabled, LRU eviction, orphaned runs, and previous_response_id misses.",
+              "fixture": "internal/apiserver/responses_runs_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/api_server.py",
+                "../hermes-agent/tests/gateway/test_api_server.py",
+                "docs/content/upstream-hermes/user-guide/features/api-server.md"
+              ],
+              "blocked_by": [
+                "OpenAI-compatible chat-completions API server"
+              ],
+              "ready_when": [
+                "Chat-completions HTTP surface is native and response storage can reuse its auth, session, and error-envelope contracts."
+              ],
+              "not_ready_when": [
+                "Responses history chains use a separate session model from gateway/TUI sessions."
+              ],
+              "unblocks": [
+                "API server disconnect snapshot persistence",
+                "Dashboard API client contract"
+              ],
+              "acceptance": [
+                "ResponseStore has bounded LRU persistence and GET/DELETE fixtures.",
+                "previous_response_id and conversation IDs reconstruct full history including tool calls/results.",
+                "/v1/runs and /v1/runs/{id}/events stream lifecycle events and sweep orphaned runs."
+              ],
+              "note": "TDD: port ResponseStore as a bounded persistent read model, previous_response_id chaining, GET/DELETE /v1/responses, POST /v1/runs, GET /v1/runs/{run_id}/events SSE, and orphaned-run cleanup as fixtures before external OpenAI-compatible clients depend on stateful runs.",
+              "write_scope": [
+                "internal/apiserver/",
+                "internal/session/",
+                "internal/gateway/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/apiserver ./internal/session ./internal/gateway -count=1"
+              ],
+              "done_signal": [
+                "Responses/runs fixtures prove bounded response storage, previous_response_id chaining, event streaming, and orphan cleanup over native session state."
+              ]
+            },
+            {
+              "name": "API server disconnect snapshot persistence",
+              "status": "planned",
+              "contract": "Streaming disconnects and server cancellations persist incomplete Responses snapshots when store=true",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway"
+              ],
+              "degraded_mode": "Stored response status distinguishes incomplete disconnect snapshots from failed or completed responses.",
+              "fixture": "internal/apiserver/disconnect_snapshot_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/api_server.py",
+                "../hermes-agent/tests/gateway/test_api_server.py",
+                "docs/content/upstream-hermes/user-guide/features/api-server.md"
+              ],
+              "blocked_by": [
+                "Responses API store + run event stream"
+              ],
+              "ready_when": [
+                "Responses store and run event stream can persist terminal and non-terminal snapshots."
+              ],
+              "not_ready_when": [
+                "Client disconnects lose response IDs or previous_response_id chains."
+              ],
+              "acceptance": [
+                "Connection reset during stream interrupts the agent and stores an incomplete response snapshot when store=true.",
+                "async cancellation stores the same incomplete snapshot before returning cancellation.",
+                "previous_response_id can continue from the incomplete snapshot without losing emitted text."
+              ],
+              "note": "Upstream Hermes now persists incomplete Responses snapshots on client disconnect and asyncio cancellation. Keep this as a separate resilience slice after the stateful Responses store exists.",
+              "write_scope": [
+                "internal/apiserver/",
+                "internal/kernel/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/apiserver ./internal/kernel -count=1"
+              ],
+              "done_signal": [
+                "Disconnect/cancellation fixtures prove store=true responses retain incomplete snapshots and interrupt running turns."
+              ]
+            },
+            {
+              "name": "Gateway proxy mode forwarding contract",
+              "status": "planned",
+              "contract": "Gateway adapters can forward turns to a remote OpenAI-compatible Gormes API server while preserving session IDs and safe history filtering",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator"
+              ],
+              "degraded_mode": "Gateway status reports proxy unreachable, stale generation, or missing proxy credentials without dropping local audit records.",
+              "fixture": "internal/gateway/proxy_mode_test.go",
+              "source_refs": [
+                "../hermes-agent/tests/gateway/test_proxy_mode.py",
+                "../hermes-agent/gateway/platforms/base.py",
+                "docs/content/upstream-hermes/user-guide/features/api-server.md"
+              ],
+              "blocked_by": [
+                "OpenAI-compatible chat-completions API server"
+              ],
+              "ready_when": [
+                "Native chat-completions API server accepts X-Hermes-Session-Id and streaming SSE fixtures."
+              ],
+              "not_ready_when": [
+                "Proxy mode forwards tool-result messages with empty content or accepts stale run generations as current output."
+              ],
+              "acceptance": [
+                "GATEWAY_PROXY_URL and config proxy_url resolve with env precedence and trailing-slash normalization.",
+                "Forwarded requests preserve X-Hermes-Session-Id and filter unsafe empty/tool-only history entries.",
+                "Stale generation or remote errors return visible degraded output without starting a duplicate local run."
+              ],
+              "note": "Hermes proxy mode now lets thin gateway deployments forward to a remote API server. Gormes should port the behavior only after its native API surface exists, so proxy mode consumes the same session and stream contracts rather than becoming a second gateway stack.",
+              "write_scope": [
+                "internal/gateway/",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway ./internal/config -count=1"
+              ],
+              "done_signal": [
+                "Proxy-mode fixtures prove URL resolution, session header propagation, safe history filtering, stale-generation handling, and remote-error degradation."
+              ]
+            },
+            {
+              "name": "Dashboard API client contract",
+              "status": "planned",
+              "contract": "Dashboard-facing API helpers consume native chat, Responses, model, provider, OAuth, session, and tool-progress endpoints without importing the upstream React app",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator"
+              ],
+              "degraded_mode": "Dashboard status reports missing native endpoints or disabled panels instead of assuming the upstream Node/React server exists.",
+              "fixture": "internal/apiserver/dashboard_contract_test.go",
+              "source_refs": [
+                "../hermes-agent/web/src/lib/api.ts",
+                "../hermes-agent/web/src/lib/gatewayClient.ts",
+                "../hermes-agent/web/src/pages/ChatPage.tsx",
+                "../hermes-agent/web/src/components/ModelPickerDialog.tsx",
+                "../hermes-agent/hermes_cli/web_server.py"
+              ],
+              "blocked_by": [
+                "OpenAI-compatible chat-completions API server",
+                "Responses API store + run event stream"
+              ],
+              "ready_when": [
+                "Native API server exposes stable chat/Responses/session endpoints that dashboard contracts can call."
+              ],
+              "not_ready_when": [
+                "The slice ports the upstream React app wholesale or adds Node/TypeScript to the Gormes runtime."
+              ],
+              "acceptance": [
+                "Contract fixtures cover chat send/stream, session list/delete, model picker data, OAuth status, and tool-progress events.",
+                "Missing optional providers or plugins render disabled/degraded states.",
+                "The Go runtime remains independent of upstream React/Vite assets."
+              ],
+              "note": "Hermes' React dashboard grew substantially in this upstream sync. Gormes should treat it as API-contract inventory, not a Node runtime dependency: freeze dashboard-facing endpoints and degraded states before deciding on any Go-native dashboard UI.",
+              "write_scope": [
+                "internal/apiserver/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/apiserver -count=1"
+              ],
+              "done_signal": [
+                "Dashboard contract fixtures prove native API helpers cover chat, sessions, models, OAuth, and tool progress without upstream React runtime dependencies."
+              ]
+            },
+            {
+              "name": "Dashboard PTY chat sidecar contract",
+              "status": "planned",
+              "contract": "Dashboard chat sidecar bridges PTY bytes and structured tool events without merging terminal transport into API server state",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator"
+              ],
+              "degraded_mode": "Dashboard status reports PTY or sidecar event publication unavailable while preserving normal API chat.",
+              "fixture": "internal/apiserver/dashboard_pty_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/pty_bridge.py",
+                "../hermes-agent/hermes_cli/web_server.py",
+                "../hermes-agent/tui_gateway/event_publisher.py",
+                "../hermes-agent/tui_gateway/ws.py"
+              ],
+              "blocked_by": [
+                "PTY bridge protocol adapter",
+                "SSE streaming to Bubble Tea TUI"
+              ],
+              "ready_when": [
+                "PTY bridge behavior and TUI gateway event streaming are each fixture-locked."
+              ],
+              "not_ready_when": [
+                "PTY bytes become the source of truth for sessions or tool events instead of a sidecar view."
+              ],
+              "acceptance": [
+                "PTY read/write/resize messages stay separate from structured tool/event publication.",
+                "Sidecar publish failures do not kill the PTY session.",
+                "Dashboard chat can degrade to API-only mode when PTY is unavailable."
+              ],
+              "note": "Upstream dashboard chat now combines PTY-over-WebSocket with sidecar tool-event publication. Track that as a later contract after PTY and TUI gateway streaming are individually stable.",
+              "write_scope": [
+                "internal/apiserver/",
+                "internal/cli/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/apiserver ./internal/cli -count=1"
+              ],
+              "done_signal": [
+                "Dashboard PTY fixtures prove byte transport, resize, sidecar events, and API-only degradation remain separate."
+              ]
             },
             {
               "name": "API server health + cron admin endpoints",

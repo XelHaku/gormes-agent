@@ -17,7 +17,7 @@ weight: 30
 | Phase 2.B.1 — Telegram Scout | ✅ complete | P1 | Telegram adapter over the existing kernel, long-poll ingress, edit coalescing at the messaging edge |
 | Phase 2.B.2 — Gateway Chassis + Discord | ✅ complete | P1 | Shared gateway manager, Telegram migrated onto the chassis, `gormes gateway` multi-channel entrypoint, and Discord as the second real adapter |
 | Phase 2.B.3 — Slack on Shared Chassis | 🔨 in progress | P1 | `internal/slack` has a Socket Mode bot, threaded reply flow, and placeholder updates; the remaining work is now split into CommandRegistry parser wiring, a `gateway.Channel` shim, then config/doctor/`cmd/gormes gateway` registration |
-| Phase 2.B.4 — WhatsApp Adapter | 🔨 in progress | P1 | Transport-neutral ingress normalization and command passthrough are landed in `internal/channels/whatsapp`; bridge-first runtime selection plus pairing/reconnect/send lifecycle still remain |
+| Phase 2.B.4 — WhatsApp Adapter | 🔨 in progress | P1 | Transport-neutral ingress normalization and command passthrough are landed in `internal/channels/whatsapp`; bridge-first runtime selection, identity resolution/self-chat guards, and pairing/reconnect/send lifecycle still remain |
 | Phase 2.B.5 — Session Context + Delivery Routing | ✅ complete | P1 | Session-store handle resolution, SessionContext prompt injection, typed `--deliver` parsing, and deterministic gateway stream fan-out now live together in `internal/gateway` |
 | Phase 2.B.6 — Signal Adapter | 🔨 in progress | P2 | Shared ingress normalization, session identity, and reply/send semantics are landed in `internal/channels/signal`; transport/bootstrap wiring still remains |
 | Phase 2.B.7 — Email + SMS Adapters | ✅ complete | P3 | RFC 822 email normalization plus SMS number/session normalization and segmented outbound delivery contracts now ride the shared gateway seam without special-casing the kernel |
@@ -33,7 +33,7 @@ weight: 30
 | **Phase 2.G — OS-AI Spine: Skills Runtime** | ✅ complete | **P0** | Static skills runtime and the first reviewed learning-loop proof are in-tree: validated `SKILL.md` parsing, active-store snapshots, deterministic selection + prompt rendering, kernel injection, append-only usage logging, delegated candidate drafting into the inactive store, and explicit promotion into the active store. |
 | Phase 2.F.1 — Slash Command Registry + Gateway Dispatch | ✅ complete | P1 | Canonical command registry now drives gateway parsing, help text, Telegram menus, and Slack subcommand exposure from one shared source of truth |
 | Phase 2.F.2 — Hook Registry + BOOT.md | ✅ complete | P2 | Shared gateway lifecycle hooks, live `HOOK.yaml` command loading, and the built-in `BOOT.md` startup hook with non-blocking failure semantics are landed |
-| Phase 2.F.3 — Restart / Pairing / Status | 🔨 in progress | P2 | Graceful shutdown drain is landed in `internal/gateway`; next slices are adapter startup cleanup, active-turn follow-up/late-arrival drain policy, drain-timeout resume recovery, pairing persistence, pairing approval/rate-limit semantics, a read-only status command, runtime-status JSON/PID validation, token-scoped credential locks, `/restart` takeover markers, then channel lifecycle writers |
+| Phase 2.F.3 — Restart / Pairing / Status | 🔨 in progress | P2 | Graceful shutdown drain is landed in `internal/gateway`; next slices are adapter startup cleanup, active-turn follow-up/late-arrival drain policy, drain-timeout resume recovery, pairing persistence, pairing approval/rate-limit semantics, unauthorized-DM pairing responses, a read-only status command, runtime-status JSON/PID validation, token-scoped credential locks, `/restart` takeover markers, then channel lifecycle writers |
 | Phase 2.F.4 — Home Channel + Operator Surfaces | ⏳ planned | P3 | Home-channel rules, notify-to routing, manager remember-source, channel-directory persistence/lookup, refresh/stale-target invalidation, mirror surfaces, and sticker-cache equivalents |
 | Phase 2.F.5 — Gateway Mid-Run Steering + Active-Turn Policy | ⏳ planned | P2 | `/steer` CommandDef + queue fallback, mid-run steer injection between tool calls, and a gateway-handled slash-command bypass of the active-session guard; depends on 2.E.2 concurrent-tool cancellation for safe mid-run fan-out |
 
@@ -87,7 +87,7 @@ Phase 2 is no longer just "ship more adapters." The backlog is now dominated by 
 2. **P1 — 2.B.3 Slack gateway.Channel shim**
    Adapt the existing Socket Mode bot to the `gateway.Channel`/`Manager` lifecycle after parser behavior is green; only then add config loading, doctor checks, and `cmd/gormes gateway` registration.
 3. **P2 — 2.F.3 pairing read model + approval semantics**
-   Port the XDG-backed `pairing.json` read model first, then freeze code generation, expiry, max-pending, failed-attempt lockout, and rate-limit behavior from upstream `gateway/pairing.py` before any adapter issues codes.
+   Port the XDG-backed `pairing.json` read model first, then freeze code generation, expiry, max-pending, failed-attempt lockout, rate-limit behavior, and unauthorized-DM response semantics from upstream `gateway/pairing.py` plus the latest gateway tests before any adapter issues codes.
 4. **P2 — 2.F.3 startup/drain correctness before richer lifecycle UX**
    Freeze adapter startup failure cleanup first, then define active-turn follow-up queue/late-arrival behavior and drain-timeout `resume_pending` recovery. These are upstream race fixes from `gateway/platforms/base.py` and `gateway/run.py`; keeping them separate prevents the status/pairing work from hiding concurrency regressions.
 5. **P2 — 2.F.3 status readout + runtime convergence**
@@ -95,7 +95,7 @@ Phase 2 is no longer just "ship more adapters." The backlog is now dominated by 
 6. **P3 — 2.F.4 Home Channel + Operator Surfaces**
    Keep this decomposed: home-channel ownership rules, notify-to delivery routing, manager remember-source, channel-directory persistence/lookup, refresh/stale-target invalidation, then mirror/sticker-cache surfaces.
 7. **P1 — 2.B.4 WhatsApp runtime closeout**
-   `NormalizeInbound` is landed; the next slices are bridge-first runtime selection and the pairing/reconnect/send contract on top of that ingress seam.
+   `NormalizeInbound` is landed; the next slices are bridge-first runtime selection, WhatsApp identity resolution/self-chat guards, and the pairing/reconnect/send contract on top of that ingress seam.
 8. **P2/P4 — 2.B.6 plus 2.B.8 transport/bot closeout**
    Signal still needs real transport/bootstrap work; Matrix and Mattermost only have the shared threaded-text contract today, so land each platform seam before client/bootstrap code.
 9. **P4 — 2.B.10 regional runtime layers**

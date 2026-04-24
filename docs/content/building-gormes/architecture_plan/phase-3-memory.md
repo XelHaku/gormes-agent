@@ -9,7 +9,7 @@ weight: 40
 
 **Deliverable:** SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes auditability, decay, cross-chat synthesis, and the GONCHO-shaped session/user boundaries the future plugin layer will depend on while preserving Honcho-compatible interfaces.
 
-Phase 3 (The Black Box) is substantially delivered as of 2026-04-23: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. The 3.E closeout queue is now mixed: session index mirror (3.E.1), tool audit (3.E.2), transcript export (3.E.3), extraction visibility (3.E.4), the lightweight insights writer (3.E.5), and the `last_seen`-based memory-decay closeout (3.E.6) are shipped; canonical `user_id > chat_id > session_id` metadata is landed for 3.E.7, and the core source-filtered session/message search path is landed for 3.E.8, but both closeout gates remain in progress while tool-boundary deny-path fixtures, operator evidence, and lineage-aware search are still unfinished. `parent_session_id` lineage remains the last explicit donor seam in this area. Architecturally, this is the phase where Gormes finishes the memory substrate that a GONCHO-style integration would stand on, without yet claiming full Honcho provider or plugin parity.
+Phase 3 (The Black Box) is substantially delivered as of 2026-04-23: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. The 3.E closeout queue is now mixed: session index mirror (3.E.1), tool audit (3.E.2), transcript export (3.E.3), extraction visibility (3.E.4), the lightweight insights writer (3.E.5), and the `last_seen`-based memory-decay closeout (3.E.6) are shipped; canonical `user_id > chat_id > session_id` metadata is landed for 3.E.7, and the core source-filtered session/message search path is landed for 3.E.8. New upstream drift adds one more memory safety gate: interrupted or cancelled turns must not flush partial observations into GONCHO/Honcho-compatible memory. `parent_session_id` lineage remains the last explicit donor seam in this area. Architecturally, this is the phase where Gormes finishes the memory substrate that a GONCHO-style integration would stand on, without yet claiming full Honcho provider or plugin parity.
 
 ## Phase 3 sub-status (as of 2026-04-23)
 
@@ -32,7 +32,7 @@ Phase 3.E is the final Black Box milestone. It closes four orthogonal gaps: **op
 | 3.E.4 — Extraction State Visibility | ✅ shipped | P1 | None (debug only) | `gormes memory status` shows extractor queue depth, dead-letter summaries, and worker-health heuristics |
 | 3.E.5 — Insights Audit Log | ✅ shipped | P3 | `agent/insights.py` (preview) | Local `telemetry.Snapshot` rollups plus append-only `usage.jsonl` persistence are landed |
 | 3.E.6 — Memory Decay | ✅ shipped | P1 | None (Gormes-original) | Relationship freshness now tracks `last_seen` through a v3g schema/backfill, writer upserts advance it independently of `updated_at`, and recall-time attenuation uses `COALESCE(NULLIF(last_seen, 0), updated_at)` |
-| 3.E.7 — Cross-Chat Synthesis | 🔨 in progress | P2 | `agent/memory_manager.py` (cross-session) + `SessionDB.user_id` | `internal/session` persists canonical `user_id > chat_id > session_id` metadata, and `internal/memory` now has both the same-chat default fence and opt-in user-scope/source-filtered recall; Honcho-compatible tool-schema exposure plus deny-path fixtures and operator evidence still remain |
+| 3.E.7 — Cross-Chat Synthesis | 🔨 in progress | P2 | `agent/memory_manager.py` (cross-session) + `SessionDB.user_id` + Honcho host integration docs | `internal/session` persists canonical `user_id > chat_id > session_id` metadata, and `internal/memory` now has both the same-chat default fence and opt-in user-scope/source-filtered recall; remaining slices are interrupted-turn sync suppression, Honcho-compatible tool-schema exposure, deny-path fixtures, host-integration compatibility fixtures, and operator evidence |
 | 3.E.8 — Session Lineage + Cross-Source Search | 🔨 in progress | P4 | `hermes_state.py` (`parent_session_id`, `search_messages`, `search_sessions`) | Source-filtered session/message search is landed via `internal/memory/session_catalog.go`, and the internal GONCHO service accepts `scope=user` / `sources[]`; `parent_session_id` lineage, lineage-aware hits, and operator evidence still remain |
 
 The 3.E ship criterion: the operator runs `cat ~/.local/share/gormes/sessions/index.yaml` and sees every active chat/session mapping in plain YAML; runs `cat ~/.local/share/gormes/tools/audit.jsonl` and sees a full history of tool invocations; a fact mentioned once six months ago and never again no longer dominates recall results; asking the same question across two different chats surfaces the same entity graph; and context-compressed branches no longer disappear into opaque IDs because lineage and source-filtered search are queryable.
@@ -84,21 +84,28 @@ Before adding more recall layers, add retrieval fixtures:
 
 The Phase 3 queue is not one flat backlog. The order matters because later memory features need operator visibility and stable identity seams before they can be debugged safely.
 
-1. **P2 — 3.E.7 Honcho-compatible tool-edge closeout**
+1. **P2 — 3.E.7 interrupted-turn sync gate**
+   Upstream Hermes now skips external-provider memory sync on interrupted turns. Gormes should pin the same safety rule over the local GONCHO finalization path before widening host-compatible memory surfaces: a cancelled turn can record a skipped-sync reason, but it must not create durable conclusions or cross-chat recall candidates.
+2. **P2 — 3.E.7 Honcho-compatible tool-edge closeout**
    The `user_id` merge rules, same-chat recall fence, and opt-in user-scope/source-filtered recall are pinned in `internal/session` and `internal/memory`. The internal GONCHO service accepts those scope/source parameters, but `internal/tools/honcho_tools.go` still needs to advertise them in the tool schemas before this is safe to call shipped. The remaining slices are scope/source schema exposure for `honcho_search`/`honcho_context`, then explicit deny-path fixtures, then operator-readable evidence.
-2. **P4 — 3.E.8 `parent_session_id` lineage closeout**
+3. **P3 — Honcho host integration compatibility fixtures**
+   Honcho upstream added OpenCode and SillyTavern integration docs. Gormes should not port their Node/Bun plugins, but it should fixture-lock the shared concepts they depend on: workspace, peer, host-scoped config, session strategy, context/tool/hybrid recall modes, and durable conclusion/search tools while keeping the internal package named `goncho`.
+4. **P4 — 3.E.8 `parent_session_id` lineage closeout**
    Source-filtered session/message search is now landed; the remaining donor gap with Hermes `SessionDB` is compression lineage plus lineage-aware search/evidence, which still pairs naturally with later context-compression work and should come after the operator-facing mirrors are stable.
 
 ## Execution blueprint (2026-04-22)
 
 The delivery sequence is frozen in `docs/superpowers/plans/2026-04-22-gormes-phase3-identity-lineage-execution-plan.md`, but the remaining cross-chat closeout is now tracked as smaller slices:
 
-`3.E.7 schema exposure -> 3.E.7 deny-path fixtures -> 3.E.7 operator evidence -> 3.E.8 parent_session_id -> 3.E.8 lineage-aware hits/evidence`
+`3.E.7 interrupted-turn sync suppression -> 3.E.7 schema exposure -> 3.E.7 deny-path fixtures -> 3.E.7 host compatibility fixtures -> 3.E.7 operator evidence -> 3.E.8 parent_session_id -> 3.E.8 lineage-aware hits/evidence`
+
+The original identity-lineage dependency backbone still remains: `3.E.7 schema exposure -> 3.E.7 deny-path fixtures -> 3.E.7 operator evidence -> 3.E.8 parent_session_id -> 3.E.8 lineage-aware hits/evidence`. The new host-compatibility fixture is a sidecar gate after deny-paths and before 3.E.7 can be called fully closed.
 
 That order is intentional even though some enabling code is already landed:
 
 - `3.E.6.1` is now landed via schema v3g, relationship `last_seen` backfill, writer freshness updates, and recall fallback coverage.
-- `3.E.7 schema exposure` remains the first closeout gate: recall and GONCHO helpers exist, but callers still cannot discover the cross-chat scope/source path reliably from the exported Honcho-compatible schemas.
+- `3.E.7 interrupted-turn sync suppression` comes first because memory written during cancelled turns can pollute every later compatibility fixture.
+- `3.E.7 schema exposure` remains the first public tool-edge gate: recall and GONCHO helpers exist, but callers still cannot discover the cross-chat scope/source path reliably from the exported Honcho-compatible schemas.
 - `3.E.7 deny-path fixtures` go next so unknown or conflicting user bindings are proven to stay same-chat before operator-facing evidence is added.
 - `3.E.7 operator evidence` closes the cross-chat audit surface only after both the schema and deny paths are pinned.
 - `3.E.8 parent_session_id` adds lineage semantics after the recall fence is proven safe.
