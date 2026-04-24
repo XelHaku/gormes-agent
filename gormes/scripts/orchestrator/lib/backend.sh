@@ -13,11 +13,13 @@ build_backend_cmd() {
       case "$MODE" in
         safe|unattended)
           printf '%s\0' codexu exec --json \
+            -m gpt-5.5 \
             -c approval_policy=never \
             --sandbox workspace-write
           ;;
         full)
           printf '%s\0' codexu exec --json \
+            -m gpt-5.5 \
             -c approval_policy=never \
             --sandbox danger-full-access
           ;;

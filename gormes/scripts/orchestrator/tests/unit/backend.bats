@@ -16,17 +16,20 @@ setup() {
   assert_line --index 0 'codexu'
   assert_line --index 1 'exec'
   assert_line --index 2 '--json'
-  assert_line --index 3 '-c'
-  assert_line --index 4 'approval_policy=never'
-  assert_line --index 5 '--sandbox'
-  assert_line --index 6 'workspace-write'
+  assert_line --index 3 '-m'
+  assert_line --index 4 'gpt-5.5'
+  assert_line --index 5 '-c'
+  assert_line --index 6 'approval_policy=never'
+  assert_line --index 7 '--sandbox'
+  assert_line --index 8 'workspace-write'
 }
 
 @test "BACKEND=codexu MODE=full uses danger-full-access sandbox" {
   BACKEND=codexu MODE=full run bash -c 'source "'"$ORCHESTRATOR_LIB_DIR"'/backend.sh"; build_backend_cmd | tr "\0" "\n"'
   assert_success
   assert_line --index 0 'codexu'
-  assert_line --index 6 'danger-full-access'
+  assert_line --index 4 'gpt-5.5'
+  assert_line --index 8 'danger-full-access'
 }
 
 @test "BACKEND=claudeu MODE=safe emits claudeu-prefixed argv" {
@@ -57,6 +60,7 @@ setup() {
   MODE=safe run bash -c 'unset BACKEND; source "'"$ORCHESTRATOR_LIB_DIR"'/backend.sh"; build_backend_cmd | tr "\0" "\n"'
   assert_success
   assert_line --index 0 'codexu'
+  assert_line --index 4 'gpt-5.5'
 }
 
 @test "MODE invalid returns non-zero for codexu backend" {

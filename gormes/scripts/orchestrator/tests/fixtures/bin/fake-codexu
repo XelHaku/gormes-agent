@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test stub for codexu. Mimics the invocation:
-#   codexu exec --json -c key=val -c key=val --sandbox MODE \
+#   codexu exec --json -m MODEL -c key=val -c key=val --sandbox MODE \
 #     --output-last-message FINAL_FILE PROMPT
 #
 # Modes via FAKE_CODEXU_MODE env var:
@@ -23,13 +23,19 @@ final_file=""
 prompt=""
 
 # Argv parser. codexu's real shape (as built by orchestrator build_codex_cmd):
-#   exec --json -c KEY=VALUE --sandbox MODE --output-last-message FILE PROMPT
-# We accept the subcommand, ignore -c key=val, --sandbox, --json, and capture
-# --output-last-message and the trailing positional PROMPT.
+#   exec --json -m MODEL -c KEY=VALUE --sandbox MODE --output-last-message FILE PROMPT
+# We accept the subcommand, ignore -m MODEL, -c key=val, --sandbox, --json,
+# and capture --output-last-message and the trailing positional PROMPT.
 while (( $# > 0 )); do
   case "$1" in
     exec|--json)
       shift
+      ;;
+    -m|--model)
+      shift
+      if (( $# > 0 )); then
+        shift
+      fi
       ;;
     -c)
       # Consume paired value: codexu uses -c approval_policy=never
