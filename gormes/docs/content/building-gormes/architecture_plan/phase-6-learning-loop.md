@@ -5,7 +5,7 @@ weight: 70
 
 # Phase 6 — The Learning Loop (Soul)
 
-**Status:** ⏳ planned · 3/6 sub-phases
+**Status:** ⏳ planned · 4/6 sub-phases
 
 The Learning Loop is the first Gormes-original core system — not a port. It detects when a task is complex enough to be worth learning from, distills the solution into a reusable skill, stores it, and improves the skill over successive runs. Upstream Hermes alludes to self-improvement; Gormes implements it as a dedicated subsystem.
 
@@ -16,7 +16,7 @@ The Learning Loop is the first Gormes-original core system — not a port. It de
 | Subphase | Status | Deliverable |
 |---|---|---|
 | 6.A — Complexity Detector | ✅ complete | Heuristic signal for "this turn was worth learning from" now ships via `internal/learning/runtime.go`, with kernel-written JSONL decisions under `${XDG_DATA_HOME}/gormes/learning/complexity.jsonl` |
-| 6.B — Skill Extractor | ⏳ planned | LLM-assisted pattern distillation from the conversation + tool-call trace |
+| 6.B — Skill Extractor | ✅ complete | LLM-assisted pattern distillation now ships via `internal/learning/extractor.go`, gating on the 6.A signal and persisting JSONL skill candidates for 6.C |
 | 6.C — Skill Storage Format | ⏳ planned | Portable, human-editable Markdown (SKILL.md) with structured metadata |
 | 6.D — Skill Retrieval + Matching | ⏳ planned | Hybrid lexical + semantic lookup for relevant skills at turn start |
 | 6.E — Feedback Loop | ✅ complete | Per-skill outcome log + Laplace-smoothed effectiveness score now ships via `internal/learning/feedback.go` |
@@ -27,6 +27,17 @@ The Learning Loop is the first Gormes-original core system — not a port. It de
 Phase 5.F (Skills system) was previously scoped as "port the upstream Python skills plumbing". That's mechanical. Phase 6 is the algorithm on top — detecting complexity, distilling patterns, scoring feedback. It depends on 5.F (needs the storage format), but it's not the same work.
 
 Positioning: **Gormes's moat over Hermes**. Hermes has a skills directory; it does not have a native learning loop that decides what's worth writing down.
+
+## 6.B Closeout
+
+Phase 6.B lands the LLM-assisted extractor half of the learning loop. `internal/learning/extractor.go` introduces a narrow `LLM` seam (`Distill(ctx, prompt) (DistillResponse, error)`) and an `Extractor` that:
+
+- Gates on the 6.A `Signal` — turns that did not cross the worth-learning threshold short-circuit before any prompt is built or any file is touched, so the extractor inherits 6.A's auditability contract.
+- Renders a deterministic prompt from the `Source` — session ID, signal reasons and tool names, the user and assistant messages, and each tool event's args + result — so replaying the same turn reproduces byte-identical input to the model.
+- Validates the returned `DistillResponse` (Name, Description, Body must all be non-blank) before accepting the distillation; invalid responses and LLM errors propagate upward without leaving a partial JSONL line behind.
+- Appends each accepted skill proposal as a `Candidate` JSONL record alongside the scoring metadata (score, threshold, reasons, tool names, distilled-at timestamp), matching the append-only `${XDG_DATA_HOME}/gormes/learning/...` convention already set by 6.A and 6.E.
+
+Wiring the live LLM seam into the kernel is deferred to the 6.C storage-format slice, which will resolve how `Candidate` records become SKILL.md artefacts on disk. 6.B ships the algorithm; 6.C will ship the file layout.
 
 ## 6.A Closeout
 

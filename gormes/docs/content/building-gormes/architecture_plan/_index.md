@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 59/66 subphases shipped · 2 in progress · 5 planned
+**Overall:** 60/66 subphases shipped · 2 in progress · 4 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -29,7 +29,7 @@ weight: 10
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 13/17 subphases |
-| Phase 6 — The Learning Loop (Soul) | 🔨 | 3/6 subphases |
+| Phase 6 — The Learning Loop (Soul) | 🔨 | 4/6 subphases |
 
 ---
 
@@ -383,9 +383,9 @@ weight: 10
 
 - [x] Heuristic or LLM-scored signal
 
-### 6.B — Skill Extractor ⏳
+### 6.B — Skill Extractor ✅
 
-- [ ] LLM-assisted pattern distillation
+- [x] LLM-assisted pattern distillation
 
 ### 6.C — Skill Storage Format ⏳
 

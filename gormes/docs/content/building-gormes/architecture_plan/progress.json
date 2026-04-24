@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-23",
+    "last_updated": "2026-04-24",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1039,7 +1039,8 @@
           "items": [
             {
               "name": "LLM-assisted pattern distillation",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD: `internal/learning/extractor.go` gates on the 6.A `Signal`, builds a deterministic prompt from the turn trace (user + assistant messages, tool events), consults a pluggable `LLM` seam, validates the distilled Name/Description/Body, and appends each accepted `Candidate` as JSONL for 6.C promotion. Skippable signals, nil seams, and invalid responses all short-circuit without touching disk."
             }
           ]
         },
