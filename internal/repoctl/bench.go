@@ -18,18 +18,6 @@ type BenchmarkOptions struct {
 	GitCommit func(string) (string, error)
 }
 
-type benchmarkFile struct {
-	Binary  benchmarkEntry   `json:"binary"`
-	History []benchmarkEntry `json:"history"`
-}
-
-type benchmarkEntry struct {
-	SizeBytes int64  `json:"size_bytes"`
-	SizeMB    string `json:"size_mb"`
-	Commit    string `json:"commit"`
-	Date      string `json:"date"`
-}
-
 func RecordBenchmark(opts BenchmarkOptions) error {
 	if opts.Root == "" {
 		opts.Root = "."
@@ -56,7 +44,7 @@ func RecordBenchmark(opts BenchmarkOptions) error {
 	}
 
 	benchPath := filepath.Join(opts.Root, "benchmarks.json")
-	var bench benchmarkFile
+	bench := map[string]any{}
 	if raw, err := os.ReadFile(benchPath); err == nil {
 		if err := json.Unmarshal(raw, &bench); err != nil {
 			return err
@@ -70,14 +58,37 @@ func RecordBenchmark(opts BenchmarkOptions) error {
 		return err
 	}
 
-	entry := benchmarkEntry{
-		SizeBytes: info.Size(),
-		SizeMB:    fmt.Sprintf("%.1f", float64(info.Size())/1048576),
-		Commit:    commit,
-		Date:      opts.Now().UTC().Format("2006-01-02"),
+	date := opts.Now().UTC().Format("2006-01-02")
+	sizeMB := fmt.Sprintf("%.1f", float64(info.Size())/1048576)
+
+	binary, _ := bench["binary"].(map[string]any)
+	if binary == nil {
+		binary = map[string]any{}
 	}
-	bench.Binary = entry
-	bench.History = append(bench.History, entry)
+	binary["size_bytes"] = info.Size()
+	binary["size_mb"] = sizeMB
+	binary["commit"] = commit
+	if _, ok := binary["last_measured"]; ok {
+		binary["last_measured"] = date
+	}
+	if _, ok := binary["date"]; ok {
+		binary["date"] = date
+	}
+	if _, hasLastMeasured := binary["last_measured"]; !hasLastMeasured {
+		if _, hasDate := binary["date"]; !hasDate {
+			binary["date"] = date
+		}
+	}
+	bench["binary"] = binary
+
+	entry := map[string]any{
+		"size_bytes": info.Size(),
+		"size_mb":    sizeMB,
+		"commit":     commit,
+		"date":       date,
+	}
+	history, _ := bench["history"].([]any)
+	bench["history"] = append(history, entry)
 
 	raw, err := json.MarshalIndent(bench, "", "  ")
 	if err != nil {
