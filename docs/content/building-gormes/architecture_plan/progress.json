@@ -562,8 +562,8 @@
             },
             {
               "name": "Token-scoped gateway locks",
-              "status": "planned",
-              "note": "TDD: port upstream `gateway/status.py` acquire_scoped_lock/release_scoped_lock behavior into an XDG state lock directory keyed by platform credential hash, with stale PID/start-time cleanup, stopped-process detection, and release-on-shutdown coverage before multi-profile adapters share credentials."
+              "status": "in_progress",
+              "note": "TDD partial landed: `internal/gateway/scoped_lock.go` introduces `LockStore`, `HashCredential`, `ScopedLockDir`, and `TryAcquire`/`Release` for XDG-backed scoped-lock files keyed by platform credential hash. Fixture coverage pins raw-token hiding, stopped-process takeover, PID-reuse start-token mismatch takeover, corrupt-lock replacement, foreign-owner-safe release, and the live `/proc/<pid>/stat` probe. Remaining closeout: wire lock acquisition/release into gateway adapter startup/shutdown so release-on-shutdown is covered before multi-profile adapters share credentials."
             },
             {
               "name": "Gateway /restart command + takeover markers",

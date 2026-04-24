@@ -568,15 +568,20 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.F.3 gateway status readout note = %q, want statusview.go/RenderStatusSummary detail", statusReadout.Note)
 	}
 	statusJSON := lifecycleItems["Runtime status JSON + PID/process validation"]
-	if statusJSON.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 runtime status JSON status = %q, want planned", statusJSON.Status)
+	if statusJSON.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 runtime status JSON status = %q, want complete", statusJSON.Status)
+	}
+	if !strings.Contains(statusJSON.Note, "internal/gateway/runtime_state.go") || !strings.Contains(statusJSON.Note, "PID-reuse") {
+		t.Fatalf("Phase 2.F.3 runtime status JSON note = %q, want runtime_state.go/PID-reuse detail", statusJSON.Note)
 	}
 	tokenLocks := lifecycleItems["Token-scoped gateway locks"]
-	if tokenLocks.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 token-scoped locks status = %q, want planned", tokenLocks.Status)
+	if tokenLocks.Status != StatusInProgress {
+		t.Fatalf("Phase 2.F.3 token-scoped locks status = %q, want in_progress", tokenLocks.Status)
 	}
-	if !strings.Contains(tokenLocks.Note, "acquire_scoped_lock") || !strings.Contains(tokenLocks.Note, "credential hash") {
-		t.Fatalf("Phase 2.F.3 token-scoped locks note = %q, want upstream lock/credential-hash detail", tokenLocks.Note)
+	if !strings.Contains(tokenLocks.Note, "internal/gateway/scoped_lock.go") ||
+		!strings.Contains(tokenLocks.Note, "credential hash") ||
+		!strings.Contains(tokenLocks.Note, "release-on-shutdown") {
+		t.Fatalf("Phase 2.F.3 token-scoped locks note = %q, want scoped_lock/credential-hash/release-on-shutdown detail", tokenLocks.Note)
 	}
 	restartMarkers := lifecycleItems["Gateway /restart command + takeover markers"]
 	if restartMarkers.Status != StatusComplete {
@@ -824,8 +829,13 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 3.E.7 tool schema status = %q, want planned", toolSchema.Status)
 	}
 	denyFixtures := crossChatItems["Cross-chat deny-path fixtures"]
-	if denyFixtures.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.7 deny-path fixtures status = %q, want planned", denyFixtures.Status)
+	if denyFixtures.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.7 deny-path fixtures status = %q, want complete", denyFixtures.Status)
+	}
+	if !strings.Contains(denyFixtures.Note, "same-chat") ||
+		!strings.Contains(denyFixtures.Note, "source allow-list") ||
+		!strings.Contains(denyFixtures.Note, "internal/goncho/service_test.go") {
+		t.Fatalf("Phase 3.E.7 deny-path fixtures note = %q, want same-chat/source/test detail", denyFixtures.Note)
 	}
 	operatorEvidence3E7 := crossChatItems["Cross-chat operator evidence"]
 	if operatorEvidence3E7.Status != StatusPlanned {

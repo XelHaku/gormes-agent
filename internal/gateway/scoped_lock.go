@@ -14,12 +14,12 @@ import (
 	"time"
 )
 
-// ProcessProbe reports whether a PID is currently running and returns an
+// LockProcessProbe reports whether a PID is currently running and returns an
 // opaque start token that identifies that particular run. Implementations
 // must return (tok, false, nil) — not an error — when the PID does not
 // exist. The token is treated as an opaque string; callers compare tokens
 // byte-for-byte to detect PID reuse.
-type ProcessProbe func(pid int) (startToken string, running bool, err error)
+type LockProcessProbe func(pid int) (startToken string, running bool, err error)
 
 // LockStoreConfig configures a LockStore. Zero-valued fields fall back to
 // process-derived defaults so production callers can pass LockStoreConfig{}.
@@ -28,7 +28,7 @@ type LockStoreConfig struct {
 	PID          int
 	StartToken   string
 	Now          func() time.Time
-	ProcessProbe ProcessProbe
+	ProcessProbe LockProcessProbe
 }
 
 // LockStore owns the XDG-backed scoped-lock directory. It ports the
@@ -41,7 +41,7 @@ type LockStore struct {
 	pid        int
 	startToken string
 	now        func() time.Time
-	probe      ProcessProbe
+	probe      LockProcessProbe
 
 	mu sync.Mutex
 }
@@ -80,7 +80,7 @@ func NewLockStore(cfg LockStoreConfig) *LockStore {
 		ls.now = time.Now
 	}
 	if ls.probe == nil {
-		ls.probe = defaultProcessProbe
+		ls.probe = defaultLockProcessProbe
 	}
 	if ls.startToken == "" {
 		if tok, _, err := ls.probe(ls.pid); err == nil {
@@ -217,10 +217,10 @@ func (l *ScopedLock) Release() error {
 	return nil
 }
 
-// defaultProcessProbe reads /proc/<pid>/stat on Linux and returns field 22
+// defaultLockProcessProbe reads /proc/<pid>/stat on Linux and returns field 22
 // (starttime, in clock ticks since boot) as the opaque start token. A PID
 // whose /proc entry has disappeared is reported as not running.
-func defaultProcessProbe(pid int) (string, bool, error) {
+func defaultLockProcessProbe(pid int) (string, bool, error) {
 	path := fmt.Sprintf("/proc/%d/stat", pid)
 	data, err := os.ReadFile(path)
 	if err != nil {

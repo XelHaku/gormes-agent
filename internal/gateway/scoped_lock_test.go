@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// newFakeProbe returns a ProcessProbe whose state is controlled by the
+// newFakeProbe returns a LockProcessProbe whose state is controlled by the
 // caller through the returned maps. Any PID not present in tokens is
 // treated as a stopped process.
-func newFakeProbe(tokens map[int]string) ProcessProbe {
+func newFakeProbe(tokens map[int]string) LockProcessProbe {
 	return func(pid int) (string, bool, error) {
 		tok, ok := tokens[pid]
 		if !ok {
@@ -22,7 +22,7 @@ func newFakeProbe(tokens map[int]string) ProcessProbe {
 	}
 }
 
-func newTestLockStore(t *testing.T, pid int, token string, probe ProcessProbe) (*LockStore, string) {
+func newTestLockStore(t *testing.T, pid int, token string, probe LockProcessProbe) (*LockStore, string) {
 	t.Helper()
 	dir := t.TempDir()
 	return NewLockStore(LockStoreConfig{
@@ -363,25 +363,25 @@ func TestLockStore_TryAcquire_EmptyInputs_ReturnError(t *testing.T) {
 
 func TestDefaultLockStore_UsesLiveProcessProbe(t *testing.T) {
 	// Default probe should see the currently running test process as alive.
-	probe := defaultProcessProbe
+	probe := defaultLockProcessProbe
 	tok, running, err := probe(os.Getpid())
 	if err != nil {
-		t.Fatalf("defaultProcessProbe(self) err=%v", err)
+		t.Fatalf("defaultLockProcessProbe(self) err=%v", err)
 	}
 	if !running {
-		t.Fatalf("defaultProcessProbe(self) running=false; want true")
+		t.Fatalf("defaultLockProcessProbe(self) running=false; want true")
 	}
 	if tok == "" {
-		t.Errorf("defaultProcessProbe(self) returned empty start token")
+		t.Errorf("defaultLockProcessProbe(self) returned empty start token")
 	}
 
 	// A very high PID that almost certainly does not exist.
 	_, running, err = probe(0x7fffffff)
 	if err != nil {
-		t.Fatalf("defaultProcessProbe(fake pid) err=%v", err)
+		t.Fatalf("defaultLockProcessProbe(fake pid) err=%v", err)
 	}
 	if running {
-		t.Errorf("defaultProcessProbe(fake pid) running=true; want false")
+		t.Errorf("defaultLockProcessProbe(fake pid) running=true; want false")
 	}
 }
 
