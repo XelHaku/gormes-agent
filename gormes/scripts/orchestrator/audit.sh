@@ -14,6 +14,7 @@ set -Eeuo pipefail
 : "${AUDIT_DIR:=$HOME/.cache/gormes-orchestrator-audit}"
 : "${CURSOR_FILE:=$AUDIT_DIR/cursor}"
 : "${REPORT_FILE:=$AUDIT_DIR/report.ndjson}"
+: "${CSV_FILE:=$AUDIT_DIR/report.csv}"
 : "${SERVICE:=gormes-orchestrator.service}"
 : "${LOOKBACK_SECONDS:=1200}"
 
@@ -136,6 +137,30 @@ line="$(jq -nc \
   '{ts:$ts, cursor_from:$cursor_from, cursor_to:$cursor_to, service:$service, summary:$summary, integration:$integration, companions:$companions}')"
 
 printf '%s\n' "$line" >> "$REPORT_FILE"
+
+# CSV append for easy trending (header written once if file missing).
+csv_header="ts,active,uptime_s,nrestarts,claimed,success,failed,promoted,cherry_pick_failed,productivity_pct,integration_head_short"
+if [[ ! -f "$CSV_FILE" ]]; then
+  printf '%s\n' "$csv_header" > "$CSV_FILE"
+fi
+csv_row="$(jq -r '
+  [
+    .ts,
+    .service.active,
+    (.service.uptime_seconds|tostring),
+    (.service.nrestarts|tostring),
+    (.summary.worker_claimed|tostring),
+    (.summary.worker_success|tostring),
+    (.summary.worker_failed|tostring),
+    (.summary.worker_promoted|tostring),
+    (.summary.worker_promotion_failed|tostring),
+    (if (.summary.worker_claimed // 0) > 0
+      then ((.summary.worker_promoted * 100) / .summary.worker_claimed | floor | tostring)
+      else "0" end),
+    .integration.short
+  ] | @csv
+' <<<"$line")"
+printf '%s\n' "$csv_row" >> "$CSV_FILE"
 
 # Human-readable summary for journald
 active="$(jq -r '.service.active' <<<"$line")"
