@@ -257,6 +257,54 @@ func TestCleanupStaleLocksKeepsActivelyFlockedRegularFileWithMalformedClaim(t *t
 	}
 }
 
+func TestCleanupStaleLocksKeepsActivelyFlockedRegularFileWithExpiredClaim(t *testing.T) {
+	lockRoot := t.TempDir()
+	lockPath := filepath.Join(lockRoot, "task.lock")
+	claimPath := lockPath + ".claim.json"
+	file := holdExclusiveFlock(t, lockPath)
+	defer file.Close()
+
+	claim := `{"pid":1,"claimed_at_epoch":100}`
+	if err := os.WriteFile(claimPath, []byte(claim), 0o644); err != nil {
+		t.Fatalf("WriteFile() claim error = %v", err)
+	}
+
+	if err := CleanupStaleLocks(lockRoot, time.Minute, func() time.Time { return time.Unix(200, 0) }); err != nil {
+		t.Fatalf("CleanupStaleLocks() error = %v", err)
+	}
+
+	if _, err := os.Stat(lockPath); err != nil {
+		t.Fatalf("lock file stat error = %v", err)
+	}
+	if _, err := os.Stat(claimPath); err != nil {
+		t.Fatalf("claim file stat error = %v", err)
+	}
+}
+
+func TestCleanupStaleLocksKeepsActivelyFlockedRegularFileWithDeadPIDClaim(t *testing.T) {
+	lockRoot := t.TempDir()
+	lockPath := filepath.Join(lockRoot, "task.lock")
+	claimPath := lockPath + ".claim.json"
+	file := holdExclusiveFlock(t, lockPath)
+	defer file.Close()
+
+	claim := `{"pid":` + strconv.Itoa(deadPID()) + `,"claimed_at_epoch":190}`
+	if err := os.WriteFile(claimPath, []byte(claim), 0o644); err != nil {
+		t.Fatalf("WriteFile() claim error = %v", err)
+	}
+
+	if err := CleanupStaleLocks(lockRoot, time.Minute, func() time.Time { return time.Unix(200, 0) }); err != nil {
+		t.Fatalf("CleanupStaleLocks() error = %v", err)
+	}
+
+	if _, err := os.Stat(lockPath); err != nil {
+		t.Fatalf("lock file stat error = %v", err)
+	}
+	if _, err := os.Stat(claimPath); err != nil {
+		t.Fatalf("claim file stat error = %v", err)
+	}
+}
+
 func holdExclusiveFlock(t *testing.T, path string) *os.File {
 	t.Helper()
 

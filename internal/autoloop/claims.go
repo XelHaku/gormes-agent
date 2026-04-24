@@ -37,25 +37,36 @@ func CleanupStaleLocks(lockRoot string, ttl time.Duration, now func() time.Time)
 		if keep && processLive(claim.PID) {
 			continue
 		}
+		var release func()
 		if !info.IsDir() {
-			locked, release, err := tryExclusiveFileLock(lockPath)
+			var locked bool
+			locked, release, err = tryExclusiveFileLock(lockPath)
 			if err != nil {
 				return err
 			}
 			if !locked {
 				continue
 			}
-			release()
 		}
 
-		if err := os.RemoveAll(lockPath); err != nil {
-			return err
-		}
-		if err := os.Remove(lockPath + ".claim.json"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := removeStaleLock(lockPath, release); err != nil {
 			return err
 		}
 	}
 
+	return nil
+}
+
+func removeStaleLock(lockPath string, release func()) error {
+	if release != nil {
+		defer release()
+	}
+	if err := os.RemoveAll(lockPath); err != nil {
+		return err
+	}
+	if err := os.Remove(lockPath + ".claim.json"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	return nil
 }
 
