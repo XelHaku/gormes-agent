@@ -25,8 +25,9 @@
     },
     {
       "source": "banner.py",
-      "status": "planned",
-      "reason": "Interactive TUI banner/start-screen remains upstream-only; cmd/gormes/main.go enters tui.Model directly without a banner."
+      "status": "in_progress",
+      "go": ["internal/cli/banner.go"],
+      "reason": "Deterministic banner helpers ported: FormatContextLength (tokens→K/M with rounding tolerance), DisplayToolsetName (_tools suffix stripping plus empty-is-unknown), and FormatBannerVersionLabel (pure BannerGitState→title formatting with carried commit/commits pluralization). The Rich/Console renderer, skin-engine color overrides, and subprocess-backed update check remain follow-on scope."
     },
     {
       "source": "callbacks.py",
