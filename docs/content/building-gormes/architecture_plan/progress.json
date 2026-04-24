@@ -149,8 +149,50 @@
             },
             {
               "name": "Planner wrapper/test consistency closeout",
-              "status": "planned",
-              "note": "P0: the `go test ./internal/ -run ArchitecturePlanner` suite is currently RED — `TestArchitecturePlannerAgentRunsCodexuAndInstallsPeriodicTimer` fails at architectureplanneragent_test.go:38 because it reads `scripts/gormes-architecture-task-manager.sh` which no longer exists in the worktree (only `scripts/gormes-architecture-planner-tasks-manager.sh` remains). TDD: pick one policy and finish it in a single slice — either (a) restore tiny exec wrappers at `scripts/gormes-architecture-task-manager.sh` and `scripts/architectureplanneragent.sh` that exec the renamed script, or (b) update `internal/architectureplanneragent_test.go` plus `docs/superpowers/plans/2026-04-23-gormes-architecture-task-manager-script.md` to a single-entrypoint policy that drops the `task-manager-help`/`legacy-help` subtests. Either path must leave `go test ./internal/ -run ArchitecturePlanner -count=1` green."
+              "priority": "P0",
+              "status": "complete",
+              "contract": "Planner wrapper compatibility contract",
+              "contract_status": "validated",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Planner callers using the old wrapper names continue to exec the renamed planner-tasks manager instead of failing before a run can start.",
+              "fixture": "internal/architectureplanneragent_test.go",
+              "source_refs": [
+                "docs/superpowers/plans/2026-04-23-gormes-architecture-task-manager-script.md",
+                "scripts/gormes-architecture-planner-tasks-manager.sh",
+                "scripts/gormes-architecture-task-manager.sh",
+                "scripts/architectureplanneragent.sh"
+              ],
+              "ready_when": [
+                "The renamed manager script remains the single implementation and both legacy wrapper names forward all arguments to it."
+              ],
+              "acceptance": [
+                "`go test ./internal -run ArchitecturePlanner -count=1` is green.",
+                "`bash -n` passes for the real manager and both wrapper scripts.",
+                "The planner run summary still emits the legacy report/state/schedule labels consumed by the test harness."
+              ],
+              "note": "Complete: restored tiny exec wrappers at scripts/gormes-architecture-task-manager.sh and scripts/architectureplanneragent.sh, both forwarding to scripts/gormes-architecture-planner-tasks-manager.sh. The manager summary now preserves Planner report, Planner state, and Periodic schedule lines for the existing wrapper test contract.",
+              "write_scope": [
+                "scripts/gormes-architecture-planner-tasks-manager.sh",
+                "scripts/gormes-architecture-task-manager.sh",
+                "scripts/architectureplanneragent.sh",
+                "internal/progress/progress_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "bash -n scripts/gormes-architecture-planner-tasks-manager.sh",
+                "bash -n scripts/gormes-architecture-task-manager.sh",
+                "bash -n scripts/architectureplanneragent.sh",
+                "go test ./internal -run ArchitecturePlanner -count=1",
+                "go test ./internal/progress -run TestLoad_RealFile_Phase1PlannerWrapperCloseout -count=1"
+              ],
+              "done_signal": [
+                "Both legacy wrapper names exist, exec the renamed planner manager, and the focused ArchitecturePlanner suite passes."
+              ]
             }
           ]
         }
@@ -510,7 +552,7 @@
             {
               "name": "Architecture planner tasks manager script",
               "status": "complete",
-              "note": "TDD landed for the main tracked entrypoint: scripts/gormes-architecture-planner-tasks-manager.sh writes .codex/planner/architecture-planner-tasks.md plus report/state artifacts, logs verbose repo/upstream/progress/validation/schedule context, and installs a periodic systemd/cron run. Wrapper compatibility is tracked separately in Phase 1.C because current docs/tests and worktree state disagree about legacy wrapper presence."
+              "note": "TDD landed for the main tracked entrypoint: scripts/gormes-architecture-planner-tasks-manager.sh writes .codex/planner/architecture-planner-tasks.md plus report/state artifacts, logs verbose repo/upstream/progress/validation/schedule context, and installs a periodic systemd/cron run. Phase 1.C later restored the compatibility wrappers at scripts/gormes-architecture-task-manager.sh and scripts/architectureplanneragent.sh."
             }
           ]
         },

@@ -1161,6 +1161,9 @@ cmd_run() {
   log "Schedule method: $SCHEDULE_METHOD"
   write_report
   write_state_file
+  log "Planner report: $REPORT_FILE"
+  log "Planner state: $STATE_FILE"
+  log "Periodic schedule: $SCHEDULE_METHOD"
   smart_commit "planner: complete" "planner run completed"
   log_step_duration "schedule" "$step_start"
 

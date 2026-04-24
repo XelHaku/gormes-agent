@@ -37,11 +37,11 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 27/71 subphases shipped · 11 in progress · 33 planned
+**Overall:** 28/71 subphases shipped · 10 in progress · 33 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
-| Phase 1 — The Dashboard | 🔨 | 2/3 subphases |
+| Phase 1 — The Dashboard | ✅ | 3/3 subphases |
 | Phase 2 — The Gateway | 🔨 | 13/23 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
@@ -50,7 +50,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ---
 
-## Phase 1 — The Dashboard 🔨
+## Phase 1 — The Dashboard ✅
 
 *Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary*
 
@@ -64,11 +64,11 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Offline tool validation
 
-### 1.C — Automation Reliability 🔨
+### 1.C — Automation Reliability ✅
 
 - [x] Orchestrator failure-row stabilization for 4-8 workers
 - [x] Soft-success-nonzero bats coverage
-- [ ] Planner wrapper/test consistency closeout
+- [x] Planner wrapper/test consistency closeout
 
 ## Phase 2 — The Gateway 🔨
 
@@ -387,8 +387,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Provider-side resilience
 - [x] Classified provider-error taxonomy
 - [x] Jittered reconnect backoff schedule
-- [ ] Retry-After header parsing + HTTPError hint
-- [ ] Kernel retry honors Retry-After hint
+- [x] Retry-After header parsing + HTTPError hint
+- [x] Kernel retry honors Retry-After hint
 - [ ] Prompt-cache capability guard
 - [ ] Provider rate guard + budget telemetry
 

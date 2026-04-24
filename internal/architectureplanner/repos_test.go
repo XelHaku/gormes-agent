@@ -68,9 +68,14 @@ func TestSyncExternalReposPullsExistingGitReposAndClonesMissingRepos(t *testing.
 			t.Fatalf("MkdirAll(%s/.git) error = %v", dir, err)
 		}
 	}
-	runner := &autoloop.FakeRunner{Results: []autoloop.Result{{}, {}, {}}}
+	runner := &autoloop.FakeRunner{Results: []autoloop.Result{
+		{Stdout: "Already up to date.\n"},
+		{Stdout: "Cloning into 'gbrain'...\n"},
+		{Stdout: "Updating abc123..def456\n"},
+	}}
 
-	if err := SyncExternalRepos(context.Background(), cfg, runner); err != nil {
+	results, err := SyncExternalRepos(context.Background(), cfg, runner)
+	if err != nil {
 		t.Fatalf("SyncExternalRepos() error = %v", err)
 	}
 
@@ -81,6 +86,15 @@ func TestSyncExternalReposPullsExistingGitReposAndClonesMissingRepos(t *testing.
 	}
 	if !reflect.DeepEqual(runner.Commands, want) {
 		t.Fatalf("Commands = %#v, want %#v", runner.Commands, want)
+	}
+
+	wantResults := []RepoSyncResult{
+		{Name: "hermes-agent", Path: cfg.HermesDir, Action: "pull", CloneURL: "https://example.test/hermes.git", Output: "Already up to date."},
+		{Name: "gbrain", Path: cfg.GBrainDir, Action: "clone", CloneURL: "https://example.test/gbrain.git", Output: "Cloning into 'gbrain'..."},
+		{Name: "honcho", Path: cfg.HonchoDir, Action: "pull", CloneURL: "https://example.test/honcho.git", Output: "Updating abc123..def456"},
+	}
+	if !reflect.DeepEqual(results, wantResults) {
+		t.Fatalf("SyncExternalRepos() results = %#v, want %#v", results, wantResults)
 	}
 }
 
@@ -96,7 +110,7 @@ func TestSyncExternalReposRejectsNonGitExistingDirectory(t *testing.T) {
 		t.Fatalf("MkdirAll() error = %v", err)
 	}
 
-	err = SyncExternalRepos(context.Background(), cfg, &autoloop.FakeRunner{})
+	_, err = SyncExternalRepos(context.Background(), cfg, &autoloop.FakeRunner{})
 	if err == nil {
 		t.Fatal("SyncExternalRepos() error = nil, want error")
 	}

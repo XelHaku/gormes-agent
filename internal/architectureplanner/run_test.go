@@ -47,7 +47,12 @@ func TestRunDryRunCollectsContextWithoutBackend(t *testing.T) {
 func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 	repoRoot := writePlannerFixture(t)
 	runner := &autoloop.FakeRunner{
-		Results: []autoloop.Result{{}, {}, {}, {Stdout: `{"type":"thread.started","thread_id":"thread-arch-1"}` + "\n"}},
+		Results: []autoloop.Result{
+			{Stdout: "Already up to date.\n"},
+			{Stdout: "Updating abc123..def456\n"},
+			{Stdout: "Already up to date.\n"},
+			{Stdout: `{"type":"thread.started","thread_id":"thread-arch-1"}` + "\n"},
+		},
 	}
 
 	summary, err := RunOnce(context.Background(), RunOptions{
@@ -76,6 +81,11 @@ func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 		"building-gormes",
 		"goncho",
 		"progress.json",
+		"only long-term prompt agent",
+		"Sync results:",
+		"gbrain: pull",
+		"Updating abc123..def456",
+		"Synchronize progress.json with the current Gormes implementation",
 		"Do not implement runtime feature code",
 	} {
 		if !strings.Contains(prompt, want) {
@@ -96,6 +106,19 @@ func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 	}
 	if state["backend"] != "codexu" {
 		t.Fatalf("state backend = %#v, want codexu", state["backend"])
+	}
+	contextData, err := os.ReadFile(filepath.Join(summary.RunRoot, "context.json"))
+	if err != nil {
+		t.Fatalf("ReadFile(context.json) error = %v", err)
+	}
+	for _, want := range []string{
+		`"sync_results"`,
+		`"output": "Updating abc123..def456"`,
+		`"implementation_inventory"`,
+	} {
+		if !strings.Contains(string(contextData), want) {
+			t.Fatalf("context.json missing %q:\n%s", want, contextData)
+		}
 	}
 }
 

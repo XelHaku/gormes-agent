@@ -8,7 +8,7 @@
 
 **Tech Stack:** Bash, jq, git, codexu, Go test harness.
 
-**Audit Note (2026-04-23):** This plan's wrapper-preservation assumption is currently stale against the worktree: `scripts/gormes-architecture-task-manager.sh` and `scripts/architectureplanneragent.sh` are deleted while `internal/architectureplanneragent_test.go` still copies/runs them. Execution agents must first choose one TDD policy: restore the tiny exec wrappers and keep the tests, or update tests/docs to a single-entrypoint policy. Do not cite this plan as complete evidence until that consistency slice is closed.
+**Audit Note (2026-04-24):** The wrapper-preservation policy is current again. `scripts/gormes-architecture-task-manager.sh` and `scripts/architectureplanneragent.sh` are tiny exec wrappers around `scripts/gormes-architecture-planner-tasks-manager.sh`, and `internal/architectureplanneragent_test.go` covers the real manager plus both compatibility names.
 
 ---
 

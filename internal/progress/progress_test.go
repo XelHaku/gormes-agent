@@ -57,9 +57,9 @@ func TestLoad_RealFile(t *testing.T) {
 	if err := Validate(p); err != nil {
 		t.Fatalf("Validate() = %v, want nil", err)
 	}
-	// Phase 1 has an active automation-reliability hardening item -> in_progress.
-	if got := p.Phases["1"].DerivedStatus(); got != StatusInProgress {
-		t.Errorf("Phase 1 = %q, want in_progress", got)
+	// Phase 1 has all dashboard and automation-reliability rows shipped.
+	if got := p.Phases["1"].DerivedStatus(); got != StatusComplete {
+		t.Errorf("Phase 1 = %q, want complete", got)
 	}
 	// Phase 2 has 2.A, 2.B.1, 2.C complete and more planned -> in_progress.
 	if got := p.Phases["2"].DerivedStatus(); got != StatusInProgress {
@@ -130,6 +130,36 @@ func TestLoad_RealFile_ContractMetadata(t *testing.T) {
 		if !containsString(it.TrustClass, tc.trust) {
 			t.Fatalf("%s trust_class = %v, want %q", tc.item, it.TrustClass, tc.trust)
 		}
+	}
+}
+
+func TestLoad_RealFile_Phase1PlannerWrapperCloseout(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := Validate(p); err != nil {
+		t.Fatalf("Validate() = %v, want nil", err)
+	}
+
+	items := itemsByName(p.Phases["1"].Subphases["1.C"].Items)
+	planner := items["Planner wrapper/test consistency closeout"]
+	if planner.Status != StatusComplete {
+		t.Fatalf("Planner wrapper closeout status = %q, want complete", planner.Status)
+	}
+	if planner.Contract != "Planner wrapper compatibility contract" || planner.ContractStatus != ContractStatusValidated {
+		t.Fatalf("Planner wrapper closeout contract = %q/%q, want validated compatibility contract", planner.Contract, planner.ContractStatus)
+	}
+	for _, want := range []string{
+		"scripts/gormes-architecture-task-manager.sh",
+		"scripts/architectureplanneragent.sh",
+	} {
+		if !containsString(planner.WriteScope, want) {
+			t.Fatalf("Planner wrapper closeout write_scope = %v, want %q", planner.WriteScope, want)
+		}
+	}
+	if !containsString(planner.TestCommands, "go test ./internal -run ArchitecturePlanner -count=1") {
+		t.Fatalf("Planner wrapper closeout test_commands = %v, want focused ArchitecturePlanner test", planner.TestCommands)
 	}
 }
 
