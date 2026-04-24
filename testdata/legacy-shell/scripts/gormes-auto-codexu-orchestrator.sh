@@ -1522,4 +1522,6 @@ main() {
   done
 }
 
-main "$@"
+if [[ "${GORMES_ORCHESTRATOR_SOURCE_ONLY:-0}" != "1" ]]; then
+  main "$@"
+fi
