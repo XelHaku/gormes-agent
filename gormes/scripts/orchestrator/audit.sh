@@ -127,9 +127,9 @@ companions_block() {
 # keys are counted as "skipped" — recorded in the summary for visibility.
 #
 # Cost formula (Sonnet 4.5 as of Apr 2026):
-#   input_cost  = (input_tokens  - cached_tokens) * $3  / 1_000_000
-#   cache_cost  =  cached_tokens                   * $0.3 / 1_000_000
-#   output_cost =  output_tokens                   * $15 / 1_000_000
+#   input_cost  = input_tokens  * $3   / 1_000_000  (already net-of-cache)
+#   cache_cost  = cached_tokens * $0.3 / 1_000_000  (cache read rate)
+#   output_cost = output_tokens * $15  / 1_000_000
 #
 # Returns JSON: {input_tokens, output_tokens, cached_tokens, skipped,
 # dollars_estimated, tokens_total_estimated}.
@@ -188,9 +188,14 @@ cost_block() {
   shopt -u nullglob
 
   # Compute dollars (use awk for floating point).
+  # Claude's usage schema reports `input_tokens` already net-of-cache, so
+  # the cache-read line is additive, not subtractive. The previous
+  # `(i - c) * 3.0` formula produced NEGATIVE dollars when a turn was
+  # mostly cached (c > i). Corrected: input + cache_read + output at
+  # their respective rates (Sonnet 4.5: $3/M in, $15/M out, $0.30/M cache read).
   local dollars tokens_total
   dollars="$(awk -v i="$total_in" -v o="$total_out" -v c="$total_cached" \
-    'BEGIN { printf "%.4f", ((i - c) * 3.0 + c * 0.3 + o * 15.0) / 1000000.0 }')"
+    'BEGIN { printf "%.4f", (i * 3.0 + c * 0.3 + o * 15.0) / 1000000.0 }')"
   tokens_total=$((total_in + total_out))
 
   jq -nc \
