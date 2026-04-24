@@ -32,6 +32,8 @@ That's it. No Python, no virtualenv, no dependency drift.
 
 Gormes is a complete Go rewrite of [Hermes Agent](https://github.com/NousResearch/hermes-agent)'s runtime infrastructure. While Hermes pioneered the multi-platform agent gateway (Python), Gormes moves the critical surfaces — TUI, tool registry, gateway adapters, memory layer — into a Go-native stack that deploys as a single static binary.
 
+Gormes began as an independent Go port/rework of ideas and architecture from Hermes-Agent, with upstream Git history preserved for attribution. It is being rebuilt around a single Go binary and Gormes-native runtime boundaries.
+
 **Current state:** Phase 2 (Gateway) is shipping now. Phase 3 (Memory) and Phase 4 (Brain) are active development.
 
 ---
