@@ -119,6 +119,97 @@ companions_block() {
   printf '%s\n' "$out"
 }
 
+# Per-window cost tracking. Scans every $LOGS_DIR/*__worker*__*.jsonl whose
+# mtime falls inside [cursor_from, cursor_to] and sums .usage.input_tokens,
+# .usage.output_tokens, and the cache-read field (schema varies: codex uses
+# .usage.cache_read_input_tokens; claudeu sometimes emits
+# .usage.cache_read_input_tokens at the top level). Files with no .usage
+# keys are counted as "skipped" — recorded in the summary for visibility.
+#
+# Cost formula (Sonnet 4.5 as of Apr 2026):
+#   input_cost  = (input_tokens  - cached_tokens) * $3  / 1_000_000
+#   cache_cost  =  cached_tokens                   * $0.3 / 1_000_000
+#   output_cost =  output_tokens                   * $15 / 1_000_000
+#
+# Returns JSON: {input_tokens, output_tokens, cached_tokens, skipped,
+# dollars_estimated, tokens_total_estimated}.
+cost_block() {
+  local cursor_from="$1"
+  local cursor_to="$2"
+
+  # Bail out cleanly if LOGS_DIR doesn't exist.
+  if [[ -z "$LOGS_DIR" || ! -d "$LOGS_DIR" ]]; then
+    printf '%s\n' '{"input_tokens":0,"output_tokens":0,"cached_tokens":0,"skipped":0,"dollars_estimated":0,"tokens_total_estimated":0}'
+    return
+  fi
+
+  local from_epoch to_epoch
+  from_epoch="$(date -d "$cursor_from" +%s 2>/dev/null || echo 0)"
+  to_epoch="$(date -d "$cursor_to" +%s 2>/dev/null || now_epoch)"
+
+  local total_in=0 total_out=0 total_cached=0 skipped=0
+  local f mtime file_in file_out file_cached
+
+  shopt -s nullglob
+  for f in "$LOGS_DIR"/*__worker*__*.jsonl; do
+    [[ -f "$f" ]] || continue
+    mtime="$(stat -c %Y "$f" 2>/dev/null || echo 0)"
+    if (( from_epoch > 0 )) && (( mtime < from_epoch )); then continue; fi
+    if (( to_epoch   > 0 )) && (( mtime > to_epoch   )); then continue; fi
+
+    # Sum usage.input_tokens / usage.output_tokens / usage.cache_read_input_tokens
+    # across all lines that carry a .usage object. If no such line exists, record
+    # a skip so the summary can note the schema mismatch.
+    local sums
+    sums="$(jq -rs '
+      (map(select(.usage != null and (.usage|type) == "object"))) as $u |
+      ($u | length) as $n |
+      {
+        n: $n,
+        i: ($u | map(.usage.input_tokens  // 0) | add // 0),
+        o: ($u | map(.usage.output_tokens // 0) | add // 0),
+        c: ($u | map(.usage.cache_read_input_tokens // 0) | add // 0)
+      } | "\(.n) \(.i) \(.o) \(.c)"
+    ' "$f" 2>/dev/null || echo "0 0 0 0")"
+
+    local n
+    n="${sums%% *}"
+    if [[ -z "$n" || "$n" == "0" ]]; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    # shellcheck disable=SC2086
+    set -- $sums
+    file_in="$2"; file_out="$3"; file_cached="$4"
+    total_in=$((total_in   + file_in))
+    total_out=$((total_out + file_out))
+    total_cached=$((total_cached + file_cached))
+  done
+  shopt -u nullglob
+
+  # Compute dollars (use awk for floating point).
+  local dollars tokens_total
+  dollars="$(awk -v i="$total_in" -v o="$total_out" -v c="$total_cached" \
+    'BEGIN { printf "%.4f", ((i - c) * 3.0 + c * 0.3 + o * 15.0) / 1000000.0 }')"
+  tokens_total=$((total_in + total_out))
+
+  jq -nc \
+    --argjson input_tokens "$total_in" \
+    --argjson output_tokens "$total_out" \
+    --argjson cached_tokens "$total_cached" \
+    --argjson skipped "$skipped" \
+    --argjson tokens_total_estimated "$tokens_total" \
+    --arg dollars_estimated "$dollars" \
+    '{
+      input_tokens: $input_tokens,
+      output_tokens: $output_tokens,
+      cached_tokens: $cached_tokens,
+      skipped: $skipped,
+      tokens_total_estimated: $tokens_total_estimated,
+      dollars_estimated: ($dollars_estimated | tonumber)
+    }'
+}
+
 cursor="$(read_cursor)"
 ts="$(now_utc)"
 svc="$(service_block)"
@@ -131,6 +222,8 @@ new_cursor="$(jq -r '.last_event_ts // empty' <<<"$summary")"
 [[ -z "$new_cursor" || "$new_cursor" == "null" ]] && new_cursor="$ts"
 write_cursor "$new_cursor"
 
+cost="$(cost_block "$cursor" "$new_cursor")"
+
 # Build combined report line
 line="$(jq -nc \
   --arg ts "$ts" \
@@ -140,12 +233,13 @@ line="$(jq -nc \
   --argjson summary "$summary" \
   --argjson integration "$integ" \
   --argjson companions "$comps" \
-  '{ts:$ts, cursor_from:$cursor_from, cursor_to:$cursor_to, service:$service, summary:$summary, integration:$integration, companions:$companions}')"
+  --argjson cost "$cost" \
+  '{ts:$ts, cursor_from:$cursor_from, cursor_to:$cursor_to, service:$service, summary:$summary, integration:$integration, companions:$companions, cost:$cost}')"
 
 printf '%s\n' "$line" >> "$REPORT_FILE"
 
 # CSV append for easy trending (header written once if file missing).
-csv_header="ts,active,uptime_s,nrestarts,claimed,success,failed,promoted,cherry_pick_failed,productivity_pct,integration_head_short"
+csv_header="ts,active,uptime_s,nrestarts,claimed,success,failed,promoted,cherry_pick_failed,productivity_pct,integration_head_short,tokens_total_estimated,dollars_estimated"
 if [[ ! -f "$CSV_FILE" ]]; then
   printf '%s\n' "$csv_header" > "$CSV_FILE"
 fi
@@ -163,7 +257,9 @@ csv_row="$(jq -r '
     (if (.summary.worker_claimed // 0) > 0
       then ((.summary.worker_promoted * 100) / .summary.worker_claimed | floor | tostring)
       else "0" end),
-    .integration.short
+    .integration.short,
+    ((.cost.tokens_total_estimated // 0)|tostring),
+    ((.cost.dollars_estimated // 0)|tostring)
   ] | @csv
 ' <<<"$line")"
 printf '%s\n' "$csv_row" >> "$CSV_FILE"
@@ -192,6 +288,11 @@ else
   rate=0
 fi
 
+# Cost summary pulled from the cost block. Tolerant of missing fields.
+cost_tokens="$(jq -r '.cost.tokens_total_estimated // 0' <<<"$line")"
+cost_dollars="$(jq -r '.cost.dollars_estimated // 0' <<<"$line")"
+cost_skipped="$(jq -r '.cost.skipped // 0' <<<"$line")"
+
 cat <<SUMMARY
 gormes-orchestrator-audit @ $ts
   service:      $active  uptime=${uptime}s  nrestarts=$nrest
@@ -201,6 +302,8 @@ gormes-orchestrator-audit @ $ts
   productivity: ${rate}% of claims landed this window
   fails by status: ${fails:-none}
   integration:  $head  "$subj"
+  cost (window):   tokens=${cost_tokens}  dollars≈\$$(printf '%.2f' "$cost_dollars")
+  cost (skipped):  ${cost_skipped} jsonl files without .usage keys
   last ledger:  $last_ev @ $last_ts
 SUMMARY
 
