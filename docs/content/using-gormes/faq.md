@@ -11,7 +11,7 @@ Yes. Gormes is a Go frontend that talks to Hermes's `api_server` over HTTP. With
 
 ### Can I use it without Python?
 
-Not yet. Phase 4 makes Hermes optional; Phase 5 removes Python entirely. See the [Roadmap](../building-gormes/architecture_plan/).
+Not yet. Phase 4 makes Hermes optional; Phase 5 removes Python entirely. See the [Roadmap](../../building-gormes/architecture_plan/).
 
 ### Where does memory live?
 

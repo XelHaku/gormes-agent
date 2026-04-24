@@ -6,9 +6,9 @@ weight: 11
 
 # Automate Anything with Cron
 
-The [daily briefing bot tutorial](daily-briefing-bot) covers the basics. This guide goes further — five real-world automation patterns you can adapt for your own workflows.
+The [daily briefing bot tutorial](../daily-briefing-bot) covers the basics. This guide goes further — five real-world automation patterns you can adapt for your own workflows.
 
-For the full feature reference, see [Scheduled Tasks (Cron)](../user-guide/features/cron).
+For the full feature reference, see [Scheduled Tasks (Cron)](../../user-guide/features/cron).
 
 > **Info: Key Concept**
 > Cron jobs run in fresh agent sessions with no memory of your current chat. Prompts must be **completely self-contained** — include everything the agent needs to know.
@@ -255,4 +255,4 @@ The `--deliver` flag controls where results go:
 
 ---
 
-*For the complete cron reference — all parameters, edge cases, and internals — see [Scheduled Tasks (Cron)](../user-guide/features/cron).*
+*For the complete cron reference — all parameters, edge cases, and internals — see [Scheduled Tasks (Cron)](../../user-guide/features/cron).*

@@ -227,7 +227,7 @@ Tool calls may execute sequentially or concurrently depending on the tool mix an
 
 ## Related docs
 
-- [Toolsets Reference](../reference/toolsets-reference)
-- [Built-in Tools Reference](../reference/tools-reference)
-- [Agent Loop Internals](agent-loop)
-- [ACP Internals](acp-internals)
+- [Toolsets Reference](../../reference/toolsets-reference)
+- [Built-in Tools Reference](../../reference/tools-reference)
+- [Agent Loop Internals](../agent-loop)
+- [ACP Internals](../acp-internals)

@@ -217,4 +217,4 @@ hermes memory setup      # pick a provider and configure it
 hermes memory status     # check what's active
 ```
 
-See the [Memory Providers](memory-providers) guide for full details on each provider, setup instructions, and comparison.
+See the [Memory Providers](../memory-providers) guide for full details on each provider, setup instructions, and comparison.

@@ -51,29 +51,29 @@ Every planned subsystem should answer these before implementation:
 
 ## Phase Mapping
 
-- [Phase 2 Gateway](./architecture_plan/phase-2-gateway/) owns command policy,
+- [Phase 2 Gateway](../architecture_plan/phase-2-gateway/) owns command policy,
   active-turn behavior, adapter contracts, cron, and subagent runtime.
-- [Phase 3 Memory](./architecture_plan/phase-3-memory/) owns provenance,
+- [Phase 3 Memory](../architecture_plan/phase-3-memory/) owns provenance,
   scoped recall, retrieval evaluation, and degraded memory health.
-- [Phase 4 Brain Transplant](./architecture_plan/phase-4-brain-transplant/)
+- [Phase 4 Brain Transplant](../architecture_plan/phase-4-brain-transplant/)
   owns stable prompt assembly, context compression, provider adapters, and
   transcript fixtures.
-- [Phase 5 Final Purge](./architecture_plan/phase-5-final-purge/) owns
+- [Phase 5 Final Purge](../architecture_plan/phase-5-final-purge/) owns
   operation/tool descriptor parity before handler ports.
-- [Phase 6 Learning Loop](./architecture_plan/phase-6-learning-loop/) owns
+- [Phase 6 Learning Loop](../architecture_plan/phase-6-learning-loop/) owns
   skills as reviewed code, resolver evals, feedback records, and safe
   self-improvement.
 
 ## Upstream Study References
 
-- [Upstream GBrain Study](../upstream-gbrain/)
-- [GBrain Architecture](../upstream-gbrain/architecture/)
-- [GBrain Good And Bad](../upstream-gbrain/good-and-bad/)
-- [GBrain Gormes Takeaways](../upstream-gbrain/gormes-takeaways/)
-- [Upstream Hermes Reference](../upstream-hermes/)
-- [Hermes Source Study](../upstream-hermes/source-study/)
-- [Hermes Good And Bad](../upstream-hermes/good-and-bad/)
-- [Hermes Gormes Takeaways](../upstream-hermes/gormes-takeaways/)
+- [Upstream GBrain Study](../../upstream-gbrain/)
+- [GBrain Architecture](../../upstream-gbrain/architecture/)
+- [GBrain Good And Bad](../../upstream-gbrain/good-and-bad/)
+- [GBrain Gormes Takeaways](../../upstream-gbrain/gormes-takeaways/)
+- [Upstream Hermes Reference](../../upstream-hermes/)
+- [Hermes Source Study](../../upstream-hermes/source-study/)
+- [Hermes Good And Bad](../../upstream-hermes/good-and-bad/)
+- [Hermes Gormes Takeaways](../../upstream-hermes/gormes-takeaways/)
 
 ## Decision
 

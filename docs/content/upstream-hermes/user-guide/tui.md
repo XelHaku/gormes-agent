@@ -6,7 +6,7 @@ weight: 2
 
 # TUI
 
-The TUI is the modern front-end for Hermes — a terminal UI backed by the same Python runtime as the [Classic CLI](cli). Same agent, same sessions, same slash commands; a cleaner, more responsive surface for interacting with them.
+The TUI is the modern front-end for Hermes — a terminal UI backed by the same Python runtime as the [Classic CLI](../cli). Same agent, same sessions, same slash commands; a cleaner, more responsive surface for interacting with them.
 
 It's the recommended way to run Hermes interactively.
 
@@ -36,7 +36,7 @@ hermes          # now uses the TUI
 hermes chat     # same
 ```
 
-The classic CLI remains available as the default. Anything documented in [CLI Interface](cli) — slash commands, quick commands, skill preloading, personalities, multi-line input, interrupts — works in the TUI identically.
+The classic CLI remains available as the default. Anything documented in [CLI Interface](../cli) — slash commands, quick commands, skill preloading, personalities, multi-line input, interrupts — works in the TUI identically.
 
 ## Why the TUI
 
@@ -48,7 +48,7 @@ The classic CLI remains available as the default. Anything documented in [CLI In
 - **Alternate-screen rendering** — differential updates mean no flicker when streaming, no scrollback clutter after you quit.
 - **Composer affordances** — inline paste-collapse for long snippets, image paste from the clipboard (`Alt+V`), bracketed-paste safety.
 
-Same [skins](features/skins) and [personalities](features/personality) apply. Switch mid-session with `/skin ares`, `/personality pirate`, and the UI repaints live. Skin keys are marked `(both)`, `(classic)`, or `(tui)` in [`example-skin.yaml`](https://github.com/NousResearch/hermes-agent/blob/main/docs/skins/example-skin.yaml) so you can see at a glance what applies where — the TUI honors the banner palette, UI colors, prompt glyph/color, session display, completion menu, selection bg, `tool_prefix`, and `help_header`.
+Same [skins](../features/skins) and [personalities](../features/personality) apply. Switch mid-session with `/skin ares`, `/personality pirate`, and the UI repaints live. Skin keys are marked `(both)`, `(classic)`, or `(tui)` in [`example-skin.yaml`](https://github.com/NousResearch/hermes-agent/blob/main/docs/skins/example-skin.yaml) so you can see at a glance what applies where — the TUI honors the banner palette, UI colors, prompt glyph/color, session display, completion menu, selection bg, `tool_prefix`, and `help_header`.
 
 ## Requirements
 
@@ -70,7 +70,7 @@ The directory must contain `dist/entry.js` and an up-to-date `node_modules`.
 
 ## Keybindings
 
-Keybindings match the [Classic CLI](cli#keybindings) exactly. The only behavioral differences:
+Keybindings match the [Classic CLI](../cli#keybindings) exactly. The only behavioral differences:
 
 - **Mouse drag** highlights text with a uniform selection background.
 - **`Ctrl+V`** pastes text from your clipboard directly into the composer; multi-line pastes stay on one row until you expand them.
@@ -89,7 +89,7 @@ All slash commands work unchanged. A few are TUI-owned — they produce richer o
 | `/details` | Toggle verbose tool-call details in the transcript |
 | `/usage` | Rich token / cost / context panel |
 
-Every other slash command (including installed skills, quick commands, and personality toggles) works identically to the classic CLI. See [Slash Commands Reference](../reference/slash-commands).
+Every other slash command (including installed skills, quick commands, and personality toggles) works identically to the classic CLI. See [Slash Commands Reference](../../reference/slash-commands).
 
 ## Status line
 
@@ -103,7 +103,7 @@ The TUI's status line tracks agent state in real time:
 | `interrupted` | Current turn was cancelled; press Enter to send again. |
 | `forging session…` / `resuming…` | Initial connect or `--resume` handshake. |
 
-The per-skin status-bar colors and thresholds are shared with the classic CLI — see [Skins](features/skins) for customization.
+The per-skin status-bar colors and thresholds are shared with the classic CLI — see [Skins](../features/skins) for customization.
 
 ## Configuration
 
@@ -125,7 +125,7 @@ display:
 
 Sessions are shared between the TUI and the classic CLI — both write to the same `~/.hermes/state.db`. You can start a session in one, resume in the other. The session picker surfaces sessions from both sources, with a source tag.
 
-See [Sessions](sessions) for lifecycle, search, compression, and export.
+See [Sessions](../sessions) for lifecycle, search, compression, and export.
 
 ## Reverting to the classic CLI
 
@@ -135,8 +135,8 @@ If the TUI fails to launch (no Node, missing bundle, TTY issue), Hermes prints a
 
 ## See also
 
-- [CLI Interface](cli) — full slash command and keybinding reference (shared)
-- [Sessions](sessions) — resume, branch, and history
-- [Skins & Themes](features/skins) — theme the banner, status bar, and overlays
-- [Voice Mode](features/voice-mode) — works in both interfaces
-- [Configuration](configuration) — all config keys
+- [CLI Interface](../cli) — full slash command and keybinding reference (shared)
+- [Sessions](../sessions) — resume, branch, and history
+- [Skins & Themes](../features/skins) — theme the banner, status bar, and overlays
+- [Voice Mode](../features/voice-mode) — works in both interfaces
+- [Configuration](../configuration) — all config keys

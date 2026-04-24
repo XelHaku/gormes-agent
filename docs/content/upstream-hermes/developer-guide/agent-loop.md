@@ -232,8 +232,8 @@ After each turn:
 
 ## Related Docs
 
-- [Provider Runtime Resolution](provider-runtime)
-- [Prompt Assembly](prompt-assembly)
-- [Context Compression & Prompt Caching](context-compression-and-caching)
-- [Tools Runtime](tools-runtime)
-- [Architecture Overview](architecture)
+- [Provider Runtime Resolution](../provider-runtime)
+- [Prompt Assembly](../prompt-assembly)
+- [Context Compression & Prompt Caching](../context-compression-and-caching)
+- [Tools Runtime](../tools-runtime)
+- [Architecture Overview](../architecture)

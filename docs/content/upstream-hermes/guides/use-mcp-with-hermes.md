@@ -410,6 +410,6 @@ Not-great first servers:
 
 ## Related docs
 
-- [MCP (Model Context Protocol)](../user-guide/features/mcp)
-- [FAQ](../reference/faq)
-- [Slash Commands](../reference/slash-commands)
+- [MCP (Model Context Protocol)](../../user-guide/features/mcp)
+- [FAQ](../../reference/faq)
+- [Slash Commands](../../reference/slash-commands)

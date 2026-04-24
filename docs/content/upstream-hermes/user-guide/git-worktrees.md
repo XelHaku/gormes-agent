@@ -32,7 +32,7 @@ With worktrees, each agent gets:
 - Its **own branch and working directory**
 - Its **own Checkpoint Manager history** for `/rollback`
 
-See also: [Checkpoints and /rollback](checkpoints-and-rollback).
+See also: [Checkpoints and /rollback](../checkpoints-and-rollback).
 
 ## Quick Start: Creating a Worktree
 
@@ -132,7 +132,7 @@ Notes:
   - e.g. `feature/hermes-checkpoints-docs`, `feature/hermes-refactor-tests`.
 - **Commit frequently**
   - Use git commits for high‑level milestones.
-  - Use [checkpoints and /rollback](checkpoints-and-rollback) as a safety net for tool‑driven edits in between.
+  - Use [checkpoints and /rollback](../checkpoints-and-rollback) as a safety net for tool‑driven edits in between.
 - **Avoid running Hermes from the bare repo root when using worktrees**
   - Prefer the worktree directories instead, so each agent has a clear scope.
 

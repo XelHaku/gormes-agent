@@ -68,7 +68,7 @@ Rebuild in Gormes-native form:
 - `NewMatrixChannel` and `Start` map cleanly to a future `internal/matrix` adapter bootstrap: validate creds, create client, register handlers, optionally initialize crypto, then sync.
 - `handleMessageEvent` is the donor for inbound edge processing, but Gormes should decide how its session key composes room identity with optional thread and optional sender dimensions, in line with the upstream Hermes Matrix model for rooms, threads, and shared-room per-user isolation.
 - `extractInboundContent` and `extractInboundMedia` map directly to a Gormes transport edge that normalizes Matrix text, files, images, audio, and video into platform events plus stored media references.
-- `Send`, `SendMedia`, `StartTyping`, `SendPlaceholder`, and `EditMessage` map well to shared outbound adapter capabilities from [shared-adapter-patterns](./shared-adapter-patterns/).
+- `Send`, `SendMedia`, `StartTyping`, `SendPlaceholder`, and `EditMessage` map well to shared outbound adapter capabilities from [shared-adapter-patterns](../shared-adapter-patterns/).
 - `handleMemberEvent` should remain adapter-local. Invite acceptance is Matrix transport behavior, not shared gateway policy.
 
 ## Implementation Notes

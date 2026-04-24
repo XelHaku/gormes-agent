@@ -11,7 +11,7 @@ Hermes has two hook systems that run custom code at key lifecycle points:
 | System | Registered via | Runs in | Use case |
 |--------|---------------|---------|----------|
 | **[Gateway hooks](#gateway-event-hooks)** | `HOOK.yaml` + `handler.py` in `~/.hermes/hooks/` | Gateway only | Logging, alerts, webhooks |
-| **[Plugin hooks](#plugin-hooks)** | `ctx.register_hook()` in a [plugin](plugins) | CLI + Gateway | Tool interception, metrics, guardrails |
+| **[Plugin hooks](#plugin-hooks)** | `ctx.register_hook()` in a [plugin](../plugins) | CLI + Gateway | Tool interception, metrics, guardrails |
 
 Both systems are non-blocking — errors in any hook are caught and logged, never crashing the agent.
 
@@ -213,7 +213,7 @@ async def handle(event_type: str, context: dict):
 
 ## Plugin Hooks
 
-[Plugins](plugins) can register hooks that fire in **both CLI and gateway** sessions. These are registered programmatically via `ctx.register_hook()` in your plugin's `register()` function.
+[Plugins](../plugins) can register hooks that fire in **both CLI and gateway** sessions. These are registered programmatically via `ctx.register_hook()` in your plugin's `register()` function.
 
 ```python
 def register(ctx):
@@ -646,4 +646,4 @@ def my_callback(session_id: str, platform: str, **kwargs):
 
 ---
 
-See the **[Build a Plugin guide](../../guides/build-a-hermes-plugin)** for the full walkthrough including tool schemas, handlers, and advanced hook patterns.
+See the **[Build a Plugin guide](../../../guides/build-a-hermes-plugin)** for the full walkthrough including tool schemas, handlers, and advanced hook patterns.

@@ -561,4 +561,4 @@ Used when the summary LLM returns empty content or raises an exception. `is_fall
 
 ---
 
-**See also:** [`02-tool-schemas.md`](./02-tool-schemas) — every tool referenced in these prompts, with its complete JSON schema.
+**See also:** [`02-tool-schemas.md`](../02-tool-schemas) — every tool referenced in these prompts, with its complete JSON schema.

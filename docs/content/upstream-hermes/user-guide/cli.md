@@ -9,7 +9,7 @@ weight: 1
 Hermes Agent's CLI is a full terminal user interface (TUI) — not a web UI. It features multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output. Built for people who live in the terminal.
 
 > **Tip**
-> Hermes also ships a modern TUI with modal overlays, mouse selection, and non-blocking input. Launch it with `hermes --tui` — see the [TUI](tui) guide.
+> Hermes also ships a modern TUI with modal overlays, mouse selection, and non-blocking input. Launch it with `hermes --tui` — see the [TUI](../tui) guide.
 
 ## Running the CLI
 
@@ -84,7 +84,7 @@ Use `/usage` for a detailed breakdown including per-category costs (input vs out
 
 ### Session Resume Display
 
-When resuming a previous session (`hermes -c` or `hermes --resume <id>`), a "Previous Conversation" panel appears between the banner and the input prompt, showing a compact recap of the conversation history. See [Sessions — Conversation Recap on Resume](sessions#conversation-recap-on-resume) for details and configuration.
+When resuming a previous session (`hermes -c` or `hermes --resume <id>`), a "Previous Conversation" panel appears between the banner and the input prompt, showing a compact recap of the conversation history. See [Sessions — Conversation Recap on Resume](../sessions#conversation-recap-on-resume) for details and configuration.
 
 ## Keybindings
 
@@ -119,9 +119,9 @@ Common examples:
 | `/reasoning high` | Increase reasoning effort |
 | `/title My Session` | Name the current session |
 
-For the full built-in CLI and messaging lists, see [Slash Commands Reference](../reference/slash-commands).
+For the full built-in CLI and messaging lists, see [Slash Commands Reference](../../reference/slash-commands).
 
-For setup, providers, silence tuning, and messaging/Discord voice usage, see [Voice Mode](features/voice-mode).
+For setup, providers, silence tuning, and messaging/Discord voice usage, see [Voice Mode](../features/voice-mode).
 
 > **Tip**
 > Commands are case-insensitive — `/HELP` works the same as `/help`. Installed skills also become slash commands automatically.
@@ -141,7 +141,7 @@ quick_commands:
     command: nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader
 ```
 
-Then type `/status` or `/gpu` in any chat. See the [Configuration guide](configuration#quick-commands) for more examples.
+Then type `/status` or `/gpu` in any chat. See the [Configuration guide](../configuration#quick-commands) for more examples.
 
 ## Preloading Skills at Launch
 
@@ -259,7 +259,7 @@ The CLI shows animated feedback as the agent works:
   ┊ 📄 web_extract (2.1s)
 ```
 
-Cycle through display modes with `/verbose`: `off → new → all → verbose`. This command can also be enabled for messaging platforms — see [configuration](configuration#display-settings).
+Cycle through display modes with `/verbose`: `off → new → all → verbose`. This command can also be enabled for messaging platforms — see [configuration](../configuration#display-settings).
 
 ### Tool Preview Length
 

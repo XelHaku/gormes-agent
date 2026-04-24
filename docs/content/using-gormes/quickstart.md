@@ -13,7 +13,7 @@ Get Gormes running in 60 seconds.
 curl -fsSL https://gormes.ai/install.sh | sh
 ```
 
-Installs `gormes` into `$HOME/go/bin` via `go install`. Requires Go 1.25+. For other install paths see [Install](./install/).
+Installs `gormes` into `$HOME/go/bin` via `go install`. Requires Go 1.25+. For other install paths see [Install](../install/).
 
 ## 2. Bring up the Hermes backend
 
@@ -30,7 +30,7 @@ API_SERVER_ENABLED=true hermes gateway start
 gormes doctor --offline
 ```
 
-See [Wire Doctor](./wire-doctor/) for what this checks.
+See [Wire Doctor](../wire-doctor/) for what this checks.
 
 ## 4. Run
 
@@ -42,6 +42,6 @@ You're in the TUI. Press `Ctrl+C` to exit.
 
 ## Next
 
-- [TUI mode](./tui-mode/) — keybindings, layout
-- [Telegram adapter](./telegram-adapter/) — use the same brain from Telegram
-- [Configuration](./configuration/) — persistent settings
+- [TUI mode](../tui-mode/) — keybindings, layout
+- [Telegram adapter](../telegram-adapter/) — use the same brain from Telegram
+- [Configuration](../configuration/) — persistent settings

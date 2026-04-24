@@ -21,7 +21,7 @@ Primary implementation:
 - `hermes_cli/model_switch.py` — shared `/model` switch pipeline (CLI + gateway)
 - `agent/auxiliary_client.py` — auxiliary model routing
 
-If you are trying to add a new first-class inference provider, read [Adding Providers](adding-providers) alongside this page.
+If you are trying to add a new first-class inference provider, read [Adding Providers](../adding-providers) alongside this page.
 
 ## Resolution precedence
 
@@ -188,6 +188,6 @@ See `tests/test_fallback_model.py` for comprehensive tests covering all supporte
 
 ## Related docs
 
-- [Agent Loop Internals](agent-loop)
-- [ACP Internals](acp-internals)
-- [Context Compression & Prompt Caching](context-compression-and-caching)
+- [Agent Loop Internals](../agent-loop)
+- [ACP Internals](../acp-internals)
+- [Context Compression & Prompt Caching](../context-compression-and-caching)

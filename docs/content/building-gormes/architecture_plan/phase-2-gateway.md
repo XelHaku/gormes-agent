@@ -37,7 +37,7 @@ weight: 30
 | Phase 2.F.4 — Home Channel + Operator Surfaces | ⏳ planned | P3 | Home-channel rules, notify-to routing, manager remember-source, channel-directory persistence/lookup, refresh/stale-target invalidation, mirror surfaces, and sticker-cache equivalents |
 | Phase 2.F.5 — Gateway Mid-Run Steering + Active-Turn Policy | ⏳ planned | P2 | `/steer` CommandDef + queue fallback, mid-run steer injection between tool calls, and a gateway-handled slash-command bypass of the active-session guard; depends on 2.E.2 concurrent-tool cancellation for safe mid-run fan-out |
 
-For channel-by-channel donor analysis against the all-Go PicoClaw repo, see [Gateway Donor Map](../gateway-donor-map/).
+For channel-by-channel donor analysis against the all-Go PicoClaw repo, see [Gateway Donor Map](../../gateway-donor-map/).
 
 Phase 2.C is intentionally not Phase 3. It stores only session handles in bbolt. Python still owns transcript memory, transcript search, and prompt assembly; the SQLite + FTS5 memory lattice is Phase 3 (now substantially implemented).
 
@@ -134,4 +134,4 @@ Do not widen the Phase 2 OS-AI spine to absorb Honcho-specific compatibility wor
 
 > **Note on binary size:** The static CGO-free binary currently builds at **~17 MB** (measured: `bin/gormes` from `make build` with `-trimpath -ldflags="-s -w"` at commit `8aa9a6e6`, post-2.D). Phase 2.D added `robfig/cron/v3` (~20 KB) and ~1500 lines of Go across `internal/cron/`. The 3.D semantic-fusion additions (Embedder, `entity_embeddings` table, cosine scan) were absorbed within the same 17 MB envelope. Remains well within the 25 MB hard moat with ~8 MB headroom.
 
-For channel-by-channel donor analysis against the all-Go PicoClaw repo, see [Gateway Donor Map](../gateway-donor-map/).
+For channel-by-channel donor analysis against the all-Go PicoClaw repo, see [Gateway Donor Map](../../gateway-donor-map/).

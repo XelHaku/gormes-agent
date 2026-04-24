@@ -159,7 +159,7 @@ Nix installations are immutable — rollback is handled by Nix's generation syst
 nix profile rollback
 ```
 
-See [Nix Setup](nix-setup) for more details.
+See [Nix Setup](../nix-setup) for more details.
 
 ---
 

@@ -64,7 +64,7 @@ Key takeaways:
 - A Unix-socket control plane captures most of Overmind's practical value without taking on tmux as a hard dependency.
 - The right implementation order is: Procfile parser -> `.env` loading -> process-group shutdown -> fan-in logs -> optional PTY -> optional socket control plane.
 
-Detailed note: [Procfile Process Managers](./procfile-process-managers/)
+Detailed note: [Procfile Process Managers](../procfile-process-managers/)
 
 ---
 

@@ -9,8 +9,8 @@ weight: 8
 This page is the compact reference companion to the main MCP docs.
 
 For conceptual guidance, see:
-- [MCP (Model Context Protocol)](../user-guide/features/mcp)
-- [Use MCP with Hermes](../guides/use-mcp-with-hermes)
+- [MCP (Model Context Protocol)](../../user-guide/features/mcp)
+- [Use MCP with Hermes](../../guides/use-mcp-with-hermes)
 
 ## Root config shape
 

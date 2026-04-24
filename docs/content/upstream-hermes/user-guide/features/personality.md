@@ -256,10 +256,10 @@ At a high level, the prompt stack includes:
 
 ## Related docs
 
-- [Context Files](context-files)
-- [Configuration](../configuration)
-- [Tips & Best Practices](../../guides/tips)
-- [SOUL.md Guide](../../guides/use-soul-with-hermes)
+- [Context Files](../context-files)
+- [Configuration](../../configuration)
+- [Tips & Best Practices](../../../guides/tips)
+- [SOUL.md Guide](../../../guides/use-soul-with-hermes)
 
 ## CLI appearance vs conversational personality
 
@@ -268,4 +268,4 @@ Conversational personality and CLI appearance are separate:
 - `SOUL.md`, `agent.system_prompt`, and `/personality` affect how Hermes speaks
 - `display.skin` and `/skin` affect how Hermes looks in the terminal
 
-For terminal appearance, see [Skins & Themes](skins).
+For terminal appearance, see [Skins & Themes](../skins).

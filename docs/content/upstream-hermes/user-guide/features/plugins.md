@@ -8,7 +8,7 @@ weight: 11
 
 Hermes has a plugin system for adding custom tools, hooks, and integrations without modifying core code.
 
-**→ [Build a Hermes Plugin](../../guides/build-a-hermes-plugin)** — step-by-step guide with a complete working example.
+**→ [Build a Hermes Plugin](../../../guides/build-a-hermes-plugin)** — step-by-step guide with a complete working example.
 
 ## Quick overview
 
@@ -99,16 +99,16 @@ Project-local plugins under `./.hermes/plugins/` are disabled by default. Enable
 
 ## Available hooks
 
-Plugins can register callbacks for these lifecycle events. See the **[Event Hooks page](hooks#plugin-hooks)** for full details, callback signatures, and examples.
+Plugins can register callbacks for these lifecycle events. See the **[Event Hooks page](../hooks#plugin-hooks)** for full details, callback signatures, and examples.
 
 | Hook | Fires when |
 |------|-----------|
-| [`pre_tool_call`](hooks#pre_tool_call) | Before any tool executes |
-| [`post_tool_call`](hooks#post_tool_call) | After any tool returns |
-| [`pre_llm_call`](hooks#pre_llm_call) | Once per turn, before the LLM loop — can return `{"context": "..."}` to [inject context into the user message](hooks#pre_llm_call) |
-| [`post_llm_call`](hooks#post_llm_call) | Once per turn, after the LLM loop (successful turns only) |
-| [`on_session_start`](hooks#on_session_start) | New session created (first turn only) |
-| [`on_session_end`](hooks#on_session_end) | End of every `run_conversation` call + CLI exit handler |
+| [`pre_tool_call`](../hooks#pre_tool_call) | Before any tool executes |
+| [`post_tool_call`](../hooks#post_tool_call) | After any tool returns |
+| [`pre_llm_call`](../hooks#pre_llm_call) | Once per turn, before the LLM loop — can return `{"context": "..."}` to [inject context into the user message](../hooks#pre_llm_call) |
+| [`post_llm_call`](../hooks#post_llm_call) | Once per turn, after the LLM loop (successful turns only) |
+| [`on_session_start`](../hooks#on_session_start) | New session created (first turn only) |
+| [`on_session_end`](../hooks#on_session_end) | End of every `run_conversation` call + CLI exit handler |
 
 ## Plugin types
 
@@ -198,4 +198,4 @@ This enables plugins like remote control viewers, messaging bridges, or webhook 
 > **Note**
 > `inject_message` is only available in CLI mode. In gateway mode, there is no CLI reference and the method returns `False`.
 
-See the **[full guide](../../guides/build-a-hermes-plugin)** for handler contracts, schema format, hook behavior, error handling, and common mistakes.
+See the **[full guide](../../../guides/build-a-hermes-plugin)** for handler contracts, schema format, hook behavior, error handling, and common mistakes.

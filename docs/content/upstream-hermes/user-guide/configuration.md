@@ -69,7 +69,7 @@ delegation:
 
 Multiple references in a single value work: `url: "${HOST}:${PORT}"`. If a referenced variable is not set, the placeholder is kept verbatim (`${UNDEFINED_VAR}` stays as-is). Only the `${VAR}` syntax is supported — bare `$VAR` is not expanded.
 
-For AI provider setup (OpenRouter, Anthropic, Copilot, custom endpoints, self-hosted LLMs, fallback models, etc.), see [AI Providers](../integrations/providers).
+For AI provider setup (OpenRouter, Anthropic, Copilot, custom endpoints, self-hosted LLMs, fallback models, etc.), see [AI Providers](../../integrations/providers).
 
 ## Terminal Backend Configuration
 
@@ -345,7 +345,7 @@ export TERMINAL_LOCAL_PERSISTENT=true
 > **Note**
 > Commands that require `stdin_data` or sudo automatically fall back to one-shot mode, since the persistent shell's stdin is already occupied by the IPC protocol.
 
-See [Code Execution](features/code-execution) and the [Terminal section of the README](features/tools) for details on each backend.
+See [Code Execution](../features/code-execution) and the [Terminal section of the README](../features/tools) for details on each backend.
 
 ## Skill Settings
 
@@ -370,7 +370,7 @@ skills:
 hermes config set skills.config.myplugin.path ~/myplugin-data
 ```
 
-For details on declaring config settings in your own skills, see [Creating Skills — Config Settings](../developer-guide/creating-skills#config-settings-configyaml).
+For details on declaring config settings in your own skills, see [Creating Skills — Config Settings](../../developer-guide/creating-skills#config-settings-configyaml).
 
 ## Memory Configuration
 
@@ -489,7 +489,7 @@ Points at a custom OpenAI-compatible endpoint. Uses `OPENAI_API_KEY` for auth.
 
 ## Context Engine
 
-The context engine controls how conversations are managed when approaching the model's token limit. The built-in `compressor` engine uses lossy summarization (see [Context Compression](../developer-guide/context-compression-and-caching)). Plugin engines can replace it with alternative strategies.
+The context engine controls how conversations are managed when approaching the model's token limit. The built-in `compressor` engine uses lossy summarization (see [Context Compression](../../developer-guide/context-compression-and-caching)). Plugin engines can replace it with alternative strategies.
 
 ```yaml
 context:
@@ -505,7 +505,7 @@ context:
 
 Plugin engines are **never auto-activated** — you must explicitly set `context.engine` to the plugin name. Available engines can be browsed and selected via `hermes plugins` → Provider Plugins → Context Engine.
 
-See [Memory Providers](features/memory-providers) for the analogous single-select system for memory plugins.
+See [Memory Providers](../features/memory-providers) for the analogous single-select system for memory plugins.
 
 ## Iteration Budget Pressure
 
@@ -576,7 +576,7 @@ credential_pool_strategies:
   anthropic: least_used      # always pick the least-used key
 ```
 
-Options: `fill_first` (default), `round_robin`, `least_used`, `random`. See [Credential Pools](features/credential-pools) for full documentation.
+Options: `fill_first` (default), `round_robin`, `least_used`, `random`. See [Credential Pools](../features/credential-pools) for full documentation.
 
 ## Auxiliary Models
 
@@ -594,10 +594,10 @@ Every model slot in Hermes — auxiliary tasks, compression, fallback — uses t
 
 When `base_url` is set, Hermes ignores the provider and calls that endpoint directly (using `api_key` or `OPENAI_API_KEY` for auth). When only `provider` is set, Hermes uses that provider's built-in auth and base URL.
 
-Available providers for auxiliary tasks: `auto`, `main`, plus any provider in the [provider registry](../reference/environment-variables) — `openrouter`, `nous`, `openai-codex`, `copilot`, `copilot-acp`, `anthropic`, `gemini`, `google-gemini-cli`, `qwen-oauth`, `zai`, `kimi-coding`, `kimi-coding-cn`, `minimax`, `minimax-cn`, `deepseek`, `nvidia`, `xai`, `ollama-cloud`, `alibaba`, `bedrock`, `huggingface`, `arcee`, `xiaomi`, `kilocode`, `opencode-zen`, `opencode-go`, `ai-gateway` — or any named custom provider from your `custom_providers` list (e.g. `provider: "beans"`).
+Available providers for auxiliary tasks: `auto`, `main`, plus any provider in the [provider registry](../../reference/environment-variables) — `openrouter`, `nous`, `openai-codex`, `copilot`, `copilot-acp`, `anthropic`, `gemini`, `google-gemini-cli`, `qwen-oauth`, `zai`, `kimi-coding`, `kimi-coding-cn`, `minimax`, `minimax-cn`, `deepseek`, `nvidia`, `xai`, `ollama-cloud`, `alibaba`, `bedrock`, `huggingface`, `arcee`, `xiaomi`, `kilocode`, `opencode-zen`, `opencode-go`, `ai-gateway` — or any named custom provider from your `custom_providers` list (e.g. `provider: "beans"`).
 
 > **Warning: `"main"` is for auxiliary tasks only**
-> The `"main"` provider option means "use whatever provider my main agent uses" — it's only valid inside `auxiliary:`, `compression:`, and `fallback_model:` configs. It is **not** a valid value for your top-level `model.provider` setting. If you use a custom OpenAI-compatible endpoint, set `provider: custom` in your `model:` section. See [AI Providers](../integrations/providers) for all main model provider options.
+> The `"main"` provider option means "use whatever provider my main agent uses" — it's only valid inside `auxiliary:`, `compression:`, and `fallback_model:` configs. It is **not** a valid value for your top-level `model.provider` setting. If you use a custom OpenAI-compatible endpoint, set `provider: custom` in your `model:` section. See [AI Providers](../../integrations/providers) for all main model provider options.
 
 ### Full auxiliary config reference
 
@@ -669,7 +669,7 @@ auxiliary:
 > Each auxiliary task has a configurable `timeout` (in seconds). Defaults: vision 120s, web_extract 360s, approval 30s, compression 120s. Increase these if you use slow local models for auxiliary tasks. Vision also has a separate `download_timeout` (default 30s) for the HTTP image download — increase this for slow connections or self-hosted image servers.
 
 > **Info**
-> Context compression has its own `compression:` block for thresholds and an `auxiliary.compression:` block for model/provider settings — see [Context Compression](#context-compression) above. The fallback model uses a `fallback_model:` block — see [Fallback Model](../integrations/providers#fallback-model). All three follow the same provider/model/base_url pattern.
+> Context compression has its own `compression:` block for thresholds and an `auxiliary.compression:` block for model/provider settings — see [Context Compression](#context-compression) above. The fallback model uses a `fallback_model:` block — see [Fallback Model](../../integrations/providers#fallback-model). All three follow the same provider/model/base_url pattern.
 
 ### Changing the Vision Model
 
@@ -983,7 +983,7 @@ voice:
   silence_duration: 3.0         # Seconds of silence before auto-stop
 ```
 
-Use `/voice on` in the CLI to enable microphone mode, `record_key` to start/stop recording, and `/voice tts` to toggle spoken replies. See [Voice Mode](features/voice-mode) for end-to-end setup and platform-specific behavior.
+Use `/voice on` in the CLI to enable microphone mode, `record_key` to start/stop recording, and `/voice tts` to toggle spoken replies. See [Voice Mode](../features/voice-mode) for end-to-end setup and platform-specific behavior.
 
 ## Streaming
 
@@ -1032,7 +1032,7 @@ group_sessions_per_user: true  # true = per-user isolation in groups/channels, f
 - Direct messages are unaffected. Hermes still keys DMs by chat/DM ID as usual.
 - Threads stay isolated from their parent channel either way; with `true`, each participant also gets their own session inside the thread.
 
-For the behavior details and examples, see [Sessions](sessions) and the [Discord guide](messaging/discord).
+For the behavior details and examples, see [Sessions](../sessions) and the [Discord guide](../messaging/discord).
 
 ## Unauthorized DM Behavior
 
@@ -1141,7 +1141,7 @@ browser:
     managed_persistence: false   # When true, Camofox sessions persist cookies/logins across restarts
 ```
 
-The browser toolset supports multiple providers. See the [Browser feature page](features/browser) for details on Browserbase, Browser Use, and local Chrome CDP setup.
+The browser toolset supports multiple providers. See the [Browser feature page](../features/browser) for details on Browserbase, Browser Use, and local Chrome CDP setup.
 
 ## Timezone
 
@@ -1240,7 +1240,7 @@ Smart mode is particularly useful for reducing approval fatigue — it lets the 
 
 ## Checkpoints
 
-Automatic filesystem snapshots before destructive file operations. See the [Checkpoints & Rollback](checkpoints-and-rollback) for details.
+Automatic filesystem snapshots before destructive file operations. See the [Checkpoints & Rollback](../checkpoints-and-rollback) for details.
 
 ```yaml
 checkpoints:
@@ -1298,8 +1298,8 @@ Hermes uses two different context scopes:
 - All loaded context files are capped at 20,000 characters with smart truncation.
 
 See also:
-- [Personality & SOUL.md](features/personality)
-- [Context Files](features/context-files)
+- [Personality & SOUL.md](../features/personality)
+- [Context Files](../features/context-files)
 
 ## Working Directory
 

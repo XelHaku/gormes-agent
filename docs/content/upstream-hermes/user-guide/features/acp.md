@@ -191,6 +191,6 @@ or by editing `~/.hermes/.env`.
 
 ## See also
 
-- [ACP Internals](../../developer-guide/acp-internals)
-- [Provider Runtime Resolution](../../developer-guide/provider-runtime)
-- [Tools Runtime](../../developer-guide/tools-runtime)
+- [ACP Internals](../../../developer-guide/acp-internals)
+- [Provider Runtime Resolution](../../../developer-guide/provider-runtime)
+- [Tools Runtime](../../../developer-guide/tools-runtime)

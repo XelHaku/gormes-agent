@@ -223,6 +223,6 @@ hermes cron remove <job_id>         # Delete a job
 
 ## Related Docs
 
-- [Cron Feature Guide](../user-guide/features/cron)
-- [Gateway Internals](gateway-internals)
-- [Agent Loop Internals](agent-loop)
+- [Cron Feature Guide](../../user-guide/features/cron)
+- [Gateway Internals](../gateway-internals)
+- [Agent Loop Internals](../agent-loop)

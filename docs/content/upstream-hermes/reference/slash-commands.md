@@ -36,7 +36,7 @@ Type `/` in the CLI to open the autocomplete menu. Built-in commands are case-in
 | `/resume [name]` | Resume a previously-named session |
 | `/status` | Show session info |
 | `/agents` (alias: `/tasks`) | Show active agents and running tasks across the current session. |
-| `/background <prompt>` (alias: `/bg`) | Run a prompt in a separate background session. The agent processes your prompt independently — your current session stays free for other work. Results appear as a panel when the task finishes. See [CLI Background Sessions](../user-guide/cli#background-sessions). |
+| `/background <prompt>` (alias: `/bg`) | Run a prompt in a separate background session. The agent processes your prompt independently — your current session stays free for other work. Results appear as a panel when the task finishes. See [CLI Background Sessions](../../user-guide/cli#background-sessions). |
 | `/btw <question>` | Ephemeral side question using session context (no tools, not persisted). Useful for quick clarifications without affecting the conversation history. |
 | `/plan [request]` | Load the bundled `plan` skill to write a markdown plan instead of executing the work. Plans are saved under `.hermes/plans/` relative to the active workspace/backend working directory. |
 | `/branch [name]` (alias: `/fork`) | Branch the current session (explore a different path) |
@@ -141,7 +141,7 @@ The messaging gateway supports the following built-in commands inside Telegram, 
 | `/voice [on\|off\|tts\|join\|channel\|leave\|status]` | Control spoken replies in chat. `join`/`channel`/`leave` manage Discord voice-channel mode. |
 | `/rollback [number]` | List or restore filesystem checkpoints. |
 | `/snapshot [create\|restore <id>\|prune]` (alias: `/snap`) | Create or restore state snapshots of Hermes config/state. |
-| `/background <prompt>` | Run a prompt in a separate background session. Results are delivered back to the same chat when the task finishes. See [Messaging Background Sessions](../user-guide/messaging#background-sessions). |
+| `/background <prompt>` | Run a prompt in a separate background session. Results are delivered back to the same chat when the task finishes. See [Messaging Background Sessions](../../user-guide/messaging#background-sessions). |
 | `/plan [request]` | Load the bundled `plan` skill to write a markdown plan instead of executing the work. Plans are saved under `.hermes/plans/` relative to the active workspace/backend working directory. |
 | `/reload-mcp` (alias: `/reload_mcp`) | Reload MCP servers from config. |
 | `/reload` | Reload `.env` variables into the running session. |

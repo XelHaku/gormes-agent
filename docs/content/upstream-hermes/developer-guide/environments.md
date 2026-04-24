@@ -19,7 +19,7 @@ All three share the same core: an **environment** class that defines tasks, runs
 
 > **Tip: Quick Links**
 > - **Want to run benchmarks?** Jump to [Available Benchmarks](#available-benchmarks)
-> - **Want to train with RL?** See [RL Training Tools](../user-guide/features/rl-training) for the agent-driven interface, or [Running Environments](#running-environments) for manual execution
+> - **Want to train with RL?** See [RL Training Tools](../../user-guide/features/rl-training) for the agent-driven interface, or [Running Environments](#running-environments) for manual execution
 > - **Want to create a new environment?** See [Creating Environments](#creating-environments)
 
 ## Architecture
@@ -489,7 +489,7 @@ python my_env.py evaluate \
 - `WANDB_API_KEY` — for Weights & Biases metrics tracking
 - The `tinker-atropos` submodule (at `tinker-atropos/` in the repo)
 
-See [RL Training](../user-guide/features/rl-training) for the agent-driven RL workflow.
+See [RL Training](../../user-guide/features/rl-training) for the agent-driven RL workflow.
 
 ## Directory Structure
 

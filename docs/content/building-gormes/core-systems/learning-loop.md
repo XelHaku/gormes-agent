@@ -28,7 +28,7 @@ Upstream Hermes has a `skills/` directory with hand-authored SKILL.md files. It 
 
 ## Current status
 
-⏳ Planned — see [Phase 6](../architecture_plan/phase-6-learning-loop/) for the sub-phase breakdown.
+⏳ Planned — see [Phase 6](../../architecture_plan/phase-6-learning-loop/) for the sub-phase breakdown.
 
 Execution should be TDD-first and local-signal-first:
 

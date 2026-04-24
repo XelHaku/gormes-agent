@@ -5,7 +5,7 @@ weight: 7
 
 # Profile Commands Reference
 
-This page covers all commands related to [Hermes profiles](../user-guide/profiles). For general CLI commands, see [CLI Commands Reference](cli-commands).
+This page covers all commands related to [Hermes profiles](../../user-guide/profiles). For general CLI commands, see [CLI Commands Reference](../cli-commands).
 
 ## `hermes profile`
 
@@ -291,6 +291,6 @@ After installation, tab completion works for:
 
 ## See also
 
-- [Profiles User Guide](../user-guide/profiles)
-- [CLI Commands Reference](cli-commands)
-- [FAQ — Profiles section](faq#profiles)
+- [Profiles User Guide](../../user-guide/profiles)
+- [CLI Commands Reference](../cli-commands)
+- [FAQ — Profiles section](../faq#profiles)

@@ -9,7 +9,7 @@ Connect Hermes to WeCom (Enterprise WeChat) as a self-built enterprise applicati
 
 > **Info: WeCom Bot vs WeCom Callback**
 > Hermes supports two WeCom integration modes:
-> - **[WeCom Bot](wecom)** — bot-style, connects via WebSocket. Simpler setup, works in group chats.
+> - **[WeCom Bot](../wecom)** — bot-style, connects via WebSocket. Simpler setup, works in group chats.
 > - **WeCom Callback** (this page) — self-built app, receives encrypted XML callbacks. Shows as a first-class app in users' WeCom sidebar. Supports multi-corp routing.
 
 ## How It Works

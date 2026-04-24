@@ -556,4 +556,4 @@ Reply "yes"/"y" to approve or "no"/"n" to deny.
 
 Never share your bot token publicly. If compromised, revoke it immediately via BotFather's `/revoke` command.
 
-For more details, see the [Security documentation](../security). You can also use [DM pairing](.#dm-pairing-alternative-to-allowlists) for a more dynamic approach to user authorization.
+For more details, see the [Security documentation](../../security). You can also use [DM pairing](.#dm-pairing-alternative-to-allowlists) for a more dynamic approach to user authorization.

@@ -11,7 +11,7 @@ This page documents all 52 built-in tools in the Hermes tool registry, grouped b
 **Quick counts:** 10 browser tools, 4 file tools, 10 RL tools, 4 Home Assistant tools, 2 terminal tools, 2 web tools, 5 Feishu tools, and 15 standalone tools across other toolsets.
 
 > **Tip: MCP Tools**
-> In addition to built-in tools, Hermes can load tools dynamically from MCP servers. MCP tools appear with a server-name prefix (e.g., `github_create_issue` for the `github` MCP server). See [MCP Integration](../user-guide/features/mcp) for configuration.
+> In addition to built-in tools, Hermes can load tools dynamically from MCP servers. MCP tools appear with a server-name prefix (e.g., `github_create_issue` for the `github` MCP server). See [MCP Integration](../../user-guide/features/mcp) for configuration.
 
 ## `browser` toolset
 
@@ -90,7 +90,7 @@ Scoped to the Feishu document-comment handler. Drives comment read/write operati
 | `ha_list_services` | List available Home Assistant services (actions) for device control. Shows what actions can be performed on each device type and what parameters they accept. Use this to discover how to control devices found via ha_list_entities. | — |
 
 > **Note**
-> **Honcho tools** (`honcho_profile`, `honcho_search`, `honcho_context`, `honcho_reasoning`, `honcho_conclude`) are no longer built-in. They are available via the Honcho memory provider plugin at `plugins/memory/honcho/`. See [Memory Providers](../user-guide/features/memory-providers) for installation and usage.
+> **Honcho tools** (`honcho_profile`, `honcho_search`, `honcho_context`, `honcho_reasoning`, `honcho_conclude`) are no longer built-in. They are available via the Honcho memory provider plugin at `plugins/memory/honcho/`. See [Memory Providers](../../user-guide/features/memory-providers) for installation and usage.
 
 ## `image_gen` toolset
 

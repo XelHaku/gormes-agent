@@ -252,8 +252,8 @@ The gateway runs as a long-lived process, managed via:
 
 ## Related Docs
 
-- [Session Storage](session-storage)
-- [Cron Internals](cron-internals)
-- [ACP Internals](acp-internals)
-- [Agent Loop Internals](agent-loop)
-- [Messaging Gateway (User Guide)](../user-guide/messaging)
+- [Session Storage](../session-storage)
+- [Cron Internals](../cron-internals)
+- [ACP Internals](../acp-internals)
+- [Agent Loop Internals](../agent-loop)
+- [Messaging Gateway (User Guide)](../../user-guide/messaging)

@@ -498,8 +498,8 @@ Hermes Agent supports Discord voice messages:
 - **Discord voice channels**: Hermes can also join a voice channel, listen to users speaking, and talk back in the channel.
 
 For the full setup and operational guide, see:
-- [Voice Mode](../features/voice-mode)
-- [Use Voice Mode with Hermes](../../guides/use-voice-mode-with-hermes)
+- [Voice Mode](../../features/voice-mode)
+- [Use Voice Mode with Hermes](../../../guides/use-voice-mode-with-hermes)
 
 ## Forum Channels
 
@@ -612,4 +612,4 @@ DISCORD_ALLOW_MENTION_REPLIED_USER=true
 > **Tip**
 > Leave `everyone` and `roles` at `false` unless you know exactly why you need them. It is very easy for an LLM to produce the string `@everyone` inside a normal-looking response; without this protection, that would notify every member of your server.
 
-For more information on securing your Hermes Agent deployment, see the [Security Guide](../security).
+For more information on securing your Hermes Agent deployment, see the [Security Guide](../../security).

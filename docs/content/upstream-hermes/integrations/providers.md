@@ -128,10 +128,10 @@ with the Generative Language API enabled.
 > The OpenAI Codex provider authenticates via device code (open a URL, enter a code). Hermes stores the resulting credentials in its own auth store under `~/.hermes/auth.json` and can import existing Codex CLI credentials from `~/.codex/auth.json` when present. No Codex CLI installation is required.
 
 > **Warning**
-> Even when using Nous Portal, Codex, or a custom endpoint, some tools (vision, web summarization, MoA) use a separate "auxiliary" model — by default Gemini Flash via OpenRouter. An `OPENROUTER_API_KEY` enables these tools automatically. You can also configure which model and provider these tools use — see [Auxiliary Models](../user-guide/configuration#auxiliary-models).
+> Even when using Nous Portal, Codex, or a custom endpoint, some tools (vision, web summarization, MoA) use a separate "auxiliary" model — by default Gemini Flash via OpenRouter. An `OPENROUTER_API_KEY` enables these tools automatically. You can also configure which model and provider these tools use — see [Auxiliary Models](../../user-guide/configuration#auxiliary-models).
 
 > **Tip: Nous Tool Gateway**
-> Paid Nous Portal subscribers also get access to the **[Tool Gateway](../user-guide/features/tool-gateway)** — web search, image generation, TTS, and browser automation routed through your subscription. No extra API keys needed. It's offered automatically during `hermes model` setup, or enable it later with `hermes tools`.
+> Paid Nous Portal subscribers also get access to the **[Tool Gateway](../../user-guide/features/tool-gateway)** — web search, image generation, TTS, and browser automation routed through your subscription. No extra API keys needed. It's offered automatically during `hermes model` setup, or enable it later with `hermes tools`.
 
 ### Two Commands for Model Management
 
@@ -287,7 +287,7 @@ When using xAI as a provider (any base URL containing `x.ai`), Hermes automatica
 
 No configuration is needed — caching activates automatically when an xAI endpoint is detected and a session ID is available. This reduces latency and cost for multi-turn conversations.
 
-xAI also ships a dedicated TTS endpoint (`/v1/tts`). Select **xAI TTS** in `hermes tools` → Voice & TTS, or see the [Voice & TTS](../user-guide/features/tts#text-to-speech) page for config.
+xAI also ships a dedicated TTS endpoint (`/v1/tts`). Select **xAI TTS** in `hermes tools` → Voice & TTS, or see the [Voice & TTS](../../user-guide/features/tts#text-to-speech) page for config.
 
 ### Ollama Cloud — Managed Ollama Models, OAuth + API Key
 
@@ -342,7 +342,7 @@ Authentication uses the standard boto3 chain: explicit `AWS_ACCESS_KEY_ID`/`AWS_
 
 Bedrock uses the **Converse API** under the hood — requests are translated to Bedrock's model-agnostic shape, so the same config works for Claude, Nova, DeepSeek, and Llama models. Set `BEDROCK_BASE_URL` only if you're calling a non-default regional endpoint.
 
-See the [AWS Bedrock guide](../guides/aws-bedrock) for a walkthrough of IAM setup, region selection, and cross-region inference.
+See the [AWS Bedrock guide](../../guides/aws-bedrock) for a walkthrough of IAM setup, region selection, and cross-region inference.
 
 ### Qwen Portal (OAuth)
 
@@ -867,7 +867,7 @@ model:
 
 **Possible causes:**
 1. **Low output cap (`max_tokens`) on the server** — SGLang defaults to 128 tokens per response. Set `--default-max-tokens` on the server or configure Hermes with `model.max_tokens` in config.yaml. Note: `max_tokens` controls response length only — it is unrelated to how long your conversation history can be (that is `context_length`).
-2. **Context exhaustion** — The model filled its context window. Increase `model.context_length` or enable [context compression](../user-guide/configuration#context-compression) in Hermes.
+2. **Context exhaustion** — The model filled its context window. Increase `model.context_length` or enable [context compression](../../user-guide/configuration#context-compression) in Hermes.
 
 ---
 
@@ -1132,7 +1132,7 @@ When activated, the fallback swaps the model and provider mid-session without lo
 Supported providers: `openrouter`, `nous`, `openai-codex`, `copilot`, `copilot-acp`, `anthropic`, `gemini`, `google-gemini-cli`, `qwen-oauth`, `huggingface`, `zai`, `kimi-coding`, `kimi-coding-cn`, `minimax`, `minimax-cn`, `deepseek`, `nvidia`, `xai`, `ollama-cloud`, `bedrock`, `ai-gateway`, `opencode-zen`, `opencode-go`, `kilocode`, `xiaomi`, `arcee`, `alibaba`, `custom`.
 
 > **Tip**
-> Fallback is configured exclusively through `config.yaml` — there are no environment variables for it. For full details on when it triggers, supported providers, and how it interacts with auxiliary tasks and delegation, see [Fallback Providers](../user-guide/features/fallback-providers).
+> Fallback is configured exclusively through `config.yaml` — there are no environment variables for it. For full details on when it triggers, supported providers, and how it interacts with auxiliary tasks and delegation, see [Fallback Providers](../../user-guide/features/fallback-providers).
 
 ## Smart Model Routing
 
@@ -1171,5 +1171,5 @@ Use this when you want lower latency or cost without fully changing your default
 
 ## See Also
 
-- [Configuration](../user-guide/configuration) — General configuration (directory structure, config precedence, terminal backends, memory, compression, and more)
-- [Environment Variables](../reference/environment-variables) — Complete reference of all environment variables
+- [Configuration](../../user-guide/configuration) — General configuration (directory structure, config precedence, terminal backends, memory, compression, and more)
+- [Environment Variables](../../reference/environment-variables) — Complete reference of all environment variables

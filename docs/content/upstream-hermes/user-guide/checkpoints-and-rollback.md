@@ -200,4 +200,4 @@ You normally never need to touch these manually.
 - **Use `/rollback` instead of `git reset`** when you want to undo agent-driven changes only.
 - **Combine with Git worktrees** for maximum safety — keep each Hermes session in its own worktree/branch, with checkpoints as an extra layer.
 
-For running multiple agents in parallel on the same repo, see the guide on [Git worktrees](git-worktrees).
+For running multiple agents in parallel on the same repo, see the guide on [Git worktrees](../git-worktrees).

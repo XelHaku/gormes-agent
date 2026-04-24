@@ -26,7 +26,7 @@ Hermes Agent works with any OpenAI-compatible API. Supported providers include:
 - **MiniMax** — global and China endpoints
 - **Local models** — via [Ollama](https://ollama.com/), [vLLM](https://docs.vllm.ai/), [llama.cpp](https://github.com/ggerganov/llama.cpp), [SGLang](https://github.com/sgl-project/sglang), or any OpenAI-compatible server
 
-Set your provider with `hermes model` or by editing `~/.hermes/.env`. See the [Environment Variables](environment-variables) reference for all provider keys.
+Set your provider with `hermes model` or by editing `~/.hermes/.env`. See the [Environment Variables](../environment-variables) reference for all provider keys.
 
 ### Does it work on Windows?
 
@@ -46,7 +46,7 @@ Quick install:
 curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 ```
 
-For the fully explicit manual steps, supported extras, and current limitations, see the [Termux guide](../getting-started/termux).
+For the fully explicit manual steps, supported extras, and current limitations, see the [Termux guide](../../getting-started/termux).
 
 Important caveat: the full `.[all]` extra is not currently available on Android because the `voice` extra depends on `faster-whisper` → `ctranslate2`, and `ctranslate2` does not publish Android wheels. Use the tested `.[termux]` extra instead.
 
@@ -78,13 +78,13 @@ model:
 
 Hermes persists the endpoint, provider, and base URL in `config.yaml` so it survives restarts. If your local server has exactly one model loaded, `/model custom` auto-detects it. You can also set `provider: custom` in config.yaml — it's a first-class provider, not an alias for anything else.
 
-This works with Ollama, vLLM, llama.cpp server, SGLang, LocalAI, and others. See the [Configuration guide](../user-guide/configuration) for details.
+This works with Ollama, vLLM, llama.cpp server, SGLang, LocalAI, and others. See the [Configuration guide](../../user-guide/configuration) for details.
 
 > **Tip: Ollama users**
 > If you set a custom `num_ctx` in Ollama (e.g., `ollama run --num_ctx 16384`), make sure to set the matching context length in Hermes — Ollama's `/api/show` reports the model's *maximum* context, not the effective `num_ctx` you configured.
 
 > **Tip: Timeouts with local models**
-> Hermes auto-detects local endpoints and relaxes streaming timeouts (read timeout raised from 120s to 1800s, stale stream detection disabled). If you still hit timeouts on very large contexts, set `HERMES_STREAM_READ_TIMEOUT=1800` in your `.env`. See the [Local LLM guide](../guides/local-llm-on-mac#timeouts) for details.
+> Hermes auto-detects local endpoints and relaxes streaming timeouts (read timeout raised from 120s to 1800s, stale stream detection disabled). If you still hit timeouts on very large contexts, set `HERMES_STREAM_READ_TIMEOUT=1800` in your `.env`. See the [Local LLM guide](../../guides/local-llm-on-mac#timeouts) for details.
 
 ### How much does it cost?
 
@@ -92,14 +92,14 @@ Hermes Agent itself is **free and open-source** (MIT license). You pay only for 
 
 ### Can multiple people use one instance?
 
-Yes. The [messaging gateway](../user-guide/messaging) lets multiple users interact with the same Hermes Agent instance via Telegram, Discord, Slack, WhatsApp, or Home Assistant. Access is controlled through allowlists (specific user IDs) and DM pairing (first user to message claims access).
+Yes. The [messaging gateway](../../user-guide/messaging) lets multiple users interact with the same Hermes Agent instance via Telegram, Discord, Slack, WhatsApp, or Home Assistant. Access is controlled through allowlists (specific user IDs) and DM pairing (first user to message claims access).
 
 ### What's the difference between memory and skills?
 
 - **Memory** stores **facts** — things the agent knows about you, your projects, and preferences. Memories are retrieved automatically based on relevance.
 - **Skills** store **procedures** — step-by-step instructions for how to do things. Skills are recalled when the agent encounters a similar task.
 
-Both persist across sessions. See [Memory](../user-guide/features/memory) and [Skills](../user-guide/features/skills) for details.
+Both persist across sessions. See [Memory](../../user-guide/features/memory) and [Skills](../../user-guide/features/skills) for details.
 
 ### Can I use it in my own Python project?
 
@@ -112,7 +112,7 @@ agent = AIAgent(model="anthropic/claude-opus-4.7")
 response = agent.chat("Explain quantum computing briefly")
 ```
 
-See the [Python Library guide](../user-guide/features/code-execution) for full API usage.
+See the [Python Library guide](../../user-guide/features/code-execution) for full API usage.
 
 ---
 
@@ -293,7 +293,7 @@ custom_providers:
         context_length: 32768
 ```
 
-See [Context Length Detection](../integrations/providers#context-length-detection) for how auto-detection works and all override options.
+See [Context Length Detection](../../integrations/providers#context-length-detection) for how auto-detection works and all override options.
 
 ---
 
@@ -305,7 +305,7 @@ See [Context Length Detection](../integrations/providers#context-length-detectio
 
 **Solution:** When prompted, review the command and type `y` to approve it. You can also:
 - Ask the agent to use a safer alternative
-- See the full list of dangerous patterns in the [Security docs](../user-guide/security)
+- See the full list of dangerous patterns in the [Security docs](../../user-guide/security)
 
 > **Tip**
 > This is working as intended — Hermes never silently runs destructive commands. The approval prompt shows you exactly what will execute.
@@ -377,7 +377,7 @@ cat ~/.hermes/logs/gateway.log | tail -50
 | **DM pairing** | First user to message in DM claims exclusive access |
 | **Open** | Anyone can interact (not recommended for production) |
 
-Configure in `~/.hermes/config.yaml` under your gateway's settings. See the [Messaging docs](../user-guide/messaging).
+Configure in `~/.hermes/config.yaml` under your gateway's settings. See the [Messaging docs](../../user-guide/messaging).
 
 #### Gateway won't start
 
@@ -542,9 +542,9 @@ hermes chat
 ```
 
 See also:
-- [MCP (Model Context Protocol)](../user-guide/features/mcp)
-- [Use MCP with Hermes](../guides/use-mcp-with-hermes)
-- [MCP Config Reference](mcp-config-reference)
+- [MCP (Model Context Protocol)](../../user-guide/features/mcp)
+- [Use MCP with Hermes](../../guides/use-mcp-with-hermes)
+- [MCP Config Reference](../mcp-config-reference)
 
 #### MCP timeout errors
 
@@ -624,7 +624,7 @@ For one-off model switches without delegation, use `/model` in the CLI:
 /model openai/gpt-5.4                   # switch back
 ```
 
-See [Subagent Delegation](../user-guide/features/delegation) for more on how delegation works.
+See [Subagent Delegation](../../user-guide/features/delegation) for more on how delegation works.
 
 ### Running multiple agents on one WhatsApp number (per-chat binding)
 
@@ -642,7 +642,7 @@ See [Subagent Delegation](../user-guide/features/delegation) for more on how del
 
 4. **Use Telegram or Discord instead.** These platforms support per-chat binding more naturally — each Telegram group or Discord channel gets its own session, and you can run multiple bot tokens (one per profile) on the same account.
 
-See [Profiles](../user-guide/profiles) and [WhatsApp setup](../user-guide/messaging/whatsapp) for more details.
+See [Profiles](../../user-guide/profiles) and [WhatsApp setup](../../user-guide/messaging/whatsapp) for more details.
 
 ### Controlling what shows up in Telegram (hiding logs and reasoning)
 

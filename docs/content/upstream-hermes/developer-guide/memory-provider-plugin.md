@@ -9,7 +9,7 @@ weight: 8
 Memory provider plugins give Hermes Agent persistent, cross-session knowledge beyond the built-in MEMORY.md and USER.md. This guide covers how to build one.
 
 > **Tip**
-> Memory providers are one of two **provider plugin** types. The other is [Context Engine Plugins](context-engine-plugin), which replace the built-in context compressor. Both follow the same pattern: single-select, config-driven, managed via `hermes plugins`.
+> Memory providers are one of two **provider plugin** types. The other is [Context Engine Plugins](../context-engine-plugin), which replace the built-in context compressor. Both follow the same pattern: single-select, config-driven, managed via `hermes plugins`.
 
 ## Directory Structure
 

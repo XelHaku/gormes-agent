@@ -16,15 +16,15 @@ We value contributions in this order:
 2. **Cross-platform compatibility** — macOS, different Linux distros, WSL2
 3. **Security hardening** — shell injection, prompt injection, path traversal
 4. **Performance and robustness** — retry logic, error handling, graceful degradation
-5. **New skills** — broadly useful ones (see [Creating Skills](creating-skills))
+5. **New skills** — broadly useful ones (see [Creating Skills](../creating-skills))
 6. **New tools** — rarely needed; most capabilities should be skills
 7. **Documentation** — fixes, clarifications, new examples
 
 ## Common contribution paths
 
-- Building a new tool? Start with [Adding Tools](adding-tools)
-- Building a new skill? Start with [Creating Skills](creating-skills)
-- Building a new inference provider? Start with [Adding Providers](adding-providers)
+- Building a new tool? Start with [Adding Tools](../adding-tools)
+- Building a new skill? Start with [Creating Skills](../creating-skills)
+- Building a new inference provider? Start with [Adding Providers](../adding-providers)
 
 ## Development Setup
 

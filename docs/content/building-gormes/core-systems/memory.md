@@ -39,4 +39,4 @@ Persistent, searchable state that outlives the process. Structured enough for gr
 
 Chat logs are append-only. Memory has schema. You query it, derive from it, inject it back into the context window. The SQLite + FTS5 combination gives you ACID durability *and* full-text search in a single ~100 KB binary dependency.
 
-See [Phase 3](../architecture_plan/phase-3-memory/) for the full sub-status.
+See [Phase 3](../../architecture_plan/phase-3-memory/) for the full sub-status.

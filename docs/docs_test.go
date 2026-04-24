@@ -472,33 +472,43 @@ func isExternalLink(link string) bool {
 	}
 }
 
+func TestResolveContentLinkUsesRenderedLeafURLBase(t *testing.T) {
+	sourceRel := "building-gormes/autoloop/autoloop-handoff.md"
+
+	if err := resolveContentLink(sourceRel, "./agent-queue/"); !os.IsNotExist(err) {
+		t.Fatalf("leaf-relative sibling link resolved from source directory; got %v", err)
+	}
+	if err := resolveContentLink(sourceRel, "../agent-queue/"); err != nil {
+		t.Fatalf("rendered leaf-relative sibling link should resolve: %v", err)
+	}
+}
+
 func resolveContentLink(sourceRel, link string) error {
-	sourceDir := filepath.Dir(filepath.Join(hugoContentRoot, sourceRel))
 	target := link
 	if idx := strings.IndexAny(target, "?#"); idx >= 0 {
 		target = target[:idx]
 	}
 
-	sourceDirs := []string{sourceDir}
+	sourceDir := filepath.Dir(sourceRel)
+	renderedDir := sourceDir
 	if base := filepath.Base(sourceRel); base != "_index.md" && filepath.Ext(base) == ".md" {
-		sourceDirs = append(sourceDirs, filepath.Join(sourceDir, strings.TrimSuffix(base, ".md")))
+		renderedDir = filepath.Join(sourceDir, strings.TrimSuffix(base, ".md"))
 	}
 
-	for _, dir := range sourceDirs {
-		candidate := filepath.Clean(filepath.Join(dir, target))
-		checks := []string{
-			candidate + ".md",
-			filepath.Join(candidate, "_index.md"),
-			filepath.Join(candidate, "index.md"),
-		}
-		if strings.HasSuffix(target, "/") {
-			checks = append([]string{filepath.Join(candidate, "_index.md")}, checks...)
-		}
+	candidateRel := filepath.Clean(filepath.Join(renderedDir, target))
+	candidate := filepath.Join(hugoContentRoot, candidateRel)
+	checks := []string{
+		candidate + ".md",
+		filepath.Join(candidate, "_index.md"),
+		filepath.Join(candidate, "index.md"),
+	}
+	if strings.HasSuffix(target, "/") {
+		checks = append([]string{filepath.Join(candidate, "_index.md")}, checks...)
+	}
 
-		for _, check := range checks {
-			if _, err := os.Stat(check); err == nil {
-				return nil
-			}
+	for _, check := range checks {
+		if _, err := os.Stat(check); err == nil {
+			return nil
 		}
 	}
 

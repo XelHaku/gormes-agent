@@ -13,7 +13,7 @@ Tools are functions that extend the agent's capabilities. They're organized into
 Hermes ships with a broad built-in tool registry covering web search, browser automation, terminal execution, file editing, memory, delegation, RL training, messaging delivery, Home Assistant, and more.
 
 > **Note**
-> **Honcho cross-session memory** is available as a memory provider plugin (`plugins/memory/honcho/`), not as a built-in toolset. See [Plugins](plugins) for installation.
+> **Honcho cross-session memory** is available as a memory provider plugin (`plugins/memory/honcho/`), not as a built-in toolset. See [Plugins](../plugins) for installation.
 
 High-level categories:
 
@@ -28,10 +28,10 @@ High-level categories:
 | **Automation & delivery** | `cronjob`, `send_message` | Scheduled tasks with create/list/update/pause/resume/run/remove actions, plus outbound messaging delivery. |
 | **Integrations** | `ha_*`, MCP server tools, `rl_*` | Home Assistant, MCP, RL training, and other integrations. |
 
-For the authoritative code-derived registry, see [Built-in Tools Reference](../../reference/tools-reference) and [Toolsets Reference](../../reference/toolsets-reference).
+For the authoritative code-derived registry, see [Built-in Tools Reference](../../../reference/tools-reference) and [Toolsets Reference](../../../reference/toolsets-reference).
 
 > **Tip: Nous Tool Gateway**
-> Paid [Nous Portal](https://portal.nousresearch.com) subscribers can use web search, image generation, TTS, and browser automation through the **[Tool Gateway](tool-gateway)** — no separate API keys needed. Run `hermes model` to enable it, or configure individual tools with `hermes tools`.
+> Paid [Nous Portal](https://portal.nousresearch.com) subscribers can use web search, image generation, TTS, and browser automation through the **[Tool Gateway](../tool-gateway)** — no separate API keys needed. Run `hermes model` to enable it, or configure individual tools with `hermes tools`.
 
 ## Using Toolsets
 
@@ -48,7 +48,7 @@ hermes tools
 
 Common toolsets include `web`, `terminal`, `file`, `browser`, `vision`, `image_gen`, `moa`, `skills`, `tts`, `todo`, `memory`, `session_search`, `cronjob`, `code_execution`, `delegation`, `clarify`, `homeassistant`, and `rl`.
 
-See [Toolsets Reference](../../reference/toolsets-reference) for the full set, including platform presets such as `hermes-cli`, `hermes-telegram`, and dynamic MCP toolsets like `mcp-<server>`.
+See [Toolsets Reference](../../../reference/toolsets-reference) for the full set, including platform presets such as `hermes-cli`, `hermes-telegram`, and dynamic MCP toolsets like `mcp-<server>`.
 
 ## Terminal Backends
 

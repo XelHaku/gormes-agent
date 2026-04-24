@@ -600,4 +600,4 @@ _TOOL_HANDLERS = {
 
 ---
 
-**See also:** [`01-prompts.md`](./01-prompts) — prompts that call these tools.
+**See also:** [`01-prompts.md`](../01-prompts) — prompts that call these tools.

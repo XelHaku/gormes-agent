@@ -6,7 +6,7 @@ weight: 2
 
 # Adding Tools
 
-Before writing a tool, ask yourself: **should this be a [skill](creating-skills) instead?**
+Before writing a tool, ask yourself: **should this be a [skill](../creating-skills) instead?**
 
 Make it a **Skill** when the capability can be expressed as instructions + shell commands + existing tools (arXiv search, git workflows, Docker management, PDF processing).
 

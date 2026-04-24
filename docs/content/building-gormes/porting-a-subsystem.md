@@ -9,7 +9,7 @@ The contribution path. Use this when you want to port a piece of Hermes into Gor
 
 ## 1. Pick your target
 
-Open [Subsystem Inventory](./architecture_plan/subsystem-inventory/). Every row is a Hermes subsystem with a target Gormes sub-phase. Pick one that:
+Open [Subsystem Inventory](../architecture_plan/subsystem-inventory/). Every row is a Hermes subsystem with a target Gormes sub-phase. Pick one that:
 
 - Carries a ⏳ planned status (not already shipped)
 - Has no hard dependency on a later phase (check the "Target phase" column)
@@ -32,9 +32,9 @@ Before writing implementation tasks, answer these in the spec or plan:
 
 Useful donor study pages:
 
-- [Upstream Hermes Source Study](../upstream-hermes/source-study/)
-- [Upstream GBrain Architecture](../upstream-gbrain/architecture/)
-- [Upstream Lessons](./upstream-lessons/)
+- [Upstream Hermes Source Study](../../upstream-hermes/source-study/)
+- [Upstream GBrain Architecture](../../upstream-gbrain/architecture/)
+- [Upstream Lessons](../upstream-lessons/)
 
 ## 3. Write a spec
 
@@ -54,4 +54,4 @@ Target `main`. Title convention: `feat(gormes/<subsystem>): port <capability> fr
 
 ## 7. Update the inventory
 
-Flip your row in [Subsystem Inventory](./architecture_plan/subsystem-inventory/) from ⏳ planned to ✅ shipped, with a link to the shipped spec.
+Flip your row in [Subsystem Inventory](../architecture_plan/subsystem-inventory/) from ⏳ planned to ✅ shipped, with a link to the shipped spec.

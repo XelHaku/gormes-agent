@@ -8,7 +8,7 @@ weight: 1
 
 This page covers the **terminal commands** you run from your shell.
 
-For in-chat slash commands, see [Slash Commands Reference](slash-commands).
+For in-chat slash commands, see [Slash Commands Reference](../slash-commands).
 
 ## Global entrypoint
 
@@ -27,7 +27,7 @@ hermes [global-options] <command> [subcommand/options]
 | `--worktree`, `-w` | Start in an isolated git worktree for parallel-agent workflows. |
 | `--yolo` | Bypass dangerous-command approval prompts. |
 | `--pass-session-id` | Include the session ID in the agent's system prompt. |
-| `--tui` | Launch the [TUI](../user-guide/tui) instead of the classic CLI. Equivalent to `HERMES_TUI=1`. |
+| `--tui` | Launch the [TUI](../../user-guide/tui) instead of the classic CLI. Equivalent to `HERMES_TUI=1`. |
 | `--dev` | With `--tui`: run the TypeScript sources directly via `tsx` instead of the prebuilt bundle (for TUI contributors). |
 
 ## Top-level commands
@@ -174,7 +174,7 @@ Subcommands:
 | `setup` | Interactive messaging-platform setup. |
 
 > **Tip: WSL users**
-> Use `hermes gateway run` instead of `hermes gateway start` — WSL's systemd support is unreliable. Wrap it in tmux for persistence: `tmux new -s hermes 'hermes gateway run'`. See [WSL FAQ](faq#wsl-gateway-keeps-disconnecting-or-hermes-gateway-start-fails) for details.
+> Use `hermes gateway run` instead of `hermes gateway start` — WSL's systemd support is unreliable. Wrap it in tmux for persistence: `tmux new -s hermes 'hermes gateway run'`. See [WSL FAQ](../faq#wsl-gateway-keeps-disconnecting-or-hermes-gateway-start-fails) for details.
 
 ## `hermes setup`
 
@@ -214,7 +214,7 @@ Runs the WhatsApp pairing/setup flow, including mode selection and QR-code pairi
 
 ## `hermes auth`
 
-Manage credential pools for same-provider key rotation. See [Credential Pools](../user-guide/features/credential-pools) for full documentation.
+Manage credential pools for same-provider key rotation. See [Credential Pools](../../user-guide/features/credential-pools) for full documentation.
 
 ```bash
 hermes auth                                              # Interactive wizard
@@ -649,7 +649,7 @@ Install support first:
 pip install -e '.[acp]'
 ```
 
-See [ACP Editor Integration](../user-guide/features/acp) and [ACP Internals](../developer-guide/acp-internals).
+See [ACP Editor Integration](../../user-guide/features/acp) and [ACP Internals](../../developer-guide/acp-internals).
 
 ## `hermes mcp`
 
@@ -668,7 +668,7 @@ Manage MCP (Model Context Protocol) server configurations and run Hermes as an M
 | `test <name>` | Test connection to an MCP server. |
 | `configure <name>` (alias: `config`) | Toggle tool selection for a server. |
 
-See [MCP Config Reference](mcp-config-reference), [Use MCP with Hermes](../guides/use-mcp-with-hermes), and [MCP Server Mode](../user-guide/features/mcp#running-hermes-as-an-mcp-server).
+See [MCP Config Reference](../mcp-config-reference), [Use MCP with Hermes](../../guides/use-mcp-with-hermes), and [MCP Server Mode](../../user-guide/features/mcp#running-hermes-as-an-mcp-server).
 
 ## `hermes plugins`
 
@@ -697,7 +697,7 @@ Provider plugin selections are saved to `config.yaml`:
 
 General plugin disabled list is stored in `config.yaml` under `plugins.disabled`.
 
-See [Plugins](../user-guide/features/plugins) and [Build a Hermes Plugin](../guides/build-a-hermes-plugin).
+See [Plugins](../../user-guide/features/plugins) and [Build a Hermes Plugin](../../guides/build-a-hermes-plugin).
 
 ## `hermes tools`
 
@@ -769,7 +769,7 @@ The migration covers 30+ categories across persona, memory, skills, model provid
 
 **API key resolution** checks three sources in priority order: config values → `~/.openclaw/.env` → `auth-profiles.json`. All token fields handle plain strings, env templates (`${VAR}`), and SecretRef objects.
 
-For the complete config key mapping, SecretRef handling details, and post-migration checklist, see the **[full migration guide](../guides/migrate-from-openclaw)**.
+For the complete config key mapping, SecretRef handling details, and post-migration checklist, see the **[full migration guide](../../guides/migrate-from-openclaw)**.
 
 ### Examples
 
@@ -793,7 +793,7 @@ hermes claw migrate --source /home/user/old-openclaw
 hermes dashboard [options]
 ```
 
-Launch the web dashboard — a browser-based UI for managing configuration, API keys, and monitoring sessions. Requires `pip install hermes-agent[web]` (FastAPI + Uvicorn). See [Web Dashboard](../user-guide/features/web-dashboard) for full documentation.
+Launch the web dashboard — a browser-based UI for managing configuration, API keys, and monitoring sessions. Requires `pip install hermes-agent[web]` (FastAPI + Uvicorn). See [Web Dashboard](../../user-guide/features/web-dashboard) for full documentation.
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -869,8 +869,8 @@ hermes completion zsh >> ~/.zshrc
 
 ## See also
 
-- [Slash Commands Reference](slash-commands)
-- [CLI Interface](../user-guide/cli)
-- [Sessions](../user-guide/sessions)
-- [Skills System](../user-guide/features/skills)
-- [Skins & Themes](../user-guide/features/skins)
+- [Slash Commands Reference](../slash-commands)
+- [CLI Interface](../../user-guide/cli)
+- [Sessions](../../user-guide/sessions)
+- [Skills System](../../user-guide/features/skills)
+- [Skins & Themes](../../user-guide/features/skins)

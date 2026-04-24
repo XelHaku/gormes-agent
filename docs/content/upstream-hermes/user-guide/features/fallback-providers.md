@@ -8,7 +8,7 @@ weight: 8
 
 Hermes Agent has three layers of resilience that keep your sessions running when providers hit issues:
 
-1. **[Credential pools](credential-pools)** — rotate across multiple API keys for the *same* provider (tried first)
+1. **[Credential pools](../credential-pools)** — rotate across multiple API keys for the *same* provider (tried first)
 2. **Primary model fallback** — automatically switches to a *different* provider:model when your main model fails
 3. **Auxiliary task fallback** — independent provider resolution for side tasks like vision, compression, and web extraction
 
@@ -249,7 +249,7 @@ All three — auxiliary, compression, fallback — work the same way: set `provi
 
 ### Provider Options for Auxiliary Tasks
 
-These options apply to `auxiliary:`, `compression:`, and `fallback_model:` configs only — `"main"` is **not** a valid value for your top-level `model.provider`. For custom endpoints, use `provider: custom` in your `model:` section (see [AI Providers](../../integrations/providers)).
+These options apply to `auxiliary:`, `compression:`, and `fallback_model:` configs only — `"main"` is **not** a valid value for your top-level `model.provider`. For custom endpoints, use `provider: custom` in your `model:` section (see [AI Providers](../../../integrations/providers)).
 
 | Provider | Description | Requirements |
 |----------|-------------|-------------|
@@ -306,7 +306,7 @@ delegation:
   # api_key: "local-key"
 ```
 
-See [Subagent Delegation](delegation) for full configuration details.
+See [Subagent Delegation](../delegation) for full configuration details.
 
 ---
 
@@ -324,7 +324,7 @@ cronjob(
 )
 ```
 
-See [Scheduled Tasks (Cron)](cron) for full configuration details.
+See [Scheduled Tasks (Cron)](../cron) for full configuration details.
 
 ---
 

@@ -624,7 +624,7 @@ Proxy mode is not limited to Matrix. Any platform adapter can use it — set `GA
 > **Warning**
 > Always set `MATRIX_ALLOWED_USERS` to restrict who can interact with the bot. Without it, the gateway denies all users by default as a safety measure. Only add User IDs of people you trust — authorized users have full access to the agent's capabilities, including tool use and system access.
 
-For more information on securing your Hermes Agent deployment, see the [Security Guide](../security).
+For more information on securing your Hermes Agent deployment, see the [Security Guide](../../security).
 
 ## Notes
 

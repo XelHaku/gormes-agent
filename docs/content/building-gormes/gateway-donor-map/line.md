@@ -72,7 +72,7 @@ Rebuild in Gormes-native form:
 
 ## Implementation Notes
 
-- LINE should be designed as a webhook family adapter inside Gormes, alongside the patterns in [shared-adapter-patterns](./shared-adapter-patterns/) and the generic [webhook](./webhook/) dossier.
+- LINE should be designed as a webhook family adapter inside Gormes, alongside the patterns in [shared-adapter-patterns](../shared-adapter-patterns/) and the generic [webhook](../webhook/) dossier.
 - Preserve the order of HTTP defenses from the donor: method check, body size limit, signature validation, JSON decode, quick acknowledgment.
 - Reply-token age matters. Gormes should preserve the "try reply first, then push" behavior because it directly affects LINE API cost and user experience.
 - Treat bot info lookup as optional enhancement for mention detection, not as a startup blocker.

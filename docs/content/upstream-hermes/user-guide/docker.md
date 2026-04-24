@@ -9,7 +9,7 @@ weight: 7
 There are two distinct ways Docker intersects with Hermes Agent:
 
 1. **Running Hermes IN Docker** — the agent itself runs inside a container (this page's primary focus)
-2. **Docker as a terminal backend** — the agent runs on your host but executes commands inside a Docker sandbox (see [Configuration → terminal.backend](configuration))
+2. **Docker as a terminal backend** — the agent runs on your host but executes commands inside a Docker sandbox (see [Configuration → terminal.backend](../configuration))
 
 This page covers option 1. The container stores all user data (config, API keys, sessions, skills, memories) in a single directory mounted from the host at `/opt/data`. The image itself is stateless and can be upgraded by pulling a new version without losing any configuration.
 
@@ -39,7 +39,7 @@ docker run -d \
   nousresearch/hermes-agent gateway run
 ```
 
-Port 8642 exposes the gateway's [OpenAI-compatible API server](features/api-server) and health endpoint. It's optional if you only use chat platforms (Telegram, Discord, etc.), but required if you want the dashboard or external tools to reach the gateway.
+Port 8642 exposes the gateway's [OpenAI-compatible API server](../features/api-server) and health endpoint. It's optional if you only use chat platforms (Telegram, Discord, etc.), but required if you want the dashboard or external tools to reach the gateway.
 
 Opening any port on an internet facing machine is a security risk. You should not do it unless you understand the risks.
 

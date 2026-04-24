@@ -175,16 +175,16 @@ Scheduler tick → load due jobs from jobs.json
 If you are new to the codebase:
 
 1. **This page** — orient yourself
-2. **[Agent Loop Internals](agent-loop)** — how AIAgent works
-3. **[Prompt Assembly](prompt-assembly)** — system prompt construction
-4. **[Provider Runtime Resolution](provider-runtime)** — how providers are selected
-5. **[Adding Providers](adding-providers)** — practical guide to adding a new provider
-6. **[Tools Runtime](tools-runtime)** — tool registry, dispatch, environments
-7. **[Session Storage](session-storage)** — SQLite schema, FTS5, session lineage
-8. **[Gateway Internals](gateway-internals)** — messaging platform gateway
-9. **[Context Compression & Prompt Caching](context-compression-and-caching)** — compression and caching
-10. **[ACP Internals](acp-internals)** — IDE integration
-11. **[Environments, Benchmarks & Data Generation](environments)** — RL training
+2. **[Agent Loop Internals](../agent-loop)** — how AIAgent works
+3. **[Prompt Assembly](../prompt-assembly)** — system prompt construction
+4. **[Provider Runtime Resolution](../provider-runtime)** — how providers are selected
+5. **[Adding Providers](../adding-providers)** — practical guide to adding a new provider
+6. **[Tools Runtime](../tools-runtime)** — tool registry, dispatch, environments
+7. **[Session Storage](../session-storage)** — SQLite schema, FTS5, session lineage
+8. **[Gateway Internals](../gateway-internals)** — messaging platform gateway
+9. **[Context Compression & Prompt Caching](../context-compression-and-caching)** — compression and caching
+10. **[ACP Internals](../acp-internals)** — IDE integration
+11. **[Environments, Benchmarks & Data Generation](../environments)** — RL training
 
 ## Major Subsystems
 
@@ -192,7 +192,7 @@ If you are new to the codebase:
 
 The synchronous orchestration engine (`AIAgent` in `run_agent.py`). Handles provider selection, prompt construction, tool execution, retries, fallback, callbacks, compression, and persistence. Supports three API modes for different provider backends.
 
-→ [Agent Loop Internals](agent-loop)
+→ [Agent Loop Internals](../agent-loop)
 
 ### Prompt System
 
@@ -202,55 +202,55 @@ Prompt construction and maintenance across the conversation lifecycle:
 - **`prompt_caching.py`** — Applies Anthropic cache breakpoints for prefix caching
 - **`context_compressor.py`** — Summarizes middle conversation turns when context exceeds thresholds
 
-→ [Prompt Assembly](prompt-assembly), [Context Compression & Prompt Caching](context-compression-and-caching)
+→ [Prompt Assembly](../prompt-assembly), [Context Compression & Prompt Caching](../context-compression-and-caching)
 
 ### Provider Resolution
 
 A shared runtime resolver used by CLI, gateway, cron, ACP, and auxiliary calls. Maps `(provider, model)` tuples to `(api_mode, api_key, base_url)`. Handles 18+ providers, OAuth flows, credential pools, and alias resolution.
 
-→ [Provider Runtime Resolution](provider-runtime)
+→ [Provider Runtime Resolution](../provider-runtime)
 
 ### Tool System
 
 Central tool registry (`tools/registry.py`) with 47 registered tools across 19 toolsets. Each tool file self-registers at import time. The registry handles schema collection, dispatch, availability checking, and error wrapping. Terminal tools support 6 backends (local, Docker, SSH, Daytona, Modal, Singularity).
 
-→ [Tools Runtime](tools-runtime)
+→ [Tools Runtime](../tools-runtime)
 
 ### Session Persistence
 
 SQLite-based session storage with FTS5 full-text search. Sessions have lineage tracking (parent/child across compressions), per-platform isolation, and atomic writes with contention handling.
 
-→ [Session Storage](session-storage)
+→ [Session Storage](../session-storage)
 
 ### Messaging Gateway
 
 Long-running process with 18 platform adapters, unified session routing, user authorization (allowlists + DM pairing), slash command dispatch, hook system, cron ticking, and background maintenance.
 
-→ [Gateway Internals](gateway-internals)
+→ [Gateway Internals](../gateway-internals)
 
 ### Plugin System
 
 Three discovery sources: `~/.hermes/plugins/` (user), `.hermes/plugins/` (project), and pip entry points. Plugins register tools, hooks, and CLI commands through a context API. Two specialized plugin types exist: memory providers (`plugins/memory/`) and context engines (`plugins/context_engine/`). Both are single-select — only one of each can be active at a time, configured via `hermes plugins` or `config.yaml`.
 
-→ [Plugin Guide](../guides/build-a-hermes-plugin), [Memory Provider Plugin](memory-provider-plugin)
+→ [Plugin Guide](../../guides/build-a-hermes-plugin), [Memory Provider Plugin](../memory-provider-plugin)
 
 ### Cron
 
 First-class agent tasks (not shell tasks). Jobs store in JSON, support multiple schedule formats, can attach skills and scripts, and deliver to any platform.
 
-→ [Cron Internals](cron-internals)
+→ [Cron Internals](../cron-internals)
 
 ### ACP Integration
 
 Exposes Hermes as an editor-native agent over stdio/JSON-RPC for VS Code, Zed, and JetBrains.
 
-→ [ACP Internals](acp-internals)
+→ [ACP Internals](../acp-internals)
 
 ### RL / Environments / Trajectories
 
 Full environment framework for evaluation and RL training. Integrates with Atropos, supports multiple tool-call parsers, and generates ShareGPT-format trajectories.
 
-→ [Environments, Benchmarks & Data Generation](environments), [Trajectories & Training Format](trajectory-format)
+→ [Environments, Benchmarks & Data Generation](../environments), [Trajectories & Training Format](../trajectory-format)
 
 ## Design Principles
 

@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scri
 ```
 
 > **Tip: Android / Termux**
-> If you're installing on a phone, see the dedicated [Termux guide](termux) for the tested manual path, supported extras, and current Android-specific limitations.
+> If you're installing on a phone, see the dedicated [Termux guide](../termux) for the tested manual path, supported extras, and current Android-specific limitations.
 
 > **Tip: Windows Users**
 > Install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) first, then run the command above inside your WSL2 terminal.
@@ -75,7 +75,7 @@ hermes setup       # Or configure everything at once
 > Hermes Agent requires a model with at least **64,000 tokens** of context. Models with smaller windows cannot maintain enough working memory for multi-step tool-calling workflows and will be rejected at startup. Most hosted models (Claude, GPT, Gemini, Qwen, DeepSeek) meet this easily. If you're running a local model, set its context size to at least 64K (e.g. `--ctx-size 65536` for llama.cpp or `-c 65536` for Ollama).
 
 > **Tip**
-> You can switch providers at any time with `hermes model` — no code changes, no lock-in. When configuring a custom endpoint, Hermes will prompt for the context window size and auto-detect it when possible. See [Context Length Detection](../integrations/providers#context-length-detection) for details.
+> You can switch providers at any time with `hermes model` — no code changes, no lock-in. When configuring a custom endpoint, Hermes will prompt for the context window size and auto-detect it when possible. See [Context Length Detection](../../integrations/providers#context-length-detection) for details.
 
 ## 3. Start Chatting
 
@@ -87,7 +87,7 @@ hermes --tui      # modern TUI (recommended)
 That's it! You'll see a welcome banner with your model, available tools, and skills. Type a message and press Enter.
 
 > **Tip: Pick your interface**
-> Hermes ships with two terminal interfaces: the classic `prompt_toolkit` CLI and a newer [TUI](../user-guide/tui) with modal overlays, mouse selection, and non-blocking input. Both share the same sessions, slash commands, and config — try each with `hermes` vs `hermes --tui`.
+> Hermes ships with two terminal interfaces: the classic `prompt_toolkit` CLI and a newer [TUI](../../user-guide/tui) with modal overlays, mouse selection, and non-blocking input. Both share the same sessions, slash commands, and config — try each with `hermes` vs `hermes --tui`.
 
 ```
 ❯ What can you help me with?
@@ -170,7 +170,7 @@ Then start Hermes and enable it inside the CLI:
 /voice on
 ```
 
-Press `Ctrl+B` to record, or use `/voice tts` to have Hermes speak its replies. See [Voice Mode](../user-guide/features/voice-mode) for the full setup across CLI, Telegram, Discord, and Discord voice channels.
+Press `Ctrl+B` to record, or use `/voice tts` to have Hermes speak its replies. See [Voice Mode](../../user-guide/features/voice-mode) for the full setup across CLI, Telegram, Discord, and Discord voice channels.
 
 ### Schedule automated tasks
 
@@ -207,7 +207,7 @@ pip install -e '.[acp]'
 hermes acp
 ```
 
-See [ACP Editor Integration](../user-guide/features/acp) for setup details.
+See [ACP Editor Integration](../../user-guide/features/acp) for setup details.
 
 ### Try MCP servers
 
@@ -240,7 +240,7 @@ mcp_servers:
 
 ## Next Steps
 
-- **[CLI Guide](../user-guide/cli)** — Master the terminal interface
-- **[Configuration](../user-guide/configuration)** — Customize your setup
-- **[Messaging Gateway](../user-guide/messaging)** — Connect Telegram, Discord, Slack, WhatsApp, Signal, Email, or Home Assistant
-- **[Tools & Toolsets](../user-guide/features/tools)** — Explore available capabilities
+- **[CLI Guide](../../user-guide/cli)** — Master the terminal interface
+- **[Configuration](../../user-guide/configuration)** — Customize your setup
+- **[Messaging Gateway](../../user-guide/messaging)** — Connect Telegram, Discord, Slack, WhatsApp, Signal, Email, or Home Assistant
+- **[Tools & Toolsets](../../user-guide/features/tools)** — Explore available capabilities

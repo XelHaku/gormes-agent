@@ -157,4 +157,4 @@ custom_toolsets:
 
 The `hermes tools` command provides a curses-based UI for toggling individual tools on or off per platform. This operates at the tool level (finer than toolsets) and persists to `config.yaml`. Disabled tools are filtered out even if their toolset is enabled.
 
-See also: [Tools Reference](tools-reference) for the complete list of individual tools and their parameters.
+See also: [Tools Reference](../tools-reference) for the complete list of individual tools and their parameters.

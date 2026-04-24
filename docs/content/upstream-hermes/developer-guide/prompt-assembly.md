@@ -241,6 +241,6 @@ The architecture is intentionally optimized to:
 
 ## Related docs
 
-- [Context Compression & Prompt Caching](context-compression-and-caching)
-- [Session Storage](session-storage)
-- [Gateway Internals](gateway-internals)
+- [Context Compression & Prompt Caching](../context-compression-and-caching)
+- [Session Storage](../session-storage)
+- [Gateway Internals](../gateway-internals)

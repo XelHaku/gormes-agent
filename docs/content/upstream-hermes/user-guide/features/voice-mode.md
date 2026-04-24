@@ -8,13 +8,13 @@ weight: 10
 
 Hermes Agent supports full voice interaction across CLI and messaging platforms. Talk to the agent using your microphone, hear spoken replies, and have live voice conversations in Discord voice channels.
 
-If you want a practical setup walkthrough with recommended configurations and real usage patterns, see [Use Voice Mode with Hermes](../../guides/use-voice-mode-with-hermes).
+If you want a practical setup walkthrough with recommended configurations and real usage patterns, see [Use Voice Mode with Hermes](../../../guides/use-voice-mode-with-hermes).
 
 ## Prerequisites
 
 Before using voice features, make sure you have:
 
-1. **Hermes Agent installed** — `pip install hermes-agent` (see [Installation](../../getting-started/installation))
+1. **Hermes Agent installed** — `pip install hermes-agent` (see [Installation](../../../getting-started/installation))
 2. **An LLM provider configured** — run `hermes model` or set your preferred provider credentials in `~/.hermes/.env`
 3. **A working base setup** — run `hermes` to verify the agent responds to text before enabling voice
 
@@ -164,8 +164,8 @@ Whisper sometimes generates phantom text from silence or background noise ("Than
 ## Gateway Voice Reply (Telegram & Discord)
 
 If you haven't set up your messaging bots yet, see the platform-specific guides:
-- [Telegram Setup Guide](../messaging/telegram)
-- [Discord Setup Guide](../messaging/discord)
+- [Telegram Setup Guide](../../messaging/telegram)
+- [Discord Setup Guide](../../messaging/discord)
 
 Start the gateway to connect to your messaging platforms:
 
@@ -236,7 +236,7 @@ The most immersive voice feature: the bot joins a Discord voice channel, listens
 
 #### 1. Discord Bot Permissions
 
-If you already have a Discord bot set up for text (see [Discord Setup Guide](../messaging/discord)), you need to add voice permissions.
+If you already have a Discord bot set up for text (see [Discord Setup Guide](../../messaging/discord)), you need to add voice permissions.
 
 Go to the [Discord Developer Portal](https://discord.com/developers/applications) → your application → **Installation** → **Default Install Settings** → **Guild Install**:
 

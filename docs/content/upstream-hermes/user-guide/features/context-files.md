@@ -77,7 +77,7 @@ This is a Next.js 14 web application with a Python FastAPI backend.
 
 ## SOUL.md
 
-`SOUL.md` controls the agent's personality, tone, and communication style. See the [Personality](personality) page for full details.
+`SOUL.md` controls the agent's personality, tone, and communication style. See the [Personality](../personality) page for full details.
 
 **Location:**
 
