@@ -1,16 +1,16 @@
 # Orchestrator commit freeze
 
 As of the commit that introduced this file, this directory and the
-companion entry script `gormes/scripts/gormes-auto-codexu-orchestrator.sh`
+companion entry script `scripts/gormes-auto-codexu-orchestrator.sh`
 are considered **frozen** for architectural change.
 
 ## What's frozen
 
-- `gormes/scripts/gormes-auto-codexu-orchestrator.sh`
-- `gormes/scripts/orchestrator/lib/*.sh`
-- `gormes/scripts/orchestrator/audit.sh`
-- `gormes/scripts/orchestrator/claudeu`
-- `gormes/scripts/orchestrator/systemd/*.in`
+- `scripts/gormes-auto-codexu-orchestrator.sh`
+- `scripts/orchestrator/lib/*.sh`
+- `scripts/orchestrator/audit.sh`
+- `scripts/orchestrator/claudeu`
+- `scripts/orchestrator/systemd/*.in`
 
 ## Allowed exceptions
 

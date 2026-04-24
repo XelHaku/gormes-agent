@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SVC_TEMPLATE="$SCRIPT_DIR/systemd/gormes-orchestrator-audit.service.in"
 TIMER_TEMPLATE="$SCRIPT_DIR/systemd/gormes-orchestrator-audit.timer.in"
 AUDIT_PATH="$SCRIPT_DIR/audit.sh"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || (cd "$SCRIPT_DIR/../.." && pwd))"
 
 for f in "$SVC_TEMPLATE" "$TIMER_TEMPLATE" "$AUDIT_PATH"; do
   [[ -f "$f" ]] || { echo "ERROR: missing $f" >&2; exit 1; }

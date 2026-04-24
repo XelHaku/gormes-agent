@@ -19,6 +19,7 @@ write_worker_state() {
 setup() {
   load_helpers
   source_lib common
+  source_lib worktree
   source_lib promote
   TMP_WS="$(mktmp_workspace)"
   export GIT_ROOT="$TMP_WS/int"
@@ -38,6 +39,7 @@ setup() {
   # Re-source load_worker_state + log_event — they live in entry script until those extractions;
   # for promote.bats we define lightweight stubs if absent.
   type load_worker_state >/dev/null 2>&1 || load_worker_state() { cat "$RUN_WORKER_STATE_DIR/worker_$1.json" 2>/dev/null; }
+  type refresh_repo_paths >/dev/null 2>&1 || refresh_repo_paths() { :; }
   # Emit events into the per-test RUNS_LEDGER so PR-mode tests can grep them.
   log_event() {
     local event="$1" worker_id="${2:-null}" detail="${3:-}" status="${4:-}"
@@ -54,6 +56,28 @@ setup() {
         detail:$detail, status:$status}' >> "$RUNS_LEDGER"
   }
   export -f log_event
+}
+
+@test "setup_integration_root recreates integration worktree after stale registration" {
+  export ORIGINAL_REPO_ROOT="$GIT_ROOT"
+  export REPO_ROOT="$GIT_ROOT"
+  export RUN_ROOT="$TMP_WS/run"
+  export INTEGRATION_WORKTREE=""
+
+  git -C "$GIT_ROOT" checkout -q main
+  local stale_worktree expected_worktree
+  stale_worktree="$TMP_WS/stale-codexu-autoloop"
+  expected_worktree="$RUN_ROOT/integration/codexu-autoloop"
+  git -C "$GIT_ROOT" worktree add "$stale_worktree" "$INTEGRATION_BRANCH" >/dev/null
+  rm -rf "$stale_worktree"
+
+  setup_integration_root
+  assert_equal "$INTEGRATION_WORKTREE" "$expected_worktree"
+  assert_equal "$REPO_ROOT" "$expected_worktree"
+
+  run git -C "$expected_worktree" rev-parse --abbrev-ref HEAD
+  assert_success
+  assert_output "$INTEGRATION_BRANCH"
 }
 
 @test "promote_successful_workers skips when feature disabled" {

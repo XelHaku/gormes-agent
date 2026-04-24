@@ -39,6 +39,10 @@ setup_integration_root() {
     git -C "$source_git_root" branch "$INTEGRATION_BRANCH" HEAD
   fi
 
+  # Repo moves can leave git worktree metadata pointing at deleted
+  # orchestrator paths. Prune before trusting branch_worktree_path.
+  git -C "$source_git_root" worktree prune >/dev/null 2>&1 || true
+
   existing_worktree="$(branch_worktree_path "$source_git_root" "$INTEGRATION_BRANCH")"
   if [[ -n "$existing_worktree" ]]; then
     INTEGRATION_WORKTREE="$existing_worktree"
