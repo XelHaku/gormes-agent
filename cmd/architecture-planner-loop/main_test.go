@@ -44,7 +44,7 @@ func TestRunBackendFlagUsesClaudeu(t *testing.T) {
 	repoRoot := writeCommandFixture(t)
 	t.Setenv("RUN_ROOT", filepath.Join(repoRoot, ".codex", "planner"))
 	t.Setenv("PLANNER_VALIDATE", "0")
-	runner := &autoloop.FakeRunner{Results: []autoloop.Result{{}}}
+	runner := &autoloop.FakeRunner{Results: []autoloop.Result{{}, {}, {}, {}}}
 	oldRunner := commandRunner
 	commandRunner = runner
 	t.Cleanup(func() {
@@ -57,11 +57,11 @@ func TestRunBackendFlagUsesClaudeu(t *testing.T) {
 		t.Fatalf("run() error = %v", err)
 	}
 
-	if got, want := len(runner.Commands), 1; got != want {
+	if got, want := len(runner.Commands), 4; got != want {
 		t.Fatalf("Commands length = %d, want %d", got, want)
 	}
-	if runner.Commands[0].Name != "claudeu" {
-		t.Fatalf("Command.Name = %q, want claudeu", runner.Commands[0].Name)
+	if runner.Commands[3].Name != "claudeu" {
+		t.Fatalf("Command.Name = %q, want claudeu", runner.Commands[3].Name)
 	}
 }
 
@@ -72,7 +72,7 @@ func TestRunStatusAndShowReportUseConfiguredRunRoot(t *testing.T) {
 	t.Setenv("PLANNER_VALIDATE", "0")
 	withWorkingDir(t, repoRoot)
 
-	runner := &autoloop.FakeRunner{Results: []autoloop.Result{{}}}
+	runner := &autoloop.FakeRunner{Results: []autoloop.Result{{}, {}, {}, {}}}
 	oldRunner := commandRunner
 	commandRunner = runner
 	t.Cleanup(func() {
@@ -129,8 +129,11 @@ func writeCommandFixture(t *testing.T) string {
   }
 }`)
 	for _, path := range []string{
+		filepath.Join(root, "..", "hermes-agent", ".git", "HEAD"),
 		filepath.Join(root, "..", "hermes-agent", "README.md"),
+		filepath.Join(root, "..", "gbrain", ".git", "HEAD"),
 		filepath.Join(root, "..", "gbrain", "README.md"),
+		filepath.Join(root, "..", "honcho", ".git", "HEAD"),
 		filepath.Join(root, "..", "honcho", "README.md"),
 		filepath.Join(root, "docs", "content", "upstream-hermes", "_index.md"),
 		filepath.Join(root, "docs", "content", "upstream-gbrain", "_index.md"),

@@ -47,7 +47,7 @@ func TestRunDryRunCollectsContextWithoutBackend(t *testing.T) {
 func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 	repoRoot := writePlannerFixture(t)
 	runner := &autoloop.FakeRunner{
-		Results: []autoloop.Result{{Stdout: `{"type":"thread.started","thread_id":"thread-arch-1"}` + "\n"}},
+		Results: []autoloop.Result{{}, {}, {}, {Stdout: `{"type":"thread.started","thread_id":"thread-arch-1"}` + "\n"}},
 	}
 
 	summary, err := RunOnce(context.Background(), RunOptions{
@@ -59,10 +59,10 @@ func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 		t.Fatalf("RunOnce() error = %v", err)
 	}
 
-	if got, want := len(runner.Commands), 1; got != want {
+	if got, want := len(runner.Commands), 4; got != want {
 		t.Fatalf("Commands length = %d, want %d", got, want)
 	}
-	command := runner.Commands[0]
+	command := runner.Commands[3]
 	if command.Name != "codexu" {
 		t.Fatalf("Command.Name = %q, want codexu", command.Name)
 	}
@@ -103,7 +103,7 @@ func TestRunOnceReturnsBackendErrorWithOutput(t *testing.T) {
 	repoRoot := writePlannerFixture(t)
 	wantErr := os.ErrPermission
 	runner := &autoloop.FakeRunner{
-		Results: []autoloop.Result{{Err: wantErr, Stderr: "backend denied\n"}},
+		Results: []autoloop.Result{{}, {}, {}, {Err: wantErr, Stderr: "backend denied\n"}},
 	}
 
 	_, err := RunOnce(context.Background(), RunOptions{
@@ -122,7 +122,7 @@ func TestRunOnceReturnsBackendErrorWithOutput(t *testing.T) {
 func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 	repoRoot := writePlannerFixture(t)
 	runner := &autoloop.FakeRunner{
-		Results: []autoloop.Result{{}, {}, {}, {}, {}},
+		Results: []autoloop.Result{{}, {}, {}, {}, {}, {}, {}, {}},
 	}
 
 	_, err := RunOnce(context.Background(), RunOptions{
@@ -133,7 +133,7 @@ func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 		t.Fatalf("RunOnce() error = %v", err)
 	}
 
-	if got, want := len(runner.Commands), 5; got != want {
+	if got, want := len(runner.Commands), 8; got != want {
 		t.Fatalf("Commands length = %d, want %d", got, want)
 	}
 	wantArgs := [][]string{
@@ -143,7 +143,7 @@ func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 		{"test", "./docs", "-count=1"},
 	}
 	for i, want := range wantArgs {
-		command := runner.Commands[i+1]
+		command := runner.Commands[i+4]
 		if command.Name != "go" {
 			t.Fatalf("validation command %d name = %q, want go", i, command.Name)
 		}
@@ -185,8 +185,11 @@ func writePlannerFixture(t *testing.T) string {
   }
 }`)
 	for _, path := range []string{
+		filepath.Join(root, "..", "hermes-agent", ".git", "HEAD"),
 		filepath.Join(root, "..", "hermes-agent", "README.md"),
+		filepath.Join(root, "..", "gbrain", ".git", "HEAD"),
 		filepath.Join(root, "..", "gbrain", "README.md"),
+		filepath.Join(root, "..", "honcho", ".git", "HEAD"),
 		filepath.Join(root, "..", "honcho", "README.md"),
 		filepath.Join(root, "docs", "content", "upstream-hermes", "_index.md"),
 		filepath.Join(root, "docs", "content", "upstream-gbrain", "_index.md"),

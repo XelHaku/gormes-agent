@@ -125,7 +125,11 @@ func plannerEnv(opts runOptions) map[string]string {
 		"HERMES_DIR",
 		"GBRAIN_DIR",
 		"HONCHO_DIR",
+		"HERMES_REPO_URL",
+		"GBRAIN_REPO_URL",
+		"HONCHO_REPO_URL",
 		"PLANNER_VALIDATE",
+		"PLANNER_SYNC_REPOS",
 	} {
 		env[key] = os.Getenv(key)
 	}

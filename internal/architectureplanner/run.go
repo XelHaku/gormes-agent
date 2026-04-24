@@ -59,6 +59,12 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 
+	if cfg.SyncRepos && !opts.DryRun {
+		if err := SyncExternalRepos(ctx, cfg, runner); err != nil {
+			return RunSummary{}, err
+		}
+	}
+
 	bundle, err := CollectContext(cfg, now)
 	if err != nil {
 		return RunSummary{}, err
