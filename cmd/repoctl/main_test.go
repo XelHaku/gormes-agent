@@ -80,6 +80,56 @@ func TestRunBenchmarkRecordUpdatesBenchmarks(t *testing.T) {
 	}
 }
 
+func TestRunBenchmarkRecordUpdatesBenchmarksHonorsBinaryPathEnv(t *testing.T) {
+	root := t.TempDir()
+	runGit(t, root, "init")
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, root, "add", "README.md")
+	runGit(t, root, "-c", "user.email=test@example.com", "-c", "user.name=Test User", "commit", "-m", "initial")
+
+	defaultBin := filepath.Join(root, "bin", "gormes")
+	customBin := filepath.Join(root, "dist", "custom-gormes")
+	for _, path := range []string{defaultBin, customBin} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(defaultBin, make([]byte, 1024*1024), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(customBin, make([]byte, 2*1024*1024), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "benchmarks.json"), []byte(`{"binary":{},"history":[]}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	withTempCwd(t, root)
+	t.Setenv("BINARY_PATH", customBin)
+	if err := run([]string{"benchmark", "record"}); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	var got struct {
+		Binary struct {
+			SizeBytes int64  `json:"size_bytes"`
+			SizeMB    string `json:"size_mb"`
+		} `json:"binary"`
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "benchmarks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Binary.SizeBytes != 2*1024*1024 || got.Binary.SizeMB != "2.0" {
+		t.Fatalf("binary = %+v, want custom BINARY_PATH metrics", got.Binary)
+	}
+}
+
 func TestRunProgressSyncUpdatesMirror(t *testing.T) {
 	root := t.TempDir()
 	docsData := filepath.Join(root, "docs", "data")

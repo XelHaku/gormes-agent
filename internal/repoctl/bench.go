@@ -59,7 +59,7 @@ func RecordBenchmark(opts BenchmarkOptions) error {
 		return err
 	}
 
-	date := opts.Now().UTC().Format("2006-01-02")
+	date := opts.Now().Format("2006-01-02")
 	sizeMB := fmt.Sprintf("%.1f", float64(info.Size())/1048576)
 
 	binary, _ := bench["binary"].(map[string]any)
@@ -188,6 +188,11 @@ func phaseFromProgress(path string) string {
 		}
 		if phaseIncomplete(phase.Status, phase.Subphases) {
 			return phase.Name
+		}
+	}
+	for i := len(keys) - 1; i >= 0; i-- {
+		if name := progress.Phases[keys[i]].Name; name != "" {
+			return name
 		}
 	}
 	return ""

@@ -21,7 +21,7 @@ func run(args []string) error {
 		return err
 	}
 	if len(args) == 2 && args[0] == "benchmark" && args[1] == "record" {
-		return repoctl.RecordBenchmark(repoctl.BenchmarkOptions{Root: root})
+		return repoctl.RecordBenchmark(repoctl.BenchmarkOptions{Root: root, Binary: os.Getenv("BINARY_PATH")})
 	}
 	if len(args) == 2 && args[0] == "progress" && args[1] == "sync" {
 		return repoctl.SyncProgress(repoctl.ProgressOptions{Root: root})

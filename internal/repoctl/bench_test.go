@@ -251,6 +251,51 @@ func TestRecordBenchmarkAvoidsDuplicateSameDayHistory(t *testing.T) {
 	}
 }
 
+func TestRecordBenchmarkUsesLocalDateFromNow(t *testing.T) {
+	root := t.TempDir()
+	bin := filepath.Join(root, "bin", "gormes")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	location := time.FixedZone("late-west", -8*60*60)
+	now := time.Date(2026, 4, 23, 23, 30, 0, 0, location)
+
+	err := RecordBenchmark(BenchmarkOptions{
+		Root:      root,
+		Binary:    bin,
+		Now:       func() time.Time { return now },
+		GitCommit: func(string) (string, error) { return "abc123", nil },
+	})
+	if err != nil {
+		t.Fatalf("RecordBenchmark: %v", err)
+	}
+
+	var got struct {
+		Binary struct {
+			LastMeasured string `json:"last_measured"`
+		} `json:"binary"`
+		History []struct {
+			Date string `json:"date"`
+		} `json:"history"`
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "benchmarks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Binary.LastMeasured != "2026-04-23" {
+		t.Fatalf("last_measured = %q, want local date 2026-04-23", got.Binary.LastMeasured)
+	}
+	if len(got.History) == 0 || got.History[0].Date != "2026-04-23" {
+		t.Fatalf("history = %+v, want local date 2026-04-23", got.History)
+	}
+}
+
 func TestRecordBenchmarkInfersPhaseFromProgressJSON(t *testing.T) {
 	root := t.TempDir()
 	bin := filepath.Join(root, "bin", "gormes")
@@ -305,6 +350,60 @@ func TestRecordBenchmarkInfersPhaseFromProgressJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(got.History) == 0 || got.History[0].Phase != "Phase 2 - In Progress" {
+		t.Fatalf("history = %+v", got.History)
+	}
+}
+
+func TestRecordBenchmarkUsesLastProgressPhaseWhenAllComplete(t *testing.T) {
+	root := t.TempDir()
+	bin := filepath.Join(root, "bin", "gormes")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, filepath.Join(root, "docs", "content", "building-gormes", "architecture_plan", "progress.json"), `{
+  "phases": {
+    "1": {
+      "name": "Phase 1 - Complete",
+      "subphases": {
+        "1.A": {"items": [{"status": "complete"}]}
+      }
+    },
+    "2": {
+      "name": "Phase 2 - Also Complete",
+      "subphases": {
+        "2.A": {"items": [{"status": "complete"}]}
+      }
+    }
+  }
+}
+`)
+
+	err := RecordBenchmark(BenchmarkOptions{
+		Root:      root,
+		Binary:    bin,
+		Now:       func() time.Time { return time.Date(2026, 4, 24, 12, 0, 0, 0, time.UTC) },
+		GitCommit: func(string) (string, error) { return "abc123", nil },
+	})
+	if err != nil {
+		t.Fatalf("RecordBenchmark: %v", err)
+	}
+
+	var got struct {
+		History []struct {
+			Phase string `json:"phase"`
+		} `json:"history"`
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "benchmarks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.History) == 0 || got.History[0].Phase != "Phase 2 - Also Complete" {
 		t.Fatalf("history = %+v", got.History)
 	}
 }
