@@ -24,3 +24,13 @@ crash-*.log
 # ── Local state directories (when run in-repo) ───────
 .gormes/
 .hermes/
+.codex/
+.superpowers/
+
+# ── Agent/orchestrator scratch ───────────────────────
+scripts/.swarm/
+
+# ── Docs/site generated artifacts ────────────────────
+docs/www-tests/node_modules/
+docs/www-tests/test-results/
+www.gormes.ai/data/
