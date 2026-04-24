@@ -3,11 +3,12 @@
 The orchestrator wrapper and CLI implementation now live in Go under
 `cmd/autoloop` and `internal/autoloop`. This directory contains transitional
 wrappers, systemd templates, and historical notes for the old shell entrypoints.
-Full `autoloop run` runtime parity remains staged follow-up work.
+Full runtime parity remains staged follow-up work.
 
 ## Layout
 
-- `*.sh` — tiny compatibility wrappers that exec `go run ./cmd/autoloop ...`.
+- `*.sh` — tiny compatibility wrappers that exec `go run ./cmd/autoloop ...`
+  for implemented Go commands.
 - `systemd/` — templates rendered or installed by `autoloop service ...`.
 - `FROZEN.md` — freeze policy and the active Go-port exception.
 
@@ -20,8 +21,12 @@ go test ./internal/autoloop ./cmd/autoloop -count=1
 ## Legacy shell
 
 Long-form frozen shell retained for parity lives under
-`testdata/legacy-shell/scripts/orchestrator/` and is marked vendored for
-language reporting.
+`testdata/legacy-shell/scripts/` and is marked vendored for language reporting.
+The root `scripts/gormes-auto-codexu-orchestrator.sh` wrapper runs the Go port
+for default execution, backend flags, help, and implemented Go subcommands.
+Legacy management/resume invocations (`status`, `tail`, `abort`, `cleanup`,
+`promote-commit`, `verify-gh-auth`, and `--resume`) temporarily exec the
+vendored shell with the original arguments until full runtime parity lands.
 
 The live companion scripts `scripts/gormes-architecture-planner-tasks-manager.sh`,
 `scripts/documentation-improver.sh`, and `scripts/landingpage-improver.sh`

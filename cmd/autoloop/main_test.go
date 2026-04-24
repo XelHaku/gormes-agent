@@ -86,6 +86,76 @@ func TestRunCommandDryRunPrintsSummary(t *testing.T) {
 	}
 }
 
+func TestRunCommandBackendFlagSetsBackend(t *testing.T) {
+	repoRoot := t.TempDir()
+	progressPath := filepath.Join(repoRoot, "progress.json")
+	if err := os.WriteFile(progressPath, []byte(`{
+		"phases": {
+			"12": {
+				"subphases": {
+					"12.A": {
+						"items": [
+							{"item_name": "backend flag candidate", "status": "planned"}
+						]
+					}
+				}
+			}
+		}
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("PROGRESS_JSON", progressPath)
+	t.Setenv("RUN_ROOT", filepath.Join(repoRoot, "runs"))
+	t.Setenv("BACKEND", "codexu")
+	t.Setenv("MODE", "safe")
+	t.Setenv("MAX_AGENTS", "1")
+
+	var stdout bytes.Buffer
+	oldStdout := commandStdout
+	commandStdout = &stdout
+	t.Cleanup(func() {
+		commandStdout = oldStdout
+	})
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	if err := os.Chdir(repoRoot); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldWD); err != nil {
+			t.Fatalf("restore Chdir() error = %v", err)
+		}
+	})
+
+	if err := run([]string{"run", "--dry-run", "--opencode"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "backend flag candidate") {
+		t.Fatalf("stdout = %q, want dry-run summary with backend flag accepted", stdout.String())
+	}
+}
+
+func TestRunCommandHelpPrintsUsage(t *testing.T) {
+	var stdout bytes.Buffer
+	oldStdout := commandStdout
+	commandStdout = &stdout
+	t.Cleanup(func() {
+		commandStdout = oldStdout
+	})
+
+	if err := run([]string{"run", "--help"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "usage: autoloop") {
+		t.Fatalf("stdout = %q, want usage", stdout.String())
+	}
+}
+
 func TestDigestUsesConfiguredRunRoot(t *testing.T) {
 	repoRoot := t.TempDir()
 	runRoot := filepath.Join(repoRoot, "custom-runs")

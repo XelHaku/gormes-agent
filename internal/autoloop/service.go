@@ -29,6 +29,8 @@ func RenderServiceUnit(opts ServiceUnitOptions) string {
 
 	return fmt.Sprintf(`[Unit]
 Description=Gormes autoloop
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -36,6 +38,14 @@ Type=simple
 WorkingDirectory=%s
 ExecStart=%s
 Restart=on-failure
+RestartSec=30s
+TimeoutStopSec=60s
+KillMode=mixed
+KillSignal=SIGTERM
+Environment=DISABLE_COMPANIONS=0
+Environment=COMPANION_ON_IDLE=1
+Environment=MAX_AGENTS=4
+Environment=MODE=safe
 
 [Install]
 WantedBy=default.target
@@ -190,9 +200,12 @@ Description=Gormes orchestrator audit
 [Service]
 Type=oneshot
 %s
+Environment=REPO_ROOT=%s
 WorkingDirectory=%s
 ExecStart=%s
-`, systemdPathEnvironment, systemdPathValue(opts.WorkDir), systemdPathValue(opts.AuditPath))
+TimeoutStartSec=60s
+Nice=10
+`, systemdPathEnvironment, systemdPathValue(opts.WorkDir), systemdPathValue(opts.WorkDir), systemdPathValue(opts.AuditPath))
 }
 
 type AuditTimerUnitOptions struct {
@@ -204,8 +217,10 @@ func RenderAuditTimerUnit(opts AuditTimerUnitOptions) string {
 Description=Run Gormes orchestrator audit periodically
 
 [Timer]
-OnBootSec=5min
+OnBootSec=2min
 OnUnitActiveSec=20min
+AccuracySec=30s
+Persistent=true
 Unit=%s
 
 [Install]

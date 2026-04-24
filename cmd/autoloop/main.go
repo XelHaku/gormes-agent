@@ -29,18 +29,24 @@ func run(args []string) error {
 	}
 
 	switch {
-	case len(args) == 1 && args[0] == "run":
-		cfg, err := autoloop.ConfigFromEnv(root, autoloopEnv())
+	case len(args) >= 1 && args[0] == "run":
+		runOpts, err := parseRunOptions(args[1:])
 		if err != nil {
 			return err
 		}
-		return runAutoloop(cfg, false)
-	case len(args) == 2 && args[0] == "run" && args[1] == "--dry-run":
-		cfg, err := autoloop.ConfigFromEnv(root, autoloopEnv())
+		if runOpts.help {
+			_, err := fmt.Fprintln(commandStdout, usage)
+			return err
+		}
+		env := autoloopEnv()
+		if runOpts.backend != "" {
+			env["BACKEND"] = runOpts.backend
+		}
+		cfg, err := autoloop.ConfigFromEnv(root, env)
 		if err != nil {
 			return err
 		}
-		return runAutoloop(cfg, true)
+		return runAutoloop(cfg, runOpts.dryRun)
 	case len(args) >= 1 && args[0] == "digest":
 		outputPath, err := digestOutputPath(args[1:])
 		if err != nil {
@@ -86,6 +92,34 @@ func run(args []string) error {
 	default:
 		return fmt.Errorf(usage)
 	}
+}
+
+type runOptions struct {
+	dryRun  bool
+	backend string
+	help    bool
+}
+
+func parseRunOptions(args []string) (runOptions, error) {
+	opts := runOptions{}
+	for _, arg := range args {
+		switch arg {
+		case "--dry-run":
+			opts.dryRun = true
+		case "--codexu":
+			opts.backend = "codexu"
+		case "--claudeu":
+			opts.backend = "claudeu"
+		case "--opencode":
+			opts.backend = "opencode"
+		case "--help", "-h":
+			opts.help = true
+		default:
+			return runOptions{}, fmt.Errorf(usage)
+		}
+	}
+
+	return opts, nil
 }
 
 func digestOutputPath(args []string) (string, error) {

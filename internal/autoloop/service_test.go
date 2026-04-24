@@ -20,9 +20,21 @@ func TestRenderServiceUnitInjectsPaths(t *testing.T) {
 		"[Unit]",
 		"[Service]",
 		"[Install]",
+		"After=network-online.target",
+		"Wants=network-online.target",
 		"Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin",
+		"Environment=DISABLE_COMPANIONS=0",
+		"Environment=COMPANION_ON_IDLE=1",
+		"Environment=MAX_AGENTS=4",
+		"Environment=MODE=safe",
 		"WorkingDirectory=/srv/gormes",
 		"ExecStart=/opt/gormes/bin/autoloop run",
+		"Restart=on-failure",
+		"RestartSec=30s",
+		"TimeoutStopSec=60s",
+		"KillMode=mixed",
+		"KillSignal=SIGTERM",
+		"WantedBy=default.target",
 	} {
 		if !strings.Contains(unit, want) {
 			t.Fatalf("RenderServiceUnit() = %q, want %q", unit, want)
@@ -183,8 +195,11 @@ func TestInstallAuditServiceWritesServiceAndTimerAndEnablesTimer(t *testing.T) {
 	for _, want := range []string{
 		"Type=oneshot",
 		"Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin",
+		"Environment=REPO_ROOT=/srv/gormes",
 		"WorkingDirectory=/srv/gormes",
 		"ExecStart=/srv/gormes/scripts/orchestrator/audit.sh",
+		"TimeoutStartSec=60s",
+		"Nice=10",
 	} {
 		if !strings.Contains(string(service), want) {
 			t.Fatalf("service unit = %q, want %q", service, want)
@@ -200,9 +215,12 @@ func TestInstallAuditServiceWritesServiceAndTimerAndEnablesTimer(t *testing.T) {
 	}
 	for _, want := range []string{
 		"[Timer]",
-		"OnBootSec=5min",
+		"OnBootSec=2min",
 		"OnUnitActiveSec=20min",
+		"AccuracySec=30s",
+		"Persistent=true",
 		"Unit=gormes-orchestrator-audit.service",
+		"WantedBy=timers.target",
 	} {
 		if !strings.Contains(string(timer), want) {
 			t.Fatalf("timer unit = %q, want %q", timer, want)
