@@ -206,6 +206,8 @@ run_companion() {
   setsid nohup bash -c "
     cd '$GIT_ROOT' || exit 1
     export AUTO_COMMIT=1 AUTO_PUSH=0 PLANNER_INSTALL_SCHEDULE=0
+    export PHASE_FLOOR='${PHASE_FLOOR:-}' PHASE_PRIORITY_BOOST='${PHASE_PRIORITY_BOOST:-}'
+    export PHASE_SKIP_SUBPHASES='${PHASE_SKIP_SUBPHASES:-}' MAX_RETRIES='${MAX_RETRIES:-}' BACKEND='${BACKEND:-}'
     timeout '$timeout_s' bash '$cmd' >'$log_file' 2>&1
     ec=\$?
     jq -n \

@@ -115,3 +115,34 @@ setup() {
   after="$(jq 'length' "$out")"
   assert_equal "$before" "$after"
 }
+
+@test "PHASE_SKIP_SUBPHASES excludes listed subphases" {
+  # Use progress.fixture.json which has phases 1 and 2. Skip 1.A.
+  export PHASE_SKIP_SUBPHASES="1.A"
+  local tmp="$(mktmp_workspace)/c.json"
+  normalize_candidates > "$tmp"
+  local out="$(mktmp_workspace)/out.json"
+  apply_phase_skip "$tmp" "$out"
+  local n
+  n="$(jq '[.[] | select(.subphase_id == "1.A")] | length' "$out")"
+  assert_equal "$n" "0"
+}
+
+@test "PHASE_SKIP_SUBPHASES is case-insensitive and trims whitespace" {
+  export PHASE_SKIP_SUBPHASES=" 1.a , 1.B "
+  local tmp="$(mktmp_workspace)/c.json"
+  normalize_candidates > "$tmp"
+  local out="$(mktmp_workspace)/out.json"
+  apply_phase_skip "$tmp" "$out"
+  local excluded
+  excluded="$(jq '[.[] | select(.subphase_id | ascii_downcase | IN("1.a","1.b"))] | length' "$out")"
+  assert_equal "$excluded" "0"
+}
+
+@test "PHASE_PRIORITY_BOOST lifts matching subphase above everything else" {
+  export PHASE_PRIORITY_BOOST="2.A"
+  local tmp="$(mktmp_workspace)/c.json"
+  normalize_candidates > "$tmp"
+  run jq -rc '.[0] | .subphase_id' "$tmp"
+  assert_output "2.A"
+}

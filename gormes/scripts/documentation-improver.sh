@@ -299,6 +299,13 @@ Files of record:
 - Website docs/content: $SITE_ROOT/content
 - Website progress data: $SITE_PROGRESS_JSON
 - Context bundle: $CONTEXT_FILE
+- README.md: $REPO_ROOT/README.md (repo landing doc; keep claims accurate)
+- Install script: $REPO_ROOT/install.sh (if present; keep in sync with build flow)
+
+Operator scope hints (optional, inherited from the orchestrator env):
+- PHASE_FLOOR=${PHASE_FLOOR:-unset} (when set, prefer documenting phases <= this)
+- PHASE_PRIORITY_BOOST=${PHASE_PRIORITY_BOOST:-unset} (subphase ids to foreground)
+- PHASE_SKIP_SUBPHASES=${PHASE_SKIP_SUBPHASES:-unset} (defer these subphases)
 
 Rules:
 - Documentation/web/progress updates only. Do not implement runtime features.
@@ -310,7 +317,16 @@ Required tasks:
 1) Scan docs + current code surface for drift.
 2) Improve architecture/core docs for newly landed features.
 3) Sync website docs/content/data with current progress where needed.
-4) Run validation commands:
+4) Refresh README.md so its top-line claims (supported channels, install steps,
+   quickstart, status badges, headline binary stats) match what's actually in
+   the tree. Keep claims sober — do NOT announce features that aren't wired.
+5) If $REPO_ROOT/install.sh exists, keep it in lockstep with the actual build
+   recipe: go build flags, install path, service-unit wiring, and any
+   prerequisites the Makefile / CI uses. If install.sh doesn't exist and a
+   Makefile install target does, leave it alone (not scope creep territory).
+6) When PHASE_SKIP_SUBPHASES is set, don't promote docs for those subphases to
+   the top of pages / landing / README — keep them listed as "deferred".
+7) Run validation commands:
    - go run ./cmd/progress-gen -write
    - go run ./cmd/progress-gen -validate
    - go test ./internal/progress -count=1
@@ -321,8 +337,9 @@ Required final report sections (exact headings):
 2) Feature/doc drift found
 3) Documentation updates applied
 4) Website updates applied
-5) Validation evidence
-6) Risks / follow-ups
+5) README + install.sh updates
+6) Validation evidence
+7) Risks / follow-ups
 EOF
 }
 
@@ -352,8 +369,9 @@ verify_final_report() {
 2|Feature/doc drift found
 3|Documentation updates applied
 4|Website updates applied
-5|Validation evidence
-6|Risks / follow-ups
+5|README \+ install.sh updates
+6|Validation evidence
+7|Risks / follow-ups
 EOF
 }
 
