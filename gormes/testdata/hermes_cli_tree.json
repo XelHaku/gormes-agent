@@ -251,8 +251,9 @@
     },
     {
       "source": "tips.py",
-      "status": "planned",
-      "reason": "Tip-of-the-day subsystem not yet ported."
+      "status": "ported",
+      "go": ["internal/cli/tips.go"],
+      "reason": "Upstream TIPS corpus (279 entries) plus get_random_tip() are ported 1:1. Tests pin count, first/last anchors, a mid-corpus canary, no duplicates/empties, corpus membership, seeded-rand determinism via PickRandomTip, and nil-rand fallback to the package-level math/rand/v2 source."
     },
     {
       "source": "tools_config.py",
