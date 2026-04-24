@@ -187,8 +187,9 @@
     },
     {
       "source": "platforms.py",
-      "status": "planned",
-      "reason": "Platform-detection helpers remain upstream-only; Go uses runtime.GOOS directly."
+      "status": "ported",
+      "go": ["internal/cli/platforms.go"],
+      "reason": "Shared platform registry (ordered Platforms slice with Key/Label/DefaultToolset entries, PlatformByKey lookup, PlatformLabel(key, default) wrapper) is ported with deterministic iteration order matching the upstream OrderedDict for TUI menu stability."
     },
     {
       "source": "plugins.py",
