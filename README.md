@@ -42,7 +42,7 @@ Gormes began as an independent Go port/rework of ideas and architecture from Her
 
 | Problem | How Go Solves It |
 |---------|------------------|
-| **Deployment friction** | Single ~16.2 MB static binary. `scp` it anywhere, it runs. |
+| **Deployment friction** | Single ~17.7 MB static binary. `scp` it anywhere, it runs. |
 | **Runtime reliability** | No Python GIL. Goroutines handle concurrent streams without contention. |
 | **Local validation** | `gormes doctor --offline` validates tool schemas before burning tokens. |
 | **Stream resilience** | Route-B reconnect treats dropped SSE as recoverable, not fatal. |
@@ -70,7 +70,7 @@ Full item-level checklist and stats: **[docs.gormes.ai/building-gormes/architect
 
 ## Core Features
 
-- **Single Static Binary** — Zero CGO. ~16.2 MB. Deploy to Termux, Alpine, a fresh VPS — it runs.
+- **Single Static Binary** — Zero CGO. ~17.7 MB. Deploy to Termux, Alpine, a fresh VPS — it runs.
 - **Always-On Runtime** — Survives restarts, reconnects dropped streams, runs for months unattended.
 - **Multi-Platform Gateway** — Telegram and Discord run through the shared gateway today; Slack shared-runtime wiring, WhatsApp, Signal, and long-tail adapters are being ported as contract-first slices.
 - **In-Process Tool Loop** — Streamed tool calls execute against a Go-native registry.

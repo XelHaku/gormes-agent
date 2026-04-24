@@ -1,15 +1,42 @@
 {
   "binary": {
+    "build_flags": "CGO_ENABLED=0 -trimpath -ldflags=\"-s -w\"",
+    "commit": "46b91211",
+    "go_version": "1.25+",
+    "last_measured": "2026-04-24",
+    "linker": "static",
     "name": "gormes",
     "path": "bin/gormes",
-    "size_bytes": 17019042,
-    "size_mb": "16.2",
-    "build_flags": "CGO_ENABLED=0 -trimpath -ldflags=\"-s -w\"",
-    "linker": "static",
-    "stripped": true,
-    "go_version": "1.25+",
-    "last_measured": "2026-04-21"
+    "size_bytes": 18530466,
+    "size_mb": "17.7",
+    "stripped": true
   },
+  "history": [
+    {
+      "commit": "46b91211",
+      "date": "2026-04-24",
+      "phase": "Phase 1 — The Dashboard",
+      "size_bytes": 18530466,
+      "size_mb": 17.7
+    },
+    {
+      "commit": "5e36abb0",
+      "date": "2026-04-21",
+      "phase": "Phase 2 — The Gateway",
+      "size_mb": 16.2
+    },
+    {
+      "date": "2026-04-20",
+      "phase": "Phase 2 (Gateway + Tools + bbolt persistence)",
+      "size_mb": 17
+    },
+    {
+      "commit": "4a25542c",
+      "date": "2026-04-19",
+      "phase": "Phase 1 (TUI only)",
+      "size_mb": 7.9
+    }
+  ],
   "properties": {
     "cgo": false,
     "dependencies": "zero (no dynamic library deps)",
@@ -19,24 +46,5 @@
       "darwin/amd64",
       "darwin/arm64"
     ]
-  },
-  "history": [
-    {
-      "date": "2026-04-21",
-      "size_mb": 16.2,
-      "commit": "5e36abb0",
-      "phase": "Phase 2 \u2014 The Gateway"
-    },
-    {
-      "date": "2026-04-20",
-      "size_mb": 17.0,
-      "phase": "Phase 2 (Gateway + Tools + bbolt persistence)"
-    },
-    {
-      "date": "2026-04-19",
-      "size_mb": 7.9,
-      "phase": "Phase 1 (TUI only)",
-      "commit": "4a25542c"
-    }
-  ]
+  }
 }
