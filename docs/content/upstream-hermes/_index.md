@@ -13,6 +13,9 @@ The content below is preserved verbatim from the upstream docs so operators eval
 
 Because Gormes is porting Hermes to Go, this section is also the upstream capability ledger:
 
+- [Source Study](./source-study/) adds a code-grounded reading of the local upstream tree studied for Gormes architecture work.
+- [Good and Bad](./good-and-bad/) separates Hermes design moves worth keeping from coupling risks Gormes should avoid.
+- [Gormes Takeaways](./gormes-takeaways/) translates the source study into Go-native architecture decisions.
 - [Features Overview](./user-guide/features/overview/) now enumerates the full upstream feature surface and the primary method Hermes uses to implement each feature.
 - [Messaging Gateway](./user-guide/messaging/) now enumerates each adapter and the transport or SDK pattern it uses upstream.
 - [Developer Guide](./developer-guide/) now enumerates the implementation subsystems and the primary runtime method Hermes uses for each one.
@@ -24,6 +27,7 @@ In both pages, **method used** means the dominant upstream implementation mechan
 
 ## Sections
 
+- **Source Study** - local code study for Gormes architecture decisions
 - **Guides** — task-oriented how-tos
 - **Developer Guide** — architectural deep dives
 - **Integrations** — platform-specific setup (Bedrock, voice, Telegram, …)

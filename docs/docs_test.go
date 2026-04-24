@@ -79,6 +79,7 @@ var nativeHugoPages = map[string]struct{}{
 	"_index.md":     {},
 	"why-gormes.md": {},
 	"building-gormes/_index.md":                                     {},
+	"building-gormes/upstream-lessons.md":                           {},
 	"building-gormes/gateway-donor-map/_index.md":                   {},
 	"building-gormes/gateway-donor-map/shared-adapter-patterns.md":  {},
 	"building-gormes/porting-a-subsystem.md":                        {},

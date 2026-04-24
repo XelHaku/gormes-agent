@@ -28,6 +28,26 @@ Phase 5.F (Skills system) was previously scoped as "port the upstream Python ski
 
 Positioning: **Gormes's moat over Hermes**. Hermes has a skills directory; it does not have a native learning loop that decides what's worth writing down.
 
+## GBrain And Hermes Skill Lessons
+
+Skills are code-like runtime assets, not loose notes. GBrain's skillpack shows
+the value of procedural knowledge with resolver checks and conformance tests.
+Hermes shows the value and risk of large skill surfaces injected into prompts.
+Gormes should combine the useful parts:
+
+- active skills require valid metadata, triggers, exclusions, provenance, and
+  review state;
+- disabled or unreviewed skills never enter prompt injection;
+- resolver routes have fixtures for confusing user phrases;
+- skill selection records are tied to turn outcome and operator feedback;
+- generated skill drafts are inactive until reviewed;
+- updates preserve version history and source evidence;
+- secret stripping and one-off task rejection are mandatory gates.
+
+The learning loop is allowed to draft and improve skills only after the storage,
+resolver, review, and feedback records are testable. Otherwise "self-improving"
+becomes unreviewed prompt mutation.
+
 ## TDD Execution Notes
 
 Do not begin Phase 6 with live LLM extraction. The dependency order is:

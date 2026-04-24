@@ -46,6 +46,34 @@ Phase 2.D shipped the Go-native cron MVP: scheduler, job store, run audit, CRON.
 
 The OpenAI-compatible API server is not the Phase 1 bridge. Phase 1 consumes Python's `api_server`; Phase 5.Q replaces that donor surface in Go. Keep its cron admin endpoints behind the 5.N cronjob parity slices so HTTP control, CLI control, and tool control all share one scheduler/store contract.
 
+## Operation And Tool Descriptor Rule
+
+The GBrain study strengthens the Phase 5 rule: do not start by porting
+handlers. Start by freezing operation/tool descriptors.
+
+Each ported operation should declare:
+
+- name and description;
+- JSON schema and result envelope;
+- toolset/category;
+- availability check;
+- mutating or read-only;
+- idempotent or not;
+- prompt-visible or operator-only;
+- allowed trust classes;
+- timeout and result-size budget;
+- audit event kind;
+- degraded-mode status field.
+
+Those descriptors should drive model tool schemas, CLI/gateway command
+surfaces, doctor checks, audit taxonomy, and fixture generation wherever
+possible. A Python donor file remains inventory until the descriptor and parity
+fixture exist.
+
+Hermes adds the schema-repair lesson: dynamic schemas must reflect available
+tools. If a related tool or provider is disabled, the prompt-visible schema must
+not advertise an impossible path that causes hallucinated tool calls.
+
 ## TDD Execution Notes
 
 Phase 5 is the highest-risk place to accidentally create giant porting tasks. Treat every broad row above as an inventory bucket, not a direct worker assignment.

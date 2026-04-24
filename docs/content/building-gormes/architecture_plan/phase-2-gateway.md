@@ -41,6 +41,43 @@ For channel-by-channel donor analysis against the all-Go PicoClaw repo, see [Gat
 
 Phase 2.C is intentionally not Phase 3. It stores only session handles in bbolt. Python still owns transcript memory, transcript search, and prompt assembly; the SQLite + FTS5 memory lattice is Phase 3 (now substantially implemented).
 
+## Hermes Gateway Lessons Now Imported
+
+The Hermes gateway source shows that messaging-native agents need an explicit
+active-turn contract, not just adapters that forward text. Gormes Phase 2 should
+keep gateway policy in shared Go data, then let each channel consume it.
+
+Command definitions should declare:
+
+- canonical name and aliases;
+- gateway/TUI/CLI visibility;
+- argument hint;
+- active-turn policy;
+- trust class allowed;
+- handler owner;
+- platform exposure rules.
+
+The active-turn policy should distinguish at least:
+
+| Policy | Meaning |
+|---|---|
+| `reject` | visible busy response; do not interrupt or queue discardable text |
+| `bypass` | safe read/control command can run while an agent is active |
+| `queue` | follow-up prompt waits for the next turn |
+| `interrupt` | `/stop` or replacement input cancels the active run |
+| `steer` | guidance is injected after the next tool result without a new user turn |
+
+This is the main Hermes lesson for 2.F.5: `/stop`, `/queue`, `/steer`,
+approvals, status, restart, background jobs, and ordinary follow-up text need
+different semantics. The command registry, not each adapter, should own those
+semantics.
+
+GBrain adds one complementary lesson: gateway-triggered work that can outlive a
+single turn should enter a durable job/subagent ledger instead of depending on
+one in-memory process. Phase 2.D cron and Phase 2.E subagents are the first
+substrates; future queue/restart/resume work should converge on the same
+ledger contract.
+
 ## TDD Priority Queue
 
 Phase 2 is no longer just "ship more adapters." The backlog is now dominated by cross-cutting contracts that future adapters depend on. The execution order is:

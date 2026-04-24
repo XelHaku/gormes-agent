@@ -36,6 +36,34 @@ Phase 4 is **optimization**, not **differentiation**. The Python bridge works. R
 
 **The rule:** stabilize the runtime substrate first, then add explicit skills and the reviewed skill flow, then harden delegation policy, then widen adapters, and only then replace the Python bridge.
 
+## Hermes Brain Lessons Now Imported
+
+Phase 4 should port Hermes's contracts, not `run_agent.py`.
+
+The native brain work must keep these boundaries explicit:
+
+- **Stable prompt assembly:** identity, memory, skills, context files,
+  platform hints, model/provider guidance, and timestamp metadata are stable
+  system layers. Turn-local memory/plugin recall is injected ephemerally into
+  the current user message so prompt-cache prefixes stay stable.
+- **Provider fixture contract:** every provider adapter must replay the same
+  transcript fixtures for tool calls, reasoning deltas, finish reasons, usage,
+  retryable errors, and tool-result continuations before it can be used by the
+  kernel.
+- **Context engine contract:** compression is its own engine, not a hidden
+  kernel side effect. It must preserve head/tail invariants, keep tool
+  call/result pairs together, expose status, record lineage, and replay from
+  fixtures.
+- **Kernel restraint:** the kernel owns turn state, cancellation, tool
+  continuation, retry orchestration, and finalization. Provider quirks, prompt
+  source discovery, compression policy, and memory-provider lifecycle stay in
+  their packages.
+
+The first sign of Phase 4 going wrong is a Go `run_agent.py`: one class-shaped
+file where provider, prompt, compression, memory, gateway callbacks, and tools
+all merge. The desired shape is smaller contracts with transcript and snapshot
+tests.
+
 ## TDD Handoff Notes
 
 Phase 4 should not start with "port `run_agent.py`." The next execution agents should close the partially landed contract work with small, test-first slices that do not require live model credentials:

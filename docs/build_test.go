@@ -38,6 +38,7 @@ func TestHugoBuild(t *testing.T) {
 		"building-gormes/core-systems/memory/index.html",
 		"building-gormes/core-systems/tool-execution/index.html",
 		"building-gormes/core-systems/gateway/index.html",
+		"building-gormes/upstream-lessons/index.html",
 		"building-gormes/what-hermes-gets-wrong/index.html",
 		"building-gormes/porting-a-subsystem/index.html",
 		"building-gormes/testing/index.html",

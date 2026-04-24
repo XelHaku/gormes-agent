@@ -37,6 +37,49 @@ Phase 3.E is the final Black Box milestone. It closes four orthogonal gaps: **op
 
 The 3.E ship criterion: the operator runs `cat ~/.local/share/gormes/sessions/index.yaml` and sees every active chat/session mapping in plain YAML; runs `cat ~/.local/share/gormes/tools/audit.jsonl` and sees a full history of tool invocations; a fact mentioned once six months ago and never again no longer dominates recall results; asking the same question across two different chats surfaces the same entity graph; and context-compressed branches no longer disappear into opaque IDs because lineage and source-filtered search are queryable.
 
+## GBrain Memory Lessons Now Imported
+
+GBrain's strongest memory lesson is provenance. It stores knowledge pages,
+chunks, links, timeline entries, versions, and ingest logs so retrieval can
+explain where a claim came from. Gormes should apply that idea to the local
+SQLite graph without adopting GBrain's Postgres-first storage model.
+
+Relationship and entity writes should carry enough evidence to debug recall:
+
+- source turn or source artifact;
+- extractor version;
+- evidence text hash;
+- confidence;
+- first seen and last seen;
+- provenance kind: manual, extracted, imported, inferred, or reviewed;
+- review/promote state where an edge can affect cross-chat recall.
+
+The default product rule is same-chat recall first, opt-in user-scope widening
+second. Cross-chat synthesis must be visible and auditable because memory bugs
+become privacy bugs once Telegram, Discord, Slack, email, and API sessions can
+share a peer identity.
+
+## Retrieval Evaluation And Degraded Health
+
+GBrain and Hermes both degrade when optional capability is missing. Gormes
+should degrade visibly. Phase 3 docs and tests should define an operator-facing
+health contract for:
+
+- semantic recall disabled because no embedding model is configured;
+- extractor queue depth and dead-letter groups;
+- stale graph extraction age;
+- relationship decay/freshness behavior;
+- cross-chat deny paths;
+- source-filtered search and lineage gaps.
+
+Before adding more recall layers, add retrieval fixtures:
+
+- seed conversations and entity facts;
+- define expected recall snippets or entity IDs;
+- run lexical, FTS, graph, semantic, and fused modes;
+- include negative tests for cross-chat leakage;
+- report why each selected seed entered the prompt fence.
+
 ## TDD Priority Queue
 
 The Phase 3 queue is not one flat backlog. The order matters because later memory features need operator visibility and stable identity seams before they can be debugged safely.
