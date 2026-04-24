@@ -27,6 +27,12 @@ type SessionContext struct {
 	SessionKey         string
 	SessionID          string
 	ConnectedPlatforms []string
+	// ResumePending, when non-nil, carries a drain-timeout resume flag
+	// captured by the previous restart/shutdown cycle. If the flag passes
+	// render gating (running agent + preserved session_id), the rendered
+	// prompt prepends a reason-aware "Resume Pending" header so the next
+	// turn picks up where the interrupted turn left off.
+	ResumePending *ResumePending
 }
 
 func sessionSourceFromInbound(ev InboundEvent) SessionSource {
@@ -114,5 +120,11 @@ func BuildSessionContextPrompt(ctx SessionContext) string {
 		}
 	}
 	lines = append(lines, "**Delivery Targets:** "+strings.Join(targets, ", "))
-	return strings.Join(lines, "\n")
+	rendered := strings.Join(lines, "\n")
+	if ctx.ResumePending != nil {
+		if note := BuildResumeNote(*ctx.ResumePending); note != "" {
+			rendered = note + "\n\n" + rendered
+		}
+	}
+	return rendered
 }

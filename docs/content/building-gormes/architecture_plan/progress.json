@@ -537,8 +537,8 @@
             },
             {
               "name": "Drain-timeout resume_pending recovery",
-              "status": "planned",
-              "note": "TDD: add a session read-model flag for restart/shutdown drain timeouts that preserves the session_id and injects a reason-aware resume note on the next turn, while marking only agents still running at timeout and letting hard suspended/stuck-loop state override resume_pending."
+              "status": "complete",
+              "note": "TDD landed (seam-first): `internal/gateway/resume.go` exposes `ResumePending{SessionID, Reason, AgentState, MarkedAt}` with `DrainReason` constants (`restart`, `shutdown`), `AgentRunState` constants (`running`, `idle`, `suspended`, `stuck_loop`), `MarkResumePending` writer, `ResumePending.ShouldResume` predicate, and `BuildResumeNote` renderer. Only agents still running at the drain deadline with a preserved session_id produce a flag; idle/suspended/stuck-loop states override the mark so operator-paused or watchdog-broken sessions never auto-resume. `gateway.SessionContext.ResumePending` (pointer) wires the renderer into `BuildSessionContextPrompt`, prepending a deterministic reason-aware `## Resume Pending` header that preserves the session_id for the next turn. Hooking this seam into `Manager.Shutdown`/`/restart` drain timeouts and persisting the flag across process restarts remain separate slices; this freeze locks the writer predicate, renderer contract, and session-context injection point."
             },
             {
               "name": "Pairing read-model schema + atomic persistence",
