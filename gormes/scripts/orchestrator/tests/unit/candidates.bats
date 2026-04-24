@@ -74,3 +74,44 @@ setup() {
   run candidate_at 1
   assert_output '{"k":"b"}'
 }
+
+@test "PHASE_FLOOR=2 filters out phase 3+ candidates" {
+  export PHASE_FLOOR=2
+  run normalize_candidates
+  assert_success
+  # Manually build a file that mimics what write_candidates_file would see
+  local tmp="$(mktmp_workspace)/c.json"
+  normalize_candidates > "$tmp"
+  local out="$(mktmp_workspace)/out.json"
+  apply_phase_floor "$tmp" "$out"
+  local phase3_count
+  phase3_count="$(jq '[.[] | select(.phase_id == "3")] | length' "$out")"
+  local phase2_count
+  phase2_count="$(jq '[.[] | select(.phase_id == "2")] | length' "$out")"
+  assert_equal "$phase3_count" "0"
+  (( phase2_count > 0 )) || (( $(jq 'length' "$tmp") == 0 ))
+}
+
+@test "PHASE_FLOOR unset is a no-op" {
+  unset PHASE_FLOOR || true
+  local tmp="$(mktmp_workspace)/c.json"
+  normalize_candidates > "$tmp"
+  local out="$(mktmp_workspace)/out.json"
+  apply_phase_floor "$tmp" "$out"
+  local before after
+  before="$(jq 'length' "$tmp")"
+  after="$(jq 'length' "$out")"
+  assert_equal "$before" "$after"
+}
+
+@test "PHASE_FLOOR with garbage value is a no-op (defensive)" {
+  export PHASE_FLOOR="abc"
+  local tmp="$(mktmp_workspace)/c.json"
+  normalize_candidates > "$tmp"
+  local out="$(mktmp_workspace)/out.json"
+  apply_phase_floor "$tmp" "$out"
+  local before after
+  before="$(jq 'length' "$tmp")"
+  after="$(jq 'length' "$out")"
+  assert_equal "$before" "$after"
+}

@@ -172,6 +172,10 @@ Env:
   CANDIDATE_LOW_WATERMARK    When write_candidates_file yields fewer than this many unfinished
                              tasks, run_once fires the planner companion synchronously to
                              refill the pool. Default: 5
+  PHASE_FLOOR                Optional positive integer. When set, only candidates whose
+                             numeric phase_id <= PHASE_FLOOR are considered. Lets the
+                             operator prioritize early phases (e.g. PHASE_FLOOR=4 works
+                             on phases 1-4 first, skipping 5-6). Default: unset (no filter).
 
 Notes:
   - Default run mode loops forever. Use ORCHESTRATOR_ONCE=1 for previous one-shot behavior.

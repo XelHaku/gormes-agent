@@ -58,25 +58,46 @@ poisoned_slugs() {
   ' "$RUNS_LEDGER" 2>/dev/null || true
 }
 
+apply_phase_floor() {
+  # Optional filter: when PHASE_FLOOR is set to a positive integer, keep
+  # only candidates whose numeric phase_id <= PHASE_FLOOR. Lets the
+  # operator prioritize lower phases when upper phases would otherwise
+  # dominate a stale candidate set. No-op when unset or empty.
+  local input="$1" output="$2"
+  local floor="${PHASE_FLOOR:-}"
+  if [[ -z "$floor" || ! "$floor" =~ ^[0-9]+$ ]]; then
+    cp "$input" "$output"
+    return 0
+  fi
+  jq -c --argjson floor "$floor" '
+    map(select((.phase_id | tonumber? // 999) <= $floor))
+  ' "$input" > "$output"
+}
+
 write_candidates_file() {
   local skip_json
   skip_json="$(poisoned_slugs | jq -Rnc '[inputs | select(length > 0)]')"
+  local tmp
+  tmp="$(mktemp "${CANDIDATES_FILE}.XXXXXX")" || return 1
   if [[ "$skip_json" == "[]" || -z "$skip_json" ]]; then
-    normalize_candidates > "$CANDIDATES_FILE"
-    return 0
+    normalize_candidates > "$tmp"
+  else
+    normalize_candidates \
+      | jq -c --argjson skip "$skip_json" --arg active_first "${ACTIVE_FIRST:-1}" '
+          def mk_slug(p; s; i):
+            (p + "__" + s + "__" + i)
+            | ascii_downcase
+            | gsub("[^a-z0-9._-]+"; "-")
+            | sub("^-+"; "")
+            | sub("-+$"; "")
+            | gsub("--+"; "-");
+          map(select(mk_slug(.phase_id; .subphase_id; .item_name) as $s
+                     | ($skip | index($s)) == null))
+        ' > "$tmp"
   fi
-  normalize_candidates \
-    | jq -c --argjson skip "$skip_json" --arg active_first "${ACTIVE_FIRST:-1}" '
-        def mk_slug(p; s; i):
-          (p + "__" + s + "__" + i)
-          | ascii_downcase
-          | gsub("[^a-z0-9._-]+"; "-")
-          | sub("^-+"; "")
-          | sub("-+$"; "")
-          | gsub("--+"; "-");
-        map(select(mk_slug(.phase_id; .subphase_id; .item_name) as $s
-                   | ($skip | index($s)) == null))
-      ' > "$CANDIDATES_FILE"
+  # Apply optional phase-floor filter on the already-poison-pruned set.
+  apply_phase_floor "$tmp" "$CANDIDATES_FILE"
+  rm -f "$tmp"
 }
 
 candidate_count() {
