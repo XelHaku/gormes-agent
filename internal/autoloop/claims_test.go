@@ -59,3 +59,54 @@ func TestCleanupStaleLocksKeepsLiveUnexpiredClaim(t *testing.T) {
 		t.Fatalf("claim file stat error = %v", err)
 	}
 }
+
+func TestCleanupStaleLocksRemovesExpiredRegularFileLock(t *testing.T) {
+	lockRoot := t.TempDir()
+	lockPath := filepath.Join(lockRoot, "task.lock")
+	claimPath := lockPath + ".claim.json"
+
+	if err := os.WriteFile(lockPath, nil, 0o644); err != nil {
+		t.Fatalf("WriteFile() lock error = %v", err)
+	}
+	claim := `{"pid":1,"claimed_at_epoch":100}`
+	if err := os.WriteFile(claimPath, []byte(claim), 0o644); err != nil {
+		t.Fatalf("WriteFile() claim error = %v", err)
+	}
+
+	if err := CleanupStaleLocks(lockRoot, time.Minute, func() time.Time { return time.Unix(200, 0) }); err != nil {
+		t.Fatalf("CleanupStaleLocks() error = %v", err)
+	}
+
+	if _, err := os.Stat(lockPath); !os.IsNotExist(err) {
+		t.Fatalf("lock file exists after cleanup, stat error = %v", err)
+	}
+	if _, err := os.Stat(claimPath); !os.IsNotExist(err) {
+		t.Fatalf("claim file exists after cleanup, stat error = %v", err)
+	}
+}
+
+func TestCleanupStaleLocksKeepsLiveUnexpiredRegularFileLock(t *testing.T) {
+	lockRoot := t.TempDir()
+	lockPath := filepath.Join(lockRoot, "task.lock")
+	claimPath := lockPath + ".claim.json"
+	now := time.Unix(200, 0)
+
+	if err := os.WriteFile(lockPath, nil, 0o644); err != nil {
+		t.Fatalf("WriteFile() lock error = %v", err)
+	}
+	claim := `{"pid":` + strconv.Itoa(os.Getpid()) + `,"claimed_at_epoch":190}`
+	if err := os.WriteFile(claimPath, []byte(claim), 0o644); err != nil {
+		t.Fatalf("WriteFile() claim error = %v", err)
+	}
+
+	if err := CleanupStaleLocks(lockRoot, time.Minute, func() time.Time { return now }); err != nil {
+		t.Fatalf("CleanupStaleLocks() error = %v", err)
+	}
+
+	if _, err := os.Stat(lockPath); err != nil {
+		t.Fatalf("lock file stat error = %v", err)
+	}
+	if _, err := os.Stat(claimPath); err != nil {
+		t.Fatalf("claim file stat error = %v", err)
+	}
+}

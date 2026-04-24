@@ -1,6 +1,8 @@
 package autoloop
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -89,4 +91,52 @@ func TestParseFinalReportRejectsMisleadingAcceptanceEvidence(t *testing.T) {
 	if err == nil {
 		t.Fatal("ParseFinalReport() error = nil, want missing labeled evidence error")
 	}
+}
+
+func TestParseFinalReportAcceptsLegacyGoodFixture(t *testing.T) {
+	got, err := ParseFinalReport(readReportFixture(t, "good.final.md"))
+	if err != nil {
+		t.Fatalf("ParseFinalReport() error = %v", err)
+	}
+
+	want := FinalReport{
+		Commit: "abc1234def5678",
+		Acceptance: []string{
+			"TestBar fails before implementation — PASS",
+			"TestBar passes after implementation — PASS",
+			"progress.json entry marked in_progress with symbol note — PASS",
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ParseFinalReport() = %#v, want %#v", got, want)
+	}
+}
+
+func TestParseFinalReportRejectsLegacyBadFixtures(t *testing.T) {
+	fixtures := []string{
+		"bad-no-acceptance.final.md",
+		"bad-acceptance-fail.final.md",
+		"bad-no-red-exit.final.md",
+		"bad-no-commit-hash.final.md",
+	}
+
+	for _, fixture := range fixtures {
+		t.Run(fixture, func(t *testing.T) {
+			_, err := ParseFinalReport(readReportFixture(t, fixture))
+			if err == nil {
+				t.Fatal("ParseFinalReport() error = nil, want error")
+			}
+		})
+	}
+}
+
+func readReportFixture(t *testing.T, name string) string {
+	t.Helper()
+
+	path := filepath.Join("..", "..", "scripts", "orchestrator", "tests", "fixtures", "reports", name)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%s) error = %v", path, err)
+	}
+	return string(raw)
 }

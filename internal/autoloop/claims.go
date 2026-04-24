@@ -24,27 +24,24 @@ func CleanupStaleLocks(lockRoot string, ttl time.Duration, now func() time.Time)
 		return err
 	}
 
-	for _, lockDir := range matches {
-		info, err := os.Stat(lockDir)
+	for _, lockPath := range matches {
+		_, err := os.Stat(lockPath)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
 			return err
 		}
-		if !info.IsDir() {
-			continue
-		}
 
-		claim, keep := readValidLockClaim(lockDir, ttl, now())
+		claim, keep := readValidLockClaim(lockPath, ttl, now())
 		if keep && processLive(claim.PID) {
 			continue
 		}
 
-		if err := os.RemoveAll(lockDir); err != nil {
+		if err := os.RemoveAll(lockPath); err != nil {
 			return err
 		}
-		if err := os.Remove(lockDir + ".claim.json"); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := os.Remove(lockPath + ".claim.json"); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
@@ -52,8 +49,8 @@ func CleanupStaleLocks(lockRoot string, ttl time.Duration, now func() time.Time)
 	return nil
 }
 
-func readValidLockClaim(lockDir string, ttl time.Duration, current time.Time) (lockClaim, bool) {
-	raw, err := os.ReadFile(lockDir + ".claim.json")
+func readValidLockClaim(lockPath string, ttl time.Duration, current time.Time) (lockClaim, bool) {
+	raw, err := os.ReadFile(lockPath + ".claim.json")
 	if err != nil {
 		return lockClaim{}, false
 	}
