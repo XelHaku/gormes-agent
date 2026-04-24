@@ -117,6 +117,7 @@ Usage:
   $0 --claudeu             # use claudeu (Claude Code) backend via PATH shim
   $0 --opencode            # use opencode backend
   $0 status [run_id]       # show run/worker status
+  $0 salvage [run_id]      # list worker worktrees/state for manual recovery
   $0 tail [run_id] [n]     # tail orchestrator logs (default n=80)
   $0 abort [run_id]        # terminate active worker pids for run
   $0 cleanup               # cleanup stale locks and enforce worktree cap
@@ -326,7 +327,7 @@ parse_cli_args() {
         COMMAND_MODE="resume"
         shift 2
         ;;
-      status|tail|abort|cleanup|promote-commit|verify-gh-auth)
+      status|salvage|tail|abort|cleanup|promote-commit|verify-gh-auth)
         COMMAND_MODE="$1"
         shift
         # Remaining positional args belong to the subcommand.
@@ -1039,6 +1040,12 @@ cmd_status() {
   fi
 }
 
+cmd_salvage() {
+  local target_run=""
+  target_run="$(resolve_target_run_id "${1:-}")"
+  worker_salvage_report "$target_run"
+}
+
 cmd_tail() {
   local target_run=""
   target_run="$(resolve_target_run_id "${1:-}")"
@@ -1406,6 +1413,9 @@ main() {
 
   if [[ "$COMMAND_MODE" == "status" ]]; then
     cmd_status "${CMD_ARGS[0]:-}"
+    return 0
+  elif [[ "$COMMAND_MODE" == "salvage" ]]; then
+    cmd_salvage "${CMD_ARGS[0]:-}"
     return 0
   elif [[ "$COMMAND_MODE" == "tail" ]]; then
     cmd_tail "${CMD_ARGS[0]:-}" "${CMD_ARGS[1]:-80}"

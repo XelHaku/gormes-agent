@@ -40,6 +40,87 @@ worker_repo_root() {
   fi
 }
 
+worker_salvage_report() {
+  local target_run="${1:-$RUN_ID}"
+  local run_worktrees_dir="$RUN_ROOT/worktrees/$target_run"
+  local run_worker_state_dir="$STATE_DIR/workers/$target_run"
+  local ids=()
+  local id f d
+
+  declare -A seen_ids=()
+  shopt -s nullglob
+  for f in "$run_worker_state_dir"/worker_*.json; do
+    id="$(basename "$f")"
+    id="${id#worker_}"
+    id="${id%.json}"
+    [[ "$id" =~ ^[0-9]+$ ]] && seen_ids["$id"]=1
+  done
+  for d in "$run_worktrees_dir"/worker*; do
+    [[ -d "$d" ]] || continue
+    id="$(basename "$d")"
+    id="${id#worker}"
+    [[ "$id" =~ ^[0-9]+$ ]] && seen_ids["$id"]=1
+  done
+  shopt -u nullglob
+
+  if ((${#seen_ids[@]} > 0)); then
+    mapfile -t ids < <(printf '%s\n' "${!seen_ids[@]}" | sort -n)
+  fi
+
+  printf 'Run: %s\n' "$target_run"
+  printf 'Worktrees: %s\n' "$run_worktrees_dir"
+  printf 'Worker state: %s\n' "$run_worker_state_dir"
+
+  if ((${#ids[@]} == 0)); then
+    printf 'No worker state or worktrees found for run %s\n' "$target_run"
+    return 0
+  fi
+
+  for id in "${ids[@]}"; do
+    local state_file="$run_worker_state_dir/worker_${id}.json"
+    local worktree="$run_worktrees_dir/worker${id}"
+    local status="unknown"
+    local reason="-"
+    local commit="-"
+    local slug="-"
+    local task="-"
+
+    if [[ -f "$state_file" ]] && command -v jq >/dev/null 2>&1; then
+      status="$(jq -r '.status // "unknown"' "$state_file" 2>/dev/null || printf 'unknown')"
+      reason="$(jq -r '.reason // "-"' "$state_file" 2>/dev/null || printf '-')"
+      commit="$(jq -r '.commit // "-"' "$state_file" 2>/dev/null || printf '-')"
+      slug="$(jq -r '.slug // "-"' "$state_file" 2>/dev/null || printf '-')"
+      local phase subphase item
+      phase="$(jq -r '.phase_id // ""' "$state_file" 2>/dev/null || true)"
+      subphase="$(jq -r '.subphase_id // ""' "$state_file" 2>/dev/null || true)"
+      item="$(jq -r '.item_name // ""' "$state_file" 2>/dev/null || true)"
+      if [[ -n "$item" && "$item" != "null" ]]; then
+        task="${phase}/${subphase}: ${item}"
+      elif [[ "$slug" != "-" && "$slug" != "null" ]]; then
+        task="$slug"
+      fi
+    fi
+
+    if [[ -d "$worktree" ]] && git -C "$worktree" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      local branch head status_output dirty_count
+      branch="$(git -C "$worktree" rev-parse --abbrev-ref HEAD 2>/dev/null || printf '?')"
+      head="$(git -C "$worktree" rev-parse --short HEAD 2>/dev/null || printf '?')"
+      status_output="$(git -C "$worktree" status --short 2>/dev/null || true)"
+      dirty_count="$(printf '%s\n' "$status_output" | sed '/^$/d' | wc -l | tr -d ' ')"
+      printf 'worker%s status=%s reason=%s commit=%s branch=%s head=%s dirty=%s inspect=%s\n' \
+        "$id" "$status" "$reason" "$commit" "$branch" "$head" "$dirty_count" "$worktree"
+      printf '  task=%s\n' "$task"
+      if ((dirty_count > 0)); then
+        printf '%s\n' "$status_output" | sed -n '1,10s/^/  /p'
+      fi
+    else
+      printf 'worker%s status=%s reason=%s commit=%s worktree=missing inspect=%s\n' \
+        "$id" "$status" "$reason" "$commit" "$worktree"
+      printf '  task=%s\n' "$task"
+    fi
+  done
+}
+
 create_worker_worktree() {
   local worker_id="$1"
   local worktree_root branch

@@ -14,6 +14,8 @@ setup() {
   source_lib report
   source_lib worktree
   TMP_WS="$(mktmp_workspace)"
+  export RUN_ROOT="$TMP_WS/run"
+  export STATE_DIR="$RUN_ROOT/state"
   export GIT_ROOT="$TMP_WS/repo"
   export WORKTREES_DIR="$TMP_WS/wt"
   export REPO_SUBDIR="."
@@ -24,6 +26,22 @@ setup() {
   mkdir -p "$WORKTREES_DIR"
 }
 
+make_salvage_worker_repo() {
+  local run_id="$1"
+  local worker_id="$2"
+  local dir="$RUN_ROOT/worktrees/$run_id/worker$worker_id"
+  mkdir -p "$dir"
+  git init -q -b main "$dir"
+  (
+    cd "$dir"
+    echo base > base.txt
+    git -c user.email=t@t -c user.name=T add base.txt
+    git -c user.email=t@t -c user.name=T commit -q -m base
+    git checkout -q -b "codexu/$run_id/worker$worker_id"
+  )
+  printf '%s\n' "$dir"
+}
+
 @test "worker_branch_name format" {
   run worker_branch_name 3
   assert_output "codexu/wrt-run-1/worker3"
@@ -32,6 +50,40 @@ setup() {
 @test "worker_worktree_root format" {
   run worker_worktree_root 2
   assert_output "$WORKTREES_DIR/worker2"
+}
+
+@test "worker_salvage_report surfaces dirty failed worker state" {
+  local run_id="salvage-run-1"
+  local wt
+  wt="$(make_salvage_worker_repo "$run_id" 1)"
+  mkdir -p "$STATE_DIR/workers/$run_id"
+  printf '{"status":"failed","reason":"timeout","slug":"phase-task","phase_id":"2","subphase_id":"2.F.3","item_name":"Runtime status JSON"}\n' \
+    > "$STATE_DIR/workers/$run_id/worker_1.json"
+  echo dirty > "$wt/dirty.txt"
+
+  run worker_salvage_report "$run_id"
+
+  assert_success
+  assert_output --partial "Run: $run_id"
+  assert_output --partial "worker1 status=failed reason=timeout"
+  assert_output --partial "dirty=1"
+  assert_output --partial "inspect=$wt"
+  assert_output --partial "task=2/2.F.3: Runtime status JSON"
+  assert_output --partial "?? dirty.txt"
+}
+
+@test "worker_salvage_report keeps aborted workers visible without worktrees" {
+  local run_id="salvage-run-2"
+  mkdir -p "$STATE_DIR/workers/$run_id"
+  printf '{"status":"aborted","reason":"fail_fast_worker_failure","slug":"queued-task"}\n' \
+    > "$STATE_DIR/workers/$run_id/worker_3.json"
+
+  run worker_salvage_report "$run_id"
+
+  assert_success
+  assert_output --partial "worker3 status=aborted reason=fail_fast_worker_failure"
+  assert_output --partial "worktree=missing"
+  assert_output --partial "task=queued-task"
 }
 
 @test "create_worker_worktree checks out base commit on new branch" {
