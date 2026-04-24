@@ -76,6 +76,125 @@ func TestNormalizeCandidatesPriorityBoostWins(t *testing.T) {
 	}
 }
 
+func TestNormalizeCandidatesPreservesExecutionMetadataAndSkipsBlockedUmbrella(t *testing.T) {
+	path := writeProgressJSON(t, `{
+		"phases": {
+			"3": {
+				"subphases": {
+					"3.E.6": {
+						"items": [
+							{
+								"item_name": "ready candidate",
+								"status": "planned",
+								"priority": " P0 ",
+								"contract": " Control plane handoff ",
+								"contract_status": " DRAFT ",
+								"slice_size": " Small ",
+								"execution_owner": " Agent ",
+								"trust_class": " T1 ",
+								"degraded_mode": " use legacy path ",
+								"fixture": " progress_fixture.json ",
+								"source_refs": [" docs/plan.md ", " "],
+								"blocked_by": [],
+								"unblocks": [" task 4 ", ""],
+								"ready_when": [" tests pass ", " "],
+								"not_ready_when": [" schema unsettled "],
+								"acceptance": [" metadata retained "],
+								"write_scope": [" internal/autoloop "],
+								"test_commands": [" go test ./internal/autoloop "],
+								"done_signal": " commit merged ",
+								"note": " Keep human note casing. "
+							},
+							{
+								"item_name": "blocked candidate",
+								"status": "planned",
+								"blocked_by": ["task 2"]
+							},
+							{
+								"item_name": "umbrella candidate",
+								"status": "planned",
+								"slice_size": "umbrella"
+							}
+						]
+					}
+				}
+			}
+		}
+	}`)
+
+	got, err := NormalizeCandidates(path, CandidateOptions{})
+	if err != nil {
+		t.Fatalf("NormalizeCandidates() error = %v", err)
+	}
+
+	want := []Candidate{
+		{
+			PhaseID:        "3",
+			SubphaseID:     "3.E.6",
+			ItemName:       "ready candidate",
+			Status:         "planned",
+			Priority:       "P0",
+			Contract:       "Control plane handoff",
+			ContractStatus: "draft",
+			SliceSize:      "small",
+			ExecutionOwner: "agent",
+			TrustClass:     "T1",
+			DegradedMode:   "use legacy path",
+			Fixture:        "progress_fixture.json",
+			SourceRefs:     []string{"docs/plan.md"},
+			BlockedBy:      nil,
+			Unblocks:       []string{"task 4"},
+			ReadyWhen:      []string{"tests pass"},
+			NotReadyWhen:   []string{"schema unsettled"},
+			Acceptance:     []string{"metadata retained"},
+			WriteScope:     []string{"internal/autoloop"},
+			TestCommands:   []string{"go test ./internal/autoloop"},
+			DoneSignal:     "commit merged",
+			Note:           "Keep human note casing.",
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("NormalizeCandidates() = %#v, want %#v", got, want)
+	}
+	if got[0].SelectionReason() != "P0 handoff" {
+		t.Fatalf("SelectionReason() = %q, want %q", got[0].SelectionReason(), "P0 handoff")
+	}
+}
+
+func TestNormalizeCandidatesUsesExecutionBuckets(t *testing.T) {
+	path := writeProgressJSON(t, `{
+		"phases": {
+			"3": {
+				"subphases": {
+					"3.E.6": {
+						"items": [
+							{"item_name": "draft candidate", "status": "planned", "contract_status": "draft"},
+							{"item_name": "fixture candidate", "status": "planned", "fixture": "ready.json"},
+							{"item_name": "active candidate", "status": "in_progress"},
+							{"item_name": "p0 candidate", "status": "planned", "priority": "P0"},
+							{"item_name": "unblocking candidate", "status": "planned", "unblocks": ["task 4"]}
+						]
+					}
+				}
+			}
+		}
+	}`)
+
+	got, err := NormalizeCandidates(path, CandidateOptions{})
+	if err != nil {
+		t.Fatalf("NormalizeCandidates() error = %v", err)
+	}
+
+	var gotNames []string
+	for _, candidate := range got {
+		gotNames = append(gotNames, candidate.ItemName)
+	}
+	wantNames := []string{"p0 candidate", "active candidate", "fixture candidate", "unblocking candidate", "draft candidate"}
+	if !reflect.DeepEqual(gotNames, wantNames) {
+		t.Fatalf("candidate order = %#v, want %#v", gotNames, wantNames)
+	}
+}
+
 func TestNormalizeCandidatesHonorsMaxPhase(t *testing.T) {
 	path := writeProgressJSON(t, `{
 		"phases": {
@@ -201,10 +320,10 @@ func TestNormalizeCandidatesItemNameFallbacksAndUnknownStatus(t *testing.T) {
 	}
 
 	want := []Candidate{
-		{PhaseID: "5", SubphaseID: "5.B.1", ItemName: "id candidate", Status: "unknown"},
 		{PhaseID: "5", SubphaseID: "5.B.1", ItemName: "item-name candidate", Status: "planned"},
 		{PhaseID: "5", SubphaseID: "5.B.1", ItemName: "name candidate", Status: "planned"},
 		{PhaseID: "5", SubphaseID: "5.B.1", ItemName: "title candidate", Status: "planned"},
+		{PhaseID: "5", SubphaseID: "5.B.1", ItemName: "id candidate", Status: "unknown"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("NormalizeCandidates() = %#v, want %#v", got, want)

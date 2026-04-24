@@ -9,16 +9,53 @@ import (
 )
 
 type CandidateOptions struct {
-	ActiveFirst   bool
-	PriorityBoost []string
-	MaxPhase      int
+	ActiveFirst     bool
+	PriorityBoost   []string
+	MaxPhase        int
+	IncludeBlocked  bool
+	IncludeUmbrella bool
 }
 
 type Candidate struct {
-	PhaseID    string
-	SubphaseID string
-	ItemName   string
-	Status     string
+	PhaseID        string
+	SubphaseID     string
+	ItemName       string
+	Status         string
+	Priority       string
+	Contract       string
+	ContractStatus string
+	SliceSize      string
+	ExecutionOwner string
+	TrustClass     string
+	DegradedMode   string
+	Fixture        string
+	SourceRefs     []string
+	BlockedBy      []string
+	Unblocks       []string
+	ReadyWhen      []string
+	NotReadyWhen   []string
+	Acceptance     []string
+	WriteScope     []string
+	TestCommands   []string
+	DoneSignal     string
+	Note           string
+}
+
+func (candidate Candidate) SelectionReason() string {
+	switch candidateBucket(candidate) {
+	case candidateBucketP0:
+		return "P0 handoff"
+	case candidateBucketInProgress:
+		return "already active"
+	case candidateBucketFixtureReady:
+		return "fixture ready"
+	case candidateBucketUnblocks:
+		return "unblocks downstream work"
+	case candidateBucketDraft:
+		return "draft contract"
+	default:
+		return "planned row"
+	}
 }
 
 func NormalizeCandidates(path string, opts CandidateOptions) ([]Candidate, error) {
@@ -53,11 +90,38 @@ func NormalizeCandidates(path string, opts CandidateOptions) ([]Candidate, error
 					continue
 				}
 
+				blockedBy := trimStringSlice(item.BlockedBy)
+				sliceSize := lowerTrim(item.SliceSize)
+				if !opts.IncludeBlocked && len(blockedBy) > 0 {
+					continue
+				}
+				if !opts.IncludeUmbrella && sliceSize == "umbrella" {
+					continue
+				}
+
 				candidate := Candidate{
-					PhaseID:    strings.TrimSpace(phase.ID),
-					SubphaseID: strings.TrimSpace(subphase.ID),
-					ItemName:   name,
-					Status:     status,
+					PhaseID:        strings.TrimSpace(phase.ID),
+					SubphaseID:     strings.TrimSpace(subphase.ID),
+					ItemName:       name,
+					Status:         status,
+					Priority:       strings.TrimSpace(item.Priority),
+					Contract:       strings.TrimSpace(item.Contract),
+					ContractStatus: lowerTrim(item.ContractStatus),
+					SliceSize:      sliceSize,
+					ExecutionOwner: lowerTrim(item.ExecutionOwner),
+					TrustClass:     strings.TrimSpace(item.TrustClass),
+					DegradedMode:   strings.TrimSpace(item.DegradedMode),
+					Fixture:        strings.TrimSpace(item.Fixture),
+					SourceRefs:     trimStringSlice(item.SourceRefs),
+					BlockedBy:      blockedBy,
+					Unblocks:       trimStringSlice(item.Unblocks),
+					ReadyWhen:      trimStringSlice(item.ReadyWhen),
+					NotReadyWhen:   trimStringSlice(item.NotReadyWhen),
+					Acceptance:     trimStringSlice(item.Acceptance),
+					WriteScope:     trimStringSlice(item.WriteScope),
+					TestCommands:   trimStringSlice(item.TestCommands),
+					DoneSignal:     strings.TrimSpace(item.DoneSignal),
+					Note:           strings.TrimSpace(item.Note),
 				}
 				seenKey := candidateSortKey(candidate)
 				if _, ok := seen[seenKey]; ok {
@@ -178,11 +242,29 @@ type progressSubphase struct {
 }
 
 type progressItem struct {
-	ItemName string `json:"item_name"`
-	Name     string `json:"name"`
-	Title    string `json:"title"`
-	ID       string `json:"id"`
-	Status   string `json:"status"`
+	ItemName       string   `json:"item_name"`
+	Name           string   `json:"name"`
+	Title          string   `json:"title"`
+	ID             string   `json:"id"`
+	Status         string   `json:"status"`
+	Priority       string   `json:"priority"`
+	Contract       string   `json:"contract"`
+	ContractStatus string   `json:"contract_status"`
+	SliceSize      string   `json:"slice_size"`
+	ExecutionOwner string   `json:"execution_owner"`
+	TrustClass     string   `json:"trust_class"`
+	DegradedMode   string   `json:"degraded_mode"`
+	Fixture        string   `json:"fixture"`
+	SourceRefs     []string `json:"source_refs"`
+	BlockedBy      []string `json:"blocked_by"`
+	Unblocks       []string `json:"unblocks"`
+	ReadyWhen      []string `json:"ready_when"`
+	NotReadyWhen   []string `json:"not_ready_when"`
+	Acceptance     []string `json:"acceptance"`
+	WriteScope     []string `json:"write_scope"`
+	TestCommands   []string `json:"test_commands"`
+	DoneSignal     string   `json:"done_signal"`
+	Note           string   `json:"note"`
 }
 
 func priorityBoostSet(boosts []string) map[string]struct{} {
@@ -197,23 +279,58 @@ func priorityBoostSet(boosts []string) map[string]struct{} {
 	return set
 }
 
-func candidateRank(candidate Candidate, activeFirst bool, boosts map[string]struct{}) int {
-	rank := 0
-	if _, ok := boosts[strings.ToLower(strings.TrimSpace(candidate.SubphaseID))]; !ok {
-		rank += 10
-	}
+func lowerTrim(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
 
-	if activeFirst {
-		switch candidate.Status {
-		case "in_progress":
-		case "planned":
-			rank += 1
-		default:
-			rank += 2
+func trimStringSlice(values []string) []string {
+	var trimmed []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			trimmed = append(trimmed, value)
 		}
 	}
 
+	return trimmed
+}
+
+const (
+	candidateBucketP0 = iota
+	candidateBucketInProgress
+	candidateBucketFixtureReady
+	candidateBucketUnblocks
+	candidateBucketDraft
+	candidateBucketPlanned
+	candidateBucketOther
+)
+
+func candidateRank(candidate Candidate, activeFirst bool, boosts map[string]struct{}) int {
+	rank := candidateBucket(candidate)
+	if _, ok := boosts[strings.ToLower(strings.TrimSpace(candidate.SubphaseID))]; !ok {
+		rank += 100
+	}
+
 	return rank
+}
+
+func candidateBucket(candidate Candidate) int {
+	switch {
+	case strings.EqualFold(strings.TrimSpace(candidate.Priority), "P0"):
+		return candidateBucketP0
+	case candidate.Status == "in_progress":
+		return candidateBucketInProgress
+	case candidate.ContractStatus == "fixture_ready" || candidate.Status == "fixture_ready" || candidate.Fixture != "":
+		return candidateBucketFixtureReady
+	case len(candidate.Unblocks) > 0:
+		return candidateBucketUnblocks
+	case candidate.ContractStatus == "draft":
+		return candidateBucketDraft
+	case candidate.Status == "planned":
+		return candidateBucketPlanned
+	default:
+		return candidateBucketOther
+	}
 }
 
 func candidateSortKey(candidate Candidate) string {
