@@ -117,3 +117,45 @@ func TestDigestUsesConfiguredRunRoot(t *testing.T) {
 		t.Fatalf("stdout = %q, want digest from configured RUN_ROOT", stdout.String())
 	}
 }
+
+func TestDigestIgnoresRunOnlyEnvValidation(t *testing.T) {
+	repoRoot := t.TempDir()
+	runRoot := filepath.Join(repoRoot, "custom-runs")
+	ledgerPath := filepath.Join(runRoot, "state", "runs.jsonl")
+	if err := autoloop.AppendLedgerEvent(ledgerPath, autoloop.LedgerEvent{
+		TS:    time.Unix(1, 0).UTC(),
+		Event: "run_started",
+	}); err != nil {
+		t.Fatalf("AppendLedgerEvent() error = %v", err)
+	}
+	t.Setenv("RUN_ROOT", runRoot)
+	t.Setenv("MAX_AGENTS", "bad")
+
+	var stdout bytes.Buffer
+	oldStdout := commandStdout
+	commandStdout = &stdout
+	t.Cleanup(func() {
+		commandStdout = oldStdout
+	})
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	if err := os.Chdir(repoRoot); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldWD); err != nil {
+			t.Fatalf("restore Chdir() error = %v", err)
+		}
+	})
+
+	if err := run([]string{"digest"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "runs: 1") {
+		t.Fatalf("stdout = %q, want digest from configured RUN_ROOT", stdout.String())
+	}
+}

@@ -25,18 +25,21 @@ func run(args []string) error {
 		return err
 	}
 
-	cfg, err := autoloop.ConfigFromEnv(root, autoloopEnv())
-	if err != nil {
-		return err
-	}
-
 	switch {
 	case len(args) == 1 && args[0] == "run":
+		cfg, err := autoloop.ConfigFromEnv(root, autoloopEnv())
+		if err != nil {
+			return err
+		}
 		return runAutoloop(cfg, false)
 	case len(args) == 2 && args[0] == "run" && args[1] == "--dry-run":
+		cfg, err := autoloop.ConfigFromEnv(root, autoloopEnv())
+		if err != nil {
+			return err
+		}
 		return runAutoloop(cfg, true)
 	case len(args) == 1 && args[0] == "digest":
-		digest, err := autoloop.DigestLedger(filepath.Join(cfg.RunRoot, "state", "runs.jsonl"))
+		digest, err := autoloop.DigestLedger(filepath.Join(digestRunRoot(root), "state", "runs.jsonl"))
 		if err != nil {
 			return err
 		}
@@ -45,6 +48,14 @@ func run(args []string) error {
 	default:
 		return fmt.Errorf("usage: autoloop run [--dry-run] | digest")
 	}
+}
+
+func digestRunRoot(root string) string {
+	if runRoot := os.Getenv("RUN_ROOT"); runRoot != "" {
+		return runRoot
+	}
+
+	return filepath.Join(root, ".codex", "orchestrator")
 }
 
 func runAutoloop(cfg autoloop.Config, dryRun bool) error {
