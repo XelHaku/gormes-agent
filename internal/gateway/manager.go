@@ -24,20 +24,12 @@ type ManagerConfig struct {
 	CoalesceMs     int
 	SessionMap     session.Map
 	Hooks          *Hooks
-
-	// RestartFunc is the service-manager-facing hook invoked after a
-	// successful /restart drain. When nil, /restart replies with an
-	// "unsupported" notice.
-	RestartFunc RestartFunc
-	// RestartMarkers persists the takeover marker that dedupes a
-	// redelivered /restart against the inbound event that caused the
-	// previous restart. When nil, the manager still handles /restart but
-	// cannot dedupe across process boundaries.
-	RestartMarkers RestartMarkerStore
-	// RestartGracePause is an optional delay between sending the restart
-	// notice and invoking RestartFunc. Tests use a tiny value; real
-	// embedders rely on drain to absorb in-flight turns.
-	RestartGracePause time.Duration
+	// Status, when non-nil, receives channel lifecycle writes from the
+	// manager (register/running/disconnected/failed). Callers that want to
+	// inject a deterministic clock can build it with NewStatusModelWithClock
+	// and read it back later via Manager.Status. A nil value makes the
+	// manager create its own time.Now-backed StatusModel.
+	Status *StatusModel
 }
 
 type kernelSubmitter interface {
@@ -51,6 +43,7 @@ type Manager struct {
 	cfg    ManagerConfig
 	kernel kernelSubmitter
 	log    *slog.Logger
+	status *StatusModel
 
 	mu       sync.Mutex
 	channels map[string]Channel
@@ -135,10 +128,15 @@ func newManagerInternal(cfg ManagerConfig, k kernelSubmitter, log *slog.Logger) 
 	if cfg.AllowDiscovery == nil {
 		cfg.AllowDiscovery = map[string]bool{}
 	}
+	status := cfg.Status
+	if status == nil {
+		status = NewStatusModel()
+	}
 	return &Manager{
 		cfg:      cfg,
 		kernel:   k,
 		log:      log,
+		status:   status,
 		channels: map[string]Channel{},
 	}
 }
@@ -156,7 +154,13 @@ func (m *Manager) Register(ch Channel) error {
 		return fmt.Errorf("%w: %q", ErrDuplicateChannel, name)
 	}
 	m.channels[name] = ch
+	m.status.MarkRegistered(name)
 	return nil
+}
+
+// Status returns the manager's in-process channel lifecycle read model.
+func (m *Manager) Status() *StatusModel {
+	return m.status
 }
 
 // ChannelCount reports how many channels are currently registered.
@@ -207,7 +211,13 @@ func (m *Manager) Run(ctx context.Context) error {
 		wg.Add(1)
 		go func(c Channel) {
 			defer wg.Done()
-			if err := c.Run(ctx, inbox); err != nil && !errors.Is(err, context.Canceled) {
+			m.status.MarkRunning(c.Name())
+			err := c.Run(ctx, inbox)
+			switch {
+			case err == nil, errors.Is(err, context.Canceled):
+				m.status.MarkDisconnected(c.Name(), nil)
+			default:
+				m.status.MarkFailed(c.Name(), err)
 				m.fireHook(ctx, HookEvent{
 					Point:    HookOnError,
 					Platform: c.Name(),

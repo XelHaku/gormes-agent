@@ -580,8 +580,11 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.F.3 restart markers note = %q, want restart/takeover-marker detail", restartMarkers.Note)
 	}
 	lifecycleWriters := lifecycleItems["Channel lifecycle writers into status model"]
-	if lifecycleWriters.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 lifecycle writers status = %q, want planned", lifecycleWriters.Status)
+	if lifecycleWriters.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 lifecycle writers status = %q, want complete", lifecycleWriters.Status)
+	}
+	if !strings.Contains(lifecycleWriters.Note, "StatusModel") || !strings.Contains(lifecycleWriters.Note, "internal/gateway/status.go") {
+		t.Fatalf("Phase 2.F.3 lifecycle writers note = %q, want StatusModel/gateway status.go detail", lifecycleWriters.Note)
 	}
 
 	if got := operator.DerivedStatus(); got != StatusPlanned {

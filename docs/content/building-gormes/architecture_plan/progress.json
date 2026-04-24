@@ -572,8 +572,8 @@
             },
             {
               "name": "Channel lifecycle writers into status model",
-              "status": "planned",
-              "note": "TDD: thread live channel lifecycle updates into the shared pairing/status surface and prove read-model coherence before adapter-specific pairing UX widens."
+              "status": "complete",
+              "note": "TDD landed: internal/gateway/status.go introduces StatusModel (LifecyclePhaseRegistered/Running/Disconnected/Failed) with deterministic Snapshot ordering and a pluggable clock, and Manager.Register plus the per-channel Run goroutine now write registered→running→disconnected/failed transitions into it with last-error capture. Later on-disk persistence slices (pairing.json, gateway_state.json) can wrap this in-process read model without renaming its phases."
             }
           ]
         },

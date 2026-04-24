@@ -197,8 +197,8 @@ weight: 10
 - [ ] `gormes gateway status` read-only command
 - [ ] Runtime status JSON + PID/process validation
 - [ ] Token-scoped gateway locks
-- [x] Gateway /restart command + takeover markers
-- [ ] Channel lifecycle writers into status model
+- [ ] Gateway /restart command + takeover markers
+- [x] Channel lifecycle writers into status model
 
 ### 2.F.4 — Home Channel + Operator Surfaces ⏳
 
