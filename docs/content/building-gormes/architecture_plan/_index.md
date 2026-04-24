@@ -296,7 +296,7 @@ weight: 10
 - [x] Same-chat default recall fence
 - [x] Opt-in user-scope recall + source filters
 - [ ] Honcho-compatible scope/source tool schema
-- [ ] Cross-chat deny-path fixtures
+- [x] Cross-chat deny-path fixtures
 - [ ] Cross-chat operator evidence
 
 ### 3.E.8 — Session Lineage + Cross-Source Search 🔨

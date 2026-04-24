@@ -888,8 +888,8 @@
             },
             {
               "name": "Cross-chat deny-path fixtures",
-              "status": "planned",
-              "note": "TDD: prove unknown, unresolved, or conflicting user_id bindings cannot widen recall or session search, and pin same-chat fallback behavior with fixture-backed allow/deny cases before cross-chat access is exposed as shipped."
+              "status": "complete",
+              "note": "TDD landed: `internal/goncho/service.go` `searchTurnFallback` now collapses to same-chat `findTurns` when the `scope=user` branch hits an unknown user, a conflicting/empty session-binding result, a directory error, or a source allow-list that excludes every binding (instead of returning empty or leaking the directory error). Fixture coverage: `internal/goncho/service_test.go` (`TestService_SearchUserScopeUnknownUserFallsBackToSameChat`, `TestService_SearchUserScopeDirectoryErrorFallsBackToSameChat`, `TestService_SearchUserScopeSourceFilterDeniesAllFallsBackToSameChat`); `internal/memory/recall_test.go` (`TestProvider_GetContext_CrossChatUnknownUserHoldsSameChatFence`, `TestProvider_GetContext_CrossChatDirectoryErrorHoldsSameChatFence`); `internal/memory/session_catalog_test.go` (`TestSessionCatalog_SearchMessagesEmptyUserIDDeniesAll`, `TestSessionCatalog_SearchMessagesIgnoresCrossUserMetadata`)."
             },
             {
               "name": "Cross-chat operator evidence",

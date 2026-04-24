@@ -2,6 +2,7 @@ package goncho
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -9,6 +10,15 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/internal/memory"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/session"
 )
+
+// failingDirectory is a SessionDirectory that always errors. Used to prove the
+// goncho service falls back to same-chat search when the cross-chat directory
+// is unreachable instead of leaking the error to callers.
+type failingDirectory struct{ err error }
+
+func (f failingDirectory) ListMetadataByUserID(_ context.Context, _ string) ([]session.Metadata, error) {
+	return nil, f.err
+}
 
 func TestService_ProfileRoundTrip(t *testing.T) {
 	svc, cleanup := newTestService(t)
@@ -211,6 +221,133 @@ func TestService_SearchUserScopeRespectsSourceFilter(t *testing.T) {
 	}
 	if got.Results[0].Source != "turn" || got.Results[0].SessionKey != "sess-discord" {
 		t.Fatalf("Search result = %+v, want discord turn bound to sess-discord", got.Results[0])
+	}
+}
+
+// TestService_SearchUserScopeUnknownUserFallsBackToSameChat pins a deny-path
+// fixture: when scope=user is requested with a peer that has no canonical
+// session bindings, the search must fall back to the caller's same-chat
+// turns instead of returning empty (which would silently drop legitimate
+// in-chat results) or widening to all chats.
+func TestService_SearchUserScopeUnknownUserFallsBackToSameChat(t *testing.T) {
+	store, _, svc, cleanup := newTestServiceWithDirectory(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES (?, ?, ?, ?, ?)`,
+		"sess-known", "user", "Atlas same-chat reminder.", time.Now().Unix(), "telegram:42",
+	); err != nil {
+		t.Fatalf("insert turn: %v", err)
+	}
+
+	got, err := svc.Search(ctx, SearchParams{
+		Peer:       "ghost-user",
+		Query:      "Atlas",
+		MaxTokens:  200,
+		SessionKey: "telegram:42",
+		Scope:      "user",
+	})
+	if err != nil {
+		t.Fatalf("Search returned error: %v", err)
+	}
+	if len(got.Results) != 1 {
+		t.Fatalf("Search results len = %d, want 1 (same-chat fallback for unbound user)", len(got.Results))
+	}
+	if got.Results[0].Source != "turn" || got.Results[0].SessionKey != "telegram:42" {
+		t.Fatalf("Search result = %+v, want turn bound to telegram:42", got.Results[0])
+	}
+}
+
+// TestService_SearchUserScopeDirectoryErrorFallsBackToSameChat pins a
+// deny-path fixture: a transient directory error must not leak through the
+// search surface as a hard failure. The user-scope branch must collapse to
+// same-chat behavior so callers keep getting in-chat results.
+func TestService_SearchUserScopeDirectoryErrorFallsBackToSameChat(t *testing.T) {
+	store, err := memory.OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer func() {
+		if cerr := store.Close(context.Background()); cerr != nil {
+			t.Fatalf("Close: %v", cerr)
+		}
+	}()
+
+	svc := NewService(store.DB(), Config{
+		WorkspaceID:      "default",
+		ObserverPeerID:   "gormes",
+		RecentMessages:   4,
+		SessionDirectory: failingDirectory{err: errors.New("session: directory offline")},
+	}, nil)
+
+	ctx := context.Background()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES (?, ?, ?, ?, ?)`,
+		"sess-known", "user", "Atlas continues in chat.", time.Now().Unix(), "telegram:42",
+	); err != nil {
+		t.Fatalf("insert turn: %v", err)
+	}
+
+	got, err := svc.Search(ctx, SearchParams{
+		Peer:       "user-juan",
+		Query:      "Atlas",
+		MaxTokens:  200,
+		SessionKey: "telegram:42",
+		Scope:      "user",
+	})
+	if err != nil {
+		t.Fatalf("Search returned directory error to caller: %v", err)
+	}
+	if len(got.Results) != 1 {
+		t.Fatalf("Search results len = %d, want 1 (same-chat fallback for dir error)", len(got.Results))
+	}
+	if got.Results[0].Source != "turn" || got.Results[0].SessionKey != "telegram:42" {
+		t.Fatalf("Search result = %+v, want turn bound to telegram:42", got.Results[0])
+	}
+}
+
+// TestService_SearchUserScopeSourceFilterDeniesAllFallsBackToSameChat pins a
+// deny-path fixture: when a source allow-list excludes every binding the
+// user owns, the user-scope branch collapses to same-chat search. The
+// allow-list must not act as a wide cross-chat passthrough.
+func TestService_SearchUserScopeSourceFilterDeniesAllFallsBackToSameChat(t *testing.T) {
+	store, dir, svc, cleanup := newTestServiceWithDirectory(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := dir.PutMetadata(ctx, session.Metadata{
+		SessionID: "sess-telegram",
+		Source:    "telegram",
+		ChatID:    "42",
+		UserID:    "user-juan",
+	}); err != nil {
+		t.Fatalf("PutMetadata: %v", err)
+	}
+	now := time.Now().Unix()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES (?, ?, ?, ?, ?)`,
+		"sess-telegram", "user", "Atlas same-chat fallback line.", now, "telegram:42",
+	); err != nil {
+		t.Fatalf("insert turn: %v", err)
+	}
+
+	got, err := svc.Search(ctx, SearchParams{
+		Peer:       "user-juan",
+		Query:      "Atlas",
+		MaxTokens:  200,
+		SessionKey: "telegram:42",
+		Scope:      "user",
+		Sources:    []string{"slack"},
+	})
+	if err != nil {
+		t.Fatalf("Search returned error: %v", err)
+	}
+	if len(got.Results) != 1 {
+		t.Fatalf("Search results len = %d, want 1 (same-chat fallback when source filter denies all)", len(got.Results))
+	}
+	if got.Results[0].Source != "turn" || got.Results[0].SessionKey != "telegram:42" {
+		t.Fatalf("Search result = %+v, want turn bound to telegram:42", got.Results[0])
 	}
 }
 

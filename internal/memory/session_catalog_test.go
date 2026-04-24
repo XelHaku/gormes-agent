@@ -69,6 +69,82 @@ func TestSessionCatalog_SearchMessagesFiltersBySource(t *testing.T) {
 	}
 }
 
+// TestSessionCatalog_SearchMessagesEmptyUserIDDeniesAll pins a deny-path
+// fixture: an unresolved user_id (empty filter.UserID) must never reach the
+// turns table, regardless of how many rows the caller passes in metas.
+func TestSessionCatalog_SearchMessagesEmptyUserIDDeniesAll(t *testing.T) {
+	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer func() {
+		if cerr := store.Close(context.Background()); cerr != nil {
+			t.Fatalf("Close: %v", cerr)
+		}
+	}()
+
+	ctx := context.Background()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES (?, ?, ?, ?, ?)`,
+		"sess-x", "user", "Atlas confidential note.", time.Now().Unix(), "telegram:42",
+	); err != nil {
+		t.Fatalf("insert turn: %v", err)
+	}
+
+	metas := []session.Metadata{
+		{SessionID: "sess-x", Source: "telegram", ChatID: "42", UserID: "user-juan"},
+	}
+	hits, err := SearchMessages(ctx, store.DB(), metas, SearchFilter{
+		UserID: "",
+		Query:  "Atlas",
+	}, 10)
+	if err != nil {
+		t.Fatalf("SearchMessages: %v", err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("SearchMessages with empty user_id len = %d, want 0 (deny-path)", len(hits))
+	}
+}
+
+// TestSessionCatalog_SearchMessagesIgnoresCrossUserMetadata pins a deny-path
+// fixture: metadata rows whose UserID does not match the filter must be
+// dropped before the SQL query runs. A caller cannot smuggle another user's
+// session through the metadata slice.
+func TestSessionCatalog_SearchMessagesIgnoresCrossUserMetadata(t *testing.T) {
+	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer func() {
+		if cerr := store.Close(context.Background()); cerr != nil {
+			t.Fatalf("Close: %v", cerr)
+		}
+	}()
+
+	ctx := context.Background()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES (?, ?, ?, ?, ?)`,
+		"sess-other", "user", "Atlas note from another user.", time.Now().Unix(), "telegram:99",
+	); err != nil {
+		t.Fatalf("insert turn: %v", err)
+	}
+
+	metas := []session.Metadata{
+		// Only one row, and it belongs to user-other — cross-user smuggling.
+		{SessionID: "sess-other", Source: "telegram", ChatID: "99", UserID: "user-other"},
+	}
+	hits, err := SearchMessages(ctx, store.DB(), metas, SearchFilter{
+		UserID: "user-juan",
+		Query:  "Atlas",
+	}, 10)
+	if err != nil {
+		t.Fatalf("SearchMessages: %v", err)
+	}
+	if len(hits) != 0 {
+		t.Fatalf("SearchMessages cross-user metas len = %d, want 0 (deny-path)", len(hits))
+	}
+}
+
 func TestSessionCatalog_SearchSessionsOrdersByLatestTurn(t *testing.T) {
 	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
 	if err != nil {

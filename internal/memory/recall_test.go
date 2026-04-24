@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -215,6 +216,57 @@ func TestProvider_GetContext_CrossChatSourceFilter(t *testing.T) {
 	if !strings.Contains(allowed, "Acme") {
 		t.Fatalf("telegram source filter should allow Acme; got %q", allowed)
 	}
+}
+
+// TestProvider_GetContext_CrossChatUnknownUserHoldsSameChatFence pins a
+// deny-path fixture: when CrossChat is requested but the user_id has no
+// canonical session bindings, recall must collapse to the caller's same-chat
+// scope. A name from a different chat must NOT leak into the fence block.
+func TestProvider_GetContext_CrossChatUnknownUserHoldsSameChatFence(t *testing.T) {
+	_, p := openProviderWithRichGraph(t)
+
+	dir := session.NewMemMap()
+	p = p.WithDirectory(dir)
+
+	// dir is empty: user-juan has no bindings at all. The opt-in cross-chat
+	// path must collapse to same-chat for telegram:99 (which has no seeds),
+	// not widen to all chats and surface telegram:42's Acme entity.
+	out := p.GetContext(context.Background(), RecallInput{
+		UserMessage: "Acme progress?",
+		ChatKey:     "telegram:99",
+		UserID:      "user-juan",
+		CrossChat:   true,
+	})
+	if out != "" {
+		t.Fatalf("unbound user_id must hold same-chat fence; got %q", out)
+	}
+}
+
+// TestProvider_GetContext_CrossChatDirectoryErrorHoldsSameChatFence pins a
+// deny-path fixture: a transient session-directory error must collapse the
+// scope to the caller's same chat instead of opening recall up. A flaky
+// directory must never widen access.
+func TestProvider_GetContext_CrossChatDirectoryErrorHoldsSameChatFence(t *testing.T) {
+	_, p := openProviderWithRichGraph(t)
+
+	p = p.WithDirectory(failingRecallDirectory{err: errors.New("dir offline")})
+	out := p.GetContext(context.Background(), RecallInput{
+		UserMessage: "Acme progress?",
+		ChatKey:     "telegram:99",
+		UserID:      "user-juan",
+		CrossChat:   true,
+	})
+	if out != "" {
+		t.Fatalf("directory error must hold same-chat fence; got %q", out)
+	}
+}
+
+// failingRecallDirectory simulates a flaky session directory for deny-path
+// fixtures.
+type failingRecallDirectory struct{ err error }
+
+func (f failingRecallDirectory) ListMetadataByUserID(_ context.Context, _ string) ([]session.Metadata, error) {
+	return nil, f.err
 }
 
 // stubEmbedServer returns a fixed vector for any input — enough to seed

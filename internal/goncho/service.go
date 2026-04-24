@@ -253,25 +253,35 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams) (
 		userID := strings.TrimSpace(params.Peer)
 		metas, err := s.sessions.ListMetadataByUserID(ctx, userID)
 		if err != nil {
-			return nil, err
+			// Deny-path: a flaky directory must not leak through the
+			// search surface as a hard error or as wide-open access.
+			// Collapse to same-chat behavior below.
+			s.log.Warn("goncho: session directory lookup failed", "err", err)
+		} else {
+			hits, err := memory.SearchMessages(ctx, s.db, metas, memory.SearchFilter{
+				UserID:  userID,
+				Sources: params.Sources,
+				Query:   params.Query,
+			}, 6)
+			if err != nil {
+				return nil, err
+			}
+			if len(hits) > 0 {
+				out := make([]SearchHit, 0, len(hits))
+				for _, hit := range hits {
+					out = append(out, SearchHit{
+						Source:     "turn",
+						Content:    hit.Content,
+						SessionKey: hit.SessionID,
+					})
+				}
+				return out, nil
+			}
+			// Deny-path: unknown user, conflicting binding, or a source
+			// allow-list that excluded every binding. Fall through to
+			// same-chat search instead of returning empty (which would
+			// silently drop legitimate in-chat results).
 		}
-		hits, err := memory.SearchMessages(ctx, s.db, metas, memory.SearchFilter{
-			UserID:  userID,
-			Sources: params.Sources,
-			Query:   params.Query,
-		}, 6)
-		if err != nil {
-			return nil, err
-		}
-		out := make([]SearchHit, 0, len(hits))
-		for _, hit := range hits {
-			out = append(out, SearchHit{
-				Source:     "turn",
-				Content:    hit.Content,
-				SessionKey: hit.SessionID,
-			})
-		}
-		return out, nil
 	}
 
 	if strings.TrimSpace(params.SessionKey) == "" {
