@@ -557,8 +557,8 @@
             },
             {
               "name": "Runtime status JSON + PID/process validation",
-              "status": "planned",
-              "note": "TDD: port the upstream gateway_state.json/PID-file read model with stale PID cleanup and process identity checks before wiring live channel state."
+              "status": "complete",
+              "note": "TDD landed: `internal/gateway/runtime_state.go` freezes a `RuntimeState{PID, StartTime, Channels}` JSON read model with `SaveRuntimeState` (atomic tmp+rename via parent MkdirAll), `LoadRuntimeState` that distinguishes missing/present/corrupt, a pluggable `ProcessProbe` seam whose `DefaultProcessProbe` uses `proc.Signal(syscall.Signal(0))` for liveness and `/proc/<pid>/stat` field 22 on Linux for identity, and `RuntimeState.IsStale`/`CleanStaleRuntimeState` that remove the file on dead PIDs *or* PID-reuse (start-time mismatch) while preserving it for live matching owners. Channel-state wiring into `Manager.Run` stays planned as a separate slice per the `before wiring live channel state` scope in the original note."
             },
             {
               "name": "Token-scoped gateway locks",

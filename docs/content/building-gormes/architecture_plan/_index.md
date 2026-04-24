@@ -191,11 +191,11 @@ weight: 10
 - [x] Graceful restart drain + managed shutdown
 - [x] Adapter startup failure cleanup contract
 - [ ] Active-turn follow-up queue + late-arrival drain policy
-- [ ] Drain-timeout resume_pending recovery
+- [x] Drain-timeout resume_pending recovery
 - [x] Pairing read-model schema + atomic persistence
 - [ ] Pairing approval + rate-limit semantics
 - [x] `gormes gateway status` read-only command
-- [ ] Runtime status JSON + PID/process validation
+- [x] Runtime status JSON + PID/process validation
 - [ ] Token-scoped gateway locks
 - [x] Gateway /restart command + takeover markers
 - [x] Channel lifecycle writers into status model
