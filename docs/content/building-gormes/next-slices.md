@@ -13,7 +13,8 @@ The ordering is:
 1. unblocked `P0` handoffs;
 2. active `in_progress` rows;
 3. `fixture_ready` rows;
-4. `draft` contract rows.
+4. unblocked rows that unblock other slices;
+5. remaining `draft` contract rows.
 
 Use this page when choosing implementation work. If a row is too broad, split
 the row in `progress.json` before assigning it.
