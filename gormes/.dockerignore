@@ -1,0 +1,22 @@
+# Version control
+.git
+.gitignore
+
+# Build output
+bin
+coverage.out
+*.test
+*.out
+
+# CI / editor / tooling caches
+.github
+.vscode
+.idea
+.codex
+.cache
+.DS_Store
+
+# Local runtime state (should never leak into the build context)
+.env
+.envrc
+gormes.log

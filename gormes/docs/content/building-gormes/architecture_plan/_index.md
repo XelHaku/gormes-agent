@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 57/66 subphases shipped · 1 in progress · 8 planned
+**Overall:** 57/66 subphases shipped · 2 in progress · 7 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -366,9 +366,9 @@ weight: 10
 
 - [ ] 49-file CLI tree port
 
-### 5.P — Docker / Packaging ⏳
+### 5.P — Docker / Packaging 🔨
 
-- [ ] OCI image
+- [x] OCI image
 - [ ] Homebrew
 
 ### 5.Q — TUI Gateway Streaming ⏳

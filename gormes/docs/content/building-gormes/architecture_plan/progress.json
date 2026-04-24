@@ -1000,7 +1000,8 @@
           "items": [
             {
               "name": "OCI image",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `gormes/Dockerfile` now ships a multi-stage `golang:1.26-bookworm` builder + Debian-slim runtime that produces a CGO-disabled static `./cmd/gormes` binary, installs under `/opt/gormes`, exports `GORMES_HOME=/opt/data` plus `XDG_DATA_HOME=/opt/data`, and declares `VOLUME [\"/opt/data\"]` so operators migrating from the upstream Hermes image keep the same bind mount. `gormes/docker/entrypoint.sh` bootstraps the canonical `cron/sessions/logs/hooks/memories/skills/plans/workspace/home` layout, honors `GORMES_UID`/`GORMES_GID` via `gosu` for bind-mount UID remap, and execs `gormes` after seeding `docker/SOUL.md` into the volume on first run. `gormes/.dockerignore` keeps `.git`, `bin/`, caches, and local env files out of the build context."
             },
             {
               "name": "Homebrew",
