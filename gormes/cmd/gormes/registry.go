@@ -28,11 +28,11 @@ func buildDefaultRegistry(parentCtx context.Context, delegation config.Delegatio
 		Toolset: "clarify",
 		CheckFn: func() bool { return clarify.Prompter != nil },
 	})
-	sessionSearch := &tools.SessionSearchTool{}
+	todo := &tools.TodoTool{}
 	reg.MustRegisterEntry(tools.ToolEntry{
-		Tool:    sessionSearch,
-		Toolset: "session_search",
-		CheckFn: func() bool { return sessionSearch.Backend != nil },
+		Tool:    todo,
+		Toolset: "todo",
+		CheckFn: func() bool { return todo.Store != nil },
 	})
 	reg.MustRegisterEntry(tools.ToolEntry{
 		Tool:    &tools.ExecuteCodeTool{},

@@ -357,7 +357,7 @@ weight: 10
 
 ### 5.N — Misc Operator Tools 🔨
 
-- [ ] Todo
+- [x] Todo
 - [x] Clarify
 - [x] Session search
 - [x] Debug helpers

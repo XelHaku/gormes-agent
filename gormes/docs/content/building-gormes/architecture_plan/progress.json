@@ -968,7 +968,8 @@
           "items": [
             {
               "name": "Todo",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD landed: `internal/tools/todo.go` now ports the per-session Todo tool core with a `TodoStore` (replace vs merge-by-id writes, duplicate-id collapsing, defensive-copy reads, status normalization, and `FormatForInjection` filtering to pending/in_progress for post-compression replay) plus a `TodoTool` that satisfies the shared `Tool` interface with JSON-summary output, and `cmd/gormes/registry.go` wires it under the dormant `todo` toolset gated on an injected per-session store."
             },
             {
               "name": "Clarify",
