@@ -16,8 +16,10 @@ func BuildBackendCommand(backend, mode string) ([]string, error) {
 	}
 
 	switch backend {
-	case "codexu", "claudeu":
-		return []string{backend, "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", sandbox}, nil
+	case "codexu":
+		return []string{"codexu", "exec", "--json", "--ephemeral", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", sandbox}, nil
+	case "claudeu":
+		return []string{"claudeu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", sandbox}, nil
 	case "opencode":
 		return []string{"opencode", "run", "--no-interactive"}, nil
 	default:

@@ -12,7 +12,7 @@ func TestBuildBackendCommandCodexuSafe(t *testing.T) {
 		t.Fatalf("BuildBackendCommand() error = %v", err)
 	}
 
-	want := []string{"codexu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
+	want := []string{"codexu", "exec", "--json", "--ephemeral", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
 	}
@@ -24,7 +24,7 @@ func TestBuildBackendCommandDefaultsToCodexuSafe(t *testing.T) {
 		t.Fatalf("BuildBackendCommand() error = %v", err)
 	}
 
-	want := []string{"codexu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
+	want := []string{"codexu", "exec", "--json", "--ephemeral", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
 	}
@@ -36,7 +36,7 @@ func TestBuildBackendCommandCodexuFull(t *testing.T) {
 		t.Fatalf("BuildBackendCommand() error = %v", err)
 	}
 
-	want := []string{"codexu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "danger-full-access"}
+	want := []string{"codexu", "exec", "--json", "--ephemeral", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "danger-full-access"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
 	}
@@ -48,7 +48,7 @@ func TestBuildBackendCommandCodexuUnattendedUsesWorkspaceWrite(t *testing.T) {
 		t.Fatalf("BuildBackendCommand() error = %v", err)
 	}
 
-	want := []string{"codexu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
+	want := []string{"codexu", "exec", "--json", "--ephemeral", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
 	}
