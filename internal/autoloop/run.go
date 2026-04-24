@@ -113,9 +113,7 @@ func BuildWorkerPrompt(candidate Candidate) string {
 	writePromptList(&prompt, candidate.SourceRefs)
 	prompt.WriteString("\n")
 
-	if strings.TrimSpace(candidate.Note) != "" {
-		fmt.Fprintf(&prompt, "Note: %s\n\n", strings.TrimSpace(candidate.Note))
-	}
+	fmt.Fprintf(&prompt, "Note: %s\n\n", valueOrDash(candidate.Note))
 
 	prompt.WriteString("Requirements:\n")
 	prompt.WriteString("- Read the repository context before editing.\n")

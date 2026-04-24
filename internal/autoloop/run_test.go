@@ -259,6 +259,19 @@ func TestRunOncePassesExecutionMetadataPromptToBackend(t *testing.T) {
 	}
 }
 
+func TestBuildWorkerPromptRendersEmptyNote(t *testing.T) {
+	prompt := BuildWorkerPrompt(Candidate{
+		PhaseID:    "12",
+		SubphaseID: "12.A",
+		ItemName:   "empty note candidate",
+		Status:     "planned",
+	})
+
+	if !strings.Contains(prompt, "Note: -") {
+		t.Fatalf("prompt = %q, want empty note rendered as dash", prompt)
+	}
+}
+
 func TestRunOnceReturnsBackendRunnerError(t *testing.T) {
 	progressPath := writeProgressJSON(t, `{
 		"phases": {
