@@ -86,15 +86,63 @@ enforce_worktree_dir_cap() {
   done
 }
 
+report_has_runtime_flag() {
+  # Args: <final_file> <flag_name>
+  # Returns 0 if final report has a "9) Runtime flags" section containing
+  # `<flag_name>: true` (case-insensitive), 1 otherwise. Accepts markdown
+  # header prefix and bold markers on the section title, same flexibility as
+  # the rest of the report validator.
+  local final_file="$1"
+  local flag_name="$2"
+
+  [[ -f "$final_file" ]] || return 1
+
+  awk -v flag="$flag_name" '
+    BEGIN { IGNORECASE = 1; in_section = 0 }
+    /^[[:space:]]*(#{1,6}[[:space:]]+)?(\*\*)?9[).][[:space:]]*(\*\*)?Runtime flags(\*\*)?/ {
+      in_section = 1
+      next
+    }
+    # Any other "N) Title" or "N. Title" section header ends the runtime-flags
+    # block. Match a leading integer followed by ) or . to avoid bleeding.
+    in_section && /^[[:space:]]*(#{1,6}[[:space:]]+)?(\*\*)?[0-9]+[).][[:space:]]/ {
+      in_section = 0
+    }
+    in_section {
+      # Allow optional leading "- " bullet prefix and trimming of whitespace.
+      line = $0
+      sub(/^[[:space:]]*[-*][[:space:]]*/, "", line)
+      sub(/^[[:space:]]+/, "", line)
+      if (match(line, "^" flag "[[:space:]]*:[[:space:]]*true[[:space:]]*$")) {
+        found = 1
+        exit
+      }
+    }
+    END { exit(found ? 0 : 1) }
+  ' "$final_file"
+}
+
 verify_worker_commit() {
   local worker_id="$1"
   local final_file="$2"
   local worktree_root branch head_commit report_commit report_branch commit_count status_output changed_files file
+  local allow_multi_commit tolerate_untracked status_cmd_flag
 
   # Reset reason so a successful run doesn't leak a stale value from
   # a prior invocation.
   LAST_VERIFY_REASON=""
   export LAST_VERIFY_REASON
+
+  # Env defaults are rigid; per-worker report flags can opt into softer
+  # behavior for a single run without setting global env vars.
+  allow_multi_commit="${ALLOW_MULTI_COMMIT:-0}"
+  tolerate_untracked="${TOLERATE_WORKTREE_UNTRACKED:-0}"
+  if report_has_runtime_flag "$final_file" "AllowMultiCommit"; then
+    allow_multi_commit=1
+  fi
+  if report_has_runtime_flag "$final_file" "TolerateWorktreeUntracked"; then
+    tolerate_untracked=1
+  fi
 
   worktree_root="$(worker_worktree_root "$worker_id")"
   branch="$(worker_branch_name "$worker_id")"
@@ -106,13 +154,25 @@ verify_worker_commit() {
   fi
 
   commit_count="$(git -C "$worktree_root" rev-list --count "${BASE_COMMIT}..HEAD")"
-  if [[ "$commit_count" != "1" ]]; then
-    LAST_VERIFY_REASON="wrong_commit_count"
-    echo "worker[$worker_id]: commit count = $commit_count, want exactly 1" >&2
-    return 1
+  if [[ "$allow_multi_commit" == "1" ]]; then
+    if (( commit_count < 1 )); then
+      LAST_VERIFY_REASON="wrong_commit_count"
+      echo "worker[$worker_id]: commit count = $commit_count, want >= 1" >&2
+      return 1
+    fi
+  else
+    if [[ "$commit_count" != "1" ]]; then
+      LAST_VERIFY_REASON="wrong_commit_count"
+      echo "worker[$worker_id]: commit count = $commit_count, want exactly 1" >&2
+      return 1
+    fi
   fi
 
-  status_output="$(git -C "$worktree_root" status --short)"
+  if [[ "$tolerate_untracked" == "1" ]]; then
+    status_output="$(git -C "$worktree_root" status --porcelain --untracked-files=no)"
+  else
+    status_output="$(git -C "$worktree_root" status --short)"
+  fi
   if [[ -n "$status_output" ]]; then
     LAST_VERIFY_REASON="worktree_dirty"
     echo "worker[$worker_id]: worktree not clean after run" >&2

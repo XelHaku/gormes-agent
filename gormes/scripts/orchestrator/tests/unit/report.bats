@@ -81,6 +81,17 @@ setup() {
   assert_output ""
 }
 
+@test "collect_final_report_issues accepts optional section 9 Runtime flags" {
+  local tmp
+  tmp="$(mktmp_workspace)"
+  local report="$tmp/good-with-section9.final.md"
+  cat "$FIXTURES_DIR/reports/good.final.md" > "$report"
+  printf '\n9) Runtime flags\nAllowMultiCommit: true\nTolerateWorktreeUntracked: true\n' >> "$report"
+  run collect_final_report_issues "$report"
+  assert_success
+  assert_output ""
+}
+
 @test "build_prompt omits PRIOR ATTEMPT FEEDBACK when no failure record" {
   local tmp
   tmp="$(mktmp_workspace)"

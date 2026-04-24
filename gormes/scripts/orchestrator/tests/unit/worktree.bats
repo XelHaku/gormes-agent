@@ -172,6 +172,91 @@ setup() {
   assert_success
 }
 
+@test "verify_worker_commit accepts multi-commit work when ALLOW_MULTI_COMMIT=1" {
+  create_worker_worktree 1
+  local wt="$WORKTREES_DIR/worker1"
+  ( cd "$wt" && echo a > a && git -c user.email=t@t -c user.name=T add a && git -c user.email=t@t -c user.name=T commit -q -m a )
+  ( cd "$wt" && echo b > b && git -c user.email=t@t -c user.name=T add b && git -c user.email=t@t -c user.name=T commit -q -m b )
+  local head
+  head="$(git -C "$wt" rev-parse HEAD)"
+  local report="$TMP_WS/f.md"
+  printf 'Branch: codexu/wrt-run-1/worker1\nCommit: %s\n' "$head" > "$report"
+  ALLOW_MULTI_COMMIT=1 run verify_worker_commit 1 "$report"
+  assert_success
+}
+
+@test "verify_worker_commit still rejects multi-commit without ALLOW_MULTI_COMMIT" {
+  create_worker_worktree 1
+  local wt="$WORKTREES_DIR/worker1"
+  ( cd "$wt" && echo a > a && git -c user.email=t@t -c user.name=T add a && git -c user.email=t@t -c user.name=T commit -q -m a )
+  ( cd "$wt" && echo b > b && git -c user.email=t@t -c user.name=T add b && git -c user.email=t@t -c user.name=T commit -q -m b )
+  local head
+  head="$(git -C "$wt" rev-parse HEAD)"
+  local report="$TMP_WS/f.md"
+  printf 'Branch: codexu/wrt-run-1/worker1\nCommit: %s\n' "$head" > "$report"
+  ! verify_worker_commit 1 "$report" 2>/dev/null
+  assert_equal "$LAST_VERIFY_REASON" "wrong_commit_count"
+}
+
+@test "verify_worker_commit accepts untracked-only dirty tree when TOLERATE_WORKTREE_UNTRACKED=1" {
+  create_worker_worktree 1
+  local wt="$WORKTREES_DIR/worker1"
+  ( cd "$wt" && echo a > a && git -c user.email=t@t -c user.name=T add a && git -c user.email=t@t -c user.name=T commit -q -m a )
+  ( cd "$wt" && echo stray > stray )
+  local head
+  head="$(git -C "$wt" rev-parse HEAD)"
+  local report="$TMP_WS/f.md"
+  printf 'Branch: codexu/wrt-run-1/worker1\nCommit: %s\n' "$head" > "$report"
+  TOLERATE_WORKTREE_UNTRACKED=1 run verify_worker_commit 1 "$report"
+  assert_success
+}
+
+@test "verify_worker_commit still rejects untracked-only dirty tree without TOLERATE_WORKTREE_UNTRACKED" {
+  create_worker_worktree 1
+  local wt="$WORKTREES_DIR/worker1"
+  ( cd "$wt" && echo a > a && git -c user.email=t@t -c user.name=T add a && git -c user.email=t@t -c user.name=T commit -q -m a )
+  ( cd "$wt" && echo stray > stray )
+  local head
+  head="$(git -C "$wt" rev-parse HEAD)"
+  local report="$TMP_WS/f.md"
+  printf 'Branch: codexu/wrt-run-1/worker1\nCommit: %s\n' "$head" > "$report"
+  ! verify_worker_commit 1 "$report" 2>/dev/null
+  assert_equal "$LAST_VERIFY_REASON" "worktree_dirty"
+}
+
+@test "verify_worker_commit report section 9 AllowMultiCommit overrides env default" {
+  create_worker_worktree 1
+  local wt="$WORKTREES_DIR/worker1"
+  ( cd "$wt" && echo a > a && git -c user.email=t@t -c user.name=T add a && git -c user.email=t@t -c user.name=T commit -q -m a )
+  ( cd "$wt" && echo b > b && git -c user.email=t@t -c user.name=T add b && git -c user.email=t@t -c user.name=T commit -q -m b )
+  local head
+  head="$(git -C "$wt" rev-parse HEAD)"
+  local report="$TMP_WS/f.md"
+  {
+    printf 'Branch: codexu/wrt-run-1/worker1\nCommit: %s\n' "$head"
+    printf '\n### 9) Runtime flags\nAllowMultiCommit: true\n'
+  } > "$report"
+  # Explicitly ensure the env default is rigid (0) to prove the report flag wins.
+  ALLOW_MULTI_COMMIT=0 run verify_worker_commit 1 "$report"
+  assert_success
+}
+
+@test "verify_worker_commit report section 9 TolerateWorktreeUntracked overrides env default" {
+  create_worker_worktree 1
+  local wt="$WORKTREES_DIR/worker1"
+  ( cd "$wt" && echo a > a && git -c user.email=t@t -c user.name=T add a && git -c user.email=t@t -c user.name=T commit -q -m a )
+  ( cd "$wt" && echo stray > stray )
+  local head
+  head="$(git -C "$wt" rev-parse HEAD)"
+  local report="$TMP_WS/f.md"
+  {
+    printf 'Branch: codexu/wrt-run-1/worker1\nCommit: %s\n' "$head"
+    printf '\n9) Runtime flags\nTolerateWorktreeUntracked: true\n'
+  } > "$report"
+  TOLERATE_WORKTREE_UNTRACKED=0 run verify_worker_commit 1 "$report"
+  assert_success
+}
+
 @test "verify_worker_commit clears LAST_VERIFY_REASON on success" {
   create_worker_worktree 1
   local wt="$WORKTREES_DIR/worker1"
