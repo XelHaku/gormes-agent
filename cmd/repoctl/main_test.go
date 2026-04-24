@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -75,6 +76,60 @@ func TestRunBenchmarkRecordUpdatesBenchmarks(t *testing.T) {
 	}
 }
 
+func TestRunProgressSyncUpdatesMirror(t *testing.T) {
+	root := t.TempDir()
+	docsData := filepath.Join(root, "docs", "data")
+	archDir := filepath.Join(root, "docs", "content", "building-gormes", "architecture_plan")
+	siteProgress := filepath.Join(root, "www.gormes.ai", "internal", "site", "data", "progress.json")
+	for _, dir := range []string{docsData, archDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(docsData, "progress.json"), []byte(`{"meta":{},"phases":{}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	archProgress := `{"meta":{"last_updated":"arch"},"phases":{"1":{}}}` + "\n"
+	if err := os.WriteFile(filepath.Join(archDir, "progress.json"), []byte(archProgress), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	withTempCwd(t, root)
+	if err := run([]string{"progress", "sync"}); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	raw, err := os.ReadFile(siteProgress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != archProgress {
+		t.Fatalf("site mirror = %s", raw)
+	}
+}
+
+func TestRunReadmeUpdateUpdatesReadme(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "benchmarks.json"), []byte(`{"binary":{"size_mb":"16.2"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	readme := filepath.Join(root, "README.md")
+	if err := os.WriteFile(readme, []byte("Binary size: ~99.9 MB\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	withTempCwd(t, root)
+	if err := run([]string{"readme", "update"}); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	raw, err := os.ReadFile(readme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "~16.2 MB") {
+		t.Fatalf("README not updated:\n%s", raw)
+	}
+}
+
 func runGit(t *testing.T, dir string, args ...string) []byte {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
@@ -83,4 +138,20 @@ func runGit(t *testing.T, dir string, args ...string) []byte {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 	return out
+}
+
+func withTempCwd(t *testing.T, dir string) {
+	t.Helper()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -56,3 +56,14 @@ func TestSyncProgressUpdatesDocsDataAndSiteMirror(t *testing.T) {
 		t.Fatalf("site mirror = %s", mirror)
 	}
 }
+
+func TestSyncProgressSkipsMissingDocsProgress(t *testing.T) {
+	root := t.TempDir()
+	siteProgress := filepath.Join(root, "www.gormes.ai", "internal", "site", "data", "progress.json")
+	if err := SyncProgress(ProgressOptions{Root: root}); err != nil {
+		t.Fatalf("SyncProgress: %v", err)
+	}
+	if _, err := os.Stat(siteProgress); !os.IsNotExist(err) {
+		t.Fatalf("site mirror was created: %v", err)
+	}
+}
