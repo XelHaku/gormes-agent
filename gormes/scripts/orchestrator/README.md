@@ -23,6 +23,18 @@ make -C .. orchestrator-test-all    # unit + integration, <2min
 3. Add the new name to the `for _lib in ...` loop at the top of `gormes-auto-codexu-orchestrator.sh`.
 4. Run `make orchestrator-test-all`.
 
+## Backends
+
+`lib/backend.sh` is the backend adapter. `BACKEND` (env var) or the equivalent CLI flag selects which agent CLI drives workers. The orchestrator's worker contract is unchanged across backends; each backend only translates argv.
+
+| Backend | Binary | CLI flag | Notes |
+|---|---|---|---|
+| `codexu` (default) | `codexu` | `--codexu` | Native codex-cli non-interactive mode. |
+| `claudeu` | `claudeu` shim (PATH) | `--claudeu` | Shim translates codexu-style argv to `claude --print`. |
+| `opencode` | `opencode` | `--opencode` | Uses `opencode run --no-interactive`; shape approximate. |
+
+Switch via env (`BACKEND=claudeu $0`) or flag (`$0 --claudeu`). CLI flag wins.
+
 ## Companion scheduling
 
 The orchestrator's forever loop interleaves three companion scripts between cycles:

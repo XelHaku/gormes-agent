@@ -5,7 +5,7 @@ shopt -s inherit_errexit 2>/dev/null || true
 
 ORCHESTRATOR_LIB_DIR="${ORCHESTRATOR_LIB_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/orchestrator/lib}"
 # shellcheck source=/dev/null
-for _lib in common candidates report failures claim worktree promote companions; do
+for _lib in common backend candidates report failures claim worktree promote companions; do
   source "$ORCHESTRATOR_LIB_DIR/${_lib}.sh"
 done
 unset _lib
@@ -31,6 +31,7 @@ PROGRESS_JSON="$REPO_ROOT/$PROGRESS_JSON_REL"
 MAX_AGENTS="${MAX_AGENTS:-4}"
 MAX_AGENTS_HARD_CAP="${MAX_AGENTS_HARD_CAP:-8}"
 MODE="${MODE:-safe}"
+BACKEND="${BACKEND:-codexu}"
 RUN_ROOT="${RUN_ROOT:-$REPO_ROOT/.codex/orchestrator}"
 RUN_ID_SEED="${RUN_ID:-}"
 WORKTREES_DIR_SEED="${WORKTREES_DIR:-}"
@@ -107,6 +108,9 @@ usage() {
 Usage:
   $0                       # run orchestrator
   $0 --resume <run_id>     # resume unfinished workers from a prior run
+  $0 --codexu              # use codexu backend (default)
+  $0 --claudeu             # use claudeu (Claude Code) backend via PATH shim
+  $0 --opencode            # use opencode backend
   $0 status [run_id]       # show run/worker status
   $0 tail [run_id] [n]     # tail orchestrator logs (default n=80)
   $0 abort [run_id]        # terminate active worker pids for run
@@ -118,6 +122,8 @@ Env:
   MAX_AGENTS                 Default: 4 (hard-capped by MAX_AGENTS_HARD_CAP)
   MAX_AGENTS_HARD_CAP        Default: 8
   MODE                       safe | unattended | full
+  BACKEND                    codexu (default) | claudeu | opencode
+                             Equivalent CLI flags: --codexu --claudeu --opencode
   RUN_ROOT                   Default: $RUN_ROOT
   WORKTREES_DIR              Default: $WORKTREES_DIR
   WORKER_TIMEOUT_SECONDS     Default: $WORKER_TIMEOUT_SECONDS
@@ -280,33 +286,52 @@ load_worker_state() {
 }
 
 parse_cli_args() {
-  local cmd="${1:-}"
-  case "$cmd" in
-    "" ) COMMAND_MODE="run" ;;
-    --resume)
-      [[ -n "${2:-}" ]] || { echo "ERROR: --resume requires run_id" >&2; exit 1; }
-      RESUME_RUN_ID="$2"
-      RUN_ID="$RESUME_RUN_ID"
-      WORKTREES_DIR="${RUN_ROOT}/worktrees/${RUN_ID}"
-      CANDIDATES_FILE="$STATE_DIR/candidates.$RUN_ID.json"
-      RUN_PIDS_DIR="$STATE_DIR/pids/$RUN_ID"
-      RUN_WORKER_STATE_DIR="$STATE_DIR/workers/$RUN_ID"
-      COMMAND_MODE="resume"
-      shift 2 || true
-      ;;
-    status|tail|abort|cleanup|promote-commit)
-      COMMAND_MODE="$cmd"
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "ERROR: unknown command '$cmd'" >&2
-      usage
-      exit 1
-      ;;
-  esac
+  CMD_ARGS=()
+  COMMAND_MODE=""
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --codexu)   BACKEND=codexu;   shift ;;
+      --claudeu)  BACKEND=claudeu;  shift ;;
+      --opencode) BACKEND=opencode; shift ;;
+      --resume)
+        [[ -n "${2:-}" ]] || { echo "ERROR: --resume requires run_id" >&2; exit 1; }
+        RESUME_RUN_ID="$2"
+        RUN_ID="$RESUME_RUN_ID"
+        WORKTREES_DIR="${RUN_ROOT}/worktrees/${RUN_ID}"
+        CANDIDATES_FILE="$STATE_DIR/candidates.$RUN_ID.json"
+        RUN_PIDS_DIR="$STATE_DIR/pids/$RUN_ID"
+        RUN_WORKER_STATE_DIR="$STATE_DIR/workers/$RUN_ID"
+        COMMAND_MODE="resume"
+        shift 2
+        ;;
+      status|tail|abort|cleanup|promote-commit)
+        COMMAND_MODE="$1"
+        shift
+        # Remaining positional args belong to the subcommand.
+        while (( $# > 0 )); do
+          CMD_ARGS+=("$1")
+          shift
+        done
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      "" )
+        shift
+        ;;
+      *)
+        echo "ERROR: unknown command '$1'" >&2
+        usage
+        exit 1
+        ;;
+    esac
+  done
+
+  if [[ -z "$COMMAND_MODE" ]]; then
+    COMMAND_MODE="run"
+  fi
 }
 
 load_extra_args() {
@@ -332,7 +357,7 @@ validate() {
   require_cmd jq
   require_cmd git
   require_cmd timeout
-  require_cmd codexu
+  require_cmd "$BACKEND"
   require_cmd free
 
   [[ -d "$REPO_ROOT" ]] || { echo "ERROR: repo root not found: $REPO_ROOT" >&2; exit 1; }
@@ -452,25 +477,6 @@ cap_workers_by_memory() {
   fi
 
   printf '%s\n' "$requested"
-}
-
-build_codex_cmd() {
-  case "$MODE" in
-    safe|unattended)
-      printf '%s\0' codexu exec --json \
-        -c approval_policy=never \
-        --sandbox workspace-write
-      ;;
-    full)
-      printf '%s\0' codexu exec --json \
-        -c approval_policy=never \
-        --sandbox danger-full-access
-      ;;
-    *)
-      echo "ERROR: invalid MODE=$MODE" >&2
-      exit 1
-      ;;
-  esac
 }
 
 # Commit directly to main branch (when COMMIT_TO_MAIN=1)
@@ -1229,25 +1235,25 @@ run_once() {
 }
 
 main() {
-  parse_cli_args "${1:-}" "${2:-}"
+  parse_cli_args "$@"
 
   if [[ "$COMMAND_MODE" == "status" ]]; then
-    cmd_status "${2:-}"
+    cmd_status "${CMD_ARGS[0]:-}"
     return 0
   elif [[ "$COMMAND_MODE" == "tail" ]]; then
-    cmd_tail "${2:-}" "${3:-80}"
+    cmd_tail "${CMD_ARGS[0]:-}" "${CMD_ARGS[1]:-80}"
     return 0
   elif [[ "$COMMAND_MODE" == "abort" ]]; then
-    cmd_abort "${2:-}"
+    cmd_abort "${CMD_ARGS[0]:-}"
     return 0
   elif [[ "$COMMAND_MODE" == "cleanup" ]]; then
     validate
     cmd_cleanup
     return 0
   elif [[ "$COMMAND_MODE" == "promote-commit" ]]; then
-    [[ -n "${2:-}" && -n "${3:-}" ]] || { echo "Usage: $0 promote-commit <run_id> <worker_id> [target_branch]" >&2; return 1; }
+    [[ -n "${CMD_ARGS[0]:-}" && -n "${CMD_ARGS[1]:-}" ]] || { echo "Usage: $0 promote-commit <run_id> <worker_id> [target_branch]" >&2; return 1; }
     validate
-    cmd_promote_commit "$2" "$3" "${4:-}"
+    cmd_promote_commit "${CMD_ARGS[0]}" "${CMD_ARGS[1]}" "${CMD_ARGS[2]:-}"
     return 0
   fi
 
