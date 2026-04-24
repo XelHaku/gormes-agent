@@ -6,7 +6,12 @@
 # Designed to run under a systemd --user timer every N minutes.
 set -Eeuo pipefail
 
-: "${REPO_ROOT:=/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve the repo root from the script's own location
+# (gormes/scripts/orchestrator/audit.sh -> up 3 -> repo root).
+# Prefer `git rev-parse --show-toplevel` when available for correctness
+# inside git worktrees; fall back to the path walk.
+: "${REPO_ROOT:=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || (cd "$SCRIPT_DIR/../../.." && pwd))}"
 : "${RUN_ROOT:=$REPO_ROOT/gormes/.codex/orchestrator}"
 : "${RUNS_LEDGER:=$RUN_ROOT/state/runs.jsonl}"
 : "${COMPANIONS_DIR:=$RUN_ROOT/companions}"
