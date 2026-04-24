@@ -325,10 +325,10 @@ func TestRenderAutoloopHandoff(t *testing.T) {
 	p := &Progress{Meta: Meta{Autoloop: AutoloopMeta{
 		Entrypoint:      "scripts/gormes-auto-codexu-orchestrator.sh",
 		Plan:            "docs/superpowers/plans/plan.md",
-		AgentQueue:      "docs/content/building-gormes/agent-queue.md",
-		ProgressSchema:  "docs/content/building-gormes/progress-schema.md",
+		AgentQueue:      "docs/content/building-gormes/autoloop/agent-queue.md",
+		ProgressSchema:  "docs/content/building-gormes/autoloop/progress-schema.md",
 		CandidateSource: "docs/content/building-gormes/architecture_plan/progress.json",
-		UnitTest:        "scripts/orchestrator/tests/run.sh unit",
+		UnitTest:        "go test ./internal/autoloop ./cmd/autoloop -count=1",
 		CandidatePolicy: []string{"Skip blocked rows.", "Skip umbrella rows."},
 	}}}
 
@@ -338,6 +338,9 @@ func TestRenderAutoloopHandoff(t *testing.T) {
 		"- Entrypoint: `scripts/gormes-auto-codexu-orchestrator.sh`",
 		"- Plan: `docs/superpowers/plans/plan.md`",
 		"- Candidate source: `docs/content/building-gormes/architecture_plan/progress.json`",
+		"- Agent queue: `docs/content/building-gormes/autoloop/agent-queue.md`",
+		"- Progress schema: `docs/content/building-gormes/autoloop/progress-schema.md`",
+		"- Unit tests: `go test ./internal/autoloop ./cmd/autoloop -count=1`",
 		"## Candidate Policy",
 		"- Skip blocked rows.",
 		"- Skip umbrella rows.",
@@ -360,8 +363,10 @@ func TestRenderProgressSchema(t *testing.T) {
 		"`test_commands`",
 		"`done_signal`",
 		"`in_progress` rows cannot use `slice_size: umbrella`",
-		"`autoloop-handoff.md`",
-		"`agent-queue.md`",
+		"`docs/content/building-gormes/autoloop/autoloop-handoff.md`",
+		"`docs/content/building-gormes/autoloop/agent-queue.md`",
+		"`docs/content/building-gormes/autoloop/blocked-slices.md`",
+		"`docs/content/building-gormes/autoloop/umbrella-cleanup.md`",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("progress schema missing %q:\n%s", want, got)

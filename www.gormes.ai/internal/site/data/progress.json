@@ -11,8 +11,8 @@
     "autoloop": {
       "entrypoint": "scripts/gormes-auto-codexu-orchestrator.sh",
       "plan": "docs/superpowers/plans/2026-04-24-orchestrator-oiling-release-1-plan.md",
-      "agent_queue": "docs/content/building-gormes/agent-queue.md",
-      "progress_schema": "docs/content/building-gormes/progress-schema.md",
+      "agent_queue": "docs/content/building-gormes/autoloop/agent-queue.md",
+      "progress_schema": "docs/content/building-gormes/autoloop/progress-schema.md",
       "candidate_source": "docs/content/building-gormes/architecture_plan/progress.json",
       "unit_test": "scripts/orchestrator/tests/run.sh unit",
       "candidate_policy": [
@@ -1488,7 +1488,7 @@
                 "Kernel retry policy reports schedule and provider hint decisions.",
                 "Unavailable cache/rate/budget capability is visible before routing relies on it."
               ],
-              "note": "Umbrella tracker for 4.H closeout. Already shipped: `internal/hermes/errors.go` classifies retryable vs fatal HTTP status plus 'context length' body signals, and `internal/kernel/retry.go` holds a 1s/2s/4s/8s/16s +/-20% reconnect budget wired into open-stream retries. Remaining work is owned by the sibling slices below — `Classified provider-error taxonomy`, `Jittered reconnect backoff schedule`, `Retry-After header parsing + HTTPError hint`, `Kernel retry honors Retry-After hint`, `Prompt-cache capability guard`, and `Provider rate guard + budget telemetry`.",
+              "note": "Umbrella tracker for 4.H closeout. Already shipped: structured provider-error taxonomy in `internal/hermes/errors.go`, Retry-After header/body parsing on `HTTPError`, and `internal/kernel/retry.go` 1s/2s/4s/8s/16s +/-20% reconnect budget with provider Retry-After hints preferred and capped during open-stream retries. Remaining work is owned by the sibling slices below — `Prompt-cache capability guard` and `Provider rate guard + budget telemetry`.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/kernel/",
@@ -1555,14 +1555,14 @@
             {
               "name": "Retry-After header parsing + HTTPError hint",
               "priority": "P1",
-              "status": "planned",
-              "note": "TDD slice 1 of 2: extend `internal/hermes/errors.go` so `HTTPError` carries a parsed Retry-After hint alongside `{Status, Body}`. Cover both integer-seconds and HTTP-date header forms, optional JSON body hints (`retry_after`/`retryAfter`) when the header is absent, a capped upper bound so a malicious provider cannot stall the kernel past the reconnect budget, and deterministic zero-hint behavior when no signal is present. Pure unit tests over table-driven fixtures; no kernel coupling in this slice. Gates the Retry-After hint consumption slice below."
+              "status": "complete",
+              "note": "Complete: TDD extended `HTTPError` with a `RetryAfter` hint and wired HTTP client response errors through shared parsing. `internal/hermes/client_test.go` covers integer-second `Retry-After`, HTTP-date `Retry-After`, `retry_after` and `retryAfter` JSON body hints when the header is absent, a 16s cap, and deterministic zero-hint behavior."
             },
             {
               "name": "Kernel retry honors Retry-After hint",
               "priority": "P1",
-              "status": "planned",
-              "note": "TDD slice 2 of 2: once `HTTPError` carries a capped Retry-After hint, make `internal/kernel` open-stream retry prefer the provider hint over the jittered schedule when present, and fall back to the existing RetryBudget cleanly when absent. Unit tests must pin (a) hint preferred over schedule, (b) hint capped so it never exceeds the reconnect budget's upper bound, (c) absent hint leaves the jittered schedule untouched, and (d) ctx cancellation still returns promptly from the merged wait. Requires the header parsing slice to be green first; do not widen the already-shipped `Jittered reconnect backoff schedule` coverage."
+              "status": "complete",
+              "note": "Complete: TDD added `RetryBudget.NextDelayFor` so open-stream retry consumes the existing retry budget while preferring a provider `RetryAfter` hint when present, capping it at 16s, and falling back to the jittered schedule when absent. `internal/kernel/retry_test.go` covers capped hint behavior, fallback behavior, and a fast end-to-end retry through the kernel."
             },
             {
               "name": "Prompt-cache capability guard",

@@ -387,8 +387,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Provider-side resilience
 - [x] Classified provider-error taxonomy
 - [x] Jittered reconnect backoff schedule
-- [ ] Retry-After header parsing + HTTPError hint
-- [ ] Kernel retry honors Retry-After hint
+- [x] Retry-After header parsing + HTTPError hint
+- [x] Kernel retry honors Retry-After hint
 - [ ] Prompt-cache capability guard
 - [ ] Provider rate guard + budget telemetry
 

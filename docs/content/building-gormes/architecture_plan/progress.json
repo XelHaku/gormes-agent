@@ -11,8 +11,8 @@
     "autoloop": {
       "entrypoint": "scripts/gormes-auto-codexu-orchestrator.sh",
       "plan": "docs/superpowers/plans/2026-04-24-orchestrator-oiling-release-1-plan.md",
-      "agent_queue": "docs/content/building-gormes/agent-queue.md",
-      "progress_schema": "docs/content/building-gormes/progress-schema.md",
+      "agent_queue": "docs/content/building-gormes/autoloop/agent-queue.md",
+      "progress_schema": "docs/content/building-gormes/autoloop/progress-schema.md",
       "candidate_source": "docs/content/building-gormes/architecture_plan/progress.json",
       "unit_test": "scripts/orchestrator/tests/run.sh unit",
       "candidate_policy": [

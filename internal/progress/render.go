@@ -309,10 +309,10 @@ func RenderProgressSchema() string {
 
 ## Generated Agent Surfaces
 
-- `+"`autoloop-handoff.md`"+` lists shared unattended-loop entrypoint, plan, candidate source, generated docs, test command, and candidate policy.
-- `+"`agent-queue.md`"+` lists only unblocked, non-umbrella contract rows with owner, size, readiness, degraded mode, fixture, write scope, test commands, done signal, acceptance, and source references.
-- `+"`blocked-slices.md`"+` keeps blocked rows out of the execution queue while preserving their unblock condition.
-- `+"`umbrella-cleanup.md`"+` lists broad inventory rows that must be split before assignment.
+- `+"`docs/content/building-gormes/autoloop/autoloop-handoff.md`"+` lists shared unattended-loop entrypoint, plan, candidate source, generated docs, test command, and candidate policy.
+- `+"`docs/content/building-gormes/autoloop/agent-queue.md`"+` lists only unblocked, non-umbrella contract rows with owner, size, readiness, degraded mode, fixture, write scope, test commands, done signal, acceptance, and source references.
+- `+"`docs/content/building-gormes/autoloop/blocked-slices.md`"+` keeps blocked rows out of the execution queue while preserving their unblock condition.
+- `+"`docs/content/building-gormes/autoloop/umbrella-cleanup.md`"+` lists broad inventory rows that must be split before assignment.
 
 ## Good Row
 
