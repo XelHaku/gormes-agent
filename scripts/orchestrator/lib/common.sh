@@ -93,6 +93,16 @@ process_tree_pids() {
   printf '%s\n' "$root"
 }
 
+find_stale_orchestrator_pids() {
+  ps -eo pid=,args= \
+    | awk -v self="$$" '
+      $1 != self && $0 ~ /[b]ash .*gormes-auto-codexu-orchestrator\.sh/ {
+        print $1
+      }
+    ' \
+    | head -10
+}
+
 abort_worker_pids() {
   local reason="${1:-worker failure}"
   shift || true

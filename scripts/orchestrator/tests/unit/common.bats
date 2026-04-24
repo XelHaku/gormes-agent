@@ -100,6 +100,11 @@ setup() {
   fail "worker process tree was still alive after abort_worker_pids"
 }
 
+@test "find_stale_orchestrator_pids tolerates no matching process under pipefail" {
+  run bash -c 'set -Eeuo pipefail; source "$1"; find_stale_orchestrator_pids >/dev/null' _ "$ORCHESTRATOR_LIB_DIR/common.sh"
+  assert_success
+}
+
 @test "should_pause_after_cycle pauses non-quota failures by default" {
   run should_pause_after_cycle 1
   assert_success

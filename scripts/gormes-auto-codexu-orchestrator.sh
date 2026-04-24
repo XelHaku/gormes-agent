@@ -214,7 +214,7 @@ claim_run_lock() {
     echo "WARNING: stale lock found at $RUN_LOCK_DIR" >&2
     echo "Checking for stale processes..." >&2
     local stale_pids
-    stale_pids=$(ps aux | grep "[gormes-auto-codexu-orchestrator] bash" | awk '{print $2}' | grep -v "^$$\$" | head -10)
+    stale_pids="$(find_stale_orchestrator_pids)"
     if [[ -n "$stale_pids" ]]; then
       echo "Auto-killing stale processes: $stale_pids" >&2
       echo "$stale_pids" | xargs -r kill -9 2>/dev/null || true
