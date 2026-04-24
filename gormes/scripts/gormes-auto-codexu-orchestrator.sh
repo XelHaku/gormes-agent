@@ -5,7 +5,7 @@ shopt -s inherit_errexit 2>/dev/null || true
 
 ORCHESTRATOR_LIB_DIR="${ORCHESTRATOR_LIB_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/orchestrator/lib}"
 # shellcheck source=/dev/null
-for _lib in common backend candidates report failures claim worktree promote companions; do
+for _lib in common backend candidates report failures claim worktree promote companions refill; do
   source "$ORCHESTRATOR_LIB_DIR/${_lib}.sh"
 done
 unset _lib
@@ -1077,14 +1077,38 @@ maybe_refill_candidates() {
   if [[ "${DISABLE_COMPANIONS:-0}" == "1" ]]; then
     return 0
   fi
+
+  local state streak last_ts now decision
+  state="$(read_refill_state)"
+  streak="${state%%$'\t'*}"
+  last_ts="${state##*$'\t'}"
+  now="$(date +%s)"
+  decision="$(should_skip_refill "$streak" "$last_ts" "$now" "${LOOP_SLEEP_SECONDS:-30}" || true)"
+  if [[ "$decision" == skip* ]]; then
+    local remaining="${decision#skip }"
+    echo "Candidate refill skipped by backoff (streak=$streak, ${remaining}s left)"
+    log_event "candidate_refill_skipped_backoff" null \
+      "before=$before streak=$streak remaining_s=$remaining" "skipped"
+    return 0
+  fi
+
   echo "Candidate pool low ($before < $watermark); running planner companion synchronously to refill"
-  log_event "candidate_refill_triggered" null "before=$before watermark=$watermark" "triggered"
+  log_event "candidate_refill_triggered" null "before=$before watermark=$watermark streak=$streak" "triggered"
   run_companion planner --sync || true
   # Re-read progress.json (planner may have edited it) and regenerate candidates
   write_candidates_file
   local after; after="$(candidate_count)"
-  log_event "candidate_refilled" null "before=$before after=$after" "refilled"
-  echo "Candidate pool refill: $before -> $after"
+
+  if (( after > before )); then
+    streak=0
+  else
+    streak=$(( streak + 1 ))
+    if (( streak > 100 )); then streak=100; fi
+  fi
+  write_refill_state "$streak" "$now"
+
+  log_event "candidate_refilled" null "before=$before after=$after streak=$streak" "refilled"
+  echo "Candidate pool refill: $before -> $after (streak=$streak)"
 }
 
 run_once() {
