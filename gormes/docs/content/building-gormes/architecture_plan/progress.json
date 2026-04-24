@@ -1499,6 +1499,21 @@
               "name": "Homebrew",
               "status": "planned",
               "note": "TDD: add formula/release artifact checks after the static binary and docs install paths are stable, with version, checksum, and install layout fixtures."
+            },
+            {
+              "name": "Unix installer (install.sh) source-backed update flow",
+              "status": "planned",
+              "note": "TDD slice 1 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): port upstream Unix installer semantics into `gormes/www.gormes.ai/internal/site/install.sh` with user-scoped PATH publication, managed checkout under a Hermes-analogy install home, rerun-as-update behavior, and no root-owned target paths. Cover path selection, managed checkout, update-on-rerun, and publish+verify flow via a new `install_unix_test.go` Go test that executes the script under a temporary fake toolchain — no network calls in unit tests. Do not install Hermes/Python/Node: Gormes' current feature set does not require them."
+            },
+            {
+              "name": "Windows installer (install.ps1 + install.cmd) parity",
+              "status": "planned",
+              "note": "TDD slice 2 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): add `gormes/www.gormes.ai/internal/site/install.ps1` (native PowerShell) plus `install.cmd` wrapper that launches it, matching the Unix contract (user-scoped PATH, managed checkout, rerun-as-update, source-backed). Cover content/smoke assertions — PATH publication, managed checkout layout, release branch handling, and stable global command publication — via `install_windows_test.go` over fake toolchains; no live network calls in unit tests."
+            },
+            {
+              "name": "Installer site asset/route coverage",
+              "status": "planned",
+              "note": "TDD slice 3 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): extend `gormes/www.gormes.ai/internal/site/{assets,server,content,static_export}.go` and matching `assets_test.go`/`static_export_test.go` coverage so `/install.sh`, `/install.ps1`, and `/install.cmd` all embed, load, serve, and static-export with the correct MIME and cache behavior. Update landing-page install copy (`content.go` + `home.spec.mjs`) and the top-level `README.md` / `gormes/www.gormes.ai/README.md` install guidance only after the script slices land. This slice freezes the public install-surface contract so downstream docs/site builds do not regress."
             }
           ]
         },
@@ -1531,9 +1546,24 @@
           "name": "Code Execution Mode Policy",
           "items": [
             {
-              "name": "Execute_code project/strict execution modes + defaults",
+              "name": "Execution-mode resolver + config precedence",
               "status": "planned",
-              "note": "TDD: port upstream PR #11971 — add `project` (default) and `strict` execution modes to `execute_code` that narrow CWD/filesystem scope, tighten network-egress rules per mode, and preserve the Phase 5.K sandboxed-exec blocked-result envelope. Land mode config parsing first with explicit off/project/strict cases, then wire mode selection into the existing sandbox guard without widening the 5.K filesystem/network blocking contract. Keep PR #11956's script-own-temp-dir behavior documented in the mode contract before any runtime default change."
+              "note": "TDD slice 1 of 4: pure helper in `internal/tools/execute_code.go` that returns `off`/`project`/`strict` from (a) env var (e.g. `GORMES_EXECUTE_CODE_MODE`), then (b) config key, then (c) default, with unknown values falling back to default and emitting a warning. Table tests only — no sandbox coupling, no CWD/interpreter behavior yet. Freeze the token set here so later slices cannot silently add modes."
+            },
+            {
+              "name": "Strict-mode CWD + interpreter parity",
+              "status": "planned",
+              "note": "TDD slice 2 of 4: strict mode keeps today's behavior frozen — isolated tmpdir CWD plus the canonical interpreter resolved via `LocalCodeSandbox.resolveRuntime`. Fixtures must prove the 5.K blocked-result envelope (status, error, filesystem_access, network_access) is unchanged and that relative imports/filesystem access outside the tmpdir continue to fail. This slice exists only to pin the reference behavior before project-mode lands."
+            },
+            {
+              "name": "Project-mode CWD + active venv detection",
+              "status": "planned",
+              "note": "TDD slice 3 of 4: port upstream `_resolve_python_binary`/`_resolve_cwd` project semantics — session's working directory for CWD and the active virtualenv/conda python when present, falling back to the resolved system interpreter. Unit tests must drive resolution via injected env (`VIRTUAL_ENV`, `CONDA_PREFIX`), not the real host. Do not widen the 5.K filesystem/network blocking contract — project mode still flows through the same `sandboxGuardReason` gate."
+            },
+            {
+              "name": "Default mode selection + config cut-over",
+              "status": "planned",
+              "note": "TDD slice 4 of 4: pick and document Gormes' default mode (recommend `strict` given the self-hosted security-first posture, with `project` opt-in via config). Wire the resolver into `NewExecuteCodeTool` so callers get the right mode without per-call arguments, add a regression test that the 5.K `Sandboxed exec` blocked-result envelope is byte-identical across modes, and update the rationale in `docs/content/building-gormes/core-systems/tool-execution.md` so operators understand the trade-off before flipping the default."
             }
           ]
         }

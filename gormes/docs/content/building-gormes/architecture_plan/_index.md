@@ -474,6 +474,9 @@ weight: 10
 
 - [ ] OCI image
 - [ ] Homebrew
+- [ ] Unix installer (install.sh) source-backed update flow
+- [ ] Windows installer (install.ps1 + install.cmd) parity
+- [ ] Installer site asset/route coverage
 
 ### 5.Q — API Server + TUI Gateway Streaming ⏳
 
@@ -484,7 +487,10 @@ weight: 10
 
 ### 5.R — Code Execution Mode Policy ⏳
 
-- [ ] Execute_code project/strict execution modes + defaults
+- [ ] Execution-mode resolver + config precedence
+- [ ] Strict-mode CWD + interpreter parity
+- [ ] Project-mode CWD + active venv detection
+- [ ] Default mode selection + config cut-over
 
 ## Phase 6 — The Learning Loop (Soul) ⏳
 
