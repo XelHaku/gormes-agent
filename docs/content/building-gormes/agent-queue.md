@@ -35,7 +35,7 @@ acceptance checks, and source references.
 
 - Phase: 4 / 4.A
 - Owner: `provider`
-- Size: `small`
+- Size: `medium`
 - Status: `in_progress`
 - Contract: Provider-neutral request and stream event transcript harness
 - Trust class: system

@@ -1069,7 +1069,7 @@
               "status": "in_progress",
               "contract": "Provider-neutral request and stream event transcript harness",
               "contract_status": "fixture_ready",
-              "slice_size": "small",
+              "slice_size": "medium",
               "execution_owner": "provider",
               "trust_class": [
                 "system"
@@ -1410,7 +1410,7 @@
               "status": "in_progress",
               "contract": "Structured provider error classification contract",
               "contract_status": "draft",
-              "slice_size": "medium",
+              "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
                 "system"
