@@ -66,6 +66,18 @@ func TestBuildBackendCommandClaudeuUsesShimShape(t *testing.T) {
 	}
 }
 
+func TestBuildBackendCommandClaudeuFull(t *testing.T) {
+	got, err := BuildBackendCommand("claudeu", "full")
+	if err != nil {
+		t.Fatalf("BuildBackendCommand() error = %v", err)
+	}
+
+	want := []string{"claudeu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "danger-full-access"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("BuildBackendCommand() = %#v, want %#v", got, want)
+	}
+}
+
 func TestBuildBackendCommandOpencode(t *testing.T) {
 	got, err := BuildBackendCommand("opencode", "safe")
 	if err != nil {
