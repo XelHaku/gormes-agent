@@ -91,6 +91,14 @@ func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 		"Updating abc123..def456",
 		"Synchronize progress.json with the current Gormes implementation",
 		"Synchronize landing page, Hugo docs, generated pages, and progress.json",
+		"Autoloop workers should not have to search or guess",
+		"source_refs",
+		"write_scope",
+		"test_commands",
+		"ready_when",
+		"not_ready_when",
+		"done_signal",
+		"acceptance",
 		"Do not implement runtime feature code",
 	} {
 		if !strings.Contains(prompt, want) {

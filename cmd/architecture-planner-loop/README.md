@@ -81,6 +81,20 @@ flows, architecture milestones, or progress totals, the planner also updates the
 landing page and Hugo docs so `www.gormes.ai`, generated docs pages, and
 `progress.json` do not drift apart.
 
+## Autoloop Handoff Quality
+
+Planner rows must be detailed enough that autoloop workers do not need to
+rediscover the architecture before starting TDD. Every new or refined executable
+row should include concrete `source_refs`, `write_scope`, `test_commands`,
+`acceptance`, `ready_when`, `not_ready_when`, and `done_signal` fields whenever
+the schema allows them. Broad goals should be split into dependency-aware slices
+with explicit `blocked_by` and `unblocks` relationships.
+
+Prefer exact file paths, function/type names, upstream commits, fixture names,
+and validation commands over generic notes. The planner may update docs,
+generated pages, and progress metadata, but it must not implement runtime
+feature code.
+
 ## Artifacts
 
 By default artifacts are written under `.codex/architecture-planner/`:
