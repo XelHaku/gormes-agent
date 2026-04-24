@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 27/71 subphases shipped · 12 in progress · 32 planned
+**Overall:** 27/71 subphases shipped · 11 in progress · 33 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -343,11 +343,11 @@ weight: 10
 - [ ] Toolset-aware skills prompt snapshot
 - [ ] Memory and session-search guidance assembly
 
-### 4.D — Smart Model Routing 🔨
+### 4.D — Smart Model Routing ⏳
 
 - [ ] Model metadata registry + context limits
 - [ ] Routing policy and fallback selector
-- [x] Per-turn model selection
+- [ ] Per-turn model selection
 
 ### 4.E — Trajectory + Insights ⏳
 
