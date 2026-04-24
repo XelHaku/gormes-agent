@@ -55,6 +55,21 @@ func TestRenderServiceUnitInjectsPaths(t *testing.T) {
 	}
 }
 
+func TestRenderServiceUnitAllowsCustomExecArgs(t *testing.T) {
+	unit := RenderServiceUnit(ServiceUnitOptions{
+		AutoloopPath: "/srv/gormes/scripts/gormes-auto-codexu-orchestrator.sh",
+		WorkDir:      "/srv/gormes",
+		ExecArgs:     []string{},
+	})
+
+	if strings.Contains(unit, " run") {
+		t.Fatalf("RenderServiceUnit() = %q, want no implicit run arg with explicit empty ExecArgs", unit)
+	}
+	if !strings.Contains(unit, "ExecStart=/srv/gormes/scripts/gormes-auto-codexu-orchestrator.sh") {
+		t.Fatalf("RenderServiceUnit() = %q, want wrapper ExecStart", unit)
+	}
+}
+
 func TestInstallServiceWritesUnitAndReloadsSystemd(t *testing.T) {
 	unitDir := t.TempDir()
 	runner := &FakeRunner{
@@ -142,6 +157,87 @@ func TestInstallServiceWithoutAutoStartDoesNotEnable(t *testing.T) {
 	}
 }
 
+func TestInstallAuditServiceWritesServiceAndTimerAndEnablesTimer(t *testing.T) {
+	unitDir := t.TempDir()
+	runner := &FakeRunner{
+		Results: []Result{{}, {}},
+	}
+
+	if err := InstallAuditService(context.Background(), AuditServiceInstallOptions{
+		Runner:    runner,
+		UnitDir:   unitDir,
+		UnitName:  "gormes-orchestrator-audit.service",
+		TimerName: "gormes-orchestrator-audit.timer",
+		AuditPath: "/srv/gormes/scripts/orchestrator/audit.sh",
+		WorkDir:   "/srv/gormes",
+		AutoStart: true,
+	}); err != nil {
+		t.Fatalf("InstallAuditService() error = %v", err)
+	}
+
+	service, err := os.ReadFile(filepath.Join(unitDir, "gormes-orchestrator-audit.service"))
+	if err != nil {
+		t.Fatalf("ReadFile(service) error = %v", err)
+	}
+	for _, want := range []string{
+		"Type=oneshot",
+		"WorkingDirectory=/srv/gormes",
+		"ExecStart=/srv/gormes/scripts/orchestrator/audit.sh",
+	} {
+		if !strings.Contains(string(service), want) {
+			t.Fatalf("service unit = %q, want %q", service, want)
+		}
+	}
+	if strings.Contains(string(service), " run") {
+		t.Fatalf("service unit = %q, want audit wrapper without run arg", service)
+	}
+
+	timer, err := os.ReadFile(filepath.Join(unitDir, "gormes-orchestrator-audit.timer"))
+	if err != nil {
+		t.Fatalf("ReadFile(timer) error = %v", err)
+	}
+	for _, want := range []string{
+		"[Timer]",
+		"OnBootSec=5min",
+		"OnUnitActiveSec=20min",
+		"Unit=gormes-orchestrator-audit.service",
+	} {
+		if !strings.Contains(string(timer), want) {
+			t.Fatalf("timer unit = %q, want %q", timer, want)
+		}
+	}
+
+	wantCommands := []Command{
+		{Name: "systemctl", Args: []string{"--user", "daemon-reload"}},
+		{Name: "systemctl", Args: []string{"--user", "enable", "--now", "gormes-orchestrator-audit.timer"}},
+	}
+	if !reflect.DeepEqual(runner.Commands, wantCommands) {
+		t.Fatalf("commands = %#v, want %#v", runner.Commands, wantCommands)
+	}
+}
+
+func TestInstallAuditServiceWithoutAutoStartDoesNotEnableTimer(t *testing.T) {
+	runner := &FakeRunner{Results: []Result{{}}}
+
+	if err := InstallAuditService(context.Background(), AuditServiceInstallOptions{
+		Runner:    runner,
+		UnitDir:   t.TempDir(),
+		UnitName:  "gormes-orchestrator-audit.service",
+		TimerName: "gormes-orchestrator-audit.timer",
+		AuditPath: "/srv/gormes/scripts/orchestrator/audit.sh",
+		WorkDir:   "/srv/gormes",
+	}); err != nil {
+		t.Fatalf("InstallAuditService() error = %v", err)
+	}
+
+	wantCommands := []Command{
+		{Name: "systemctl", Args: []string{"--user", "daemon-reload"}},
+	}
+	if !reflect.DeepEqual(runner.Commands, wantCommands) {
+		t.Fatalf("commands = %#v, want %#v", runner.Commands, wantCommands)
+	}
+}
+
 func TestInstallServiceForceOverwritesExistingUnit(t *testing.T) {
 	unitDir := t.TempDir()
 	unitPath := filepath.Join(unitDir, "gormes-autoloop.service")
@@ -211,7 +307,7 @@ func TestInstallServiceReturnsEnableFailure(t *testing.T) {
 
 func TestDisableLegacyTimersRunsExpectedSystemctlCalls(t *testing.T) {
 	runner := &FakeRunner{
-		Results: []Result{{}, {}},
+		Results: []Result{{}, {}, {}},
 	}
 
 	if err := DisableLegacyTimers(context.Background(), runner); err != nil {
@@ -221,9 +317,24 @@ func TestDisableLegacyTimersRunsExpectedSystemctlCalls(t *testing.T) {
 	wantCommands := []Command{
 		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner-tasks-manager.timer"}},
 		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architectureplanneragent.timer"}},
+		{Name: "sh", Args: []string{"-c", legacyCronCleanupScript}},
 	}
 	if !reflect.DeepEqual(runner.Commands, wantCommands) {
 		t.Fatalf("commands = %#v, want %#v", runner.Commands, wantCommands)
+	}
+}
+
+func TestDisableLegacyTimersInvokesCronCleanup(t *testing.T) {
+	runner := &FakeRunner{
+		Results: []Result{{}, {}, {}},
+	}
+
+	if err := DisableLegacyTimers(context.Background(), runner); err != nil {
+		t.Fatalf("DisableLegacyTimers() error = %v", err)
+	}
+
+	if got := runner.Commands[len(runner.Commands)-1]; got.Name != "sh" || !strings.Contains(got.Args[1], "gormes-architecture-planner-tasks-manager\\.sh") || !strings.Contains(got.Args[1], "documentation-improver\\.sh") || !strings.Contains(got.Args[1], "landingpage-improver\\.sh") {
+		t.Fatalf("cron cleanup command = %#v, want cleanup for all legacy scripts", got)
 	}
 }
 
@@ -232,6 +343,7 @@ func TestDisableLegacyTimersIgnoresMissingTimerAndContinues(t *testing.T) {
 		Results: []Result{
 			{Stderr: "Failed to disable unit: Unit file gormes-architecture-planner-tasks-manager.timer does not exist.", Err: errors.New("missing")},
 			{},
+			{},
 		},
 	}
 
@@ -239,7 +351,7 @@ func TestDisableLegacyTimersIgnoresMissingTimerAndContinues(t *testing.T) {
 		t.Fatalf("DisableLegacyTimers() error = %v", err)
 	}
 
-	if got, want := len(runner.Commands), 2; got != want {
+	if got, want := len(runner.Commands), 3; got != want {
 		t.Fatalf("commands length = %d, want %d", got, want)
 	}
 }
@@ -265,13 +377,14 @@ func TestDisableLegacyTimersIgnoresHyphenatedMissingStates(t *testing.T) {
 				Results: []Result{
 					{Stderr: test.stderr, Err: errors.New(test.name)},
 					{},
+					{},
 				},
 			}
 
 			if err := DisableLegacyTimers(context.Background(), runner); err != nil {
 				t.Fatalf("DisableLegacyTimers() error = %v", err)
 			}
-			if got, want := len(runner.Commands), 2; got != want {
+			if got, want := len(runner.Commands), 3; got != want {
 				t.Fatalf("commands length = %d, want %d", got, want)
 			}
 		})

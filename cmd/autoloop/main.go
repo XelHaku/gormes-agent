@@ -41,37 +41,61 @@ func run(args []string) error {
 			return err
 		}
 		return runAutoloop(cfg, true)
-	case len(args) == 1 && args[0] == "digest":
+	case len(args) >= 1 && args[0] == "digest":
+		outputPath, err := digestOutputPath(args[1:])
+		if err != nil {
+			return err
+		}
 		digest, err := autoloop.DigestLedger(filepath.Join(digestRunRoot(root), "state", "runs.jsonl"))
 		if err != nil {
 			return err
+		}
+		if outputPath != "" {
+			return os.WriteFile(outputPath, []byte(digest), 0o644)
 		}
 		_, err = fmt.Fprint(commandStdout, digest)
 		return err
 	case len(args) == 1 && args[0] == "audit":
-		digest, err := autoloop.DigestLedger(filepath.Join(digestRunRoot(root), "state", "runs.jsonl"))
+		auditDir, err := auditReportDir()
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprint(commandStdout, digest)
+		summary, err := autoloop.WriteAuditReport(autoloop.AuditReportOptions{
+			LedgerPath: filepath.Join(digestRunRoot(root), "state", "runs.jsonl"),
+			AuditDir:   auditDir,
+		})
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprint(commandStdout, summary)
 		return err
 	case len(args) >= 2 && args[0] == "service" && args[1] == "install":
 		force, err := serviceForce(args[2:])
 		if err != nil {
 			return err
 		}
-		return installService(root, "gormes-orchestrator.service", force)
+		return installService(root, force)
 	case len(args) >= 2 && args[0] == "service" && args[1] == "install-audit":
 		force, err := serviceForce(args[2:])
 		if err != nil {
 			return err
 		}
-		return installService(root, "gormes-orchestrator-audit.service", force)
+		return installAuditService(root, force)
 	case len(args) == 3 && args[0] == "service" && args[1] == "disable" && args[2] == "legacy-timers":
 		return autoloop.DisableLegacyTimers(context.Background(), serviceRunner)
 	default:
 		return fmt.Errorf(usage)
 	}
+}
+
+func digestOutputPath(args []string) (string, error) {
+	if len(args) == 0 {
+		return "", nil
+	}
+	if len(args) == 2 && args[0] == "--output" && args[1] != "" {
+		return args[1], nil
+	}
+	return "", fmt.Errorf(usage)
 }
 
 func serviceForce(args []string) (bool, error) {
@@ -86,12 +110,8 @@ func serviceForce(args []string) (bool, error) {
 	return force, nil
 }
 
-func installService(root string, unitName string, force bool) error {
+func installService(root string, force bool) error {
 	unitDir, err := systemdUserUnitDir()
-	if err != nil {
-		return err
-	}
-	executable, err := os.Executable()
 	if err != nil {
 		return err
 	}
@@ -99,12 +119,59 @@ func installService(root string, unitName string, force bool) error {
 	return autoloop.InstallService(context.Background(), autoloop.ServiceInstallOptions{
 		Runner:       serviceRunner,
 		UnitDir:      unitDir,
-		UnitName:     unitName,
-		AutoloopPath: executable,
+		UnitName:     "gormes-orchestrator.service",
+		AutoloopPath: orchestratorWrapperPath(root),
 		WorkDir:      root,
-		AutoStart:    true,
+		ExecArgs:     []string{},
+		AutoStart:    autoStart(),
 		Force:        force,
 	})
+}
+
+func installAuditService(root string, force bool) error {
+	unitDir, err := systemdUserUnitDir()
+	if err != nil {
+		return err
+	}
+
+	return autoloop.InstallAuditService(context.Background(), autoloop.AuditServiceInstallOptions{
+		Runner:    serviceRunner,
+		UnitDir:   unitDir,
+		UnitName:  "gormes-orchestrator-audit.service",
+		TimerName: "gormes-orchestrator-audit.timer",
+		AuditPath: auditWrapperPath(root),
+		WorkDir:   root,
+		AutoStart: autoStart(),
+		Force:     force,
+	})
+}
+
+func autoStart() bool {
+	return os.Getenv("AUTO_START") != "0"
+}
+
+func orchestratorWrapperPath(root string) string {
+	if path := os.Getenv("ORCHESTRATOR_PATH"); path != "" {
+		return path
+	}
+	return filepath.Join(root, "scripts", "gormes-auto-codexu-orchestrator.sh")
+}
+
+func auditWrapperPath(root string) string {
+	if path := os.Getenv("AUDIT_PATH"); path != "" {
+		return path
+	}
+	return filepath.Join(root, "scripts", "orchestrator", "audit.sh")
+}
+
+func auditReportDir() (string, error) {
+	if auditDir := os.Getenv("AUDIT_DIR"); auditDir != "" {
+		return auditDir, nil
+	}
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".cache", "gormes-orchestrator-audit"), nil
+	}
+	return "", fmt.Errorf("cannot determine audit directory: set AUDIT_DIR or HOME")
 }
 
 func systemdUserUnitDir() (string, error) {
