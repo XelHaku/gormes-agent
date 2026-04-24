@@ -22,17 +22,17 @@ generate-progress:
 
 define record-benchmark
 	@echo "Recording benchmark..."
-	@bash scripts/record-benchmark.sh
+	@go run ./cmd/repoctl benchmark record
 endef
 
 define update-readme
 	@echo "Updating README.md..."
-	@bash scripts/update-readme.sh
+	@go run ./cmd/repoctl readme update
 endef
 
 define record-progress
 	@echo "Updating progress..."
-	@bash scripts/record-progress.sh
+	@go run ./cmd/repoctl progress sync
 endef
 
 update-readme:
