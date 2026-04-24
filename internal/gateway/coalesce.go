@@ -57,6 +57,10 @@ func (c *coalescer) currentMessageID() string {
 }
 
 func (c *coalescer) flushImmediate(ctx context.Context, text string) {
+	c.flushImmediateFinal(ctx, text, false)
+}
+
+func (c *coalescer) flushImmediateFinal(ctx context.Context, text string, finalize bool) {
 	c.mu.Lock()
 	msgID := c.pendingMsgID
 	c.mu.Unlock()
@@ -66,11 +70,11 @@ func (c *coalescer) flushImmediate(ctx context.Context, text string) {
 	if msgID == "" {
 		sentID, err = c.sender.SendPlaceholder(ctx, c.chatID)
 		if err == nil {
-			err = c.sender.EditMessage(ctx, c.chatID, sentID, text)
+			err = editCoalescedMessage(ctx, c.sender, c.chatID, sentID, text, finalize)
 		}
 	} else {
 		sentID = msgID
-		err = c.sender.EditMessage(ctx, c.chatID, msgID, text)
+		err = editCoalescedMessage(ctx, c.sender, c.chatID, msgID, text, finalize)
 	}
 	if err != nil {
 		return
@@ -136,7 +140,7 @@ func (c *coalescer) tryFlush(ctx context.Context) {
 		return
 	}
 
-	if err := c.sender.EditMessage(ctx, c.chatID, msgID, text); err != nil {
+	if err := editCoalescedMessage(ctx, c.sender, c.chatID, msgID, text, false); err != nil {
 		return
 	}
 
@@ -145,4 +149,11 @@ func (c *coalescer) tryFlush(ctx context.Context) {
 	c.lastEditAt = time.Now()
 	c.pendingText = ""
 	c.mu.Unlock()
+}
+
+func editCoalescedMessage(ctx context.Context, sender placeholderEditor, chatID, msgID, text string, finalize bool) error {
+	if finalizer, ok := sender.(FinalizingMessageEditor); ok {
+		return finalizer.EditMessageFinal(ctx, chatID, msgID, text, finalize)
+	}
+	return sender.EditMessage(ctx, chatID, msgID, text)
 }

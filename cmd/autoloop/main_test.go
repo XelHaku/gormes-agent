@@ -39,7 +39,18 @@ func TestRunCommandDryRunPrintsSummary(t *testing.T) {
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "planned CLI candidate", "status": "planned"}
+							{
+								"name": "planned CLI candidate",
+								"status": "planned",
+								"priority": "P0",
+								"contract": "CLI execution contract",
+								"contract_status": "draft",
+								"slice_size": "small",
+								"execution_owner": "orchestrator",
+								"write_scope": ["cmd/autoloop/"],
+								"test_commands": ["go test ./cmd/autoloop -count=1"],
+								"done_signal": ["dry-run output names metadata"]
+							}
 						]
 					}
 				}
@@ -80,7 +91,14 @@ func TestRunCommandDryRunPrintsSummary(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, want := range []string{"candidates: 1", "selected: 1", "planned CLI candidate"} {
+	for _, want := range []string{
+		"candidates: 1",
+		"selected: 1",
+		"planned CLI candidate",
+		"owner=orchestrator",
+		"size=small",
+		"reason=P0 handoff",
+	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("stdout = %q, want %q", output, want)
 		}

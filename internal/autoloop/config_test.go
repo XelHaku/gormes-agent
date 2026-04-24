@@ -2,6 +2,7 @@ package autoloop
 
 import (
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -42,17 +43,23 @@ func TestConfigFromEnvDefaultsToRepoRootPaths(t *testing.T) {
 	if cfg.MaxPhase != 3 {
 		t.Fatalf("MaxPhase = %d, want %d", cfg.MaxPhase, 3)
 	}
+
+	wantPriorityBoost := []string{"2.B.3", "2.B.4", "2.B.10", "2.B.11"}
+	if !reflect.DeepEqual(cfg.PriorityBoost, wantPriorityBoost) {
+		t.Fatalf("PriorityBoost = %#v, want %#v", cfg.PriorityBoost, wantPriorityBoost)
+	}
 }
 
 func TestConfigFromEnvReadsOverrides(t *testing.T) {
 	root := filepath.Join("tmp", "repo")
 
 	cfg, err := ConfigFromEnv(root, map[string]string{
-		"RUN_ROOT":   "/tmp/run",
-		"BACKEND":    "claudeu",
-		"MODE":       "full",
-		"MAX_AGENTS": "7",
-		"MAX_PHASE":  "5",
+		"RUN_ROOT":       "/tmp/run",
+		"BACKEND":        "claudeu",
+		"MODE":           "full",
+		"MAX_AGENTS":     "7",
+		"MAX_PHASE":      "5",
+		"PRIORITY_BOOST": "3.E.7, 4.A ",
 	})
 	if err != nil {
 		t.Fatalf("ConfigFromEnv() error = %v", err)
@@ -76,6 +83,10 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 
 	if cfg.MaxPhase != 5 {
 		t.Fatalf("MaxPhase = %d, want %d", cfg.MaxPhase, 5)
+	}
+
+	if want := []string{"3.E.7", "4.A"}; !reflect.DeepEqual(cfg.PriorityBoost, want) {
+		t.Fatalf("PriorityBoost = %#v, want %#v", cfg.PriorityBoost, want)
 	}
 }
 

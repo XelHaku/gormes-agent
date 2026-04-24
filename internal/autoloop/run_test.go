@@ -2,7 +2,10 @@ package autoloop
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -172,14 +175,33 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 	}
 }
 
-func TestRunOncePassesSelectedTaskPromptToBackend(t *testing.T) {
+func TestRunOncePassesExecutionMetadataPromptToBackend(t *testing.T) {
 	progressPath := writeProgressJSON(t, `{
 		"phases": {
 			"12": {
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "prompted candidate", "status": "planned"}
+							{
+								"name": "prompted candidate",
+								"status": "planned",
+								"priority": "P0",
+								"contract": "Provider-neutral transcript contract",
+								"contract_status": "fixture_ready",
+								"slice_size": "medium",
+								"execution_owner": "provider",
+								"trust_class": ["system"],
+								"degraded_mode": "provider status reports missing fixtures",
+								"fixture": "internal/hermes/testdata/provider_transcripts",
+								"source_refs": ["docs/content/upstream-hermes/source-study.md"],
+								"ready_when": ["fixtures replay"],
+								"not_ready_when": ["live provider call required"],
+								"acceptance": ["go test ./internal/hermes passes"],
+								"write_scope": ["internal/hermes/"],
+								"test_commands": ["go test ./internal/hermes -count=1"],
+								"done_signal": ["provider transcript replay passes"],
+								"note": "Use captured transcript fixtures."
+							}
 						]
 					}
 				}
@@ -217,6 +239,22 @@ func TestRunOncePassesSelectedTaskPromptToBackend(t *testing.T) {
 		"Selected task:",
 		"12 / 12.A / prompted candidate",
 		"Current status: planned",
+		"Priority: P0",
+		"Execution owner: provider",
+		"Slice size: medium",
+		"Contract: Provider-neutral transcript contract",
+		"Trust class:",
+		"- system",
+		"Allowed write scope:",
+		"- internal/hermes/",
+		"Required test commands:",
+		"- go test ./internal/hermes -count=1",
+		"Done signal:",
+		"- provider transcript replay passes",
+		"Source references:",
+		"- docs/content/upstream-hermes/source-study.md",
+		"Degraded mode: provider status reports missing fixtures",
+		"Note: Use captured transcript fixtures.",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt = %q, want %q", prompt, want)
@@ -293,4 +331,113 @@ func TestRunOnceIncludesBackendStderrInError(t *testing.T) {
 	if !strings.Contains(err.Error(), "No prompt provided via stdin.") {
 		t.Fatalf("RunOnce() error = %q, want backend stderr", err)
 	}
+}
+
+func TestRunOnceWritesLedgerEvents(t *testing.T) {
+	progressPath := writeProgressJSON(t, `{
+		"phases": {
+			"12": {
+				"subphases": {
+					"12.A": {
+						"items": [
+							{"item_name": "ledger candidate", "status": "planned"}
+						]
+					}
+				}
+			}
+		}
+	}`)
+	runRoot := t.TempDir()
+	runner := &FakeRunner{Results: []Result{{}}}
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:     t.TempDir(),
+			ProgressJSON: progressPath,
+			RunRoot:      runRoot,
+			Backend:      "opencode",
+			Mode:         "safe",
+			MaxAgents:    1,
+		},
+		Runner: runner,
+	})
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	var got []string
+	for _, event := range events {
+		got = append(got, event.Event)
+	}
+	want := []string{"run_started", "worker_claimed", "worker_success", "run_completed"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ledger events = %#v, want %#v", got, want)
+	}
+	if events[1].Worker != 1 || events[1].Task != "12/12.A/ledger candidate" || events[1].Status != "claimed" {
+		t.Fatalf("claim event = %#v, want worker/task/status detail", events[1])
+	}
+}
+
+func TestRunOnceWritesWorkerFailedLedgerEventBeforeReturningBackendError(t *testing.T) {
+	progressPath := writeProgressJSON(t, `{
+		"phases": {
+			"12": {
+				"subphases": {
+					"12.A": {
+						"items": [
+							{"item_name": "failing ledger candidate", "status": "planned"}
+						]
+					}
+				}
+			}
+		}
+	}`)
+	runRoot := t.TempDir()
+	wantErr := errors.New("backend failed")
+	runner := &FakeRunner{Results: []Result{{Err: wantErr, Stderr: "backend stderr"}}}
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:     t.TempDir(),
+			ProgressJSON: progressPath,
+			RunRoot:      runRoot,
+			Backend:      "opencode",
+			Mode:         "safe",
+			MaxAgents:    1,
+		},
+		Runner: runner,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("RunOnce() error = %v, want wrapped %v", err, wantErr)
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	var got []string
+	for _, event := range events {
+		got = append(got, event.Event+":"+event.Status)
+	}
+	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:backend_failed"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ledger events = %#v, want %#v", got, want)
+	}
+}
+
+func readLedgerEvents(t *testing.T, path string) []LedgerEvent {
+	t.Helper()
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%s) error = %v", path, err)
+	}
+
+	var events []LedgerEvent
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		var event LedgerEvent
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatalf("Unmarshal(%q) error = %v", line, err)
+		}
+		events = append(events, event)
+	}
+	return events
 }

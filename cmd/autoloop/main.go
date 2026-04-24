@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/autoloop"
 )
@@ -238,10 +239,26 @@ func runAutoloop(cfg autoloop.Config, dryRun bool) error {
 
 	fmt.Fprintf(commandStdout, "candidates: %d\nselected: %d\n", summary.Candidates, len(summary.Selected))
 	for _, candidate := range summary.Selected {
-		fmt.Fprintf(commandStdout, "- %s/%s %s [%s]\n", candidate.PhaseID, candidate.SubphaseID, candidate.ItemName, candidate.Status)
+		fmt.Fprintf(commandStdout, "- %s/%s %s [%s] owner=%s size=%s reason=%s\n",
+			candidate.PhaseID,
+			candidate.SubphaseID,
+			candidate.ItemName,
+			candidate.Status,
+			dashIfEmpty(candidate.ExecutionOwner),
+			dashIfEmpty(candidate.SliceSize),
+			candidate.SelectionReason(),
+		)
 	}
 
 	return nil
+}
+
+func dashIfEmpty(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "-"
+	}
+	return trimmed
 }
 
 func autoloopEnv() map[string]string {

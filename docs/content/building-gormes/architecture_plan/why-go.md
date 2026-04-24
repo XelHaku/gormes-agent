@@ -152,9 +152,9 @@ type Subagent struct {
 
 ### P2: Multi-Platform Gateway
 
-**Why third:** Telegram proves the pattern. Scale to Discord/Slack/WhatsApp/Signal/Email. Platform breadth matters for adoption, but it doesn't differentiate architecturally.
+**Why third:** Telegram proves the pattern. Scale first to Discord, Slack, WhatsApp, and WeChat. Platform breadth matters for adoption, but it doesn't differentiate architecturally, so the remaining channels are paused into Phase 7.
 
-**Status:** 🔨 Shared gateway chassis + `gormes gateway` landed; Telegram (2.B.1) and Discord (2.B.2) are shipped. Slack has a private Socket Mode bot but still needs shared runtime registration, WhatsApp has only ingress normalization, and the long-tail regional adapters are advancing as contract-first seams before real transports.
+**Status:** 🔨 Shared gateway chassis + `gormes gateway` landed; Telegram (2.B.1) and Discord (2.B.2) are shipped. Slack has a private Socket Mode bot but still needs shared runtime registration, WhatsApp has ingress normalization, and WeChat has WeCom/WeiXin shared-bot seams before real transports.
 
 ---
 

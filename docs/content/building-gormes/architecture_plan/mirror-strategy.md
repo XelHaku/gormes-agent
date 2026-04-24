@@ -94,7 +94,7 @@ Based on the comprehensive Hermes file inventory, these Hermes files do not need
 | `BOOT.md` | Built-in startup automation file at `$XDG_DATA_HOME/gormes/BOOT.md`; run through an isolated background boot kernel on gateway start in **Phase 2.F.2** | Boot sequence audit remains future work |
 | `SOUL.md` | Personality system not yet implemented (Phase 4+) | Persona versioning when Phase 4 lands |
 | `gateway_voice_mode.json` | Voice mode not implemented (Phase 5.E) | Voice state mirroring if voice features land |
-| Platform state JSON files | Shared gateway exists, but most remaining adapter-specific state surfaces are still planned (Phase 2.B.4–2.B.10) | Per-platform state audit when those adapters land |
+| Platform state JSON files | Shared gateway exists, but most remaining adapter-specific state surfaces are split between the priority channel work (Phase 2.B.4/2.B.10) and the paused adapter backlog (Phase 7) | Per-platform state audit when those adapters land |
 
 **Operational State Files Discovered in Additional Research:**
 

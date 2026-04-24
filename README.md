@@ -57,11 +57,12 @@ Gormes is not a wrapper around Hermes. It is a **strangler fig rewrite** — eac
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 13/23 subphases |
+| Phase 2 — The Gateway | 🔨 | 11/19 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
+| Phase 7 — Paused Channel Backlog | 🔨 | 2/5 subphases |
 <!-- PROGRESS:END -->
 
 Full item-level checklist and stats: **[docs.gormes.ai/building-gormes/architecture_plan](https://docs.gormes.ai/building-gormes/architecture_plan/)**
@@ -72,7 +73,7 @@ Full item-level checklist and stats: **[docs.gormes.ai/building-gormes/architect
 
 - **Single Static Binary** — Zero CGO. ~17.7 MB. Deploy to Termux, Alpine, a fresh VPS — it runs.
 - **Always-On Runtime** — Survives restarts, reconnects dropped streams, runs for months unattended.
-- **Multi-Platform Gateway** — Telegram and Discord run through the shared gateway today; Slack shared-runtime wiring, WhatsApp, Signal, and long-tail adapters are being ported as contract-first slices.
+- **Multi-Platform Gateway** — Telegram and Discord run through the shared gateway today; Slack shared-runtime wiring, WhatsApp, and WeChat are the active channel priorities while the other adapters sit in Phase 7.
 - **In-Process Tool Loop** — Streamed tool calls execute against a Go-native registry.
 - **Scheduled Automations** — Built-in cron scheduler delivering to any platform.
 - **Isolated Subagents** — Parallel workstreams with resource isolation and bounded memory.

@@ -37,16 +37,17 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 28/71 subphases shipped · 10 in progress · 33 planned
+**Overall:** 28/72 subphases shipped · 11 in progress · 33 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 13/23 subphases |
+| Phase 2 — The Gateway | 🔨 | 11/19 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
+| Phase 7 — Paused Channel Backlog | 🔨 | 2/5 subphases |
 
 ---
 
@@ -72,7 +73,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ## Phase 2 — The Gateway 🔨
 
-*Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before the long-tail adapter flood*
+*Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before focused channel closeout*
 
 ### 2.A — Tool Registry ✅
 
@@ -115,47 +116,10 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 
-### 2.B.6 — Signal Adapter 🔨
+### 2.B.10 — WeChat Adapter 🔨
 
-- [x] Inbound event normalization + session identity
-- [x] Reply/send contract on shared chassis
-- [ ] Signal transport/bootstrap layer
-
-### 2.B.7 — Email + SMS Adapters ✅
-
-- [x] Email ingress + outbound delivery contract
-- [x] SMS ingress + outbound delivery contract
-
-### 2.B.8 — Matrix + Mattermost Adapters 🔨
-
-- [x] Threaded text adapter contract suite
-- [ ] Matrix shared-chassis bot seam
-- [ ] Mattermost shared-chassis bot seam
-- [ ] Matrix real client/bootstrap layer
-- [ ] Mattermost REST/WS bootstrap layer
-
-### 2.B.9 — Webhook + Trigger Ingress ✅
-
-- [x] Signed event parsing + auth gates
-- [x] Prompt-to-delivery routing bridge
-
-### 2.B.10 — Regional + Device Adapter Flood 🔨
-
-- [x] BlueBubbles + HomeAssistant adapters
-- [x] Feishu shared-chassis bot seam
 - [x] WeCom + WeiXin shared-chassis bot seam
-- [x] DingTalk shared-chassis bot seam
-- [x] QQ Bot shared-chassis bot seam
-- [ ] Feishu transport/bootstrap layer
-- [ ] Feishu drive-comment rule + pairing seam
-- [ ] Feishu drive-comment reply workflow
 - [ ] WeCom + WeiXin transport/bootstrap layer
-- [x] DingTalk transport/bootstrap layer
-- [ ] DingTalk real SDK binding
-- [ ] DingTalk AI Cards streaming-update contract
-- [ ] DingTalk emoji reaction send/receive parity
-- [ ] DingTalk media (image/file) attachment routing
-- [ ] QQ Bot transport/bootstrap layer
 
 ### 2.B.11 — Discord Forum Channels ⏳
 
@@ -539,6 +503,50 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 6.F — Skill Surface ⏳
 
 - [ ] TUI + Telegram browsing
+
+## Phase 7 — Paused Channel Backlog 🔨
+
+*Deferred non-priority channel adapters after Telegram, Discord, Slack, WhatsApp, and WeChat stabilize*
+
+### 7.A — Signal Adapter 🔨
+
+- [x] Inbound event normalization + session identity
+- [x] Reply/send contract on shared chassis
+- [ ] Signal transport/bootstrap layer
+
+### 7.B — Email + SMS Adapters ✅
+
+- [x] Email ingress + outbound delivery contract
+- [x] SMS ingress + outbound delivery contract
+
+### 7.C — Matrix + Mattermost Adapters 🔨
+
+- [x] Threaded text adapter contract suite
+- [ ] Matrix shared-chassis bot seam
+- [ ] Mattermost shared-chassis bot seam
+- [ ] Matrix real client/bootstrap layer
+- [ ] Mattermost REST/WS bootstrap layer
+
+### 7.D — Webhook + Trigger Ingress ✅
+
+- [x] Signed event parsing + auth gates
+- [x] Prompt-to-delivery routing bridge
+
+### 7.E — Regional + Device Adapter Backlog 🔨
+
+- [x] BlueBubbles + HomeAssistant adapters
+- [x] Feishu shared-chassis bot seam
+- [x] DingTalk shared-chassis bot seam
+- [x] QQ Bot shared-chassis bot seam
+- [ ] Feishu transport/bootstrap layer
+- [ ] Feishu drive-comment rule + pairing seam
+- [ ] Feishu drive-comment reply workflow
+- [x] DingTalk transport/bootstrap layer
+- [ ] DingTalk real SDK binding
+- [x] DingTalk AI Cards streaming-update contract
+- [x] DingTalk emoji reaction send/receive parity
+- [x] DingTalk media (image/file) attachment routing
+- [ ] QQ Bot transport/bootstrap layer
 
 <!-- PROGRESS:END -->
 

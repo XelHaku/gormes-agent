@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -43,6 +44,21 @@ func TestCoalescer_FlushImmediateBypassesWindow(t *testing.T) {
 	})
 }
 
+func TestCoalescer_FlushImmediateFinalPassesTerminalFlag(t *testing.T) {
+	ch := &finalizingFakeChannel{fakeChannel: newFakeChannel("test")}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	c := newCoalescer(ch, time.Second, "chat1")
+
+	c.flushImmediate(ctx, "partial")
+	c.flushImmediateFinal(ctx, "final", true)
+
+	if got, want := ch.finalizes, []bool{false, true}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("finalize flags = %v, want %v", got, want)
+	}
+}
+
 func TestCoalescer_SendErrorIsSwallowed(t *testing.T) {
 	ch := newFakeChannel("test")
 	ch.sendErr = errors.New("transient")
@@ -54,6 +70,16 @@ func TestCoalescer_SendErrorIsSwallowed(t *testing.T) {
 
 	c.setPending("x")
 	time.Sleep(50 * time.Millisecond)
+}
+
+type finalizingFakeChannel struct {
+	*fakeChannel
+	finalizes []bool
+}
+
+func (f *finalizingFakeChannel) EditMessageFinal(ctx context.Context, chatID, msgID, text string, finalize bool) error {
+	f.finalizes = append(f.finalizes, finalize)
+	return f.fakeChannel.EditMessage(ctx, chatID, msgID, text)
 }
 
 func waitFor(t *testing.T, timeout time.Duration, cond func() bool) {

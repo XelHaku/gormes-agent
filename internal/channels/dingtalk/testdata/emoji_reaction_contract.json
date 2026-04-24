@@ -1,0 +1,41 @@
+{
+  "thinkingReply": {
+    "robotCode": "robot-code",
+    "openMsgId": "user-msg-1",
+    "openConversationId": "dm-42",
+    "emotionType": 2,
+    "emotionName": "🤔Thinking",
+    "textEmotion": {
+      "emotionId": "2659900",
+      "emotionName": "🤔Thinking",
+      "text": "🤔Thinking",
+      "backgroundId": "im_bg_1"
+    }
+  },
+  "thinkingRecall": {
+    "robotCode": "robot-code",
+    "openMsgId": "user-msg-1",
+    "openConversationId": "dm-42",
+    "emotionType": 2,
+    "emotionName": "🤔Thinking",
+    "textEmotion": {
+      "emotionId": "2659900",
+      "emotionName": "🤔Thinking",
+      "text": "🤔Thinking",
+      "backgroundId": "im_bg_1"
+    }
+  },
+  "doneReply": {
+    "robotCode": "robot-code",
+    "openMsgId": "user-msg-1",
+    "openConversationId": "dm-42",
+    "emotionType": 2,
+    "emotionName": "🥳Done",
+    "textEmotion": {
+      "emotionId": "2659900",
+      "emotionName": "🥳Done",
+      "text": "🥳Done",
+      "backgroundId": "im_bg_1"
+    }
+  }
+}

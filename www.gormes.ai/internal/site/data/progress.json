@@ -200,7 +200,7 @@
     },
     "2": {
       "name": "Phase 2 — The Gateway",
-      "deliverable": "Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before the long-tail adapter flood",
+      "deliverable": "Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before focused channel closeout",
       "subphases": {
         "2.A": {
           "name": "Tool Registry",
@@ -284,11 +284,23 @@
             {
               "name": "Slack gateway.Channel adapter shim",
               "status": "planned",
+              "blocked_by": [
+                "Slack CommandRegistry parser wiring"
+              ],
+              "ready_when": [
+                "Slack ingress uses gateway.ParseInboundText and shared CommandRegistry fixtures are green"
+              ],
               "note": "TDD: adapt internal/slack onto the gateway.Channel interface and Manager lifecycle without rewriting the existing Socket Mode client or coalesced reply tests."
             },
             {
               "name": "Slack config + cmd/gormes gateway registration",
               "status": "planned",
+              "blocked_by": [
+                "Slack gateway.Channel adapter shim"
+              ],
+              "ready_when": [
+                "Slack gateway.Channel adapter shim runs through the shared Manager lifecycle in tests"
+              ],
               "note": "TDD: add Slack config loading, doctor coverage, and cmd/gormes gateway registration only after the Channel shim is green; current evidence shows only Telegram and Discord are registered there."
             }
           ]
@@ -310,6 +322,12 @@
             {
               "name": "Pairing, reconnect, and send contract",
               "status": "planned",
+              "blocked_by": [
+                "Bridge-vs-native runtime decision"
+              ],
+              "ready_when": [
+                "WhatsApp runtime-selection contract freezes bridge-first versus native-first startup behavior"
+              ],
               "note": "TDD: add a transport-neutral outbound lifecycle contract that gates sends on pairing state, retries reconnects with bounded backoff, and maps normalized gateway chat IDs back to raw WhatsApp DM/group peers with reply metadata preservation."
             }
           ]
@@ -340,171 +358,6 @@
             }
           ]
         },
-        "2.B.6": {
-          "name": "Signal Adapter",
-          "priority": "P2",
-          "items": [
-            {
-              "name": "Inbound event normalization + session identity",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/signal.NormalizeInbound now freezes Signal DM/group chat IDs, generic slash passthrough, and alternate phone/UUID session identity before client wiring."
-            },
-            {
-              "name": "Reply/send contract on shared chassis",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/signal.Bot now records reply metadata from normalized inbound events and routes shared-chassis sends back to direct recipients or native group IDs with reply-to preservation."
-            },
-            {
-              "name": "Signal transport/bootstrap layer",
-              "status": "planned",
-              "note": "TDD: freeze signal-cli or bridge client lifecycle, receive-loop reconnect/error handling, and outbound attachment/send seams before binding a real transport."
-            }
-          ]
-        },
-        "2.B.7": {
-          "name": "Email + SMS Adapters",
-          "priority": "P3",
-          "items": [
-            {
-              "name": "Email ingress + outbound delivery contract",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/email now normalizes RFC 822 MIME bodies into plaintext gateway events and derives deterministic reply-thread targets before IMAP or SMTP transport glue."
-            },
-            {
-              "name": "SMS ingress + outbound delivery contract",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/sms.NormalizeInbound now canonicalizes phone-number session keys, delegates generic slash commands through gateway.ParseInboundText, and BuildDelivery splits outbound replies into natural-boundary 1600-rune segments for future Twilio sends."
-            }
-          ]
-        },
-        "2.B.8": {
-          "name": "Matrix + Mattermost Adapters",
-          "priority": "P4",
-          "items": [
-            {
-              "name": "Threaded text adapter contract suite",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/threadtext freezes canonical thread IDs, gateway inbound normalization, and reply-target derivation before Matrix/Mattermost transport work."
-            },
-            {
-              "name": "Matrix shared-chassis bot seam",
-              "status": "planned",
-              "note": "TDD: land a Matrix-specific bot seam on top of `internal/channels/threadtext` that freezes canonical thread reply targets, root-message thread defaults, and placeholder/edit hooks before auth/sync/E2EE transport work."
-            },
-            {
-              "name": "Mattermost shared-chassis bot seam",
-              "status": "planned",
-              "note": "TDD: land a Mattermost-specific bot seam on top of `internal/channels/threadtext` that freezes canonical reply targets, flat-vs-thread root reply defaults, and placeholder/edit hooks before REST/WS transport work."
-            },
-            {
-              "name": "Matrix real client/bootstrap layer",
-              "status": "planned",
-              "note": "TDD: freeze auth, sync/invite handling, room-kind and mention policy, and media/E2EE bootstrap seams before binding a real Matrix client."
-            },
-            {
-              "name": "Mattermost REST/WS bootstrap layer",
-              "status": "planned",
-              "note": "TDD: freeze auth, websocket reconnect, channel/user lookup, and file upload/edit seams before binding a real Mattermost transport."
-            }
-          ]
-        },
-        "2.B.9": {
-          "name": "Webhook + Trigger Ingress",
-          "priority": "P4",
-          "items": [
-            {
-              "name": "Signed event parsing + auth gates",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/webhook.ParseInbound now enforces body-size and event-filter gates, and ValidateSignature freezes GitHub, GitLab, and generic HMAC auth before any HTTP runtime wiring."
-            },
-            {
-              "name": "Prompt-to-delivery routing bridge",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/webhook now renders prompt and deliver_extra templates, derives deterministic webhook session chat IDs, and resolves typed gateway delivery targets including thread aliases."
-            }
-          ]
-        },
-        "2.B.10": {
-          "name": "Regional + Device Adapter Flood",
-          "priority": "P4",
-          "items": [
-            {
-              "name": "BlueBubbles + HomeAssistant adapters",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/bluebubbles and internal/channels/homeassistant now freeze webhook-auth, cached home-channel delivery, filtered state-change formatting, cooldown, and persistent-notification contracts before any SDK wiring."
-            },
-            {
-              "name": "Feishu shared-chassis bot seam",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/feishu now pins webhook-versus-websocket ingress, group mention policy, allowlist behavior, and reply-target preservation before any SDK wiring."
-            },
-            {
-              "name": "WeCom + WeiXin shared-chassis bot seam",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/wecom and internal/channels/weixin now pin policy-gated ingress, request/reply routing, and per-platform reply-path contracts before any SDK wiring."
-            },
-            {
-              "name": "DingTalk shared-chassis bot seam",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/dingtalk.Bot now covers allow-list policy, mention-gated ingress, generic command parsing, session-webhook capture, and callback-bound reply delivery; runtime/bootstrap and real SDK binding remain tracked separately."
-            },
-            {
-              "name": "QQ Bot shared-chassis bot seam",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/qqbot now covers DM/group policy gates, mention-gated ingress, and passive-reply sequencing before any runtime bootstrap."
-            },
-            {
-              "name": "Feishu transport/bootstrap layer",
-              "status": "planned",
-              "note": "TDD: freeze webhook and websocket client lifecycle, credential validation, and rich-text send failure modes before binding a real Feishu transport."
-            },
-            {
-              "name": "Feishu drive-comment rule + pairing seam",
-              "status": "planned",
-              "note": "TDD: port the upstream `gateway/platforms/feishu_comment_rules.py` contract as a Go rule resolver with exact document, wildcard, and top-level fallback plus allowlist/pairing decisions before comment replies can invoke an agent."
-            },
-            {
-              "name": "Feishu drive-comment reply workflow",
-              "status": "planned",
-              "note": "TDD: freeze `drive.notice.comment_add_v1` parsing, OK-reaction behavior, whole-document vs local-thread prompt construction, and reply fallback semantics from `gateway/platforms/feishu_comment.py` before real SDK binding."
-            },
-            {
-              "name": "WeCom + WeiXin transport/bootstrap layer",
-              "status": "planned",
-              "note": "TDD: freeze callback/webhook bootstrap, credential validation, and outbound push/reply lifecycle seams before binding real WeCom or WeiXin transports."
-            },
-            {
-              "name": "DingTalk transport/bootstrap layer",
-              "status": "complete",
-              "note": "TDD landed: internal/channels/dingtalk now freezes Stream Mode bootstrap via DecideRuntime plus SessionWebhooks refresh and ReplySender retry/error contracts before any real SDK binding."
-            },
-            {
-              "name": "DingTalk real SDK binding",
-              "status": "planned",
-              "note": "TDD: bind the frozen Stream Mode/runtime contract to the real DingTalk SDK, credential checks, receive loop, and send lifecycle without widening the already-tested session-webhook retry seam."
-            },
-            {
-              "name": "DingTalk AI Cards streaming-update contract",
-              "status": "planned",
-              "note": "TDD slice 1 of 3 from upstream PR #4459913f: freeze the AI Cards streaming-update contract on top of the existing DingTalk bot seam and Stream Mode transport — coalesced token pushes, terminal-frame semantics, and a DingTalk-shaped failure fallback — with fixture-backed tests before binding to the real SDK in `DingTalk real SDK binding`. Gates the next two slices."
-            },
-            {
-              "name": "DingTalk emoji reaction send/receive parity",
-              "status": "planned",
-              "note": "TDD slice 2 of 3 from upstream PR #4459913f: freeze emoji reaction send/receive parity on the DingTalk bot seam with fixture-backed tests and a DingTalk-shaped failure fallback. Requires the AI Cards streaming-update slice to be green first; do not bind to the real SDK until `DingTalk real SDK binding` lands."
-            },
-            {
-              "name": "DingTalk media (image/file) attachment routing",
-              "status": "planned",
-              "note": "TDD slice 3 of 3 from upstream PR #4459913f: freeze media (image/file) attachment routing on the DingTalk bot seam with fixture-backed tests and a DingTalk-shaped failure fallback. Requires the streaming-update and emoji-reaction slices to be green first; do not bind to the real SDK until `DingTalk real SDK binding` lands."
-            },
-            {
-              "name": "QQ Bot transport/bootstrap layer",
-              "status": "planned",
-              "note": "TDD: freeze gateway/event receive loops, passive-reply lifecycle, and platform-specific send failure handling before binding a real QQ transport."
-            }
-          ]
-        },
         "2.B.11": {
           "name": "Discord Forum Channels",
           "priority": "P3",
@@ -517,6 +370,12 @@
             {
               "name": "Discord forum media + polish parity",
               "status": "planned",
+              "blocked_by": [
+                "Discord forum channel ingress + thread lifecycle"
+              ],
+              "ready_when": [
+                "Discord forum ingress and thread lifecycle fixtures are green on top of the shipped Discord adapter"
+              ],
               "note": "TDD: port upstream PR #607be54a (forum channel media + polish) after the ingress slice is green — attachment flow for forum posts, initial-post vs reply differences, and deterministic outbound routing to forum threads. Keep the shared-chassis send contract intact so non-forum Discord behavior cannot regress."
             }
           ]
@@ -835,6 +694,22 @@
             {
               "name": "Explicit promotion flow",
               "status": "complete"
+            }
+          ]
+        },
+        "2.B.10": {
+          "name": "WeChat Adapter",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "WeCom + WeiXin shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/wecom and internal/channels/weixin now pin policy-gated ingress, request/reply routing, and per-platform reply-path contracts before any SDK wiring."
+            },
+            {
+              "name": "WeCom + WeiXin transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze callback/webhook bootstrap, credential validation, and outbound push/reply lifecycle seams before binding real WeCom or WeiXin transports."
             }
           ]
         }
@@ -2194,6 +2069,167 @@
               "name": "TUI + Telegram browsing",
               "status": "planned",
               "note": "TDD: expose browse/edit/disable/review flows through TUI and gateway commands after the store and feedback records are stable, with permission and active-turn behavior pinned by tests."
+            }
+          ]
+        }
+      }
+    },
+    "7": {
+      "name": "Phase 7 — Paused Channel Backlog",
+      "deliverable": "Deferred non-priority channel adapters after Telegram, Discord, Slack, WhatsApp, and WeChat stabilize",
+      "subphases": {
+        "7.A": {
+          "name": "Signal Adapter",
+          "priority": "P2",
+          "items": [
+            {
+              "name": "Inbound event normalization + session identity",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/signal.NormalizeInbound now freezes Signal DM/group chat IDs, generic slash passthrough, and alternate phone/UUID session identity before client wiring."
+            },
+            {
+              "name": "Reply/send contract on shared chassis",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/signal.Bot now records reply metadata from normalized inbound events and routes shared-chassis sends back to direct recipients or native group IDs with reply-to preservation."
+            },
+            {
+              "name": "Signal transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze signal-cli or bridge client lifecycle, receive-loop reconnect/error handling, and outbound attachment/send seams before binding a real transport."
+            }
+          ]
+        },
+        "7.B": {
+          "name": "Email + SMS Adapters",
+          "priority": "P3",
+          "items": [
+            {
+              "name": "Email ingress + outbound delivery contract",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/email now normalizes RFC 822 MIME bodies into plaintext gateway events and derives deterministic reply-thread targets before IMAP or SMTP transport glue."
+            },
+            {
+              "name": "SMS ingress + outbound delivery contract",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/sms.NormalizeInbound now canonicalizes phone-number session keys, delegates generic slash commands through gateway.ParseInboundText, and BuildDelivery splits outbound replies into natural-boundary 1600-rune segments for future Twilio sends."
+            }
+          ]
+        },
+        "7.C": {
+          "name": "Matrix + Mattermost Adapters",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "Threaded text adapter contract suite",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/threadtext freezes canonical thread IDs, gateway inbound normalization, and reply-target derivation before Matrix/Mattermost transport work."
+            },
+            {
+              "name": "Matrix shared-chassis bot seam",
+              "status": "planned",
+              "note": "TDD: land a Matrix-specific bot seam on top of `internal/channels/threadtext` that freezes canonical thread reply targets, root-message thread defaults, and placeholder/edit hooks before auth/sync/E2EE transport work."
+            },
+            {
+              "name": "Mattermost shared-chassis bot seam",
+              "status": "planned",
+              "note": "TDD: land a Mattermost-specific bot seam on top of `internal/channels/threadtext` that freezes canonical reply targets, flat-vs-thread root reply defaults, and placeholder/edit hooks before REST/WS transport work."
+            },
+            {
+              "name": "Matrix real client/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze auth, sync/invite handling, room-kind and mention policy, and media/E2EE bootstrap seams before binding a real Matrix client."
+            },
+            {
+              "name": "Mattermost REST/WS bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze auth, websocket reconnect, channel/user lookup, and file upload/edit seams before binding a real Mattermost transport."
+            }
+          ]
+        },
+        "7.D": {
+          "name": "Webhook + Trigger Ingress",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "Signed event parsing + auth gates",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/webhook.ParseInbound now enforces body-size and event-filter gates, and ValidateSignature freezes GitHub, GitLab, and generic HMAC auth before any HTTP runtime wiring."
+            },
+            {
+              "name": "Prompt-to-delivery routing bridge",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/webhook now renders prompt and deliver_extra templates, derives deterministic webhook session chat IDs, and resolves typed gateway delivery targets including thread aliases."
+            }
+          ]
+        },
+        "7.E": {
+          "name": "Regional + Device Adapter Backlog",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "BlueBubbles + HomeAssistant adapters",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/bluebubbles and internal/channels/homeassistant now freeze webhook-auth, cached home-channel delivery, filtered state-change formatting, cooldown, and persistent-notification contracts before any SDK wiring."
+            },
+            {
+              "name": "Feishu shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/feishu now pins webhook-versus-websocket ingress, group mention policy, allowlist behavior, and reply-target preservation before any SDK wiring."
+            },
+            {
+              "name": "DingTalk shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/dingtalk.Bot now covers allow-list policy, mention-gated ingress, generic command parsing, session-webhook capture, and callback-bound reply delivery; runtime/bootstrap and real SDK binding remain tracked separately."
+            },
+            {
+              "name": "QQ Bot shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/qqbot now covers DM/group policy gates, mention-gated ingress, and passive-reply sequencing before any runtime bootstrap."
+            },
+            {
+              "name": "Feishu transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze webhook and websocket client lifecycle, credential validation, and rich-text send failure modes before binding a real Feishu transport."
+            },
+            {
+              "name": "Feishu drive-comment rule + pairing seam",
+              "status": "planned",
+              "note": "TDD: port the upstream `gateway/platforms/feishu_comment_rules.py` contract as a Go rule resolver with exact document, wildcard, and top-level fallback plus allowlist/pairing decisions before comment replies can invoke an agent."
+            },
+            {
+              "name": "Feishu drive-comment reply workflow",
+              "status": "planned",
+              "note": "TDD: freeze `drive.notice.comment_add_v1` parsing, OK-reaction behavior, whole-document vs local-thread prompt construction, and reply fallback semantics from `gateway/platforms/feishu_comment.py` before real SDK binding."
+            },
+            {
+              "name": "DingTalk transport/bootstrap layer",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/dingtalk now freezes Stream Mode bootstrap via DecideRuntime plus SessionWebhooks refresh and ReplySender retry/error contracts before any real SDK binding."
+            },
+            {
+              "name": "DingTalk real SDK binding",
+              "status": "planned",
+              "note": "TDD: bind the frozen Stream Mode/runtime contract to the real DingTalk SDK, credential checks, receive loop, and send lifecycle without widening the already-tested session-webhook retry seam."
+            },
+            {
+              "name": "DingTalk AI Cards streaming-update contract",
+              "status": "complete",
+              "note": "TDD landed: AICardBot now freezes the SDK-neutral DingTalk AI Card create/deliver/streaming-update contract with fixture-backed tests, uses gateway.FinalizingMessageEditor for terminal-frame finalize semantics, and falls back to the stored session webhook when card streaming updates fail. Real SDK binding remains tracked separately."
+            },
+            {
+              "name": "DingTalk emoji reaction send/receive parity",
+              "status": "complete",
+              "note": "TDD landed: EmojiReactionClient now freezes DingTalk robot emotion reply/recall payloads with fixture-backed tests, emits Thinking on accepted inbound messages, swaps to Done on final session-webhook and AI Card replies, and keeps reaction failures as best-effort so fallback delivery still succeeds. Real SDK binding remains tracked separately."
+            },
+            {
+              "name": "DingTalk media (image/file) attachment routing",
+              "status": "complete",
+              "note": "TDD landed: DingTalk media routing now keeps image/file download-code handling SDK-neutral, resolves robot message file-download requests into gateway attachments with fixture-backed tests, preserves media-only turns, and falls back to the original DingTalk download code with an error note when URL resolution fails. Real SDK binding remains tracked separately."
+            },
+            {
+              "name": "QQ Bot transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze gateway/event receive loops, passive-reply lifecycle, and platform-specific send failure handling before binding a real QQ transport."
             }
           ]
         }

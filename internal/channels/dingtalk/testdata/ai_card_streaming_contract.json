@@ -1,0 +1,38 @@
+{
+  "dmCreate": {
+    "templateId": "tmpl-1",
+    "outTrackId": "hermes-test",
+    "callbackType": "STREAM",
+    "cardData": {
+      "cardParamMap": {
+        "content": ""
+      }
+    },
+    "supportForward": true
+  },
+  "dmDeliver": {
+    "outTrackId": "hermes-test",
+    "openSpaceId": "dtv1.card//IM_ROBOT.staff-1",
+    "userIdType": 1,
+    "robotCode": "robot-code",
+    "spaceType": "IM_ROBOT"
+  },
+  "streamOpen": {
+    "outTrackId": "hermes-test",
+    "guid": "guid-1",
+    "key": "content",
+    "content": "partial answer",
+    "isFull": true,
+    "isFinalize": false,
+    "isError": false
+  },
+  "streamFinal": {
+    "outTrackId": "hermes-test",
+    "guid": "guid-2",
+    "key": "content",
+    "content": "final answer",
+    "isFull": true,
+    "isFinalize": true,
+    "isError": false
+  }
+}

@@ -92,6 +92,13 @@ func (h hookedPlaceholderEditor) EditMessage(ctx context.Context, chatID, msgID,
 	return h.base.EditMessage(ctx, chatID, msgID, text)
 }
 
+func (h hookedPlaceholderEditor) EditMessageFinal(ctx context.Context, chatID, msgID, text string, finalize bool) error {
+	if finalizer, ok := h.base.(FinalizingMessageEditor); ok {
+		return finalizer.EditMessageFinal(ctx, chatID, msgID, text, finalize)
+	}
+	return h.base.EditMessage(ctx, chatID, msgID, text)
+}
+
 // ErrDuplicateChannel is returned when two registered channels share a name.
 var ErrDuplicateChannel = errors.New("gateway: duplicate channel name")
 
@@ -339,7 +346,7 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) {
 		m.pinTurn(ev.Platform, ev.ChatID, ev.MsgID)
 		if err := m.kernel.Submit(kernel.PlatformEvent{
 			Kind:           kernel.PlatformEventSubmit,
-			Text:           ev.Text,
+			Text:           ev.SubmitText(),
 			SessionID:      sessionID,
 			SessionContext: sessionContext,
 		}); err != nil {
@@ -378,7 +385,7 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 	switch f.Phase {
 	case kernel.PhaseIdle:
 		if *co != nil {
-			(*co).flushImmediate(ctx, m.formatFinal(platform, f))
+			(*co).flushImmediateFinal(ctx, m.formatFinal(platform, f), true)
 			(*coCancel)()
 			*co = nil
 			*coCancel = nil
@@ -389,7 +396,7 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 	case kernel.PhaseFailed, kernel.PhaseCancelling:
 		text := m.formatError(platform, f)
 		if *co != nil {
-			(*co).flushImmediate(ctx, text)
+			(*co).flushImmediateFinal(ctx, text, true)
 			(*coCancel)()
 			*co = nil
 			*coCancel = nil

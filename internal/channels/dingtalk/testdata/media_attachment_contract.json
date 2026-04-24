@@ -1,0 +1,37 @@
+{
+  "downloadRequests": [
+    {
+      "robotCode": "robot-code",
+      "downloadCode": "img-code-1"
+    },
+    {
+      "robotCode": "robot-code",
+      "downloadCode": "file-code-1"
+    }
+  ],
+  "resolvedAttachments": [
+    {
+      "kind": "image",
+      "url": "https://media.dingtalk.example/image.png",
+      "mediaType": "image",
+      "sourceId": "img-code-1"
+    },
+    {
+      "kind": "file",
+      "url": "https://media.dingtalk.example/report.pdf",
+      "mediaType": "application/octet-stream",
+      "fileName": "report.pdf",
+      "sourceId": "file-code-1"
+    }
+  ],
+  "fallbackAttachments": [
+    {
+      "kind": "file",
+      "url": "file-code-timeout",
+      "mediaType": "application/octet-stream",
+      "fileName": "report.pdf",
+      "sourceId": "file-code-timeout",
+      "error": "dingtalk: media download: 429 rate limit"
+    }
+  ]
+}

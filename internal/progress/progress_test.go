@@ -357,34 +357,54 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.B.4 pairing/reconnect/send note = %q, want pairing-state/reconnect detail", whatsAppPairing.Note)
 	}
 
-	signal := p.Phases["2"].Subphases["2.B.6"]
+	weChat := p.Phases["2"].Subphases["2.B.10"]
+	if weChat.Priority != "P1" {
+		t.Fatalf("Phase 2.B.10 priority = %q, want P1", weChat.Priority)
+	}
+	if got := weChat.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.B.10 = %q, want in_progress", got)
+	}
+	weChatItems := itemsByName(weChat.Items)
+	weComWeiXin := weChatItems["WeCom + WeiXin shared-chassis bot seam"]
+	if weComWeiXin.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 WeCom + WeiXin shared-chassis bot seam status = %q, want complete", weComWeiXin.Status)
+	}
+	if !strings.Contains(weComWeiXin.Note, "internal/channels/wecom") || !strings.Contains(weComWeiXin.Note, "internal/channels/weixin") {
+		t.Fatalf("Phase 2.B.10 WeCom + WeiXin shared-chassis bot seam note = %q, want WeCom/WeiXin detail", weComWeiXin.Note)
+	}
+	weComTransport := weChatItems["WeCom + WeiXin transport/bootstrap layer"]
+	if weComTransport.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.10 WeCom + WeiXin transport/bootstrap status = %q, want planned", weComTransport.Status)
+	}
+
+	signal := p.Phases["7"].Subphases["7.A"]
 	if signal.Priority != "P2" {
-		t.Fatalf("Phase 2.B.6 priority = %q, want P2", signal.Priority)
+		t.Fatalf("Phase 7.A priority = %q, want P2", signal.Priority)
 	}
 	if got := signal.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.B.6 = %q, want in_progress", got)
+		t.Fatalf("Phase 7.A = %q, want in_progress", got)
 	}
 	signalItems := itemsByName(signal.Items)
 	identity := signalItems["Inbound event normalization + session identity"]
 	if identity.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.6 inbound normalization status = %q, want complete", identity.Status)
+		t.Fatalf("Phase 7.A inbound normalization status = %q, want complete", identity.Status)
 	}
 	if !strings.Contains(identity.Note, "NormalizeInbound") || !strings.Contains(identity.Note, "phone/UUID") {
-		t.Fatalf("Phase 2.B.6 inbound normalization note = %q, want NormalizeInbound/phone-UUID detail", identity.Note)
+		t.Fatalf("Phase 7.A inbound normalization note = %q, want NormalizeInbound/phone-UUID detail", identity.Note)
 	}
 	replySend := signalItems["Reply/send contract on shared chassis"]
 	if replySend.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.6 reply/send status = %q, want complete", replySend.Status)
+		t.Fatalf("Phase 7.A reply/send status = %q, want complete", replySend.Status)
 	}
 	if !strings.Contains(replySend.Note, "signal.Bot") || !strings.Contains(replySend.Note, "native group IDs") {
-		t.Fatalf("Phase 2.B.6 reply/send note = %q, want signal.Bot/native group IDs detail", replySend.Note)
+		t.Fatalf("Phase 7.A reply/send note = %q, want signal.Bot/native group IDs detail", replySend.Note)
 	}
 	transport := signalItems["Signal transport/bootstrap layer"]
 	if transport.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.6 transport/bootstrap status = %q, want planned", transport.Status)
+		t.Fatalf("Phase 7.A transport/bootstrap status = %q, want planned", transport.Status)
 	}
 	if !strings.Contains(transport.Note, "signal-cli") || !strings.Contains(transport.Note, "bridge client lifecycle") {
-		t.Fatalf("Phase 2.B.6 transport/bootstrap note = %q, want signal-cli/bridge detail", transport.Note)
+		t.Fatalf("Phase 7.A transport/bootstrap note = %q, want signal-cli/bridge detail", transport.Note)
 	}
 
 	routing := p.Phases["2"].Subphases["2.B.5"]
@@ -478,152 +498,155 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.F.4 priority = %q, want P3", operator.Priority)
 	}
 
-	mail := p.Phases["2"].Subphases["2.B.7"]
+	mail := p.Phases["7"].Subphases["7.B"]
 	if mail.Priority != "P3" {
-		t.Fatalf("Phase 2.B.7 priority = %q, want P3", mail.Priority)
+		t.Fatalf("Phase 7.B priority = %q, want P3", mail.Priority)
 	}
 	if got := mail.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.B.7 = %q, want complete", got)
+		t.Fatalf("Phase 7.B = %q, want complete", got)
 	}
 	mailItems := itemsByName(mail.Items)
 	email := mailItems["Email ingress + outbound delivery contract"]
 	if email.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.7 email status = %q, want complete", email.Status)
+		t.Fatalf("Phase 7.B email status = %q, want complete", email.Status)
 	}
 	if !strings.Contains(email.Note, "TDD landed") {
-		t.Fatalf("Phase 2.B.7 email note = %q, want TDD landed guidance", email.Note)
+		t.Fatalf("Phase 7.B email note = %q, want TDD landed guidance", email.Note)
 	}
 	sms := mailItems["SMS ingress + outbound delivery contract"]
 	if sms.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.7 sms status = %q, want complete", sms.Status)
+		t.Fatalf("Phase 7.B sms status = %q, want complete", sms.Status)
 	}
 	if !strings.Contains(sms.Note, "NormalizeInbound") || !strings.Contains(sms.Note, "BuildDelivery") {
-		t.Fatalf("Phase 2.B.7 sms note = %q, want NormalizeInbound/BuildDelivery detail", sms.Note)
+		t.Fatalf("Phase 7.B sms note = %q, want NormalizeInbound/BuildDelivery detail", sms.Note)
 	}
 
-	webhookIngress := p.Phases["2"].Subphases["2.B.9"]
+	webhookIngress := p.Phases["7"].Subphases["7.D"]
 	if webhookIngress.Priority != "P4" {
-		t.Fatalf("Phase 2.B.9 priority = %q, want P4", webhookIngress.Priority)
+		t.Fatalf("Phase 7.D priority = %q, want P4", webhookIngress.Priority)
 	}
 	if got := webhookIngress.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.B.9 = %q, want complete", got)
+		t.Fatalf("Phase 7.D = %q, want complete", got)
 	}
 	webhookItems := itemsByName(webhookIngress.Items)
 	signed := webhookItems["Signed event parsing + auth gates"]
 	if signed.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.9 signed-ingress status = %q, want complete", signed.Status)
+		t.Fatalf("Phase 7.D signed-ingress status = %q, want complete", signed.Status)
 	}
 	if !strings.Contains(signed.Note, "ParseInbound") || !strings.Contains(signed.Note, "ValidateSignature") {
-		t.Fatalf("Phase 2.B.9 signed-ingress note = %q, want ParseInbound/ValidateSignature detail", signed.Note)
+		t.Fatalf("Phase 7.D signed-ingress note = %q, want ParseInbound/ValidateSignature detail", signed.Note)
 	}
 	promptBridge := webhookItems["Prompt-to-delivery routing bridge"]
 	if promptBridge.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.9 prompt bridge status = %q, want complete", promptBridge.Status)
+		t.Fatalf("Phase 7.D prompt bridge status = %q, want complete", promptBridge.Status)
 	}
 
-	matrixMattermost := p.Phases["2"].Subphases["2.B.8"]
+	matrixMattermost := p.Phases["7"].Subphases["7.C"]
 	if matrixMattermost.Priority != "P4" {
-		t.Fatalf("Phase 2.B.8 priority = %q, want P4", matrixMattermost.Priority)
+		t.Fatalf("Phase 7.C priority = %q, want P4", matrixMattermost.Priority)
 	}
 	if got := matrixMattermost.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.B.8 = %q, want in_progress", got)
+		t.Fatalf("Phase 7.C = %q, want in_progress", got)
 	}
 	matrixItems := itemsByName(matrixMattermost.Items)
 	threadedText := matrixItems["Threaded text adapter contract suite"]
 	if threadedText.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.8 threaded text status = %q, want complete", threadedText.Status)
+		t.Fatalf("Phase 7.C threaded text status = %q, want complete", threadedText.Status)
 	}
 	matrixBot := matrixItems["Matrix shared-chassis bot seam"]
 	if matrixBot.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.8 matrix bot status = %q, want planned", matrixBot.Status)
+		t.Fatalf("Phase 7.C matrix bot status = %q, want planned", matrixBot.Status)
 	}
 	if !strings.Contains(matrixBot.Note, "internal/channels/threadtext") || !strings.Contains(matrixBot.Note, "thread") {
-		t.Fatalf("Phase 2.B.8 matrix bot note = %q, want threadtext/thread detail", matrixBot.Note)
+		t.Fatalf("Phase 7.C matrix bot note = %q, want threadtext/thread detail", matrixBot.Note)
 	}
 	mattermostBot := matrixItems["Mattermost shared-chassis bot seam"]
 	if mattermostBot.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.8 mattermost bot status = %q, want planned", mattermostBot.Status)
+		t.Fatalf("Phase 7.C mattermost bot status = %q, want planned", mattermostBot.Status)
 	}
 	if !strings.Contains(mattermostBot.Note, "internal/channels/threadtext") || !strings.Contains(mattermostBot.Note, "REST/WS") {
-		t.Fatalf("Phase 2.B.8 mattermost bot note = %q, want threadtext/REST-WS detail", mattermostBot.Note)
+		t.Fatalf("Phase 7.C mattermost bot note = %q, want threadtext/REST-WS detail", mattermostBot.Note)
 	}
 	matrixBootstrap := matrixItems["Matrix real client/bootstrap layer"]
 	if matrixBootstrap.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.8 matrix bootstrap status = %q, want planned", matrixBootstrap.Status)
+		t.Fatalf("Phase 7.C matrix bootstrap status = %q, want planned", matrixBootstrap.Status)
 	}
 	mattermostBootstrap := matrixItems["Mattermost REST/WS bootstrap layer"]
 	if mattermostBootstrap.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.8 mattermost bootstrap status = %q, want planned", mattermostBootstrap.Status)
+		t.Fatalf("Phase 7.C mattermost bootstrap status = %q, want planned", mattermostBootstrap.Status)
 	}
 
-	longTail := p.Phases["2"].Subphases["2.B.10"]
+	longTail := p.Phases["7"].Subphases["7.E"]
 	if longTail.Priority != "P4" {
-		t.Fatalf("Phase 2.B.10 priority = %q, want P4", longTail.Priority)
+		t.Fatalf("Phase 7.E priority = %q, want P4", longTail.Priority)
 	}
 	if got := longTail.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.B.10 = %q, want in_progress", got)
+		t.Fatalf("Phase 7.E = %q, want in_progress", got)
 	}
 	longTailItems := itemsByName(longTail.Items)
 	blueBubblesHA := longTailItems["BlueBubbles + HomeAssistant adapters"]
 	if blueBubblesHA.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.10 BlueBubbles + HomeAssistant adapters status = %q, want complete", blueBubblesHA.Status)
+		t.Fatalf("Phase 7.E BlueBubbles + HomeAssistant adapters status = %q, want complete", blueBubblesHA.Status)
 	}
 	if !strings.Contains(blueBubblesHA.Note, "internal/channels/bluebubbles") || !strings.Contains(blueBubblesHA.Note, "internal/channels/homeassistant") {
-		t.Fatalf("Phase 2.B.10 BlueBubbles + HomeAssistant adapters note = %q, want BlueBubbles/HomeAssistant contract detail", blueBubblesHA.Note)
+		t.Fatalf("Phase 7.E BlueBubbles + HomeAssistant adapters note = %q, want BlueBubbles/HomeAssistant contract detail", blueBubblesHA.Note)
 	}
 	feishu := longTailItems["Feishu shared-chassis bot seam"]
 	if feishu.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.10 Feishu shared-chassis bot seam status = %q, want complete", feishu.Status)
+		t.Fatalf("Phase 7.E Feishu shared-chassis bot seam status = %q, want complete", feishu.Status)
 	}
 	if !strings.Contains(feishu.Note, "internal/channels/feishu") {
-		t.Fatalf("Phase 2.B.10 Feishu shared-chassis bot seam note = %q, want Feishu detail", feishu.Note)
-	}
-	weComWeiXin := longTailItems["WeCom + WeiXin shared-chassis bot seam"]
-	if weComWeiXin.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.10 WeCom + WeiXin shared-chassis bot seam status = %q, want complete", weComWeiXin.Status)
-	}
-	if !strings.Contains(weComWeiXin.Note, "internal/channels/wecom") || !strings.Contains(weComWeiXin.Note, "internal/channels/weixin") {
-		t.Fatalf("Phase 2.B.10 WeCom + WeiXin shared-chassis bot seam note = %q, want WeCom/WeiXin detail", weComWeiXin.Note)
+		t.Fatalf("Phase 7.E Feishu shared-chassis bot seam note = %q, want Feishu detail", feishu.Note)
 	}
 	dingTalk := longTailItems["DingTalk shared-chassis bot seam"]
 	if dingTalk.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.10 DingTalk shared-chassis bot seam status = %q, want complete", dingTalk.Status)
+		t.Fatalf("Phase 7.E DingTalk shared-chassis bot seam status = %q, want complete", dingTalk.Status)
 	}
 	if !strings.Contains(dingTalk.Note, "internal/channels/dingtalk") {
-		t.Fatalf("Phase 2.B.10 DingTalk shared-chassis bot seam note = %q, want DingTalk detail", dingTalk.Note)
+		t.Fatalf("Phase 7.E DingTalk shared-chassis bot seam note = %q, want DingTalk detail", dingTalk.Note)
 	}
 	qqBot := longTailItems["QQ Bot shared-chassis bot seam"]
 	if qqBot.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.10 QQ Bot shared-chassis bot seam status = %q, want complete", qqBot.Status)
+		t.Fatalf("Phase 7.E QQ Bot shared-chassis bot seam status = %q, want complete", qqBot.Status)
 	}
 	if !strings.Contains(qqBot.Note, "internal/channels/qqbot") {
-		t.Fatalf("Phase 2.B.10 QQ Bot shared-chassis bot seam note = %q, want QQ detail", qqBot.Note)
+		t.Fatalf("Phase 7.E QQ Bot shared-chassis bot seam note = %q, want QQ detail", qqBot.Note)
 	}
 	feishuTransport := longTailItems["Feishu transport/bootstrap layer"]
 	if feishuTransport.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.10 Feishu transport/bootstrap status = %q, want planned", feishuTransport.Status)
-	}
-	weComTransport := longTailItems["WeCom + WeiXin transport/bootstrap layer"]
-	if weComTransport.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.10 WeCom + WeiXin transport/bootstrap status = %q, want planned", weComTransport.Status)
+		t.Fatalf("Phase 7.E Feishu transport/bootstrap status = %q, want planned", feishuTransport.Status)
 	}
 	dingTalkTransport := longTailItems["DingTalk transport/bootstrap layer"]
 	if dingTalkTransport.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.10 DingTalk transport/bootstrap status = %q, want complete", dingTalkTransport.Status)
+		t.Fatalf("Phase 7.E DingTalk transport/bootstrap status = %q, want complete", dingTalkTransport.Status)
 	}
 	if !strings.Contains(dingTalkTransport.Note, "DecideRuntime") || !strings.Contains(dingTalkTransport.Note, "ReplySender") {
-		t.Fatalf("Phase 2.B.10 DingTalk transport/bootstrap note = %q, want DecideRuntime/ReplySender detail", dingTalkTransport.Note)
+		t.Fatalf("Phase 7.E DingTalk transport/bootstrap note = %q, want DecideRuntime/ReplySender detail", dingTalkTransport.Note)
 	}
 	dingTalkSDK := longTailItems["DingTalk real SDK binding"]
 	if dingTalkSDK.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.10 DingTalk real SDK binding status = %q, want planned", dingTalkSDK.Status)
+		t.Fatalf("Phase 7.E DingTalk real SDK binding status = %q, want planned", dingTalkSDK.Status)
 	}
 	if !strings.Contains(dingTalkSDK.Note, "real DingTalk SDK") {
-		t.Fatalf("Phase 2.B.10 DingTalk real SDK binding note = %q, want real SDK detail", dingTalkSDK.Note)
+		t.Fatalf("Phase 7.E DingTalk real SDK binding note = %q, want real SDK detail", dingTalkSDK.Note)
+	}
+	dingTalkCards := longTailItems["DingTalk AI Cards streaming-update contract"]
+	if dingTalkCards.Status != StatusComplete {
+		t.Fatalf("Phase 7.E DingTalk AI Cards streaming-update contract status = %q, want complete", dingTalkCards.Status)
+	}
+	if !strings.Contains(dingTalkCards.Note, "AICardBot") || !strings.Contains(dingTalkCards.Note, "FinalizingMessageEditor") {
+		t.Fatalf("Phase 7.E DingTalk AI Cards streaming-update note = %q, want AICardBot/FinalizingMessageEditor detail", dingTalkCards.Note)
+	}
+	dingTalkReactions := longTailItems["DingTalk emoji reaction send/receive parity"]
+	if dingTalkReactions.Status != StatusComplete {
+		t.Fatalf("Phase 7.E DingTalk emoji reaction send/receive parity status = %q, want complete", dingTalkReactions.Status)
+	}
+	if !strings.Contains(dingTalkReactions.Note, "EmojiReactionClient") || !strings.Contains(dingTalkReactions.Note, "Thinking") || !strings.Contains(dingTalkReactions.Note, "Done") {
+		t.Fatalf("Phase 7.E DingTalk emoji reaction note = %q, want EmojiReactionClient/Thinking/Done detail", dingTalkReactions.Note)
 	}
 	qqTransport := longTailItems["QQ Bot transport/bootstrap layer"]
 	if qqTransport.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.10 QQ Bot transport/bootstrap status = %q, want planned", qqTransport.Status)
+		t.Fatalf("Phase 7.E QQ Bot transport/bootstrap status = %q, want planned", qqTransport.Status)
 	}
 
 	lifecycleStore := lifecycleItems["Pairing read-model schema + atomic persistence"]

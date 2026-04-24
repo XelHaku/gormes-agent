@@ -120,6 +120,56 @@ func TestManager_Inbound_AllowedChat_Submit(t *testing.T) {
 	}
 }
 
+func TestManager_Inbound_AppendsAttachmentsToSubmittedText(t *testing.T) {
+	tg := newFakeChannel("dingtalk")
+	fk := &fakeKernel{}
+
+	m := NewManagerWithSubmitter(ManagerConfig{
+		AllowedChats: map[string]string{"dingtalk": "dm-42"},
+	}, fk, slog.Default())
+	if err := m.Register(tg); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = m.Run(ctx) }()
+
+	tg.pushInbound(InboundEvent{
+		Platform: "dingtalk",
+		ChatID:   "dm-42",
+		UserID:   "staff-1",
+		MsgID:    "msg-1",
+		Kind:     EventSubmit,
+		Text:     "please inspect",
+		Attachments: []Attachment{
+			{
+				Kind:      "image",
+				URL:       "https://media.dingtalk.example/image.png",
+				MediaType: "image",
+				SourceID:  "img-code-1",
+			},
+			{
+				Kind:      "file",
+				URL:       "file-code-timeout",
+				MediaType: "application/octet-stream",
+				FileName:  "report.pdf",
+				SourceID:  "file-code-timeout",
+				Error:     "dingtalk: media download: 429 rate limit",
+			},
+		},
+	})
+
+	waitFor(t, 200*time.Millisecond, func() bool {
+		return len(fk.submitsSnapshot()) == 1
+	})
+	got := fk.submitsSnapshot()[0]
+	want := "please inspect\n\nAttachments:\n- image: https://media.dingtalk.example/image.png (mediaType=image, sourceId=img-code-1)\n- file report.pdf: file-code-timeout (mediaType=application/octet-stream, sourceId=file-code-timeout, error=dingtalk: media download: 429 rate limit)"
+	if got.Text != want {
+		t.Fatalf("submitted text = %q, want %q", got.Text, want)
+	}
+}
+
 func TestManager_Inbound_BlockedChat_NoSubmit(t *testing.T) {
 	tg := newFakeChannel("telegram")
 	fk := &fakeKernel{}

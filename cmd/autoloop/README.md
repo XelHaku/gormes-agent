@@ -42,6 +42,8 @@ Useful environment variables:
 - `MAX_AGENTS`: cap selected rows for one run.
 - `MAX_PHASE`: cap eligible roadmap phases. Defaults to `3`, so Phase 4+
   rows are held until the operator raises the ceiling.
+- `PRIORITY_BOOST`: comma-separated subphase IDs to pull ahead of equally ready
+  work. Defaults to the active priority channels: `2.B.3,2.B.4,2.B.10,2.B.11`.
 
 ## Documentation Contract
 

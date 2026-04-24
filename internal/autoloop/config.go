@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
-	RepoRoot     string
-	ProgressJSON string
-	RunRoot      string
-	Backend      string
-	Mode         string
-	MaxAgents    int
-	MaxPhase     int
+	RepoRoot      string
+	ProgressJSON  string
+	RunRoot       string
+	Backend       string
+	Mode          string
+	MaxAgents     int
+	MaxPhase      int
+	PriorityBoost []string
 }
 
 func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
@@ -22,13 +24,14 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 	}
 
 	cfg := Config{
-		RepoRoot:     repoRoot,
-		ProgressJSON: filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"),
-		RunRoot:      filepath.Join(repoRoot, ".codex", "orchestrator"),
-		Backend:      "codexu",
-		Mode:         "safe",
-		MaxAgents:    4,
-		MaxPhase:     3,
+		RepoRoot:      repoRoot,
+		ProgressJSON:  filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"),
+		RunRoot:       filepath.Join(repoRoot, ".codex", "orchestrator"),
+		Backend:       "codexu",
+		Mode:          "safe",
+		MaxAgents:     4,
+		MaxPhase:      3,
+		PriorityBoost: []string{"2.B.3", "2.B.4", "2.B.10", "2.B.11"},
 	}
 
 	if value := env["PROGRESS_JSON"]; value != "" {
@@ -63,6 +66,20 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		}
 		cfg.MaxPhase = maxPhase
 	}
+	if value := env["PRIORITY_BOOST"]; value != "" {
+		cfg.PriorityBoost = splitCSV(value)
+	}
 
 	return cfg, nil
+}
+
+func splitCSV(value string) []string {
+	var out []string
+	for _, part := range strings.Split(value, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }

@@ -22,6 +22,12 @@ type MessageEditor interface {
 	EditMessage(ctx context.Context, chatID, msgID, text string) error
 }
 
+// FinalizingMessageEditor is implemented by channels whose streaming edit
+// lifecycle needs an explicit terminal update.
+type FinalizingMessageEditor interface {
+	EditMessageFinal(ctx context.Context, chatID, msgID, text string, finalize bool) error
+}
+
 // PlaceholderCapable is implemented by channels that can create a message
 // placeholder for subsequent streaming edits.
 type PlaceholderCapable interface {
