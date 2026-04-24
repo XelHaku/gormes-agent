@@ -51,6 +51,8 @@ func RecordBenchmark(opts BenchmarkOptions) error {
 		if err := json.Unmarshal(raw, &bench); err != nil {
 			return err
 		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		bench = defaultBenchmarkSkeleton()
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
@@ -112,6 +114,30 @@ func gitCommit(root string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func defaultBenchmarkSkeleton() map[string]any {
+	return map[string]any{
+		"binary": map[string]any{
+			"name":        "gormes",
+			"path":        "bin/gormes",
+			"build_flags": `CGO_ENABLED=0 -trimpath -ldflags="-s -w"`,
+			"linker":      "static",
+			"stripped":    true,
+			"go_version":  "1.25+",
+		},
+		"properties": map[string]any{
+			"cgo":          false,
+			"dependencies": "zero (no dynamic library deps)",
+			"platforms": []string{
+				"linux/amd64",
+				"linux/arm64",
+				"darwin/amd64",
+				"darwin/arm64",
+			},
+		},
+		"history": []any{},
+	}
 }
 
 func historyDate(entry any) string {

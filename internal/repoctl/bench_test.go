@@ -85,6 +85,89 @@ func TestRecordBenchmarkSkipsMissingBinary(t *testing.T) {
 	}
 }
 
+func TestRecordBenchmarkCreatesLegacySkeletonWhenBenchmarksMissing(t *testing.T) {
+	root := t.TempDir()
+	bin := filepath.Join(root, "bin", "gormes")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, make([]byte, 4*1024*1024), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	err := RecordBenchmark(BenchmarkOptions{
+		Root:      root,
+		Binary:    bin,
+		Now:       func() time.Time { return time.Date(2026, 4, 24, 12, 0, 0, 0, time.UTC) },
+		GitCommit: func(string) (string, error) { return "abc123", nil },
+	})
+	if err != nil {
+		t.Fatalf("RecordBenchmark: %v", err)
+	}
+
+	var got struct {
+		Binary struct {
+			Name         string `json:"name"`
+			Path         string `json:"path"`
+			SizeBytes    int64  `json:"size_bytes"`
+			SizeMB       string `json:"size_mb"`
+			BuildFlags   string `json:"build_flags"`
+			Linker       string `json:"linker"`
+			Stripped     bool   `json:"stripped"`
+			GoVersion    string `json:"go_version"`
+			LastMeasured string `json:"last_measured"`
+			Commit       string `json:"commit"`
+		} `json:"binary"`
+		Properties struct {
+			CGO          bool     `json:"cgo"`
+			Dependencies string   `json:"dependencies"`
+			Platforms    []string `json:"platforms"`
+		} `json:"properties"`
+		History []struct {
+			Date      string  `json:"date"`
+			SizeBytes int64   `json:"size_bytes"`
+			SizeMB    float64 `json:"size_mb"`
+			Commit    string  `json:"commit"`
+			Phase     string  `json:"phase"`
+		} `json:"history"`
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "benchmarks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("benchmarks.json is invalid JSON: %v\n%s", err, raw)
+	}
+
+	if got.Binary.Name != "gormes" || got.Binary.Path != "bin/gormes" {
+		t.Fatalf("binary identity = %+v", got.Binary)
+	}
+	if got.Binary.BuildFlags != `CGO_ENABLED=0 -trimpath -ldflags="-s -w"` || got.Binary.Linker != "static" || !got.Binary.Stripped || got.Binary.GoVersion != "1.25+" {
+		t.Fatalf("binary build metadata = %+v", got.Binary)
+	}
+	if got.Binary.SizeBytes != 4*1024*1024 || got.Binary.SizeMB != "4.0" || got.Binary.LastMeasured != "2026-04-24" || got.Binary.Commit != "abc123" {
+		t.Fatalf("binary measured metadata = %+v", got.Binary)
+	}
+	if got.Properties.CGO || got.Properties.Dependencies != "zero (no dynamic library deps)" {
+		t.Fatalf("properties = %+v", got.Properties)
+	}
+	wantPlatforms := []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"}
+	if strings.Join(got.Properties.Platforms, ",") != strings.Join(wantPlatforms, ",") {
+		t.Fatalf("platforms = %v", got.Properties.Platforms)
+	}
+	if len(got.History) != 1 || got.History[0].Date != "2026-04-24" || got.History[0].SizeBytes != 4*1024*1024 || got.History[0].SizeMB != 4.0 || got.History[0].Commit != "abc123" || got.History[0].Phase != "unknown" {
+		t.Fatalf("history = %+v", got.History)
+	}
+
+	docsRaw, err := os.ReadFile(filepath.Join(root, "docs", "data", "benchmarks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(docsRaw) != string(raw) {
+		t.Fatalf("docs/data/benchmarks.json did not match root benchmarks.json")
+	}
+}
+
 func TestRecordBenchmarkPreservesRepoStyleMetadata(t *testing.T) {
 	root := t.TempDir()
 	bin := filepath.Join(root, "bin", "gormes")
