@@ -170,6 +170,7 @@ func runValidation(ctx context.Context, runner autoloop.Runner, repoRoot, logPat
 		{Name: "go", Args: []string{"run", "./cmd/progress-gen", "-validate"}, Dir: repoRoot},
 		{Name: "go", Args: []string{"test", "./internal/progress", "-count=1"}, Dir: repoRoot},
 		{Name: "go", Args: []string{"test", "./docs", "-count=1"}, Dir: repoRoot},
+		{Name: "go", Args: []string{"test", "./...", "-count=1"}, Dir: filepath.Join(repoRoot, "www.gormes.ai")},
 	}
 
 	var log strings.Builder

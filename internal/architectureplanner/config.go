@@ -99,5 +99,7 @@ func (cfg Config) SourceRoots() []SourceRoot {
 		{Name: "upstream-hermes", Path: filepath.Join(cfg.RepoRoot, "docs", "content", "upstream-hermes")},
 		{Name: "upstream-gbrain", Path: filepath.Join(cfg.RepoRoot, "docs", "content", "upstream-gbrain")},
 		{Name: "building-gormes", Path: filepath.Join(cfg.RepoRoot, "docs", "content", "building-gormes")},
+		{Name: "www.gormes.ai", Path: filepath.Join(cfg.RepoRoot, "www.gormes.ai")},
+		{Name: "hugo-docs", Path: filepath.Join(cfg.RepoRoot, "docs")},
 	}
 }

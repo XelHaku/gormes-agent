@@ -27,8 +27,8 @@ func TestRunDryRunCollectsContextWithoutBackend(t *testing.T) {
 	if summary.Backend != "codexu" {
 		t.Fatalf("Backend = %q, want codexu", summary.Backend)
 	}
-	if len(summary.SourceRoots) != 6 {
-		t.Fatalf("SourceRoots length = %d, want 6: %#v", len(summary.SourceRoots), summary.SourceRoots)
+	if len(summary.SourceRoots) != 8 {
+		t.Fatalf("SourceRoots length = %d, want 8: %#v", len(summary.SourceRoots), summary.SourceRoots)
 	}
 	if summary.ProgressItems != 2 {
 		t.Fatalf("ProgressItems = %d, want 2", summary.ProgressItems)
@@ -79,6 +79,10 @@ func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 		"upstream-hermes",
 		"upstream-gbrain",
 		"building-gormes",
+		"www.gormes.ai",
+		"Hugo docs",
+		"landing page",
+		"docs/hugo.toml",
 		"goncho",
 		"progress.json",
 		"only long-term prompt agent",
@@ -86,6 +90,7 @@ func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 		"gbrain: pull",
 		"Updating abc123..def456",
 		"Synchronize progress.json with the current Gormes implementation",
+		"Synchronize landing page, Hugo docs, generated pages, and progress.json",
 		"Do not implement runtime feature code",
 	} {
 		if !strings.Contains(prompt, want) {
@@ -115,6 +120,8 @@ func TestRunOnceSendsPlannerPromptToBackendAndWritesArtifacts(t *testing.T) {
 		`"sync_results"`,
 		`"output": "Updating abc123..def456"`,
 		`"implementation_inventory"`,
+		`"landing_site"`,
+		`"hugo_docs"`,
 	} {
 		if !strings.Contains(string(contextData), want) {
 			t.Fatalf("context.json missing %q:\n%s", want, contextData)
@@ -145,7 +152,7 @@ func TestRunOnceReturnsBackendErrorWithOutput(t *testing.T) {
 func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 	repoRoot := writePlannerFixture(t)
 	runner := &autoloop.FakeRunner{
-		Results: []autoloop.Result{{}, {}, {}, {}, {}, {}, {}, {}},
+		Results: []autoloop.Result{{}, {}, {}, {}, {}, {}, {}, {}, {}},
 	}
 
 	_, err := RunOnce(context.Background(), RunOptions{
@@ -156,7 +163,7 @@ func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 		t.Fatalf("RunOnce() error = %v", err)
 	}
 
-	if got, want := len(runner.Commands), 8; got != want {
+	if got, want := len(runner.Commands), 9; got != want {
 		t.Fatalf("Commands length = %d, want %d", got, want)
 	}
 	wantArgs := [][]string{
@@ -164,6 +171,7 @@ func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 		{"run", "./cmd/progress-gen", "-validate"},
 		{"test", "./internal/progress", "-count=1"},
 		{"test", "./docs", "-count=1"},
+		{"test", "./...", "-count=1"},
 	}
 	for i, want := range wantArgs {
 		command := runner.Commands[i+4]
@@ -173,6 +181,9 @@ func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 		if strings.Join(command.Args, " ") != strings.Join(want, " ") {
 			t.Fatalf("validation command %d args = %#v, want %#v", i, command.Args, want)
 		}
+	}
+	if got, want := runner.Commands[8].Dir, filepath.Join(repoRoot, "www.gormes.ai"); got != want {
+		t.Fatalf("landing validation dir = %q, want %q", got, want)
 	}
 }
 
@@ -217,6 +228,12 @@ func writePlannerFixture(t *testing.T) string {
 		filepath.Join(root, "docs", "content", "upstream-hermes", "_index.md"),
 		filepath.Join(root, "docs", "content", "upstream-gbrain", "_index.md"),
 		filepath.Join(root, "docs", "content", "building-gormes", "_index.md"),
+		filepath.Join(root, "docs", "hugo.toml"),
+		filepath.Join(root, "docs", "layouts", "index.html"),
+		filepath.Join(root, "docs", "static", "site.css"),
+		filepath.Join(root, "www.gormes.ai", "README.md"),
+		filepath.Join(root, "www.gormes.ai", "internal", "site", "server.go"),
+		filepath.Join(root, "www.gormes.ai", "tests", "home.spec.mjs"),
 	} {
 		writeFile(t, path, "# fixture\n")
 	}

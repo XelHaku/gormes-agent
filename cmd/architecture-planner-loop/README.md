@@ -9,7 +9,8 @@ This command is the long-term architecture prompt owner for Gormes. It must stay
 self-sufficient: every real run synchronizes upstream source repos, records sync
 evidence in planner context, inventories the current Gormes implementation, and
 prompts the planner to keep `progress.json` aligned with both upstream changes
-and local implementation reality.
+and local implementation reality. It also owns public web alignment for the
+`www.gormes.ai` landing page and the Hugo docs site under `docs/`.
 
 Run from the repository root:
 
@@ -31,6 +32,8 @@ The planner context includes:
 - `docs/content/upstream-hermes`
 - `docs/content/upstream-gbrain`
 - `docs/content/building-gormes`
+- `www.gormes.ai`
+- `docs/` (`docs/hugo.toml`, layouts, static assets, and content)
 
 Override source paths with `HERMES_DIR`, `GBRAIN_DIR`, and `HONCHO_DIR`.
 
@@ -65,12 +68,18 @@ Each run also records a lightweight Gormes implementation inventory:
 - command directories under `cmd/`
 - internal packages under `internal/`
 - top-level building-gormes docs
+- `www.gormes.ai` landing page files and tests
+- Hugo docs files, layouts, static assets, and content
 
 The planner prompt uses this inventory to synchronize
 `docs/content/building-gormes/architecture_plan/progress.json` with the current
 implementation. If source code has advanced, the planner updates progress
 status, notes, acceptance, and source references. If upstream has advanced but
 Gormes has not, the planner adds or refines small execution rows for autoloop.
+When roadmap or implementation changes affect public messaging, installation
+flows, architecture milestones, or progress totals, the planner also updates the
+landing page and Hugo docs so `www.gormes.ai`, generated docs pages, and
+`progress.json` do not drift apart.
 
 ## Artifacts
 
@@ -99,6 +108,7 @@ go run ./cmd/progress-gen -write
 go run ./cmd/progress-gen -validate
 go test ./internal/progress -count=1
 go test ./docs -count=1
+(cd www.gormes.ai && go test ./... -count=1)
 ```
 
 Set `PLANNER_VALIDATE=0` only for tests or controlled local debugging.

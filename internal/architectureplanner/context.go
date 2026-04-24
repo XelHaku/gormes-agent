@@ -38,9 +38,11 @@ type ProgressInfo struct {
 }
 
 type ImplementationInventory struct {
-	Commands         []string `json:"commands"`
-	InternalPackages []string `json:"internal_packages"`
-	BuildingDocs     []string `json:"building_docs"`
+	Commands         []string   `json:"commands"`
+	InternalPackages []string   `json:"internal_packages"`
+	BuildingDocs     []string   `json:"building_docs"`
+	LandingSite      SourceRoot `json:"landing_site"`
+	HugoDocs         SourceRoot `json:"hugo_docs"`
 }
 
 func CollectContext(cfg Config, now time.Time) (ContextBundle, error) {
@@ -64,13 +66,18 @@ func CollectContext(cfg Config, now time.Time) (ContextBundle, error) {
 		}
 	}
 
+	inventory, err := collectImplementationInventory(cfg)
+	if err != nil {
+		return ContextBundle{}, err
+	}
+
 	return ContextBundle{
 		GeneratedUTC:            now.UTC().Format(time.RFC3339),
 		RepoRoot:                cfg.RepoRoot,
 		ProgressJSON:            cfg.ProgressJSON,
 		ProgressStats:           progressInfo,
 		SourceRoots:             roots,
-		ImplementationInventory: collectImplementationInventory(cfg),
+		ImplementationInventory: inventory,
 	}, nil
 }
 
@@ -134,19 +141,31 @@ func enrichSourceRoot(root *SourceRoot) error {
 
 func sampleFile(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".go", ".py", ".ts", ".js", ".md", ".json", ".yaml", ".yml":
+	case ".css", ".go", ".html", ".js", ".json", ".md", ".py", ".tmpl", ".toml", ".ts", ".yaml", ".yml":
 		return true
 	default:
 		return false
 	}
 }
 
-func collectImplementationInventory(cfg Config) ImplementationInventory {
+func collectImplementationInventory(cfg Config) (ImplementationInventory, error) {
+	landingSite := SourceRoot{Name: "www.gormes.ai", Path: filepath.Join(cfg.RepoRoot, "www.gormes.ai")}
+	if err := enrichSourceRoot(&landingSite); err != nil {
+		return ImplementationInventory{}, err
+	}
+
+	hugoDocs := SourceRoot{Name: "Hugo docs", Path: filepath.Join(cfg.RepoRoot, "docs")}
+	if err := enrichSourceRoot(&hugoDocs); err != nil {
+		return ImplementationInventory{}, err
+	}
+
 	return ImplementationInventory{
 		Commands:         collectImmediateDirs(filepath.Join(cfg.RepoRoot, "cmd")),
 		InternalPackages: collectImmediateDirs(filepath.Join(cfg.RepoRoot, "internal")),
 		BuildingDocs:     collectImmediateFiles(filepath.Join(cfg.RepoRoot, "docs", "content", "building-gormes"), ".md"),
-	}
+		LandingSite:      landingSite,
+		HugoDocs:         hugoDocs,
+	}, nil
 }
 
 func collectImmediateDirs(root string) []string {
