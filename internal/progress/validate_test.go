@@ -28,6 +28,57 @@ func TestValidate_RejectsBadVersion(t *testing.T) {
 	}
 }
 
+func TestValidate_AcceptsCompleteAutoloopMeta(t *testing.T) {
+	p := &Progress{
+		Meta: Meta{
+			Version: "2.0",
+			Autoloop: AutoloopMeta{
+				Entrypoint:      "scripts/gormes-auto-codexu-orchestrator.sh",
+				Plan:            "docs/superpowers/plans/2026-04-24-autoloop-repoctl-go-port.md",
+				AgentQueue:      "docs/content/building-gormes/agent-queue.md",
+				ProgressSchema:  "docs/content/building-gormes/progress-schema.md",
+				CandidateSource: "docs/content/building-gormes/architecture_plan/progress.json",
+				UnitTest:        "scripts/orchestrator/tests/run.sh unit",
+				CandidatePolicy: []string{"skip blocked rows"},
+			},
+		},
+		Phases: map[string]Phase{},
+	}
+	if err := Validate(p); err != nil {
+		t.Errorf("Validate() = %v, want nil", err)
+	}
+}
+
+func TestValidate_RejectsPartialAutoloopMeta(t *testing.T) {
+	p := &Progress{
+		Meta: Meta{
+			Version: "2.0",
+			Autoloop: AutoloopMeta{
+				Entrypoint:      "scripts/gormes-auto-codexu-orchestrator.sh",
+				CandidatePolicy: []string{" "},
+			},
+		},
+		Phases: map[string]Phase{},
+	}
+	err := Validate(p)
+	if err == nil {
+		t.Fatalf("Validate() = nil, want autoloop metadata errors")
+	}
+	msg := err.Error()
+	for _, want := range []string{
+		"meta.autoloop missing plan",
+		"meta.autoloop missing agent_queue",
+		"meta.autoloop missing progress_schema",
+		"meta.autoloop missing candidate_source",
+		"meta.autoloop missing unit_test",
+		"meta.autoloop candidate_policy[0] is blank",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error missing %q:\n%s", want, msg)
+		}
+	}
+}
+
 func TestValidate_RejectsBadStatus(t *testing.T) {
 	p := &Progress{
 		Meta: Meta{Version: "2.0"},

@@ -32,9 +32,22 @@ This page is generated from the Go progress model and validation rules.
 | `test_commands` | contract rows | Commands that prove the slice without live provider or platform credentials. |
 | `done_signal` | contract rows | Observable evidence that the row can move forward or close. |
 
+## Meta Fields
+
+| Field | Required when | Meaning |
+|---|---|---|
+| `meta.autoloop.entrypoint` | autoloop metadata is declared | Main unattended-loop script. |
+| `meta.autoloop.plan` | autoloop metadata is declared | Canonical implementation plan for improving the orchestrator. |
+| `meta.autoloop.agent_queue` | autoloop metadata is declared | Generated queue page for assignable rows. |
+| `meta.autoloop.progress_schema` | autoloop metadata is declared | This schema reference. |
+| `meta.autoloop.candidate_source` | autoloop metadata is declared | Canonical progress file consumed by the loop. |
+| `meta.autoloop.unit_test` | autoloop metadata is declared | Fast verification command for orchestrator prompt/candidate behavior. |
+| `meta.autoloop.candidate_policy` | autoloop metadata is declared | Shared selection rules injected into worker prompts. |
+
 ## Validation Rules
 
 - `docs/data/progress.json` must not exist.
+- if `meta.autoloop` is declared, entrypoint, plan, candidate source, generated docs, unit test, and candidate policy must all be present.
 - `in_progress` rows cannot use `slice_size: umbrella`.
 - item-level `P0` and `in_progress` rows must include full contract metadata.
 - contract rows must declare `slice_size`, `execution_owner`, `ready_when`, `write_scope`, `test_commands`, and `done_signal`.
@@ -44,6 +57,7 @@ This page is generated from the Go progress model and validation rules.
 
 ## Generated Agent Surfaces
 
+- `autoloop-handoff.md` lists shared unattended-loop entrypoint, plan, candidate source, generated docs, test command, and candidate policy.
 - `agent-queue.md` lists only unblocked, non-umbrella contract rows with owner, size, readiness, degraded mode, fixture, write scope, test commands, done signal, acceptance, and source references.
 - `blocked-slices.md` keeps blocked rows out of the execution queue while preserving their unblock condition.
 - `umbrella-cleanup.md` lists broad inventory rows that must be split before assignment.

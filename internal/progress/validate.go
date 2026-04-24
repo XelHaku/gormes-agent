@@ -15,6 +15,7 @@ func Validate(p *Progress) error {
 		return fmt.Errorf("progress: meta.version = %q, want %q", p.Meta.Version, "2.0")
 	}
 	var errs []error
+	errs = append(errs, validateAutoloopMeta(p.Meta.Autoloop)...)
 	for _, phKey := range sortedMapKeys(p.Phases) {
 		ph := p.Phases[phKey]
 		for _, spKey := range sortedMapKeys(ph.Subphases) {
@@ -63,6 +64,47 @@ func Validate(p *Progress) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func validateAutoloopMeta(m AutoloopMeta) []error {
+	if !autoloopMetaDeclared(m) {
+		return nil
+	}
+	var errs []error
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{name: "entrypoint", value: m.Entrypoint},
+		{name: "plan", value: m.Plan},
+		{name: "agent_queue", value: m.AgentQueue},
+		{name: "progress_schema", value: m.ProgressSchema},
+		{name: "candidate_source", value: m.CandidateSource},
+		{name: "unit_test", value: m.UnitTest},
+	} {
+		if strings.TrimSpace(field.value) == "" {
+			errs = append(errs, fmt.Errorf("progress: meta.autoloop missing %s", field.name))
+		}
+	}
+	if len(m.CandidatePolicy) == 0 {
+		errs = append(errs, fmt.Errorf("progress: meta.autoloop missing candidate_policy"))
+	}
+	for i, policy := range m.CandidatePolicy {
+		if strings.TrimSpace(policy) == "" {
+			errs = append(errs, fmt.Errorf("progress: meta.autoloop candidate_policy[%d] is blank", i))
+		}
+	}
+	return errs
+}
+
+func autoloopMetaDeclared(m AutoloopMeta) bool {
+	return m.Entrypoint != "" ||
+		m.Plan != "" ||
+		m.AgentQueue != "" ||
+		m.ProgressSchema != "" ||
+		m.CandidateSource != "" ||
+		m.UnitTest != "" ||
+		len(m.CandidatePolicy) > 0
 }
 
 func validStatus(s Status) bool {

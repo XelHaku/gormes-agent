@@ -80,6 +80,7 @@ var nativeHugoPages = map[string]struct{}{
 	"why-gormes.md":                                                  {},
 	"building-gormes/_index.md":                                      {},
 	"building-gormes/contract-readiness.md":                          {},
+	"building-gormes/autoloop-handoff.md":                            {},
 	"building-gormes/agent-queue.md":                                 {},
 	"building-gormes/next-slices.md":                                 {},
 	"building-gormes/blocked-slices.md":                              {},

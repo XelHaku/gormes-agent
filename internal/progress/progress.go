@@ -47,10 +47,21 @@ const (
 	ExecutionOwnerOrchestrator ExecutionOwner = "orchestrator"
 )
 
+type AutoloopMeta struct {
+	Entrypoint      string   `json:"entrypoint"`
+	Plan            string   `json:"plan"`
+	AgentQueue      string   `json:"agent_queue"`
+	ProgressSchema  string   `json:"progress_schema"`
+	CandidateSource string   `json:"candidate_source"`
+	UnitTest        string   `json:"unit_test"`
+	CandidatePolicy []string `json:"candidate_policy"`
+}
+
 type Meta struct {
 	Version     string            `json:"version"`
 	LastUpdated string            `json:"last_updated"`
 	Links       map[string]string `json:"links"`
+	Autoloop    AutoloopMeta      `json:"autoloop,omitempty"`
 }
 
 type Item struct {

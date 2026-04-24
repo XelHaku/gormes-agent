@@ -300,9 +300,38 @@ func TestRenderUmbrellaCleanup(t *testing.T) {
 	}
 }
 
+func TestRenderAutoloopHandoff(t *testing.T) {
+	p := &Progress{Meta: Meta{Autoloop: AutoloopMeta{
+		Entrypoint:      "scripts/gormes-auto-codexu-orchestrator.sh",
+		Plan:            "docs/superpowers/plans/plan.md",
+		AgentQueue:      "docs/content/building-gormes/agent-queue.md",
+		ProgressSchema:  "docs/content/building-gormes/progress-schema.md",
+		CandidateSource: "docs/content/building-gormes/architecture_plan/progress.json",
+		UnitTest:        "scripts/orchestrator/tests/run.sh unit",
+		CandidatePolicy: []string{"Skip blocked rows.", "Skip umbrella rows."},
+	}}}
+
+	got := RenderAutoloopHandoff(p)
+	for _, want := range []string{
+		"## Control Plane",
+		"- Entrypoint: `scripts/gormes-auto-codexu-orchestrator.sh`",
+		"- Plan: `docs/superpowers/plans/plan.md`",
+		"- Candidate source: `docs/content/building-gormes/architecture_plan/progress.json`",
+		"## Candidate Policy",
+		"- Skip blocked rows.",
+		"- Skip umbrella rows.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("autoloop handoff missing %q:\n%s", want, got)
+		}
+	}
+}
+
 func TestRenderProgressSchema(t *testing.T) {
 	got := RenderProgressSchema()
 	for _, want := range []string{
+		"`meta.autoloop.entrypoint`",
+		"`meta.autoloop.candidate_policy`",
 		"`slice_size`",
 		"`execution_owner`",
 		"`ready_when`",
@@ -310,6 +339,7 @@ func TestRenderProgressSchema(t *testing.T) {
 		"`test_commands`",
 		"`done_signal`",
 		"`in_progress` rows cannot use `slice_size: umbrella`",
+		"`autoloop-handoff.md`",
 		"`agent-queue.md`",
 	} {
 		if !strings.Contains(got, want) {

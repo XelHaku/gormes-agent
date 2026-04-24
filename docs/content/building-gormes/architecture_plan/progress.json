@@ -7,6 +7,20 @@
       "landing_page": "https://gormes.ai",
       "docs_site": "https://docs.gormes.ai/building-gormes/architecture_plan/",
       "source_code": "https://github.com/TrebuchetDynamics/gormes-agent"
+    },
+    "autoloop": {
+      "entrypoint": "scripts/gormes-auto-codexu-orchestrator.sh",
+      "plan": "docs/superpowers/plans/2026-04-24-orchestrator-oiling-release-1-plan.md",
+      "agent_queue": "docs/content/building-gormes/agent-queue.md",
+      "progress_schema": "docs/content/building-gormes/progress-schema.md",
+      "candidate_source": "docs/content/building-gormes/architecture_plan/progress.json",
+      "unit_test": "scripts/orchestrator/tests/run.sh unit",
+      "candidate_policy": [
+        "Skip rows with blocked_by until ready_when is satisfied.",
+        "Skip slice_size=umbrella rows until they are split.",
+        "Prefer contract rows with write_scope, test_commands, and done_signal.",
+        "Inject selected progress metadata into the worker prompt instead of asking workers to rescan the whole roadmap."
+      ]
     }
   },
   "phases": {

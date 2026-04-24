@@ -31,6 +31,7 @@ func main() {
 	readmePath := filepath.Join(root, "README.md")
 	docsIndexPath := filepath.Join(root, "docs", "content", "building-gormes", "architecture_plan", "_index.md")
 	contractReadinessPath := filepath.Join(root, "docs", "content", "building-gormes", "contract-readiness.md")
+	autoloopHandoffPath := filepath.Join(root, "docs", "content", "building-gormes", "autoloop-handoff.md")
 	agentQueuePath := filepath.Join(root, "docs", "content", "building-gormes", "agent-queue.md")
 	nextSlicesPath := filepath.Join(root, "docs", "content", "building-gormes", "next-slices.md")
 	blockedSlicesPath := filepath.Join(root, "docs", "content", "building-gormes", "blocked-slices.md")
@@ -70,6 +71,11 @@ func main() {
 		errs = append(errs, err)
 	} else {
 		fmt.Println("progress-gen: contract readiness regenerated")
+	}
+	if err := rewrite(autoloopHandoffPath, "autoloop-handoff", progress.RenderAutoloopHandoff(p)); err != nil {
+		errs = append(errs, err)
+	} else {
+		fmt.Println("progress-gen: autoloop handoff regenerated")
 	}
 	if err := rewrite(agentQueuePath, "agent-queue", progress.RenderAgentQueue(p, 10)); err != nil {
 		errs = append(errs, err)

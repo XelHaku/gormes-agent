@@ -39,6 +39,7 @@ func TestHugoBuild(t *testing.T) {
 		"building-gormes/core-systems/tool-execution/index.html",
 		"building-gormes/core-systems/gateway/index.html",
 		"building-gormes/contract-readiness/index.html",
+		"building-gormes/autoloop-handoff/index.html",
 		"building-gormes/agent-queue/index.html",
 		"building-gormes/next-slices/index.html",
 		"building-gormes/blocked-slices/index.html",

@@ -45,18 +45,21 @@ Use the planning docs in this order:
 
 1. Read [Upstream Lessons](./upstream-lessons/) to understand which contracts
    Gormes absorbs from Hermes and GBrain.
-2. Pick work from [Agent Queue](./agent-queue/) for an autonomous-worker-ready
+2. Check [Autoloop Handoff](./autoloop-handoff/) for the unattended-loop
+   entrypoint, orchestrator plan, candidate source, generated docs, tests, and
+   candidate policy.
+3. Pick work from [Agent Queue](./agent-queue/) for an autonomous-worker-ready
    handoff, then use [Next Slices](./next-slices/) for the shorter ranking.
-3. Run through `scripts/gormes-auto-codexu-orchestrator.sh` when using the
+4. Run through `scripts/gormes-auto-codexu-orchestrator.sh` when using the
    unattended loop; it consumes the same canonical progress rows and injects
    row-specific handoff fields into worker prompts.
-4. Check [Contract Readiness](./contract-readiness/) before implementation; an
+5. Check [Contract Readiness](./contract-readiness/) before implementation; an
    active or P0 row must name its contract, trust class, degraded mode, fixture,
    source references, and acceptance checks.
-5. Check [Blocked Slices](./blocked-slices/) and
+6. Check [Blocked Slices](./blocked-slices/) and
    [Umbrella Cleanup](./umbrella-cleanup/) before assigning a row.
-6. Use [Progress Schema](./progress-schema/) when editing canonical progress.
-7. Write the spec/plan from [Porting a Subsystem](./porting-a-subsystem/),
+7. Use [Progress Schema](./progress-schema/) when editing canonical progress.
+8. Write the spec/plan from [Porting a Subsystem](./porting-a-subsystem/),
    then implement with the fixture classes in [Testing](./testing/).
 
 ## Contents
@@ -64,6 +67,7 @@ Use the planning docs in this order:
 - [Core Systems](./core-systems/) — one page per system, how they work today
 - [Upstream Lessons](./upstream-lessons/) — what GBrain and Hermes taught the Gormes architecture
 - [Contract Readiness](./contract-readiness/) — the enforceable upstream-contract checklist for priority subsystems
+- [Autoloop Handoff](./autoloop-handoff/) — the main script, plan link, candidate source, generated docs, tests, and selection policy
 - [Agent Queue](./agent-queue/) — autonomous-worker-ready handoff cards from canonical progress
 - [Next Slices](./next-slices/) — the highest-leverage contract-bearing progress rows to execute next
 - [Blocked Slices](./blocked-slices/) — contract-bearing rows waiting on prerequisites
