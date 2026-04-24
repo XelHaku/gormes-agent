@@ -86,6 +86,47 @@ make_salvage_worker_repo() {
   assert_output --partial "task=queued-task"
 }
 
+@test "dirty_worker_worktree_report lists only retained dirty worker worktrees" {
+  local dirty_run="dirty-run-1"
+  local clean_run="clean-run-1"
+  local dirty_wt clean_wt
+  dirty_wt="$(make_salvage_worker_repo "$dirty_run" 1)"
+  clean_wt="$(make_salvage_worker_repo "$clean_run" 2)"
+  echo local-change > "$dirty_wt/local.txt"
+
+  run dirty_worker_worktree_report
+
+  assert_success
+  assert_output --partial "run=$dirty_run worker=1 dirty=1 path=$dirty_wt"
+  refute_output --partial "$clean_wt"
+}
+
+@test "refuse_dirty_worker_worktrees blocks launch by default" {
+  local run_id="dirty-run-2"
+  local wt
+  wt="$(make_salvage_worker_repo "$run_id" 1)"
+  echo local-change > "$wt/local.txt"
+
+  run refuse_dirty_worker_worktrees
+
+  assert_failure
+  assert_output --partial "Refusing to launch workers: dirty retained worker worktrees found"
+  assert_output --partial "scripts/gormes-auto-codexu-orchestrator.sh salvage $run_id"
+  assert_output --partial "path=$wt"
+}
+
+@test "refuse_dirty_worker_worktrees allows explicit override" {
+  local run_id="dirty-run-3"
+  local wt
+  wt="$(make_salvage_worker_repo "$run_id" 1)"
+  echo local-change > "$wt/local.txt"
+
+  ALLOW_DIRTY_WORKER_WORKTREES=1 run refuse_dirty_worker_worktrees
+
+  assert_success
+  assert_output --partial "Warning: ALLOW_DIRTY_WORKER_WORKTREES=1"
+}
+
 @test "create_worker_worktree checks out base commit on new branch" {
   run create_worker_worktree 1
   assert_success

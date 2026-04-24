@@ -69,6 +69,7 @@ ALLOW_SOFT_SUCCESS_NONZERO="${ALLOW_SOFT_SUCCESS_NONZERO:-1}"
 FAIL_FAST_ON_WORKER_FAILURE="${FAIL_FAST_ON_WORKER_FAILURE:-1}"
 PAUSE_ON_RUN_FAILURE="${PAUSE_ON_RUN_FAILURE:-1}"
 SKIP_COMPANIONS_ON_RUN_FAILURE="${SKIP_COMPANIONS_ON_RUN_FAILURE:-1}"
+ALLOW_DIRTY_WORKER_WORKTREES="${ALLOW_DIRTY_WORKER_WORKTREES:-0}"
 INTEGRATION_BRANCH="${INTEGRATION_BRANCH:-codexu/autoloop}"
 INTEGRATION_WORKTREE="${INTEGRATION_WORKTREE:-}"
 MAX_RUN_WORKTREE_DIRS="${MAX_RUN_WORKTREE_DIRS:-4}"
@@ -151,6 +152,7 @@ Env:
   FAIL_FAST_ON_WORKER_FAILURE Set to 1 to terminate remaining workers after first worker failure (default: 1)
   PAUSE_ON_RUN_FAILURE       Set to 1 to stop forever mode after non-quota failures (default: 1)
   SKIP_COMPANIONS_ON_RUN_FAILURE Set to 1 to run companions only after clean cycles (default: 1)
+  ALLOW_DIRTY_WORKER_WORKTREES Set to 1 to bypass retained dirty worker-worktree launch guard (default: 0)
   PROMOTION_MODE             "pr" (default) opens a PR per successful worker and falls back
                              to cherry-pick on any gh/push failure. "cherry-pick" skips the
                              PR flow entirely.
@@ -461,6 +463,10 @@ validate() {
   fi
   if [[ "$SKIP_COMPANIONS_ON_RUN_FAILURE" != "0" && "$SKIP_COMPANIONS_ON_RUN_FAILURE" != "1" ]]; then
     echo "ERROR: SKIP_COMPANIONS_ON_RUN_FAILURE must be 0 or 1" >&2
+    exit 1
+  fi
+  if [[ "$ALLOW_DIRTY_WORKER_WORKTREES" != "0" && "$ALLOW_DIRTY_WORKER_WORKTREES" != "1" ]]; then
+    echo "ERROR: ALLOW_DIRTY_WORKER_WORKTREES must be 0 or 1" >&2
     exit 1
   fi
   if promotion_enabled && [[ -z "$INTEGRATION_BRANCH" ]]; then
@@ -1131,6 +1137,10 @@ run_once() {
   # Recreate run-scoped paths in case --resume changed RUN_ID.
   mkdir -p "$RUN_PIDS_DIR" "$RUN_WORKER_STATE_DIR" "$WORKTREES_DIR" "$STATE_DIR" "$LOGS_DIR" "$PROMPTS_DIR" "$LOCKS_DIR"
 
+  if ! refuse_dirty_worker_worktrees; then
+    log_event "dirty_worker_worktrees_blocked" null "run=$RUN_ID" "blocked"
+    return 1
+  fi
   preflight_resource_safety
   cleanup_stale_locks
   write_candidates_file

@@ -8,6 +8,8 @@ setup() {
   export REPO_ROOT="$TMP_WS/repo"
   export RUN_ROOT="$TMP_WS/run"
   export RUN_ID="salvage-cli-seed"
+  export PATH="$FIXTURES_DIR/bin:$PATH"
+  export FAKE_CODEXU_LOG="$TMP_WS/fake-codexu.log"
   mkdir -p "$REPO_ROOT"
 }
 
@@ -44,4 +46,35 @@ make_worker_repo() {
   assert_output --partial "dirty=1"
   assert_output --partial "inspect=$wt"
   assert_output --partial "?? local.txt"
+}
+
+@test "dirty retained worker worktree guard stops run before backend launch" {
+  local dirty_run="prior-dirty-run"
+  local wt
+  wt="$(make_worker_repo "$dirty_run" 1)"
+  echo local-change > "$wt/local.txt"
+
+  git init -q -b main "$REPO_ROOT"
+  mkdir -p "$REPO_ROOT/docs/content/building-gormes/architecture_plan"
+  cp "$FIXTURES_DIR/progress.fixture.json" \
+    "$REPO_ROOT/docs/content/building-gormes/architecture_plan/progress.json"
+  (
+    cd "$REPO_ROOT"
+    git -c user.email=t@t -c user.name=T add -A
+    git -c user.email=t@t -c user.name=T commit -q -m init
+  )
+
+  export ORCHESTRATOR_ONCE=1
+  export MAX_AGENTS=1
+  export MIN_AVAILABLE_MEM_MB=1
+  export MIN_MEM_PER_WORKER_MB=1
+  export FORCE_RUN_UNDER_PRESSURE=1
+  export AUTO_PROMOTE_SUCCESS=0
+
+  run "$ENTRY_SCRIPT"
+
+  assert_failure
+  assert_output --partial "Refusing to launch workers: dirty retained worker worktrees found"
+  assert_output --partial "scripts/gormes-auto-codexu-orchestrator.sh salvage $dirty_run"
+  [ ! -f "$FAKE_CODEXU_LOG" ]
 }

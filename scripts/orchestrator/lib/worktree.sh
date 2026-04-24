@@ -121,6 +121,52 @@ worker_salvage_report() {
   done
 }
 
+dirty_worker_worktree_report() {
+  local worktrees_base="$RUN_ROOT/worktrees"
+  local run_dir worktree run_id worker_id status_output dirty_count
+
+  [[ -d "$worktrees_base" ]] || return 0
+
+  shopt -s nullglob
+  for run_dir in "$worktrees_base"/*; do
+    [[ -d "$run_dir" ]] || continue
+    run_id="$(basename "$run_dir")"
+    for worktree in "$run_dir"/worker*; do
+      [[ -d "$worktree" ]] || continue
+      git -C "$worktree" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+      status_output="$(git -C "$worktree" status --short 2>/dev/null || true)"
+      dirty_count="$(printf '%s\n' "$status_output" | sed '/^$/d' | wc -l | tr -d ' ')"
+      if ((dirty_count == 0)); then
+        continue
+      fi
+      worker_id="$(basename "$worktree")"
+      worker_id="${worker_id#worker}"
+      printf 'run=%s worker=%s dirty=%s path=%s\n' "$run_id" "$worker_id" "$dirty_count" "$worktree"
+      printf '%s\n' "$status_output" | sed -n '1,10s/^/  /p'
+    done
+  done
+  shopt -u nullglob
+}
+
+refuse_dirty_worker_worktrees() {
+  local report
+  report="$(dirty_worker_worktree_report)"
+  [[ -n "$report" ]] || return 0
+
+  if [[ "${ALLOW_DIRTY_WORKER_WORKTREES:-0}" == "1" ]]; then
+    echo "Warning: ALLOW_DIRTY_WORKER_WORKTREES=1; continuing with dirty retained worker worktrees." >&2
+    printf '%s\n' "$report" >&2
+    return 0
+  fi
+
+  echo "Refusing to launch workers: dirty retained worker worktrees found." >&2
+  echo "Salvage or remove these before rerunning, or set ALLOW_DIRTY_WORKER_WORKTREES=1 after manual review." >&2
+  printf '%s\n' "$report" >&2
+  printf '%s\n' "$report" \
+    | awk -F'[ =]' '/^run=/ && !seen[$2]++ { print "  scripts/gormes-auto-codexu-orchestrator.sh salvage " $2 }' >&2
+  return 1
+}
+
 create_worker_worktree() {
   local worker_id="$1"
   local worktree_root branch
