@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -94,10 +95,82 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 		t.Fatalf("Selected length = %d, want %d", got, want)
 	}
 
-	wantCommand := Command{Name: "opencode", Args: []string{"run", "--no-interactive"}, Dir: repoRoot}
-	wantCommands := []Command{wantCommand, wantCommand}
+	wantCommands := []Command{
+		{
+			Name: "opencode",
+			Args: []string{"run", "--no-interactive", BuildWorkerPrompt(Candidate{
+				PhaseID:    "12",
+				SubphaseID: "12.A",
+				ItemName:   "active candidate",
+				Status:     "in_progress",
+			})},
+			Dir: repoRoot,
+		},
+		{
+			Name: "opencode",
+			Args: []string{"run", "--no-interactive", BuildWorkerPrompt(Candidate{
+				PhaseID:    "12",
+				SubphaseID: "12.A",
+				ItemName:   "planned candidate",
+				Status:     "planned",
+			})},
+			Dir: repoRoot,
+		},
+	}
 	if !reflect.DeepEqual(runner.Commands, wantCommands) {
 		t.Fatalf("Commands = %#v, want %#v", runner.Commands, wantCommands)
+	}
+}
+
+func TestRunOncePassesSelectedTaskPromptToBackend(t *testing.T) {
+	progressPath := writeProgressJSON(t, `{
+		"phases": {
+			"12": {
+				"subphases": {
+					"12.A": {
+						"items": [
+							{"item_name": "prompted candidate", "status": "planned"}
+						]
+					}
+				}
+			}
+		}
+	}`)
+	runner := &FakeRunner{
+		Results: []Result{{}},
+	}
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:     t.TempDir(),
+			ProgressJSON: progressPath,
+			Backend:      "codexu",
+			Mode:         "safe",
+			MaxAgents:    1,
+		},
+		Runner: runner,
+	})
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+
+	if got, want := len(runner.Commands), 1; got != want {
+		t.Fatalf("Commands length = %d, want %d", got, want)
+	}
+	args := runner.Commands[0].Args
+	if len(args) == 0 {
+		t.Fatal("Command args are empty, want backend flags plus prompt")
+	}
+	prompt := args[len(args)-1]
+	for _, want := range []string{
+		"Mission:",
+		"Selected task:",
+		"12 / 12.A / prompted candidate",
+		"Current status: planned",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt = %q, want %q", prompt, want)
+		}
 	}
 }
 
@@ -132,5 +205,42 @@ func TestRunOnceReturnsBackendRunnerError(t *testing.T) {
 	})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("RunOnce() error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestRunOnceIncludesBackendStderrInError(t *testing.T) {
+	progressPath := writeProgressJSON(t, `{
+		"phases": {
+			"12": {
+				"subphases": {
+					"12.A": {
+						"items": [
+							{"item_name": "planned run candidate", "status": "planned"}
+						]
+					}
+				}
+			}
+		}
+	}`)
+	wantErr := errors.New("exit status 1")
+	runner := &FakeRunner{
+		Results: []Result{{Err: wantErr, Stderr: "No prompt provided via stdin.\n"}},
+	}
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:     t.TempDir(),
+			ProgressJSON: progressPath,
+			Backend:      "codexu",
+			Mode:         "safe",
+			MaxAgents:    1,
+		},
+		Runner: runner,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("RunOnce() error = %v, want wrapped %v", err, wantErr)
+	}
+	if !strings.Contains(err.Error(), "No prompt provided via stdin.") {
+		t.Fatalf("RunOnce() error = %q, want backend stderr", err)
 	}
 }

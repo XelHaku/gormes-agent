@@ -1,6 +1,10 @@
 package autoloop
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"strings"
+)
 
 type RunOptions struct {
 	Config Config
@@ -42,16 +46,45 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 
-	for range selected {
+	for _, candidate := range selected {
+		args := append([]string(nil), argv[1:]...)
+		args = append(args, BuildWorkerPrompt(candidate))
 		result := runner.Run(ctx, Command{
 			Name: argv[0],
-			Args: argv[1:],
+			Args: args,
 			Dir:  opts.Config.RepoRoot,
 		})
 		if result.Err != nil {
-			return RunSummary{}, result.Err
+			return RunSummary{}, backendRunError(argv[0], result)
 		}
 	}
 
 	return summary, nil
+}
+
+func BuildWorkerPrompt(candidate Candidate) string {
+	return fmt.Sprintf(`Mission:
+Complete the selected Gormes progress task with strict Test-Driven Development (TDD).
+
+Selected task:
+- Phase/Subphase/Item: %s / %s / %s
+- Current status: %s
+
+Requirements:
+- Read the repository context before editing.
+- Keep changes scoped to the selected task.
+- Run the relevant tests before reporting completion.
+`, candidate.PhaseID, candidate.SubphaseID, candidate.ItemName, candidate.Status)
+}
+
+func backendRunError(name string, result Result) error {
+	output := strings.TrimSpace(result.Stderr)
+	if output == "" {
+		output = strings.TrimSpace(result.Stdout)
+	}
+	if output == "" {
+		return fmt.Errorf("%s failed: %w", name, result.Err)
+	}
+
+	return fmt.Errorf("%s failed: %w: %s", name, result.Err, output)
 }

@@ -13,6 +13,12 @@ guess the entrypoint, plan, candidate source, generated docs, or selection
 policy from scattered prose. Row-specific execution facts stay in
 [Agent Queue](./agent-queue/) and canonical progress rows.
 
+`autoloop` is intended to execute the building-gormes architecture plan. It
+selects work from `progress.json`, uses the generated building-gormes pages as
+the operator-facing handoff, and passes selected row metadata into worker
+prompts so the agent loop can develop the full `gormes-agent` one phase slice
+at a time. Do not maintain a parallel queue outside this docs tree.
+
 <!-- PROGRESS:START kind=autoloop-handoff -->
 ## Control Plane
 
