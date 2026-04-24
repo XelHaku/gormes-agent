@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type ServiceUnitOptions struct {
@@ -25,7 +26,7 @@ Restart=on-failure
 
 [Install]
 WantedBy=default.target
-`, opts.WorkDir, opts.AutoloopPath)
+`, systemdPathValue(opts.WorkDir), systemdPathValue(opts.AutoloopPath))
 }
 
 type ServiceInstallOptions struct {
@@ -89,6 +90,33 @@ func InstallService(ctx context.Context, opts ServiceInstallOptions) error {
 	return nil
 }
 
+func systemdPathValue(path string) string {
+	escaped := strings.ReplaceAll(path, "%", "%%")
+	if !strings.ContainsAny(escaped, " \t\r\n\"\\") {
+		return escaped
+	}
+
+	escaped = strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(escaped)
+	return `"` + escaped + `"`
+}
+
+func isMissingSystemdUnit(result Result) bool {
+	output := strings.ToLower(result.Stdout + "\n" + result.Stderr)
+	for _, marker := range []string{
+		"missing",
+		"not loaded",
+		"not found",
+		"does not exist",
+		"no such file",
+	} {
+		if strings.Contains(output, marker) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func DisableLegacyTimers(ctx context.Context, runner Runner) error {
 	if runner == nil {
 		runner = ExecRunner{}
@@ -102,7 +130,7 @@ func DisableLegacyTimers(ctx context.Context, runner Runner) error {
 			Name: "systemctl",
 			Args: []string{"--user", "disable", "--now", timer},
 		})
-		if result.Err != nil {
+		if result.Err != nil && !isMissingSystemdUnit(result) {
 			return result.Err
 		}
 	}

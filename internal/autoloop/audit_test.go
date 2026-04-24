@@ -50,3 +50,26 @@ func TestDigestLedgerCountsLastEvents(t *testing.T) {
 		t.Fatal("DigestLedger() error = nil, want parse error")
 	}
 }
+
+func TestDigestLedgerEmptyLedgerReturnsZeroCounts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ledger.jsonl")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	digest, err := DigestLedger(path)
+	if err != nil {
+		t.Fatalf("DigestLedger() error = %v", err)
+	}
+
+	for _, want := range []string{
+		"runs: 0",
+		"claimed: 0",
+		"success: 0",
+		"promoted: 0",
+	} {
+		if !strings.Contains(digest, want) {
+			t.Fatalf("DigestLedger() = %q, want line containing %q", digest, want)
+		}
+	}
+}
