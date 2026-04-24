@@ -21,11 +21,13 @@ type SourceRoot struct {
 }
 
 type ContextBundle struct {
-	GeneratedUTC  string       `json:"generated_utc"`
-	RepoRoot      string       `json:"repo_root"`
-	ProgressJSON  string       `json:"progress_json"`
-	ProgressStats ProgressInfo `json:"progress_stats"`
-	SourceRoots   []SourceRoot `json:"source_roots"`
+	GeneratedUTC            string                  `json:"generated_utc"`
+	RepoRoot                string                  `json:"repo_root"`
+	ProgressJSON            string                  `json:"progress_json"`
+	ProgressStats           ProgressInfo            `json:"progress_stats"`
+	SourceRoots             []SourceRoot            `json:"source_roots"`
+	SyncResults             []RepoSyncResult        `json:"sync_results,omitempty"`
+	ImplementationInventory ImplementationInventory `json:"implementation_inventory"`
 }
 
 type ProgressInfo struct {
@@ -33,6 +35,12 @@ type ProgressInfo struct {
 	Planned    int `json:"planned"`
 	InProgress int `json:"in_progress"`
 	Complete   int `json:"complete"`
+}
+
+type ImplementationInventory struct {
+	Commands         []string `json:"commands"`
+	InternalPackages []string `json:"internal_packages"`
+	BuildingDocs     []string `json:"building_docs"`
 }
 
 func CollectContext(cfg Config, now time.Time) (ContextBundle, error) {
@@ -57,11 +65,12 @@ func CollectContext(cfg Config, now time.Time) (ContextBundle, error) {
 	}
 
 	return ContextBundle{
-		GeneratedUTC:  now.UTC().Format(time.RFC3339),
-		RepoRoot:      cfg.RepoRoot,
-		ProgressJSON:  cfg.ProgressJSON,
-		ProgressStats: progressInfo,
-		SourceRoots:   roots,
+		GeneratedUTC:            now.UTC().Format(time.RFC3339),
+		RepoRoot:                cfg.RepoRoot,
+		ProgressJSON:            cfg.ProgressJSON,
+		ProgressStats:           progressInfo,
+		SourceRoots:             roots,
+		ImplementationInventory: collectImplementationInventory(cfg),
 	}, nil
 }
 
@@ -130,4 +139,42 @@ func sampleFile(path string) bool {
 	default:
 		return false
 	}
+}
+
+func collectImplementationInventory(cfg Config) ImplementationInventory {
+	return ImplementationInventory{
+		Commands:         collectImmediateDirs(filepath.Join(cfg.RepoRoot, "cmd")),
+		InternalPackages: collectImmediateDirs(filepath.Join(cfg.RepoRoot, "internal")),
+		BuildingDocs:     collectImmediateFiles(filepath.Join(cfg.RepoRoot, "docs", "content", "building-gormes"), ".md"),
+	}
+}
+
+func collectImmediateDirs(root string) []string {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+	var dirs []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirs = append(dirs, entry.Name())
+		}
+	}
+	sort.Strings(dirs)
+	return dirs
+}
+
+func collectImmediateFiles(root, ext string) []string {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ext {
+			files = append(files, entry.Name())
+		}
+	}
+	sort.Strings(files)
+	return files
 }

@@ -34,14 +34,15 @@ type RunSummary struct {
 }
 
 type stateFile struct {
-	LastRunUTC   string `json:"last_run_utc"`
-	Backend      string `json:"backend"`
-	Mode         string `json:"mode"`
-	RepoRoot     string `json:"repo_root"`
-	ProgressJSON string `json:"progress_json"`
-	ContextPath  string `json:"context_path"`
-	PromptPath   string `json:"prompt_path"`
-	ReportPath   string `json:"report_path"`
+	LastRunUTC   string           `json:"last_run_utc"`
+	Backend      string           `json:"backend"`
+	Mode         string           `json:"mode"`
+	RepoRoot     string           `json:"repo_root"`
+	ProgressJSON string           `json:"progress_json"`
+	ContextPath  string           `json:"context_path"`
+	PromptPath   string           `json:"prompt_path"`
+	ReportPath   string           `json:"report_path"`
+	SyncResults  []RepoSyncResult `json:"sync_results,omitempty"`
 }
 
 func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
@@ -59,8 +60,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 
+	var syncResults []RepoSyncResult
 	if cfg.SyncRepos && !opts.DryRun {
-		if err := SyncExternalRepos(ctx, cfg, runner); err != nil {
+		var err error
+		syncResults, err = SyncExternalRepos(ctx, cfg, runner)
+		if err != nil {
 			return RunSummary{}, err
 		}
 	}
@@ -69,6 +73,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	if err != nil {
 		return RunSummary{}, err
 	}
+	bundle.SyncResults = syncResults
 
 	contextPath := filepath.Join(cfg.RunRoot, "context.json")
 	promptPath := filepath.Join(cfg.RunRoot, "latest_prompt.txt")
@@ -134,6 +139,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		ContextPath:  contextPath,
 		PromptPath:   promptPath,
 		ReportPath:   reportPath,
+		SyncResults:  syncResults,
 	}); err != nil {
 		return RunSummary{}, err
 	}

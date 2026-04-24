@@ -5,6 +5,12 @@ It is the planning counterpart to `cmd/autoloop`: autoloop executes roadmap
 rows, while this command asks a planner agent to study source/reference context
 and refine `docs/content/building-gormes/architecture_plan/progress.json`.
 
+This command is the long-term architecture prompt owner for Gormes. It must stay
+self-sufficient: every real run synchronizes upstream source repos, records sync
+evidence in planner context, inventories the current Gormes implementation, and
+prompts the planner to keep `progress.json` aligned with both upstream changes
+and local implementation reality.
+
 Run from the repository root:
 
 ```sh
@@ -46,6 +52,25 @@ local debugging.
 
 Dry-run mode writes planner context and prompt artifacts without pulling or
 cloning external repositories.
+
+`context.json` records sync results from the latest real run. If Hermes,
+Honcho, or GBrain moved, the planner prompt includes the `git pull`/`git clone`
+evidence so the agent can add or refine TDD-ready roadmap rows instead of
+allowing silent drift.
+
+## Current Implementation Inventory
+
+Each run also records a lightweight Gormes implementation inventory:
+
+- command directories under `cmd/`
+- internal packages under `internal/`
+- top-level building-gormes docs
+
+The planner prompt uses this inventory to synchronize
+`docs/content/building-gormes/architecture_plan/progress.json` with the current
+implementation. If source code has advanced, the planner updates progress
+status, notes, acceptance, and source references. If upstream has advanced but
+Gormes has not, the planner adds or refines small execution rows for autoloop.
 
 ## Artifacts
 
