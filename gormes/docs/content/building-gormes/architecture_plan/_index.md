@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 57/66 subphases shipped · 2 in progress · 7 planned
+**Overall:** 58/66 subphases shipped · 2 in progress · 6 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -29,7 +29,7 @@ weight: 10
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 13/17 subphases |
-| Phase 6 — The Learning Loop (Soul) | 🔨 | 1/6 subphases |
+| Phase 6 — The Learning Loop (Soul) | 🔨 | 2/6 subphases |
 
 ---
 
@@ -395,9 +395,9 @@ weight: 10
 
 - [ ] Hybrid lexical + semantic lookup
 
-### 6.E — Feedback Loop ⏳
+### 6.E — Feedback Loop ✅
 
-- [ ] Skill effectiveness scoring
+- [x] Skill effectiveness scoring
 
 ### 6.F — Skill Surface ⏳
 

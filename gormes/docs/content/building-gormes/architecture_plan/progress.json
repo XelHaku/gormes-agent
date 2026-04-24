@@ -1066,7 +1066,8 @@
           "items": [
             {
               "name": "Skill effectiveness scoring",
-              "status": "planned"
+              "status": "complete",
+              "note": "TDD: `internal/learning/feedback.go` adds a `FeedbackStore` that appends per-turn outcomes as JSONL and aggregates them into per-skill `EffectivenessScore` records using Laplace smoothing `(successes+1)/(uses+2)`. Unseen skills receive a neutral 0.5 prior via `Weight`, so ranking code can multiply the score into relevance without special-casing fresh skills."
             }
           ]
         },
