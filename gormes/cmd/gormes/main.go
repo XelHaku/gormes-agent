@@ -47,11 +47,22 @@ func newRootCommand() *cobra.Command {
 	}
 	root.Flags().Bool("offline", false, "skip startup api_server health check (dev only — turns the TUI into a cosmetic smoke-tester)")
 	root.Flags().String("resume", "", "override persisted session_id for the TUI's default key")
+	root.Flags().String("remote", "", "stream frames from a tuigateway rooted at <url> instead of a local kernel (bridges tui.Submitter/Canceller to the gateway's /events POST surface)")
 	root.AddCommand(authCmd, doctorCmd, versionCmd, telegramCmd, gatewayCmd, sessionCmd, memoryCmd, skillsCmd, pluginsCmd, acpCmd)
 	return root
 }
 
 func runTUI(cmd *cobra.Command, _ []string) error {
+	// --remote short-circuits the entire local-kernel wiring: when the
+	// operator targets a tuigateway, the remote process owns config
+	// loading, the LLM health check, and session persistence. This branch
+	// exists so `cmd/gormes --remote <url>` can drive a Bubble Tea TUI
+	// against a gateway without accidentally spinning up a redundant local
+	// kernel alongside it.
+	if remote, _ := cmd.Flags().GetString("remote"); remote != "" {
+		return runRemoteTUI(remote)
+	}
+
 	cfg, err := config.Load(nil)
 	if err != nil {
 		return err
