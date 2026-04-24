@@ -573,8 +573,8 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.F.3 token-scoped locks note = %q, want upstream lock/credential-hash detail", tokenLocks.Note)
 	}
 	restartMarkers := lifecycleItems["Gateway /restart command + takeover markers"]
-	if restartMarkers.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 restart markers status = %q, want planned", restartMarkers.Status)
+	if restartMarkers.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 restart markers status = %q, want complete", restartMarkers.Status)
 	}
 	if !strings.Contains(restartMarkers.Note, "/restart") || !strings.Contains(restartMarkers.Note, "takeover-marker") {
 		t.Fatalf("Phase 2.F.3 restart markers note = %q, want restart/takeover-marker detail", restartMarkers.Note)

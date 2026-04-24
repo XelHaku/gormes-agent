@@ -31,6 +31,7 @@ func TestEventKind_String(t *testing.T) {
 		{EventCancel, "cancel"},
 		{EventReset, "reset"},
 		{EventStart, "start"},
+		{EventRestart, "restart"},
 	}
 	for _, tt := range tests {
 		if got := tt.k.String(); got != tt.want {

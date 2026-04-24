@@ -12,9 +12,10 @@ func TestCommandRegistryContainsRequiredCommands(t *testing.T) {
 	}
 
 	required := map[string]bool{
-		"help": false,
-		"new":  false,
-		"stop": false,
+		"help":    false,
+		"new":     false,
+		"stop":    false,
+		"restart": false,
 	}
 	for _, cmd := range CommandRegistry {
 		if _, ok := required[cmd.Name]; ok {
@@ -25,6 +26,32 @@ func TestCommandRegistryContainsRequiredCommands(t *testing.T) {
 		if !seen {
 			t.Fatalf("CommandRegistry missing %q", name)
 		}
+	}
+}
+
+func TestRestartCommandRegistered(t *testing.T) {
+	cmd, ok := ResolveCommand("/restart")
+	if !ok {
+		t.Fatal("ResolveCommand(\"/restart\") ok = false, want true")
+	}
+	if cmd.Name != "restart" {
+		t.Fatalf("ResolveCommand(\"/restart\").Name = %q, want %q", cmd.Name, "restart")
+	}
+	if cmd.Kind != EventRestart {
+		t.Fatalf("ResolveCommand(\"/restart\").Kind = %v, want EventRestart", cmd.Kind)
+	}
+
+	gotKind, gotBody := ParseInboundText("/restart")
+	if gotKind != EventRestart {
+		t.Fatalf("ParseInboundText(\"/restart\") kind = %v, want EventRestart", gotKind)
+	}
+	if gotBody != "" {
+		t.Fatalf("ParseInboundText(\"/restart\") body = %q, want empty", gotBody)
+	}
+
+	helpLines := strings.Join(GatewayHelpLines(), "\n")
+	if !strings.Contains(helpLines, "/restart") {
+		t.Fatalf("GatewayHelpLines missing /restart in %q", helpLines)
 	}
 }
 

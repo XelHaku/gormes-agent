@@ -39,6 +39,11 @@ var CommandRegistry = []CommandDef{
 		Description: "Cancel the active turn",
 		Kind:        EventCancel,
 	},
+	{
+		Name:        "restart",
+		Description: "Drain and restart the gateway process",
+		Kind:        EventRestart,
+	},
 }
 
 var commandLookup = buildCommandLookup()

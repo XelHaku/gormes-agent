@@ -24,6 +24,20 @@ type ManagerConfig struct {
 	CoalesceMs     int
 	SessionMap     session.Map
 	Hooks          *Hooks
+
+	// RestartFunc is the service-manager-facing hook invoked after a
+	// successful /restart drain. When nil, /restart replies with an
+	// "unsupported" notice.
+	RestartFunc RestartFunc
+	// RestartMarkers persists the takeover marker that dedupes a
+	// redelivered /restart against the inbound event that caused the
+	// previous restart. When nil, the manager still handles /restart but
+	// cannot dedupe across process boundaries.
+	RestartMarkers RestartMarkerStore
+	// RestartGracePause is an optional delay between sending the restart
+	// notice and invoking RestartFunc. Tests use a tiny value; real
+	// embedders rely on drain to absorb in-flight turns.
+	RestartGracePause time.Duration
 }
 
 type kernelSubmitter interface {
@@ -347,8 +361,58 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) {
 			_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Busy — try again in a second.")
 			return
 		}
+	case EventRestart:
+		m.handleRestart(ctx, ch, ev)
 	case EventUnknown:
 		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "unknown command")
+	}
+}
+
+func (m *Manager) handleRestart(ctx context.Context, ch Channel, ev InboundEvent) {
+	if m.cfg.RestartMarkers != nil {
+		stored, ok, err := m.cfg.RestartMarkers.LoadTakeoverMarker(ctx)
+		if err != nil {
+			m.log.Warn("load takeover marker", "err", err)
+		} else if ok && markerMatches(stored, ev) {
+			m.log.Info("redelivered /restart deduped by takeover marker",
+				"platform", ev.Platform,
+				"chat_id", ev.ChatID,
+				"msg_id", ev.MsgID,
+			)
+			return
+		}
+	}
+
+	if m.cfg.RestartFunc == nil {
+		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, restartUnsupportedNotice)
+		return
+	}
+
+	if _, err := m.sendWithHooks(ctx, ch, ev.ChatID, restartNotice); err != nil {
+		m.log.Warn("send restart notice", "err", err)
+	}
+
+	marker := TakeoverMarker{
+		Platform: ev.Platform,
+		ChatID:   ev.ChatID,
+		MsgID:    ev.MsgID,
+	}
+	if m.cfg.RestartMarkers != nil {
+		if err := m.cfg.RestartMarkers.SaveTakeoverMarker(ctx, marker); err != nil {
+			m.log.Warn("save takeover marker", "err", err)
+		}
+	}
+
+	if m.cfg.RestartGracePause > 0 {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(m.cfg.RestartGracePause):
+		}
+	}
+
+	if err := m.cfg.RestartFunc(ctx, ev); err != nil {
+		m.log.Warn("restart hook returned error", "err", err)
 	}
 }
 

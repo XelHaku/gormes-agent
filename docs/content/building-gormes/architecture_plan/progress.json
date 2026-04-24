@@ -567,8 +567,8 @@
             },
             {
               "name": "Gateway /restart command + takeover markers",
-              "status": "planned",
-              "note": "TDD: add a registry-backed gateway /restart path with restart notify/dedup markers, service-manager restart exit semantics, and planned --replace takeover-marker handling so redelivered Telegram restart updates cannot loop a fresh process."
+              "status": "complete",
+              "note": "TDD landed: CommandRegistry now owns a /restart entry mapped to EventRestart; gateway.Manager dispatches /restart by writing a takeover-marker keyed on (Platform, ChatID, MsgID), sending a user-visible restart notice, and invoking a pluggable service-manager RestartFunc after an optional drain pause. A redelivered /restart matching the stored marker is deduped (no notice, no RestartFunc call), so a redelivered Telegram restart update cannot loop a fresh process. When no RestartFunc is configured the manager replies with an explicit unsupported notice. Real RestartMarkerStore persistence and cmd/gormes wiring (service-manager exit semantics + --replace handling) stay planned as separate slices; this freeze only locks the manager contract and the takeover-marker dedup path."
             },
             {
               "name": "Channel lifecycle writers into status model",

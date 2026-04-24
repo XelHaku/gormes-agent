@@ -19,6 +19,9 @@ const (
 	EventReset
 	// EventStart is the help or welcome command.
 	EventStart
+	// EventRestart asks the gateway to drain and hand off to the service
+	// manager for a fresh process.
+	EventRestart
 )
 
 // String returns the stable log/test representation of an EventKind.
@@ -32,6 +35,8 @@ func (k EventKind) String() string {
 		return "reset"
 	case EventStart:
 		return "start"
+	case EventRestart:
+		return "restart"
 	default:
 		return "unknown"
 	}
