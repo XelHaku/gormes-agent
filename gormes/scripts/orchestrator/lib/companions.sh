@@ -170,7 +170,18 @@ run_companion() {
     rm -f "$pid_file"
   fi
 
+  # Per-companion timeout, falling back to the shared default. Planner's
+  # full upstream-Hermes scan + codex LLM call routinely exceeds 10 min;
+  # doc-improver / landingpage are cheaper. Specialized knobs:
+  #   COMPANION_PLANNER_TIMEOUT_SECONDS        (default 1800)
+  #   COMPANION_DOC_IMPROVER_TIMEOUT_SECONDS   (default COMPANION_TIMEOUT_SECONDS)
+  #   COMPANION_LANDINGPAGE_TIMEOUT_SECONDS    (default COMPANION_TIMEOUT_SECONDS)
   local timeout_s="${COMPANION_TIMEOUT_SECONDS:-600}"
+  case "$name" in
+    planner)      timeout_s="${COMPANION_PLANNER_TIMEOUT_SECONDS:-1800}" ;;
+    doc_improver) timeout_s="${COMPANION_DOC_IMPROVER_TIMEOUT_SECONDS:-$timeout_s}" ;;
+    landingpage)  timeout_s="${COMPANION_LANDINGPAGE_TIMEOUT_SECONDS:-$timeout_s}" ;;
+  esac
   local ts_start
   ts_start="$(date +%s)"
   local ts_utc
