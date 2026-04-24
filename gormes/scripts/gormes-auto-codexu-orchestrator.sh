@@ -5,7 +5,7 @@ shopt -s inherit_errexit 2>/dev/null || true
 
 ORCHESTRATOR_LIB_DIR="${ORCHESTRATOR_LIB_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/orchestrator/lib}"
 # shellcheck source=/dev/null
-for _lib in common candidates report claim worktree promote companions; do
+for _lib in common candidates report failures claim worktree promote companions; do
   source "$ORCHESTRATOR_LIB_DIR/${_lib}.sh"
 done
 unset _lib
@@ -721,10 +721,14 @@ run_worker() {
           save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'success' --arg slug "$slug" --arg commit "$head_commit" '{run_id:$run_id,status:$status,slug:$slug,commit:$commit}')"
           log_event "worker_success" "$worker_id" "$slug@$head_commit" "success"
         fi
+        failure_record_reset "$slug"
       elif [[ "$rc" == "124" ]]; then
         echo "worker[$worker_id]: timeout(${WORKER_TIMEOUT_SECONDS}s) -> $slug" | tee "$LOGS_DIR/worker_${worker_id}.status"
         save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'failed' --arg slug "$slug" --arg reason 'timeout' '{run_id:$run_id,status:$status,slug:$slug,reason:$reason}')"
         log_event "worker_failed" "$worker_id" "$slug" "timeout"
+        local timeout_final_errors_json
+        timeout_final_errors_json="$(collect_final_report_issues "$final_file" 2>/dev/null | jq -Rnc '[inputs | select(length > 0)]' 2>/dev/null || echo '[]')"
+        failure_record_write "$slug" "$rc" "timeout" "$stderr_file" "$timeout_final_errors_json"
       else
         local failure_reason
         failure_reason="$(classify_worker_failure "$rc")"
@@ -738,6 +742,9 @@ run_worker() {
         echo "worker[$worker_id]: failed($rc) -> $slug" | tee "$LOGS_DIR/worker_${worker_id}.status"
         save_worker_state "$worker_id" "$(jq -nc --arg run_id "$RUN_ID" --arg status 'failed' --arg slug "$slug" --arg reason "$failure_reason" --arg rc "$rc" '{run_id:$run_id,status:$status,slug:$slug,reason:$reason,rc:($rc|tonumber)}')"
         log_event "worker_failed" "$worker_id" "$slug" "$failure_reason"
+        local final_errors_json
+        final_errors_json="$(collect_final_report_issues "$final_file" 2>/dev/null | jq -Rnc '[inputs | select(length > 0)]' 2>/dev/null || echo '[]')"
+        failure_record_write "$slug" "$rc" "$failure_reason" "$stderr_file" "$final_errors_json"
       fi
 
       return "$rc"

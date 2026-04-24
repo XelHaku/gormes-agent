@@ -4,7 +4,11 @@ load '../lib/test_env'
 
 setup() {
   load_helpers
+  source_lib common
+  source_lib candidates
   source_lib report
+  source_lib failures
+  source_lib worktree
 }
 
 @test "collect_final_report_issues passes on good fixture" {
@@ -75,4 +79,58 @@ setup() {
   printf 'hello\n' > "$tmp/r.md"
   run extract_report_field "Commit" "$tmp/r.md"
   assert_output ""
+}
+
+@test "build_prompt omits PRIOR ATTEMPT FEEDBACK when no failure record" {
+  local tmp
+  tmp="$(mktmp_workspace)"
+  export STATE_DIR="$tmp/state"
+  export WORKTREES_DIR="$tmp/worktrees"
+  export REPO_SUBDIR="."
+  export RUN_ID="testrun"
+  export BASE_COMMIT="abc1234"
+  export PROGRESS_JSON_REL="docs/progress.json"
+  mkdir -p "$STATE_DIR"
+  local selected
+  selected='{"phase_id":"1","subphase_id":"1.A","item_name":"Item A1","status":"planned"}'
+  local prompt_file="$tmp/prompt.txt"
+  run build_prompt 1 "$selected" "0:1/1.A/Item A1" "$prompt_file"
+  assert_success
+  run cat "$prompt_file"
+  assert_success
+  refute_output --partial "PRIOR ATTEMPT FEEDBACK"
+  assert_output --partial "Mission:"
+}
+
+@test "build_prompt injects PRIOR ATTEMPT FEEDBACK when failure record exists" {
+  local tmp
+  tmp="$(mktmp_workspace)"
+  export STATE_DIR="$tmp/state"
+  export WORKTREES_DIR="$tmp/worktrees"
+  export REPO_SUBDIR="."
+  export RUN_ID="testrun"
+  export BASE_COMMIT="abc1234"
+  export PROGRESS_JSON_REL="docs/progress.json"
+  mkdir -p "$STATE_DIR"
+
+  local stderr_file="$tmp/stderr.log"
+  printf 'panic: explosive failure at line 9000\nstack trace blah\n' > "$stderr_file"
+  local slug
+  slug="$(task_slug "1" "1.A" "Item A1")"
+  failure_record_write "$slug" "1" "report_validation_failed" "$stderr_file" '["Missing section GREEN proof","Missing Commit hash"]'
+
+  local selected
+  selected='{"phase_id":"1","subphase_id":"1.A","item_name":"Item A1","status":"planned"}'
+  local prompt_file="$tmp/prompt.txt"
+  run build_prompt 1 "$selected" "0:1/1.A/Item A1" "$prompt_file"
+  assert_success
+  run cat "$prompt_file"
+  assert_success
+  assert_output --partial "PRIOR ATTEMPT FEEDBACK"
+  assert_output --partial "This task has been attempted 1 times before"
+  assert_output --partial "report_validation_failed"
+  assert_output --partial "Missing section GREEN proof"
+  assert_output --partial "Missing Commit hash"
+  assert_output --partial "panic: explosive failure"
+  assert_output --partial "Mission:"
 }

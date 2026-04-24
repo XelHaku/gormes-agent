@@ -5,24 +5,88 @@
 # defined in the entry script until Task 6 extracts worktree.sh — that's fine because
 # bash resolves function names at call time, not source time.
 
+build_retry_context_block() {
+  local slug="$1"
+  local record
+  record="$(failure_record_read "$slug" 2>/dev/null || echo '')"
+  [[ -n "$record" ]] || return 0
+
+  local count
+  count="$(jq -r '.count // 0' <<<"$record" 2>/dev/null || echo 0)"
+  [[ "$count" =~ ^[0-9]+$ ]] || count=0
+  (( count > 0 )) || return 0
+
+  local last_rc last_reason stderr_tail
+  last_rc="$(jq -r '.last_rc // 0' <<<"$record")"
+  last_reason="$(jq -r '.last_reason // "unknown"' <<<"$record")"
+  stderr_tail="$(jq -r '.last_stderr_tail // ""' <<<"$record")"
+
+  local errors_block=""
+  local line
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    errors_block+="- $line"$'\n'
+  done < <(jq -r '.last_final_errors[]? // empty' <<<"$record" 2>/dev/null || true)
+  if [[ -z "$errors_block" ]]; then
+    errors_block="- (none recorded)"$'\n'
+  fi
+
+  local block
+  block="$(cat <<EOF
+
+==================================================
+PRIOR ATTEMPT FEEDBACK
+==================================================
+This task has been attempted ${count} times before. The last attempt failed.
+
+Previous exit code: ${last_rc}
+Previous failure reason: ${last_reason}
+
+Specific validation errors from the last attempt:
+${errors_block}
+Last ~40 lines of stderr from the previous attempt:
+${stderr_tail}
+
+Focus on addressing these specific gaps. Do not repeat the same mistake.
+==================================================
+EOF
+)"
+
+  local max_kb="${RETRY_CONTEXT_MAX_KB:-5}"
+  [[ "$max_kb" =~ ^[0-9]+$ ]] || max_kb=5
+  local max_bytes=$(( max_kb * 1024 ))
+  if (( ${#block} > max_bytes )); then
+    local keep=$(( max_bytes - 20 ))
+    (( keep < 1 )) && keep=1
+    block="${block:0:$keep}"
+    block+=$'\n[...truncated...]'
+  fi
+
+  printf '%s\n' "$block"
+}
+
 build_prompt() {
   local worker_id="$1"
   local selected_json="$2"
   local trail="$3"
   local prompt_file="$4"
 
-  local phase_id subphase_id item_name status branch worker_dir
+  local phase_id subphase_id item_name status branch worker_dir slug
   phase_id="$(jq -r '.phase_id' <<<"$selected_json")"
   subphase_id="$(jq -r '.subphase_id' <<<"$selected_json")"
   item_name="$(jq -r '.item_name' <<<"$selected_json")"
   status="$(jq -r '.status' <<<"$selected_json")"
   branch="$(worker_branch_name "$worker_id")"
   worker_dir="$(worker_repo_root "$worker_id")"
+  slug="$(task_slug "$phase_id" "$subphase_id" "$item_name")"
+
+  local retry_block=""
+  retry_block="$(build_retry_context_block "$slug")"
 
   cat > "$prompt_file" <<EOF
 Repository root:
   $worker_dir
-
+${retry_block}
 Mission:
 Pick exactly ONE unfinished phase task and complete it with strict Test-Driven Development (TDD), while documenting progress and related docs before and after implementation.
 
