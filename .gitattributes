@@ -1,0 +1,8 @@
+# Browser test/support files are not core application code.
+docs/www-tests/** -linguist-detectable
+www.gormes.ai/tests/** -linguist-detectable
+www.gormes.ai/playwright.config.mjs -linguist-detectable
+docs/www-tests/playwright.config.mjs -linguist-detectable
+
+# Optional: enable this only if docs browser behavior should not count.
+# docs/static/site.js -linguist-detectable
