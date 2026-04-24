@@ -17,13 +17,12 @@ check `git status --short` and preserve unrelated unstaged user changes.
 ## File Structure
 
 - Create: `docs/content/building-gormes/autoloop/_index.md` section landing page.
-- Move generated execution pages under `docs/content/building-gormes/autoloop/`.
-- Keep `docs/content/building-gormes/autoloop/autoloop-handoff.md`.
-- Keep `docs/content/building-gormes/autoloop/agent-queue.md`.
-- Keep `docs/content/building-gormes/autoloop/next-slices.md`.
-- Keep `docs/content/building-gormes/autoloop/blocked-slices.md`.
-- Keep `docs/content/building-gormes/autoloop/umbrella-cleanup.md`.
-- Keep `docs/content/building-gormes/autoloop/progress-schema.md`.
+- Move: `docs/content/building-gormes/autoloop-handoff.md` to `docs/content/building-gormes/autoloop/autoloop-handoff.md`.
+- Move: `docs/content/building-gormes/agent-queue.md` to `docs/content/building-gormes/autoloop/agent-queue.md`.
+- Move: `docs/content/building-gormes/next-slices.md` to `docs/content/building-gormes/autoloop/next-slices.md`.
+- Move: `docs/content/building-gormes/blocked-slices.md` to `docs/content/building-gormes/autoloop/blocked-slices.md`.
+- Move: `docs/content/building-gormes/umbrella-cleanup.md` to `docs/content/building-gormes/autoloop/umbrella-cleanup.md`.
+- Move: `docs/content/building-gormes/progress-schema.md` to `docs/content/building-gormes/autoloop/progress-schema.md`.
 - Modify: `cmd/progress-gen/main.go` so generated execution pages target the new section.
 - Modify: `docs/content/building-gormes/architecture_plan/progress.json` `meta.autoloop` paths.
 - Modify: `docs/content/building-gormes/_index.md` and `cmd/autoloop/README.md` links.
@@ -36,7 +35,12 @@ check `git status --short` and preserve unrelated unstaged user changes.
 
 **Files:**
 - Create: `docs/content/building-gormes/autoloop/_index.md`
-- Move generated execution pages into `docs/content/building-gormes/autoloop/`.
+- Move: `docs/content/building-gormes/autoloop-handoff.md`
+- Move: `docs/content/building-gormes/agent-queue.md`
+- Move: `docs/content/building-gormes/next-slices.md`
+- Move: `docs/content/building-gormes/blocked-slices.md`
+- Move: `docs/content/building-gormes/umbrella-cleanup.md`
+- Move: `docs/content/building-gormes/progress-schema.md`
 - Modify: `docs/docs_test.go`
 - Modify: `docs/build_test.go`
 
@@ -117,7 +121,12 @@ Run:
 
 ```bash
 mkdir -p docs/content/building-gormes/autoloop
-git mv <old execution page> docs/content/building-gormes/autoloop/<execution page>
+git mv docs/content/building-gormes/autoloop-handoff.md docs/content/building-gormes/autoloop/autoloop-handoff.md
+git mv docs/content/building-gormes/agent-queue.md docs/content/building-gormes/autoloop/agent-queue.md
+git mv docs/content/building-gormes/next-slices.md docs/content/building-gormes/autoloop/next-slices.md
+git mv docs/content/building-gormes/blocked-slices.md docs/content/building-gormes/autoloop/blocked-slices.md
+git mv docs/content/building-gormes/umbrella-cleanup.md docs/content/building-gormes/autoloop/umbrella-cleanup.md
+git mv docs/content/building-gormes/progress-schema.md docs/content/building-gormes/autoloop/progress-schema.md
 ```
 
 Create `docs/content/building-gormes/autoloop/_index.md`:
@@ -137,16 +146,16 @@ contributors, and worker agents use the same queue.
 
 ## Start Here
 
-- [Autoloop Handoff](./autoloop/autoloop-handoff/) explains the shared entrypoint, queue
+- [Autoloop Handoff](./autoloop-handoff/) explains the shared entrypoint, queue
   source, generated docs, tests, and candidate policy.
-- [Agent Queue](./autoloop/agent-queue/) lists rows that are ready for autonomous worker
+- [Agent Queue](./agent-queue/) lists rows that are ready for autonomous worker
   execution.
-- [Next Slices](./autoloop/next-slices/) shows the short ranking of high-leverage work.
-- [Blocked Slices](./autoloop/blocked-slices/) keeps blocked rows visible without making
+- [Next Slices](./next-slices/) shows the short ranking of high-leverage work.
+- [Blocked Slices](./blocked-slices/) keeps blocked rows visible without making
   them assignable.
-- [Umbrella Cleanup](./autoloop/umbrella-cleanup/) lists broad rows that need to be split
+- [Umbrella Cleanup](./umbrella-cleanup/) lists broad rows that need to be split
   before assignment.
-- [Progress Schema](./autoloop/progress-schema/) defines the row fields autoloop expects.
+- [Progress Schema](./progress-schema/) defines the row fields autoloop expects.
 ```
 
 - [ ] **Step 4: Add Hugo aliases to moved pages**
