@@ -93,6 +93,8 @@ type legacyReportEvidence struct {
 	nonZeroExits int
 	hasBranch    bool
 	sections     [9]bool
+	current      int
+	sectionExits map[int][]int
 	criteria     []string
 }
 
@@ -115,6 +117,12 @@ func (legacy *legacyReportEvidence) collect(line string) {
 			legacy.zeroExits++
 		} else {
 			legacy.nonZeroExits++
+		}
+		if legacy.current > 0 {
+			if legacy.sectionExits == nil {
+				legacy.sectionExits = make(map[int][]int)
+			}
+			legacy.sectionExits[legacy.current] = append(legacy.sectionExits[legacy.current], exitCode)
 		}
 		return
 	}
@@ -141,6 +149,7 @@ func (legacy *legacyReportEvidence) collectSection(line string) {
 	title = strings.TrimSpace(title)
 	if title == legacySectionTitles[number-1] {
 		legacy.sections[number-1] = true
+		legacy.current = number
 	}
 }
 
@@ -171,6 +180,18 @@ func (legacy legacyReportEvidence) validate() error {
 	if legacy.zeroExits < 3 {
 		return fmt.Errorf("final report missing GREEN exit evidence")
 	}
+	if !sectionHasNonZeroExit(legacy.sectionExits[3]) {
+		return fmt.Errorf("final report RED proof missing non-zero exit")
+	}
+	if !sectionHasZeroExit(legacy.sectionExits[4]) {
+		return fmt.Errorf("final report GREEN proof missing zero exit")
+	}
+	if !sectionHasZeroExit(legacy.sectionExits[5]) {
+		return fmt.Errorf("final report REFACTOR proof missing zero exit")
+	}
+	if !sectionHasZeroExit(legacy.sectionExits[6]) {
+		return fmt.Errorf("final report Regression proof missing zero exit")
+	}
 	if len(legacy.criteria) < 3 {
 		return fmt.Errorf("final report missing acceptance")
 	}
@@ -183,6 +204,24 @@ func (legacy legacyReportEvidence) validate() error {
 		}
 	}
 	return nil
+}
+
+func sectionHasNonZeroExit(exits []int) bool {
+	for _, exit := range exits {
+		if exit != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func sectionHasZeroExit(exits []int) bool {
+	for _, exit := range exits {
+		if exit == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 var legacySectionTitles = []string{

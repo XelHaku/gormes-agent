@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -159,7 +160,68 @@ func TestParseFinalReportRejectsLegacyMissingSectionWithCompleteEvidence(t *test
 	}
 }
 
+func TestParseFinalReportRejectsLegacyWrongSectionExitEvidence(t *testing.T) {
+	cases := map[string]struct {
+		section int
+		exit    int
+	}{
+		"red zero with later nonzero": {section: 3, exit: 0},
+		"green nonzero":               {section: 4, exit: 1},
+		"refactor nonzero":            {section: 5, exit: 1},
+		"regression nonzero":          {section: 6, exit: 1},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			extraExit := 0
+			if tc.section == 3 {
+				extraExit = 1
+			}
+			report := legacyReportFixtureWithOptions(legacyReportOptions{
+				exits: map[int]int{
+					3: exitForSection(tc.section, tc.exit, 3, 1),
+					4: exitForSection(tc.section, tc.exit, 4, 0),
+					5: exitForSection(tc.section, tc.exit, 5, 0),
+					6: exitForSection(tc.section, tc.exit, 6, 0),
+					7: extraExit,
+				},
+			})
+
+			_, err := ParseFinalReport(report)
+			if err == nil {
+				t.Fatal("ParseFinalReport() error = nil, want section-specific exit error")
+			}
+		})
+	}
+}
+
+func exitForSection(changedSection, changedExit, section, defaultExit int) int {
+	if section == changedSection {
+		return changedExit
+	}
+	return defaultExit
+}
+
 func legacyReportFixture(skipSection string) string {
+	return legacyReportFixtureWithOptions(legacyReportOptions{skipSection: skipSection})
+}
+
+type legacyReportOptions struct {
+	skipSection string
+	exits       map[int]int
+}
+
+func legacyReportFixtureWithOptions(options legacyReportOptions) string {
+	exitFor := func(section int, fallback int) string {
+		exitCode := fallback
+		if options.exits != nil {
+			if override, ok := options.exits[section]; ok {
+				exitCode = override
+			}
+		}
+		return "Exit: " + strconv.Itoa(exitCode)
+	}
+
 	sections := []struct {
 		number string
 		title  string
@@ -167,11 +229,11 @@ func legacyReportFixture(skipSection string) string {
 	}{
 		{"1", "Selected task", []string{"Task: 1 / 1.A / Item A2"}},
 		{"2", "Pre-doc baseline", []string{"Files:", "- docs/progress.json"}},
-		{"3", "RED proof", []string{"Command: go test ./internal/foo", "Exit: 1", "Snippet: FAIL: TestBar"}},
-		{"4", "GREEN proof", []string{"Command: go test ./internal/foo", "Exit: 0", "Snippet: PASS"}},
-		{"5", "REFACTOR proof", []string{"Command: go test ./internal/foo", "Exit: 0", "Snippet: PASS"}},
-		{"6", "Regression proof", []string{"Command: go test ./...", "Exit: 0", "Snippet: ok"}},
-		{"7", "Post-doc closeout", []string{"Files:", "- docs/progress.json"}},
+		{"3", "RED proof", []string{"Command: go test ./internal/foo", exitFor(3, 1), "Snippet: FAIL: TestBar"}},
+		{"4", "GREEN proof", []string{"Command: go test ./internal/foo", exitFor(4, 0), "Snippet: PASS"}},
+		{"5", "REFACTOR proof", []string{"Command: go test ./internal/foo", exitFor(5, 0), "Snippet: PASS"}},
+		{"6", "Regression proof", []string{"Command: go test ./...", exitFor(6, 0), "Snippet: ok"}},
+		{"7", "Post-doc closeout", []string{"Files:", "- docs/progress.json", exitFor(7, 0)}},
 		{"8", "Commit", []string{"Branch: codexu/test-run/worker1", "Commit: abc1234def5678", "Files:", "- internal/foo/foo.go"}},
 		{"9", "Acceptance check", []string{
 			"Criterion: TestBar fails before implementation — PASS",
@@ -182,7 +244,7 @@ func legacyReportFixture(skipSection string) string {
 
 	var lines []string
 	for _, section := range sections {
-		if section.number == skipSection {
+		if section.number == options.skipSection {
 			lines = append(lines, section.body...)
 			continue
 		}
