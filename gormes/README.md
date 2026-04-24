@@ -79,7 +79,7 @@ GORMES_TELEGRAM_TOKEN=... GORMES_TELEGRAM_CHAT_ID=123456789 gormes telegram
 | Phase 2 — The Gateway | ✅ | 20/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
-| Phase 5 — The Final Purge | 🔨 | 15/17 subphases |
+| Phase 5 — The Final Purge | 🔨 | 14/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | 🔨 | 5/6 subphases |
 <!-- PROGRESS:END -->
 

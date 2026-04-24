@@ -20,7 +20,7 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 63/66 subphases shipped · 0 in progress · 3 planned
+**Overall:** 62/66 subphases shipped · 2 in progress · 2 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -28,7 +28,7 @@ weight: 10
 | Phase 2 — The Gateway | ✅ | 20/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
 | Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
-| Phase 5 — The Final Purge | 🔨 | 15/17 subphases |
+| Phase 5 — The Final Purge | 🔨 | 14/17 subphases |
 | Phase 6 — The Learning Loop (Soul) | 🔨 | 5/6 subphases |
 
 ---
@@ -371,7 +371,7 @@ weight: 10
 - [x] OCI image
 - [x] Homebrew
 
-### 5.Q — TUI Gateway Streaming ⏳
+### 5.Q — TUI Gateway Streaming 🔨
 
 - [ ] SSE streaming to Bubble Tea TUI
 

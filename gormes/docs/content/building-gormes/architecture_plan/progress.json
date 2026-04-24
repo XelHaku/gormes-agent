@@ -1017,7 +1017,8 @@
           "items": [
             {
               "name": "SSE streaming to Bubble Tea TUI",
-              "status": "planned"
+              "status": "in_progress",
+              "note": "TDD landed: `internal/tuigateway/sse.go` now ships the Go-native SSE streaming spine for the future remote TUI gateway — `NewSSEHandler` pumps `kernel.RenderFrame` snapshots over `text/event-stream` (one `event: frame` per frame, JSON-encoded body, terminating `event: end` on input-channel close) with proper `Cache-Control`, `X-Accel-Buffering`, and per-flush semantics, and `DialSSE`/`ConsumeSSE` close the loop with a parser that survives keepalive comments, malformed frames, and request-context cancellation; broader `tui_gateway/` server.py port (slash worker, skin engine, JSON-RPC method surface, image upload, approvals) plus the Bubble Tea client wiring that swaps the in-process kernel channel for `DialSSE` remain explicit follow-on scope under 5.Q."
             }
           ]
         }
