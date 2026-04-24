@@ -13,7 +13,9 @@ type FinalReport struct {
 }
 
 var commitLinePattern = regexp.MustCompile("^Commit:\\s*`?([0-9a-fA-F]{7,40})`?\\s*$")
-var exitLinePattern = regexp.MustCompile(`^Exit:\s*(-?\d+)\s*$`)
+var branchLinePattern = regexp.MustCompile("^Branch:\\s*`?(.+)`?\\s*$")
+var exitLinePattern = regexp.MustCompile("^Exit:\\s*`?(-?\\d+)`?\\s*$")
+var sectionLinePattern = regexp.MustCompile(`^([1-9])[).]\s*(.+)$`)
 
 func ParseFinalReport(text string) (FinalReport, error) {
 	var report FinalReport
@@ -89,10 +91,17 @@ type legacyReportEvidence struct {
 	commandCount int
 	zeroExits    int
 	nonZeroExits int
+	hasBranch    bool
+	sections     [9]bool
 	criteria     []string
 }
 
 func (legacy *legacyReportEvidence) collect(line string) {
+	legacy.collectSection(line)
+	if branchLinePattern.MatchString(line) {
+		legacy.hasBranch = true
+		return
+	}
 	if strings.HasPrefix(line, "Command:") {
 		legacy.commandCount++
 		return
@@ -117,7 +126,42 @@ func (legacy *legacyReportEvidence) collect(line string) {
 	}
 }
 
+func (legacy *legacyReportEvidence) collectSection(line string) {
+	normalized := normalizeSectionLine(line)
+	match := sectionLinePattern.FindStringSubmatch(normalized)
+	if match == nil {
+		return
+	}
+
+	number, err := strconv.Atoi(match[1])
+	if err != nil || number < 1 || number > len(legacySectionTitles) {
+		return
+	}
+	title := strings.Trim(strings.TrimSpace(match[2]), "*")
+	title = strings.TrimSpace(title)
+	if title == legacySectionTitles[number-1] {
+		legacy.sections[number-1] = true
+	}
+}
+
+func normalizeSectionLine(line string) string {
+	line = strings.TrimSpace(line)
+	if strings.HasPrefix(line, "#") {
+		line = strings.TrimLeft(line, "#")
+		line = strings.TrimSpace(line)
+	}
+	for strings.HasPrefix(line, "**") && strings.HasSuffix(line, "**") && len(line) >= 4 {
+		line = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(line, "**"), "**"))
+	}
+	return line
+}
+
 func (legacy legacyReportEvidence) validate() error {
+	for i, found := range legacy.sections {
+		if !found {
+			return fmt.Errorf("final report missing section %d) %s", i+1, legacySectionTitles[i])
+		}
+	}
 	if legacy.commandCount < 4 {
 		return fmt.Errorf("final report missing command evidence")
 	}
@@ -130,10 +174,25 @@ func (legacy legacyReportEvidence) validate() error {
 	if len(legacy.criteria) < 3 {
 		return fmt.Errorf("final report missing acceptance")
 	}
+	if !legacy.hasBranch {
+		return fmt.Errorf("final report missing Branch field")
+	}
 	for _, criterion := range legacy.criteria {
 		if strings.Contains(criterion, "FAIL") {
 			return fmt.Errorf("final report acceptance failed")
 		}
 	}
 	return nil
+}
+
+var legacySectionTitles = []string{
+	"Selected task",
+	"Pre-doc baseline",
+	"RED proof",
+	"GREEN proof",
+	"REFACTOR proof",
+	"Regression proof",
+	"Post-doc closeout",
+	"Commit",
+	"Acceptance check",
 }

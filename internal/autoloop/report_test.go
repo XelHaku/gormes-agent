@@ -134,6 +134,65 @@ func TestParseFinalReportRejectsLegacyBadFixtures(t *testing.T) {
 	}
 }
 
+func TestParseFinalReportRejectsLegacyMissingBranchWithCompleteEvidence(t *testing.T) {
+	report := legacyReportFixture("")
+	report = strings.Replace(report, "Branch: codexu/test-run/worker1\n", "", 1)
+
+	_, err := ParseFinalReport(report)
+	if err == nil {
+		t.Fatal("ParseFinalReport() error = nil, want missing branch error")
+	}
+	if !strings.Contains(err.Error(), "Branch") {
+		t.Fatalf("ParseFinalReport() error = %q, want Branch message", err)
+	}
+}
+
+func TestParseFinalReportRejectsLegacyMissingSectionWithCompleteEvidence(t *testing.T) {
+	report := legacyReportFixture("5")
+
+	_, err := ParseFinalReport(report)
+	if err == nil {
+		t.Fatal("ParseFinalReport() error = nil, want missing section error")
+	}
+	if !strings.Contains(err.Error(), "section") {
+		t.Fatalf("ParseFinalReport() error = %q, want section message", err)
+	}
+}
+
+func legacyReportFixture(skipSection string) string {
+	sections := []struct {
+		number string
+		title  string
+		body   []string
+	}{
+		{"1", "Selected task", []string{"Task: 1 / 1.A / Item A2"}},
+		{"2", "Pre-doc baseline", []string{"Files:", "- docs/progress.json"}},
+		{"3", "RED proof", []string{"Command: go test ./internal/foo", "Exit: 1", "Snippet: FAIL: TestBar"}},
+		{"4", "GREEN proof", []string{"Command: go test ./internal/foo", "Exit: 0", "Snippet: PASS"}},
+		{"5", "REFACTOR proof", []string{"Command: go test ./internal/foo", "Exit: 0", "Snippet: PASS"}},
+		{"6", "Regression proof", []string{"Command: go test ./...", "Exit: 0", "Snippet: ok"}},
+		{"7", "Post-doc closeout", []string{"Files:", "- docs/progress.json"}},
+		{"8", "Commit", []string{"Branch: codexu/test-run/worker1", "Commit: abc1234def5678", "Files:", "- internal/foo/foo.go"}},
+		{"9", "Acceptance check", []string{
+			"Criterion: TestBar fails before implementation — PASS",
+			"Criterion: TestBar passes after implementation — PASS",
+			"Criterion: progress.json entry marked in_progress with symbol note — PASS",
+		}},
+	}
+
+	var lines []string
+	for _, section := range sections {
+		if section.number == skipSection {
+			lines = append(lines, section.body...)
+			continue
+		}
+		lines = append(lines, section.number+") "+section.title)
+		lines = append(lines, section.body...)
+		lines = append(lines, "")
+	}
+	return strings.Join(lines, "\n")
+}
+
 func readReportFixture(t *testing.T, name string) string {
 	t.Helper()
 
