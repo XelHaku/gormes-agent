@@ -41,8 +41,9 @@
     },
     {
       "source": "cli_output.py",
-      "status": "planned",
-      "reason": "Terminal output helpers (color, tables) remain upstream-only; Go CLI uses direct fmt/bubbletea output."
+      "status": "ported",
+      "go": ["internal/cli/cli_output.go"],
+      "reason": "Shared print/prompt helpers ported: FormatInfo/Success/Warning/Error/Header wrap Colorize() with the upstream prefixes (\"  \"/\"✓ \"/\"⚠ \"/\"✗ \"/\"\\n  \") and color assignments (Dim/Green/Yellow/Red/Yellow), plus FormatPromptLabel (\"  <question>[ [<default>]]: \" in yellow), ResolvePromptAnswer (strip+default-fallback), FormatYesNoHint (Y/n vs y/N), and ParseYesNoAnswer (empty→default, otherwise startswith 'y' case-insensitively). The interactive stdin/getpass wrapper stays intentionally unported — callers wire their own io.Reader/io.Writer around these deterministic helpers."
     },
     {
       "source": "clipboard.py",
