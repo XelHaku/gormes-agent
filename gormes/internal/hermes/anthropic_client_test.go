@@ -11,61 +11,141 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
 
-type anthropicTestRequest struct {
-	Model     string `json:"model"`
-	MaxTokens int    `json:"max_tokens"`
-	System    string `json:"system,omitempty"`
-	Stream    bool   `json:"stream"`
-	Messages  []struct {
-		Role    string `json:"role"`
-		Content []struct {
-			Type      string         `json:"type"`
-			Text      string         `json:"text,omitempty"`
-			ID        string         `json:"id,omitempty"`
-			Name      string         `json:"name,omitempty"`
-			Input     map[string]any `json:"input,omitempty"`
-			ToolUseID string         `json:"tool_use_id,omitempty"`
-			Content   string         `json:"content,omitempty"`
-		} `json:"content"`
-	} `json:"messages"`
-	Tools []struct {
-		Name        string         `json:"name"`
-		Description string         `json:"description"`
-		InputSchema map[string]any `json:"input_schema"`
-	} `json:"tools,omitempty"`
+func TestAnthropicOpenStream_MapsConversationAndCacheControl(t *testing.T) {
+	type capturedRequest struct {
+		Model     string           `json:"model"`
+		MaxTokens int              `json:"max_tokens"`
+		Stream    bool             `json:"stream"`
+		System    any              `json:"system"`
+		Messages  []map[string]any `json:"messages"`
+		Tools     []map[string]any `json:"tools"`
+	}
+
+	var got capturedRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Fatalf("path = %q, want %q", r.URL.Path, "/v1/messages")
+		}
+		if got := r.Header.Get("x-api-key"); got != "sk-ant-api-test" {
+			t.Fatalf("x-api-key = %q, want %q", got, "sk-ant-api-test")
+		}
+		if got := r.Header.Get("anthropic-version"); got != anthropicVersion {
+			t.Fatalf("anthropic-version = %q, want %q", got, anthropicVersion)
+		}
+		if got := r.Header.Get("Accept"); got != "text/event-stream" {
+			t.Fatalf("Accept = %q, want text/event-stream", got)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer srv.Close()
+
+	client := NewAnthropicClient(srv.URL, "sk-ant-api-test")
+	stream, err := client.OpenStream(context.Background(), ChatRequest{
+		Model:     "claude-sonnet-4-5-20250929",
+		MaxTokens: 2048,
+		Messages: []Message{
+			{Role: "system", Content: "cached system", CacheControl: &CacheControl{Type: "ephemeral"}},
+			{Role: "user", Content: "look up weather"},
+			{
+				Role:    "assistant",
+				Content: "Calling a tool",
+				ToolCalls: []ToolCall{{
+					ID:        "toolu_1",
+					Name:      "get_weather",
+					Arguments: json.RawMessage(`{"location":"Monterrey"}`),
+				}},
+			},
+			{Role: "tool", ToolCallID: "toolu_1", Name: "get_weather", Content: "72F and sunny", CacheControl: &CacheControl{Type: "ephemeral"}},
+		},
+		Tools: []ToolDescriptor{{
+			Name:        "get_weather",
+			Description: "Returns the weather",
+			Schema:      json.RawMessage(`{"type":"object","properties":{"location":{"type":"string"}},"required":["location"]}`),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("OpenStream() error = %v", err)
+	}
+	defer stream.Close()
+
+	if _, err := stream.Recv(context.Background()); err != io.EOF {
+		t.Fatalf("Recv() err = %v, want EOF", err)
+	}
+
+	if got.Model != "claude-sonnet-4-5-20250929" {
+		t.Fatalf("model = %q, want claude-sonnet-4-5-20250929", got.Model)
+	}
+	if got.MaxTokens != 2048 {
+		t.Fatalf("max_tokens = %d, want 2048", got.MaxTokens)
+	}
+	if !got.Stream {
+		t.Fatal("stream = false, want true")
+	}
+	systemBlocks, ok := got.System.([]any)
+	if !ok || len(systemBlocks) != 1 {
+		t.Fatalf("system = %#v, want one cached content block", got.System)
+	}
+	systemBlock, _ := systemBlocks[0].(map[string]any)
+	if systemBlock["text"] != "cached system" {
+		t.Fatalf("system text = %#v, want %q", systemBlock["text"], "cached system")
+	}
+	cacheControl, _ := systemBlock["cache_control"].(map[string]any)
+	if cacheControl["type"] != "ephemeral" {
+		t.Fatalf("system cache_control = %#v, want ephemeral", systemBlock["cache_control"])
+	}
+	if len(got.Messages) != 3 {
+		t.Fatalf("messages len = %d, want 3 after tool result continuation mapping", len(got.Messages))
+	}
+	assistantBlocks, _ := got.Messages[1]["content"].([]any)
+	if len(assistantBlocks) != 2 {
+		t.Fatalf("assistant blocks len = %d, want 2", len(assistantBlocks))
+	}
+	toolUse, _ := assistantBlocks[1].(map[string]any)
+	if toolUse["type"] != "tool_use" || toolUse["name"] != "get_weather" || toolUse["id"] != "toolu_1" {
+		t.Fatalf("assistant tool_use = %#v, want id/name/type preserved", toolUse)
+	}
+	input, _ := toolUse["input"].(map[string]any)
+	if input["location"] != "Monterrey" {
+		t.Fatalf("tool_use input = %#v, want location Monterrey", input)
+	}
+	toolResultBlocks, _ := got.Messages[2]["content"].([]any)
+	if len(toolResultBlocks) != 1 {
+		t.Fatalf("tool result blocks len = %d, want 1", len(toolResultBlocks))
+	}
+	toolResult, _ := toolResultBlocks[0].(map[string]any)
+	if toolResult["type"] != "tool_result" || toolResult["tool_use_id"] != "toolu_1" {
+		t.Fatalf("tool_result = %#v, want linked tool result", toolResult)
+	}
+	toolResultCache, _ := toolResult["cache_control"].(map[string]any)
+	if toolResultCache["type"] != "ephemeral" {
+		t.Fatalf("tool_result cache_control = %#v, want ephemeral", toolResult["cache_control"])
+	}
+	if len(got.Tools) != 1 {
+		t.Fatalf("tools len = %d, want 1", len(got.Tools))
+	}
+	if got.Tools[0]["name"] != "get_weather" {
+		t.Fatalf("tools[0].name = %#v, want get_weather", got.Tools[0]["name"])
+	}
+	if got.Tools[0]["input_schema"] == nil {
+		t.Fatalf("tools[0].input_schema = nil, want schema passthrough")
+	}
 }
 
-const anthropicEndTurnFixture = `event: message_start
-data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":21,"output_tokens":1}}}
-
-event: content_block_start
-data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
-
-event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"done"}}
-
-event: content_block_stop
-data: {"type":"content_block_stop","index":0}
-
-event: message_delta
-data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":7}}
-
-event: message_stop
-data: {"type":"message_stop"}
-
-`
-
 const anthropicToolUseFixture = `event: message_start
-data: {"type":"message_start","message":{"id":"msg_2","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":42,"output_tokens":1}}}
+data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-4-5-20250929","content":[],"usage":{"input_tokens":11}}}
 
 event: content_block_start
-data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"need calculator"}}
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Need a tool."}}
 
 event: content_block_stop
 data: {"type":"content_block_stop","index":0}
@@ -74,262 +154,128 @@ event: content_block_start
 data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Let me check. "}}
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Checking weather. "}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"One moment."}}
 
 event: content_block_stop
 data: {"type":"content_block_stop","index":1}
 
 event: content_block_start
-data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"toolu_stream","name":"calc","input":{}}}
+data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"toolu_1","name":"get_weather","input":{}}}
 
 event: content_block_delta
-data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"expression\":\"2+2\"}"}}
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"location\":\"Mon"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"terrey\"}"}}
 
 event: content_block_stop
 data: {"type":"content_block_stop","index":2}
 
 event: message_delta
-data: {"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null},"usage":{"output_tokens":17}}
+data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":23}}
 
 event: message_stop
 data: {"type":"message_stop"}
 
 `
 
-func TestNewClient_AnthropicTranslatesCanonicalMessages(t *testing.T) {
-	reqSeen := make(chan anthropicTestRequest, 1)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Fatalf("method = %s, want POST", r.Method)
-		}
-		if r.URL.Path != "/v1/messages" {
-			t.Fatalf("path = %s, want /v1/messages", r.URL.Path)
-		}
-		if got := r.Header.Get("x-api-key"); got != "test-key" {
-			t.Fatalf("x-api-key = %q, want test-key", got)
-		}
-		if got := r.Header.Get("anthropic-version"); got != "2023-06-01" {
-			t.Fatalf("anthropic-version = %q, want 2023-06-01", got)
-		}
-		if got := r.Header.Get("Accept"); got != "text/event-stream" {
-			t.Fatalf("Accept = %q, want text/event-stream", got)
-		}
-
-		var body anthropicTestRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode body: %v", err)
-		}
-		reqSeen <- body
-
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(200)
-		bw := bufio.NewWriter(w)
-		fmt.Fprint(bw, anthropicEndTurnFixture)
-		bw.Flush()
-	}))
-	defer srv.Close()
-
-	c := NewClient("anthropic", srv.URL, "test-key")
-	s, err := c.OpenStream(context.Background(), ChatRequest{
-		Model: "claude-sonnet-4-20250514",
-		Messages: []Message{
-			{Role: "system", Content: "follow rules"},
-			{Role: "system", Content: "use tools precisely"},
-			{Role: "user", Content: "what is 2+2"},
-			{
-				Role:    "assistant",
-				Content: "I'll calculate that.",
-				ToolCalls: []ToolCall{{
-					ID:        "toolu_123",
-					Name:      "calc",
-					Arguments: json.RawMessage(`{"expression":"2+2"}`),
-				}},
-			},
-			{Role: "tool", ToolCallID: "toolu_123", Name: "calc", Content: "4"},
-		},
-		Tools: []ToolDescriptor{{
-			Name:        "calc",
-			Description: "calculator",
-			Schema:      json.RawMessage(`{"type":"object","properties":{"expression":{"type":"string"}},"required":["expression"]}`),
-		}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-
-	for {
-		ev, err := s.Recv(context.Background())
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		if ev.Kind == EventDone {
-			break
-		}
-	}
-
-	body := <-reqSeen
-	if body.Model != "claude-sonnet-4-20250514" {
-		t.Fatalf("model = %q, want claude-sonnet-4-20250514", body.Model)
-	}
-	if body.MaxTokens <= 0 {
-		t.Fatalf("max_tokens = %d, want > 0", body.MaxTokens)
-	}
-	if !body.Stream {
-		t.Fatal("stream = false, want true")
-	}
-	if body.System != "follow rules\n\nuse tools precisely" {
-		t.Fatalf("system = %q", body.System)
-	}
-	if len(body.Messages) != 3 {
-		t.Fatalf("messages len = %d, want 3", len(body.Messages))
-	}
-	if body.Messages[0].Role != "user" || len(body.Messages[0].Content) != 1 || body.Messages[0].Content[0].Text != "what is 2+2" {
-		t.Fatalf("messages[0] = %+v", body.Messages[0])
-	}
-	if body.Messages[1].Role != "assistant" || len(body.Messages[1].Content) != 2 {
-		t.Fatalf("messages[1] = %+v", body.Messages[1])
-	}
-	if body.Messages[1].Content[0].Type != "text" || body.Messages[1].Content[0].Text != "I'll calculate that." {
-		t.Fatalf("assistant text block = %+v", body.Messages[1].Content[0])
-	}
-	if body.Messages[1].Content[1].Type != "tool_use" || body.Messages[1].Content[1].ID != "toolu_123" || body.Messages[1].Content[1].Name != "calc" {
-		t.Fatalf("assistant tool block = %+v", body.Messages[1].Content[1])
-	}
-	if got := body.Messages[1].Content[1].Input["expression"]; got != "2+2" {
-		t.Fatalf("tool input expression = %#v, want 2+2", got)
-	}
-	if body.Messages[2].Role != "user" || len(body.Messages[2].Content) != 1 {
-		t.Fatalf("messages[2] = %+v", body.Messages[2])
-	}
-	if body.Messages[2].Content[0].Type != "tool_result" || body.Messages[2].Content[0].ToolUseID != "toolu_123" || body.Messages[2].Content[0].Content != "4" {
-		t.Fatalf("tool result block = %+v", body.Messages[2].Content[0])
-	}
-	if len(body.Tools) != 1 || body.Tools[0].Name != "calc" || body.Tools[0].Description != "calculator" {
-		t.Fatalf("tools = %+v", body.Tools)
-	}
-	if got := body.Tools[0].InputSchema["type"]; got != "object" {
-		t.Fatalf("tool input_schema type = %#v, want object", got)
-	}
-}
-
-func TestNewClient_AnthropicMapsThinkingAndToolUseEvents(t *testing.T) {
+func TestAnthropicStream_AccumulatesToolUseDeltasAndMapsStopReason(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(200)
 		bw := bufio.NewWriter(w)
 		fmt.Fprint(bw, anthropicToolUseFixture)
 		bw.Flush()
 	}))
 	defer srv.Close()
 
-	c := NewClient("anthropic", srv.URL, "test-key")
-	s, err := c.OpenStream(context.Background(), ChatRequest{
-		Model:    "claude-sonnet-4-20250514",
-		Messages: []Message{{Role: "user", Content: "what is 2+2?"}},
+	client := NewAnthropicClient(srv.URL, "sk-ant-api-test")
+	stream, err := client.OpenStream(context.Background(), ChatRequest{
+		Model:     "claude-sonnet-4-5-20250929",
+		MaxTokens: 256,
+		Messages:  []Message{{Role: "user", Content: "weather in Monterrey"}},
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("OpenStream() error = %v", err)
 	}
-	defer s.Close()
+	defer stream.Close()
 
-	var reasoning strings.Builder
-	var tokens strings.Builder
-	var final Event
+	var got []Event
 	for {
-		ev, err := s.Recv(context.Background())
+		ev, err := stream.Recv(context.Background())
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("Recv() error = %v", err)
 		}
-		switch ev.Kind {
-		case EventReasoning:
-			reasoning.WriteString(ev.Reasoning)
-		case EventToken:
-			tokens.WriteString(ev.Token)
-		case EventDone:
-			final = ev
-			goto done
-		}
+		got = append(got, ev)
 	}
 
-done:
-	if reasoning.String() != "need calculator" {
-		t.Fatalf("reasoning = %q, want need calculator", reasoning.String())
+	if len(got) != 4 {
+		t.Fatalf("event count = %d, want 4 (reasoning, token, token, done)", len(got))
 	}
-	if tokens.String() != "Let me check. " {
-		t.Fatalf("tokens = %q, want Let me check. ", tokens.String())
+	if got[0].Kind != EventReasoning || got[0].Reasoning != "Need a tool." {
+		t.Fatalf("got[0] = %+v, want reasoning delta", got[0])
+	}
+	if got[1].Kind != EventToken || got[1].Token != "Checking weather. " {
+		t.Fatalf("got[1] = %+v, want first text delta", got[1])
+	}
+	if got[2].Kind != EventToken || got[2].Token != "One moment." {
+		t.Fatalf("got[2] = %+v, want second text delta", got[2])
+	}
+	final := got[3]
+	if final.Kind != EventDone {
+		t.Fatalf("final kind = %v, want EventDone", final.Kind)
 	}
 	if final.FinishReason != "tool_calls" {
-		t.Fatalf("FinishReason = %q, want tool_calls", final.FinishReason)
+		t.Fatalf("FinishReason = %q, want %q", final.FinishReason, "tool_calls")
 	}
-	if final.TokensIn != 42 || final.TokensOut != 17 {
-		t.Fatalf("usage = %d/%d, want 42/17", final.TokensIn, final.TokensOut)
+	if final.TokensIn != 11 || final.TokensOut != 23 {
+		t.Fatalf("usage = %d/%d, want 11/23", final.TokensIn, final.TokensOut)
 	}
 	if len(final.ToolCalls) != 1 {
-		t.Fatalf("ToolCalls len = %d, want 1", len(final.ToolCalls))
+		t.Fatalf("tool_calls len = %d, want 1", len(final.ToolCalls))
 	}
-	if final.ToolCalls[0].ID != "toolu_stream" || final.ToolCalls[0].Name != "calc" {
-		t.Fatalf("ToolCalls[0] = %+v", final.ToolCalls[0])
+	tc := final.ToolCalls[0]
+	if tc.ID != "toolu_1" || tc.Name != "get_weather" {
+		t.Fatalf("tool call = %+v, want toolu_1/get_weather", tc)
 	}
-	if !strings.Contains(string(final.ToolCalls[0].Arguments), `"2+2"`) {
-		t.Fatalf("ToolCalls[0].Arguments = %s, want expression JSON", final.ToolCalls[0].Arguments)
+	if strings.TrimSpace(string(tc.Arguments)) != `{"location":"Monterrey"}` {
+		t.Fatalf("tool args = %s, want Monterrey payload", tc.Arguments)
 	}
 }
 
-func TestNewClient_AnthropicPreservesRetryAfterOnRateLimit(t *testing.T) {
+func TestAnthropicOpenStream_MapsRateLimitErrors(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Retry-After", "3")
-		http.Error(w, "slow down", http.StatusTooManyRequests)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		fmt.Fprint(w, `{"type":"error","error":{"type":"rate_limit_error","message":"slow down"}}`)
 	}))
 	defer srv.Close()
 
-	c := NewClient("anthropic", srv.URL, "test-key")
-	_, err := c.OpenStream(context.Background(), ChatRequest{
-		Model:    "claude-sonnet-4-20250514",
-		Messages: []Message{{Role: "user", Content: "hello"}},
+	client := NewAnthropicClient(srv.URL, "sk-ant-api-test")
+	_, err := client.OpenStream(context.Background(), ChatRequest{
+		Model:     "claude-sonnet-4-5-20250929",
+		MaxTokens: 128,
+		Messages:  []Message{{Role: "user", Content: "hello"}},
 	})
 	if err == nil {
-		t.Fatal("OpenStream() err = nil, want rate-limit error")
+		t.Fatal("OpenStream() err = nil, want rate limit error")
+	}
+	var httpErr *HTTPError
+	if !errors.As(err, &httpErr) {
+		t.Fatalf("error type = %T, want *HTTPError", err)
+	}
+	if httpErr.Status != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want 429", httpErr.Status)
+	}
+	if !strings.Contains(httpErr.Body, "slow down") {
+		t.Fatalf("body = %q, want slow down", httpErr.Body)
 	}
 	if got := Classify(err); got != ClassRetryable {
 		t.Fatalf("Classify(err) = %q, want %q", got, ClassRetryable)
-	}
-	var retryAfterer RetryAfterer
-	if !errors.As(err, &retryAfterer) {
-		t.Fatalf("error %T does not expose RetryAfter()", err)
-	}
-	if got, ok := retryAfterer.RetryAfter(); !ok || got != 3*time.Second {
-		t.Fatalf("RetryAfter = (%v, %t), want (3s, true)", got, ok)
-	}
-}
-
-func TestNewClient_AnthropicHealthUsesModelsEndpoint(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Fatalf("method = %s, want GET", r.Method)
-		}
-		if r.URL.Path != "/v1/models" {
-			t.Fatalf("path = %s, want /v1/models", r.URL.Path)
-		}
-		if got := r.Header.Get("x-api-key"); got != "test-key" {
-			t.Fatalf("x-api-key = %q, want test-key", got)
-		}
-		if got := r.Header.Get("anthropic-version"); got != "2023-06-01" {
-			t.Fatalf("anthropic-version = %q, want 2023-06-01", got)
-		}
-		w.WriteHeader(200)
-		_, _ = w.Write([]byte(`{"data":[]}`))
-	}))
-	defer srv.Close()
-
-	c := NewClient("anthropic", srv.URL, "test-key")
-	if err := c.Health(context.Background()); err != nil {
-		t.Fatalf("Health() error = %v", err)
 	}
 }

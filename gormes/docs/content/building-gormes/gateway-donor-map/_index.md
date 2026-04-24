@@ -9,7 +9,7 @@ PicoClaw is useful to Gormes as a donor repo for Go channel-edge work, not as th
 
 ## Provenance
 
-- Donor inspected for this section: external sibling repo `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- Donor inspected for this section: external sibling repo `<picoclaw donor repo>`.
 - Donor commit pinned for this research: `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - Upstream donor repo: `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed on this page is relative to that donor root, not relative to the Gormes repo.

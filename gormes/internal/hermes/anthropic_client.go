@@ -8,13 +8,14 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
-	anthropicMessagesPath = "/v1/messages"
-	anthropicModelsPath   = "/v1/models"
-	anthropicVersion      = "2023-06-01"
-	anthropicMaxTokens    = 4096
+	anthropicVersion             = "2023-06-01"
+	defaultAnthropicMessagesPath = "/v1/messages"
+	defaultAnthropicModelsPath   = "/v1/models"
+	defaultAnthropicMaxTokens    = 1024
 )
 
 type anthropicClient struct {
@@ -23,21 +24,13 @@ type anthropicClient struct {
 	http    *http.Client
 }
 
-func newAnthropicClient(baseURL, apiKey string) Client {
-	return &anthropicClient{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		apiKey:  apiKey,
-		http:    newStreamingHTTPClient(),
-	}
-}
-
 type anthropicRequest struct {
-	Model     string                    `json:"model"`
-	MaxTokens int                       `json:"max_tokens"`
-	System    string                    `json:"system,omitempty"`
-	Messages  []anthropicMessage        `json:"messages"`
-	Stream    bool                      `json:"stream"`
-	Tools     []anthropicToolDescriptor `json:"tools,omitempty"`
+	Model     string             `json:"model"`
+	MaxTokens int                `json:"max_tokens"`
+	Stream    bool               `json:"stream"`
+	System    any                `json:"system,omitempty"`
+	Messages  []anthropicMessage `json:"messages"`
+	Tools     []anthropicTool    `json:"tools,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -53,51 +46,65 @@ type anthropicContentSource struct {
 }
 
 type anthropicContentBlock struct {
-	Type      string                  `json:"type"`
-	Text      string                  `json:"text,omitempty"`
-	ID        string                  `json:"id,omitempty"`
-	Name      string                  `json:"name,omitempty"`
-	Input     map[string]any          `json:"input,omitempty"`
-	Source    *anthropicContentSource `json:"source,omitempty"`
-	ToolUseID string                  `json:"tool_use_id,omitempty"`
-	Content   string                  `json:"content,omitempty"`
+	Type         string                  `json:"type"`
+	Text         string                  `json:"text,omitempty"`
+	ID           string                  `json:"id,omitempty"`
+	Name         string                  `json:"name,omitempty"`
+	Input        any                     `json:"input,omitempty"`
+	Source       *anthropicContentSource `json:"source,omitempty"`
+	ToolUseID    string                  `json:"tool_use_id,omitempty"`
+	Content      string                  `json:"content,omitempty"`
+	CacheControl *CacheControl           `json:"cache_control,omitempty"`
 }
 
-type anthropicToolDescriptor struct {
+type anthropicTool struct {
 	Name        string          `json:"name"`
-	Description string          `json:"description"`
+	Description string          `json:"description,omitempty"`
 	InputSchema json.RawMessage `json:"input_schema"`
 }
 
-func (c *anthropicClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, error) {
-	body, err := buildAnthropicRequest(req)
-	if err != nil {
-		return nil, err
+// NewAnthropicClient returns a Client that talks directly to Anthropic's
+// Messages API over HTTP+SSE.
+func NewAnthropicClient(baseURL, apiKey string) Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = 5 * time.Second
+	return &anthropicClient{
+		baseURL: strings.TrimRight(baseURL, "/"),
+		apiKey:  apiKey,
+		http:    &http.Client{Timeout: 0, Transport: transport},
 	}
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
+}
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+anthropicMessagesPath, bytes.NewReader(raw))
+func newAnthropicClient(baseURL, apiKey string) Client {
+	return NewAnthropicClient(baseURL, apiKey)
+}
+
+func (c *anthropicClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, error) {
+	payload, err := buildAnthropicRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+defaultAnthropicMessagesPath, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "text/event-stream")
 	httpReq.Header.Set("anthropic-version", anthropicVersion)
-	if c.apiKey != "" {
-		httpReq.Header.Set("x-api-key", c.apiKey)
-	}
+	c.applyAuth(httpReq)
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode >= 300 {
-		rawBody, _ := io.ReadAll(resp.Body)
+		raw, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		return nil, newHTTPError(resp, rawBody)
+		return nil, newHTTPError(resp, raw)
 	}
 	return newAnthropicStream(resp.Body), nil
 }
@@ -107,118 +114,162 @@ func (c *anthropicClient) OpenRunEvents(context.Context, string) (RunEventStream
 }
 
 func (c *anthropicClient) Health(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+anthropicModelsPath, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+defaultAnthropicModelsPath, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("anthropic-version", anthropicVersion)
-	if c.apiKey != "" {
-		req.Header.Set("x-api-key", c.apiKey)
-	}
+	c.applyAuth(req)
+
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return newHTTPError(resp, body)
+		raw, _ := io.ReadAll(resp.Body)
+		return newHTTPError(resp, raw)
 	}
 	return nil
 }
 
+func (c *anthropicClient) applyAuth(req *http.Request) {
+	if c.apiKey == "" {
+		return
+	}
+	req.Header.Set("x-api-key", c.apiKey)
+}
+
 func buildAnthropicRequest(req ChatRequest) (anthropicRequest, error) {
-	system, messages, err := translateAnthropicMessages(req.Messages)
+	system, messages, err := convertAnthropicMessages(req.Messages)
 	if err != nil {
 		return anthropicRequest{}, err
 	}
-	tools := make([]anthropicToolDescriptor, len(req.Tools))
-	for i, t := range req.Tools {
-		tools[i] = anthropicToolDescriptor{
-			Name:        t.Name,
-			Description: t.Description,
-			InputSchema: t.Schema,
-		}
+	tools := make([]anthropicTool, 0, len(req.Tools))
+	for _, tool := range req.Tools {
+		tools = append(tools, anthropicTool{
+			Name:        tool.Name,
+			Description: tool.Description,
+			InputSchema: tool.Schema,
+		})
+	}
+	maxTokens := req.MaxTokens
+	if maxTokens <= 0 {
+		maxTokens = defaultAnthropicMaxTokens
 	}
 	return anthropicRequest{
 		Model:     req.Model,
-		MaxTokens: anthropicMaxTokens,
+		MaxTokens: maxTokens,
+		Stream:    true,
 		System:    system,
 		Messages:  messages,
-		Stream:    true,
 		Tools:     tools,
 	}, nil
 }
 
-func translateAnthropicMessages(messages []Message) (string, []anthropicMessage, error) {
-	systemParts := make([]string, 0, len(messages))
-	out := make([]anthropicMessage, 0, len(messages))
-
+func convertAnthropicMessages(messages []Message) (any, []anthropicMessage, error) {
+	var (
+		systemBlocks []anthropicContentBlock
+		systemText   []string
+		out          []anthropicMessage
+	)
 	for i := 0; i < len(messages); i++ {
 		msg := messages[i]
 		switch msg.Role {
 		case "system":
-			if strings.TrimSpace(msg.Content) != "" {
-				systemParts = append(systemParts, msg.Content)
+			if len(msg.Parts) > 0 {
+				return nil, nil, fmt.Errorf("anthropic system messages do not support multimodal content")
 			}
+			if strings.TrimSpace(msg.Content) == "" {
+				continue
+			}
+			if msg.CacheControl != nil {
+				systemBlocks = append(systemBlocks, textBlock(msg.Content, msg.CacheControl))
+				continue
+			}
+			systemText = append(systemText, msg.Content)
 		case "user":
 			blocks, err := anthropicMessageBlocks(msg)
 			if err != nil {
-				return "", nil, err
+				return nil, nil, err
 			}
-			out = append(out, anthropicMessage{
-				Role:    "user",
-				Content: blocks,
-			})
+			if msg.CacheControl != nil && len(blocks) == 1 && blocks[0].Type == "text" {
+				blocks[0].CacheControl = msg.CacheControl
+			}
+			out = append(out, anthropicMessage{Role: "user", Content: blocks})
 		case "assistant":
-			blocks := make([]anthropicContentBlock, 0, 1+len(msg.ToolCalls))
-			messageBlocks, err := anthropicMessageBlocks(msg)
+			blocks, err := assistantContentBlocks(msg)
 			if err != nil {
-				return "", nil, err
-			}
-			for _, block := range messageBlocks {
-				if block.Type == "image" {
-					return "", nil, fmt.Errorf("anthropic assistant messages do not support image content")
-				}
-			}
-			blocks = append(blocks, messageBlocks...)
-			for _, tc := range msg.ToolCalls {
-				input, err := parseAnthropicToolInput(tc.Arguments)
-				if err != nil {
-					return "", nil, fmt.Errorf("anthropic assistant tool %q: %w", tc.Name, err)
-				}
-				blocks = append(blocks, anthropicContentBlock{
-					Type:  "tool_use",
-					ID:    tc.ID,
-					Name:  tc.Name,
-					Input: input,
-				})
-			}
-			if len(blocks) == 0 {
-				continue
+				return nil, nil, err
 			}
 			out = append(out, anthropicMessage{Role: "assistant", Content: blocks})
 		case "tool":
-			blocks := make([]anthropicContentBlock, 0, 1)
+			var blocks []anthropicContentBlock
 			for ; i < len(messages) && messages[i].Role == "tool"; i++ {
 				toolMsg := messages[i]
-				if strings.TrimSpace(toolMsg.ToolCallID) == "" {
-					return "", nil, fmt.Errorf("anthropic tool result missing tool_call_id")
+				block, err := anthropicToolResultBlock(toolMsg)
+				if err != nil {
+					return nil, nil, err
 				}
-				blocks = append(blocks, anthropicContentBlock{
-					Type:      "tool_result",
-					ToolUseID: toolMsg.ToolCallID,
-					Content:   toolMsg.Content,
-				})
+				blocks = append(blocks, block)
 			}
 			i--
 			out = append(out, anthropicMessage{Role: "user", Content: blocks})
 		default:
-			return "", nil, fmt.Errorf("anthropic unsupported role %q", msg.Role)
+			return nil, nil, fmt.Errorf("anthropic unsupported role %q", msg.Role)
 		}
 	}
+	if len(systemBlocks) > 0 {
+		return systemBlocks, out, nil
+	}
+	if len(systemText) > 0 {
+		return strings.Join(systemText, "\n\n"), out, nil
+	}
+	return nil, out, nil
+}
 
-	return strings.Join(systemParts, "\n\n"), out, nil
+func assistantContentBlocks(msg Message) ([]anthropicContentBlock, error) {
+	blocks, err := anthropicMessageBlocks(msg)
+	if err != nil {
+		return nil, err
+	}
+	for _, block := range blocks {
+		if block.Type == "image" {
+			return nil, fmt.Errorf("anthropic assistant messages do not support image content")
+		}
+	}
+	for _, tc := range msg.ToolCalls {
+		input, err := parseAnthropicToolInput(tc.Arguments)
+		if err != nil {
+			return nil, fmt.Errorf("anthropic assistant tool %q: %w", tc.Name, err)
+		}
+		blocks = append(blocks, anthropicContentBlock{
+			Type:  "tool_use",
+			ID:    tc.ID,
+			Name:  tc.Name,
+			Input: input,
+		})
+	}
+	if len(blocks) == 0 {
+		blocks = append(blocks, textBlock("(empty)", nil))
+	}
+	return blocks, nil
+}
+
+func anthropicToolResultBlock(msg Message) (anthropicContentBlock, error) {
+	if strings.TrimSpace(msg.ToolCallID) == "" {
+		return anthropicContentBlock{}, fmt.Errorf("anthropic tool result missing tool_call_id")
+	}
+	content := msg.Content
+	if content == "" {
+		content = "(no output)"
+	}
+	return anthropicContentBlock{
+		Type:         "tool_result",
+		ToolUseID:    msg.ToolCallID,
+		Content:      content,
+		CacheControl: msg.CacheControl,
+	}, nil
 }
 
 func parseAnthropicToolInput(raw json.RawMessage) (map[string]any, error) {
@@ -234,4 +285,8 @@ func parseAnthropicToolInput(raw json.RawMessage) (map[string]any, error) {
 		return map[string]any{}, nil
 	}
 	return input, nil
+}
+
+func textBlock(text string, cache *CacheControl) anthropicContentBlock {
+	return anthropicContentBlock{Type: "text", Text: text, CacheControl: cache}
 }

@@ -61,7 +61,7 @@ mkdir -p gormes/docs/content/upstream-hermes
 - [ ] **Step 2: Move the six inherited subtrees with `git mv` (preserves history)**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 for dir in guides developer-guide integrations reference user-guide getting-started; do
   if [ -d "gormes/docs/content/$dir" ]; then
     git mv "gormes/docs/content/$dir" "gormes/docs/content/upstream-hermes/$dir"
@@ -109,7 +109,7 @@ Expected: ≥20 (the inherited Hermes content count from earlier — 18 guides +
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/docs/content/upstream-hermes/ && \
 git commit -m "docs(gormes): re-home inherited Hermes content under upstream-hermes/
 
@@ -347,7 +347,7 @@ Expected: `ok` (any pre-existing failures unrelated to this task can be noted as
 - [ ] **Step 10: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/docs/ARCH_PLAN.md \
         gormes/docs/content/building-gormes/architecture_plan/ \
         gormes/docs/docs_test.go && \
@@ -700,7 +700,7 @@ Every PR must keep all three layers green. The `deploy-gormes-landing.yml` and `
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/docs/content/building-gormes/ && \
 git commit -m "docs(gormes): add building-gormes section (core systems + overview)
 
@@ -1057,7 +1057,7 @@ gormes --resume new
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/docs/content/using-gormes/ && \
 git commit -m "docs(gormes): add using-gormes section (8 user-facing pages)
 
@@ -1388,7 +1388,7 @@ Expected: `Total in Xms` with no error. If the build fails, read the error and f
 - [ ] **Step 8: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/docs/hugo.toml gormes/docs/layouts/ && \
 git commit -m "docs(gormes): hand-built Hugo layouts for docs.gormes.ai
 
@@ -1931,7 +1931,7 @@ Expected: `Total in Xms`. Open `/tmp/gormes-docs-preview/index.html` (or spin up
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/docs/static/site.css && \
 git commit -m "style(gormes/docs): site.css aligned with landing + docs layout
 
@@ -2050,7 +2050,7 @@ jobs:
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add .github/workflows/deploy-gormes-docs.yml && \
 git commit -m "ci(docs): add Pagefind search index to the deploy pipeline
 
@@ -2191,7 +2191,7 @@ Expected: `PASS`. If any page is missing, the test names which one.
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/docs/build_test.go && \
 git commit -m "test(gormes/docs): Hugo build smoke + sidebar structure assertions
 
@@ -2398,7 +2398,7 @@ Expected: `X passed` (at least 7 — home smoke + 12 mobile overflow + 2 drawer)
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/docs/www-tests/ && \
 git commit -m "test(gormes/docs): parametrized Playwright suite for docs site
 
@@ -2494,7 +2494,7 @@ Expected: `5 passed`. The overflow-check test at the smallest viewport now has 6
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/www.gormes.ai/internal/site/ && \
 git commit -m "feat(gormes/www): add Phase 6 (Learning Loop) card to landing roadmap
 
@@ -2560,7 +2560,7 @@ Expected: `ok`.
 - [ ] **Step 5: Push to main**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git push origin main 2>&1 | tail -5
 ```
 

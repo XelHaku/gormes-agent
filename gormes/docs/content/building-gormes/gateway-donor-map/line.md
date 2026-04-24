@@ -13,7 +13,7 @@ LINE matters mainly as a webhook-first channel. The donor value is not a full ad
 
 Evidence level:
 
-- Donor code for this dossier was verified against the external sibling repo at `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- Donor code for this dossier was verified against the external sibling repo at `<picoclaw donor repo>`.
 - The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - The upstream donor repo is `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
@@ -38,7 +38,7 @@ The implementation is not a direct copy candidate because outbound media support
 
 ## Picoclaw Donor Files
 
-- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
+- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `<picoclaw donor repo>` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
 - `picoclaw/pkg/channels/line/line.go`
 - `picoclaw/pkg/channels/line/line_test.go`
 - `picoclaw/docs/channels/line/README.md`

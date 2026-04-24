@@ -1,8 +1,7 @@
 {
   "meta": {
-    "version": "1.0",
-    "last_updated": "2026-04-23",
-    "source_of_truth": "gormes/docs/content/building-gormes/architecture_plan/progress.json",
+    "version": "2.0",
+    "last_updated": "2026-04-24",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -13,493 +12,1634 @@
   "phases": {
     "1": {
       "name": "Phase 1 \u2014 The Dashboard",
-      "status": "complete",
       "deliverable": "Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary",
-      "shipped": [
-        "Bubble Tea TUI shell",
-        "Kernel with 16 ms render mailbox (coalescing)",
-        "Route-B SSE reconnect",
-        "Wire Doctor \u2014 offline tool-registry validation",
-        "Streaming token renderer"
-      ],
-      "ongoing": [
-        "Polish, bug fixes, TUI ergonomics"
-      ],
       "subphases": {
         "1.A": {
-          "status": "complete",
           "name": "Core TUI",
           "items": [
-            "Bubble Tea shell",
-            "16ms coalescing mailbox",
-            "SSE reconnect"
+            {
+              "name": "Bubble Tea shell",
+              "status": "complete"
+            },
+            {
+              "name": "16ms coalescing mailbox",
+              "status": "complete"
+            },
+            {
+              "name": "SSE reconnect",
+              "status": "complete"
+            }
           ]
         },
         "1.B": {
-          "status": "complete",
           "name": "Wire Doctor",
           "items": [
-            "Offline tool validation"
+            {
+              "name": "Offline tool validation",
+              "status": "complete"
+            }
+          ]
+        },
+        "1.C": {
+          "name": "Automation Reliability",
+          "items": [
+            {
+              "name": "Orchestrator failure-row stabilization for 4-8 workers",
+              "status": "in_progress",
+              "note": "P0 umbrella: stop false failure rows when codex exits non-zero despite valid final report + single clean commit; preserve promotion flow and keep loop throughput viable at higher parallelism. Partials landed since the prior audit: (a) granular failure taxonomy replaces the conflated `contract_or_test_failure` status with `no_commit_made|wrong_commit_count|worktree_dirty|branch_mismatch|report_commit_mismatch|scope_violation|report_validation_failed` — `verify_worker_commit` exports `LAST_VERIFY_REASON` and `run_worker` stamps it into the `runs.jsonl` status (`scripts/orchestrator/lib/worktree.sh`, `scripts/gormes-auto-codexu-orchestrator.sh`); (b) `try_soft_success_nonzero` in the main entry script recovers a non-zero codex rc into a `soft_success_nonzero` worker_success iff the final report validates and `verify_worker_commit` is clean — but it is gated behind `ALLOW_SOFT_SUCCESS_NONZERO=1` with no default flip. The remaining closeout is owned by the sibling slice below (bats coverage + default enablement)."
+            },
+            {
+              "name": "Soft-success-nonzero bats coverage + default enablement decision",
+              "priority": "P0",
+              "status": "planned",
+              "note": "TDD: add `scripts/orchestrator/tests/unit/` (and/or `integration/`) bats coverage for `try_soft_success_nonzero` pinning (a) rc=124/137 always reject (timeouts/OOM are NOT soft-successable), (b) invalid final report rejects regardless of rc, (c) dirty verify_worker_commit rejects regardless of rc, (d) valid final report + clean commit + rc∈{non-124,non-137} flips to `soft_success_nonzero` and emits `original_rc` in the worker state. Once tests are green, make the default-on vs default-off decision as a separate tiny slice (flip `ALLOW_SOFT_SUCCESS_NONZERO` default or leave env-gated with docs), and record the decision in `docs/superpowers/specs/2026-04-24-orchestrator-oiling-release-1-design.md`. Blocks marking the umbrella item complete."
+            },
+            {
+              "name": "Planner wrapper/test consistency closeout",
+              "status": "planned",
+              "note": "P0: the `go test ./internal/ -run ArchitecturePlanner` suite is currently RED — `TestArchitecturePlannerAgentRunsCodexuAndInstallsPeriodicTimer` fails at architectureplanneragent_test.go:38 because it reads `scripts/gormes-architecture-task-manager.sh` which no longer exists in the worktree (only `scripts/gormes-architecture-planner-tasks-manager.sh` remains). TDD: pick one policy and finish it in a single slice — either (a) restore tiny exec wrappers at `scripts/gormes-architecture-task-manager.sh` and `scripts/architectureplanneragent.sh` that exec the renamed script, or (b) update `internal/architectureplanneragent_test.go` plus `docs/superpowers/plans/2026-04-23-gormes-architecture-task-manager-script.md` to a single-entrypoint policy that drops the `task-manager-help`/`legacy-help` subtests. Either path must leave `go test ./internal/ -run ArchitecturePlanner -count=1` green."
+            }
           ]
         }
       }
     },
     "2": {
       "name": "Phase 2 \u2014 The Gateway",
-      "status": "in_progress",
-      "deliverable": "Go-native tools + Telegram + session resume + wider adapters",
+      "deliverable": "Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before the long-tail adapter flood",
       "subphases": {
         "2.A": {
-          "status": "complete",
           "name": "Tool Registry",
           "items": [
-            "In-process Go tool registry",
-            "Streamed tool_calls accumulation",
-            "Kernel tool loop",
-            "Doctor verification"
+            {
+              "name": "In-process Go tool registry",
+              "status": "complete"
+            },
+            {
+              "name": "Streamed tool_calls accumulation",
+              "status": "complete"
+            },
+            {
+              "name": "Kernel tool loop",
+              "status": "complete"
+            },
+            {
+              "name": "Doctor verification",
+              "status": "complete"
+            }
           ]
         },
         "2.B.1": {
-          "status": "complete",
           "name": "Telegram Scout",
           "items": [
-            "Telegram adapter",
-            "Long-poll ingress",
-            "Edit coalescing"
-          ]
-        },
-        "2.C": {
-          "status": "complete",
-          "name": "Thin Mapping Persistence",
-          "items": [
-            "bbolt session resume",
-            "(platform, chat_id) -> session_id"
-          ]
-        },
-        "2.D": {
-          "status": "complete",
-          "name": "Cron / Scheduled Automations",
-          "items": [
-            "robfig/cron/v3 scheduler",
-            "bbolt cron_jobs bucket",
-            "SQLite cron_runs audit table (schema v3e)",
-            "CRON.md mirror (3.D.5 atomic-write pattern)",
-            "Heartbeat [SYSTEM:] prefix (verbatim upstream port)",
-            "Exact-match [SILENT] suppression protocol",
-            "Kernel PlatformEvent.SessionID + CronJobID per-event override",
-            "Generic DeliverySink interface (kernel-agnostic)",
-            "Ollama E2E heartbeat crucible proven live"
+            {
+              "name": "Telegram adapter",
+              "status": "complete"
+            },
+            {
+              "name": "Long-poll ingress",
+              "status": "complete"
+            },
+            {
+              "name": "Edit coalescing",
+              "status": "complete"
+            }
           ]
         },
         "2.B.2": {
-          "status": "planned",
-          "name": "Wider Gateway Surface",
+          "name": "Gateway Chassis + Discord",
+          "priority": "P1",
           "items": [
-            "Discord",
-            "Slack",
-            "WhatsApp",
-            "Signal",
-            "Email",
-            "SMS"
+            {
+              "name": "Reusable gateway chassis",
+              "status": "complete"
+            },
+            {
+              "name": "Telegram on shared chassis",
+              "status": "complete"
+            },
+            {
+              "name": "gormes gateway multi-channel entrypoint",
+              "status": "complete"
+            },
+            {
+              "name": "Discord",
+              "status": "complete"
+            }
           ]
         },
-        "2.E": {
-          "status": "planned",
-          "name": "Subagent System",
+        "2.B.3": {
+          "name": "Slack on Shared Chassis",
+          "priority": "P1",
           "items": [
-            "Execution isolation",
-            "Resource boundaries",
-            "Context isolation",
-            "Cancellation scopes"
-          ],
-          "priority": "P0"
+            {
+              "name": "Slack Socket Mode adapter",
+              "status": "complete",
+              "note": "TDD landed: internal/slack owns a Socket Mode bot with AuthTest, event acking, message filtering, placeholder updates, and final/error delivery over the kernel."
+            },
+            {
+              "name": "Thread routing + coalesced reply flow",
+              "status": "complete",
+              "note": "TDD landed: internal/slack preserves reply thread timestamps, coalesces streaming updates through a placeholder, and persists channel/thread session handles."
+            },
+            {
+              "name": "Slack CommandRegistry parser wiring",
+              "status": "planned",
+              "note": "TDD: route Slack slash/message command ingress through gateway.ParseInboundText and the shared CommandRegistry, with adapter-local affordances kept behind Slack-specific tests."
+            },
+            {
+              "name": "Slack gateway.Channel adapter shim",
+              "status": "planned",
+              "note": "TDD: adapt internal/slack onto the gateway.Channel interface and Manager lifecycle without rewriting the existing Socket Mode client or coalesced reply tests."
+            },
+            {
+              "name": "Slack config + cmd/gormes gateway registration",
+              "status": "planned",
+              "note": "TDD: add Slack config loading, doctor coverage, and cmd/gormes gateway registration only after the Channel shim is green; current evidence shows only Telegram and Discord are registered there."
+            }
+          ]
         },
-        "2.F": {
-          "status": "planned",
-          "name": "Hooks + Lifecycle",
+        "2.B.4": {
+          "name": "WhatsApp Adapter",
+          "priority": "P1",
           "items": [
-            "Per-event extension points",
-            "Managed restarts"
+            {
+              "name": "Bridge-vs-native runtime decision",
+              "status": "planned",
+              "note": "TDD: port the runtime-selection seam from upstream `gateway/platforms/whatsapp.py` into a Go contract that freezes bridge-first vs native-first startup, session-path ownership, and bot/self-chat policy before transport wiring. Current tree only lands `internal/channels/whatsapp.NormalizeInbound`."
+            },
+            {
+              "name": "Inbound normalization + command passthrough",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/whatsapp.NormalizeInbound normalizes bridge/native peer IDs and routes generic slash commands through gateway.ParseInboundText."
+            },
+            {
+              "name": "Pairing, reconnect, and send contract",
+              "status": "planned",
+              "note": "TDD: add a transport-neutral outbound lifecycle contract that gates sends on pairing state, retries reconnects with bounded backoff, and maps normalized gateway chat IDs back to raw WhatsApp DM/group peers with reply metadata preservation."
+            }
+          ]
+        },
+        "2.B.5": {
+          "name": "Session Context + Delivery Routing",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "Gateway session store + SessionSource parity",
+              "status": "complete",
+              "note": "TDD landed: gateway session-ID resolution now prefers stored handles, falls back deterministically to the chat-scoped key on empty/error paths, and freezes SessionSource/session-context prompt contracts in gateway tests."
+            },
+            {
+              "name": "SessionContext prompt injection",
+              "status": "complete",
+              "note": "TDD landed: each inbound submit now injects a stable Current Session Context system block ahead of recall/user messages, covering source metadata plus deterministic delivery-target exposure."
+            },
+            {
+              "name": "DeliveryRouter + --deliver target parsing",
+              "status": "complete",
+              "note": "TDD landed: --deliver parsing now covers origin/local/platform/platform:chat/platform:chat:thread forms with explicit invalid-shape tests before future adapter routing binds them to live channels."
+            },
+            {
+              "name": "Gateway stream consumer for agent-event fan-out",
+              "status": "complete",
+              "note": "TDD landed: a typed GatewayStreamConsumer contract now replays one render frame to multiple delivery targets in deterministic order and preserves later deliveries when one sink fails."
+            }
+          ]
+        },
+        "2.B.6": {
+          "name": "Signal Adapter",
+          "priority": "P2",
+          "items": [
+            {
+              "name": "Inbound event normalization + session identity",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/signal.NormalizeInbound now freezes Signal DM/group chat IDs, generic slash passthrough, and alternate phone/UUID session identity before client wiring."
+            },
+            {
+              "name": "Reply/send contract on shared chassis",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/signal.Bot now records reply metadata from normalized inbound events and routes shared-chassis sends back to direct recipients or native group IDs with reply-to preservation."
+            },
+            {
+              "name": "Signal transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze signal-cli or bridge client lifecycle, receive-loop reconnect/error handling, and outbound attachment/send seams before binding a real transport."
+            }
+          ]
+        },
+        "2.B.7": {
+          "name": "Email + SMS Adapters",
+          "priority": "P3",
+          "items": [
+            {
+              "name": "Email ingress + outbound delivery contract",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/email now normalizes RFC 822 MIME bodies into plaintext gateway events and derives deterministic reply-thread targets before IMAP or SMTP transport glue."
+            },
+            {
+              "name": "SMS ingress + outbound delivery contract",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/sms.NormalizeInbound now canonicalizes phone-number session keys, delegates generic slash commands through gateway.ParseInboundText, and BuildDelivery splits outbound replies into natural-boundary 1600-rune segments for future Twilio sends."
+            }
+          ]
+        },
+        "2.B.8": {
+          "name": "Matrix + Mattermost Adapters",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "Threaded text adapter contract suite",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/threadtext freezes canonical thread IDs, gateway inbound normalization, and reply-target derivation before Matrix/Mattermost transport work."
+            },
+            {
+              "name": "Matrix shared-chassis bot seam",
+              "status": "planned",
+              "note": "TDD: land a Matrix-specific bot seam on top of `internal/channels/threadtext` that freezes canonical thread reply targets, root-message thread defaults, and placeholder/edit hooks before auth/sync/E2EE transport work."
+            },
+            {
+              "name": "Mattermost shared-chassis bot seam",
+              "status": "planned",
+              "note": "TDD: land a Mattermost-specific bot seam on top of `internal/channels/threadtext` that freezes canonical reply targets, flat-vs-thread root reply defaults, and placeholder/edit hooks before REST/WS transport work."
+            },
+            {
+              "name": "Matrix real client/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze auth, sync/invite handling, room-kind and mention policy, and media/E2EE bootstrap seams before binding a real Matrix client."
+            },
+            {
+              "name": "Mattermost REST/WS bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze auth, websocket reconnect, channel/user lookup, and file upload/edit seams before binding a real Mattermost transport."
+            }
+          ]
+        },
+        "2.B.9": {
+          "name": "Webhook + Trigger Ingress",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "Signed event parsing + auth gates",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/webhook.ParseInbound now enforces body-size and event-filter gates, and ValidateSignature freezes GitHub, GitLab, and generic HMAC auth before any HTTP runtime wiring."
+            },
+            {
+              "name": "Prompt-to-delivery routing bridge",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/webhook now renders prompt and deliver_extra templates, derives deterministic webhook session chat IDs, and resolves typed gateway delivery targets including thread aliases."
+            }
+          ]
+        },
+        "2.B.10": {
+          "name": "Regional + Device Adapter Flood",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "BlueBubbles + HomeAssistant adapters",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/bluebubbles and internal/channels/homeassistant now freeze webhook-auth, cached home-channel delivery, filtered state-change formatting, cooldown, and persistent-notification contracts before any SDK wiring."
+            },
+            {
+              "name": "Feishu shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/feishu now pins webhook-versus-websocket ingress, group mention policy, allowlist behavior, and reply-target preservation before any SDK wiring."
+            },
+            {
+              "name": "WeCom + WeiXin shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/wecom and internal/channels/weixin now pin policy-gated ingress, request/reply routing, and per-platform reply-path contracts before any SDK wiring."
+            },
+            {
+              "name": "DingTalk shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/dingtalk.Bot now covers allow-list policy, mention-gated ingress, generic command parsing, session-webhook capture, and callback-bound reply delivery; runtime/bootstrap and real SDK binding remain tracked separately."
+            },
+            {
+              "name": "QQ Bot shared-chassis bot seam",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/qqbot now covers DM/group policy gates, mention-gated ingress, and passive-reply sequencing before any runtime bootstrap."
+            },
+            {
+              "name": "Feishu transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze webhook and websocket client lifecycle, credential validation, and rich-text send failure modes before binding a real Feishu transport."
+            },
+            {
+              "name": "Feishu drive-comment rule + pairing seam",
+              "status": "planned",
+              "note": "TDD: port the upstream `gateway/platforms/feishu_comment_rules.py` contract as a Go rule resolver with exact document, wildcard, and top-level fallback plus allowlist/pairing decisions before comment replies can invoke an agent."
+            },
+            {
+              "name": "Feishu drive-comment reply workflow",
+              "status": "planned",
+              "note": "TDD: freeze `drive.notice.comment_add_v1` parsing, OK-reaction behavior, whole-document vs local-thread prompt construction, and reply fallback semantics from `gateway/platforms/feishu_comment.py` before real SDK binding."
+            },
+            {
+              "name": "WeCom + WeiXin transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze callback/webhook bootstrap, credential validation, and outbound push/reply lifecycle seams before binding real WeCom or WeiXin transports."
+            },
+            {
+              "name": "DingTalk transport/bootstrap layer",
+              "status": "complete",
+              "note": "TDD landed: internal/channels/dingtalk now freezes Stream Mode bootstrap via DecideRuntime plus SessionWebhooks refresh and ReplySender retry/error contracts before any real SDK binding."
+            },
+            {
+              "name": "DingTalk real SDK binding",
+              "status": "planned",
+              "note": "TDD: bind the frozen Stream Mode/runtime contract to the real DingTalk SDK, credential checks, receive loop, and send lifecycle without widening the already-tested session-webhook retry seam."
+            },
+            {
+              "name": "DingTalk AI Cards streaming-update contract",
+              "status": "planned",
+              "note": "TDD slice 1 of 3 from upstream PR #4459913f: freeze the AI Cards streaming-update contract on top of the existing DingTalk bot seam and Stream Mode transport — coalesced token pushes, terminal-frame semantics, and a DingTalk-shaped failure fallback — with fixture-backed tests before binding to the real SDK in `DingTalk real SDK binding`. Gates the next two slices."
+            },
+            {
+              "name": "DingTalk emoji reaction send/receive parity",
+              "status": "planned",
+              "note": "TDD slice 2 of 3 from upstream PR #4459913f: freeze emoji reaction send/receive parity on the DingTalk bot seam with fixture-backed tests and a DingTalk-shaped failure fallback. Requires the AI Cards streaming-update slice to be green first; do not bind to the real SDK until `DingTalk real SDK binding` lands."
+            },
+            {
+              "name": "DingTalk media (image/file) attachment routing",
+              "status": "planned",
+              "note": "TDD slice 3 of 3 from upstream PR #4459913f: freeze media (image/file) attachment routing on the DingTalk bot seam with fixture-backed tests and a DingTalk-shaped failure fallback. Requires the streaming-update and emoji-reaction slices to be green first; do not bind to the real SDK until `DingTalk real SDK binding` lands."
+            },
+            {
+              "name": "QQ Bot transport/bootstrap layer",
+              "status": "planned",
+              "note": "TDD: freeze gateway/event receive loops, passive-reply lifecycle, and platform-specific send failure handling before binding a real QQ transport."
+            }
+          ]
+        },
+        "2.B.11": {
+          "name": "Discord Forum Channels",
+          "priority": "P3",
+          "items": [
+            {
+              "name": "Discord forum channel ingress + thread lifecycle",
+              "status": "planned",
+              "note": "TDD: port upstream PR #e5333e79 (forum channel support) as an additive seam on top of the already-shipped 2.B.2 Discord adapter. Freeze forum-channel detection, canonical thread IDs derived from forum posts, and open/close/archive lifecycle normalization into gateway events with fixture-backed tests before widening outbound routing. Do not change the baseline 2.B.2 Discord contract or shared chassis tests."
+            },
+            {
+              "name": "Discord forum media + polish parity",
+              "status": "planned",
+              "note": "TDD: port upstream PR #607be54a (forum channel media + polish) after the ingress slice is green — attachment flow for forum posts, initial-post vs reply differences, and deterministic outbound routing to forum threads. Keep the shared-chassis send contract intact so non-forum Discord behavior cannot regress."
+            }
+          ]
+        },
+        "2.C": {
+          "name": "Thin Mapping Persistence",
+          "items": [
+            {
+              "name": "bbolt session resume",
+              "status": "complete"
+            },
+            {
+              "name": "(platform, chat_id) -> session_id",
+              "status": "complete"
+            }
+          ]
+        },
+        "2.D": {
+          "name": "Cron / Scheduled Automations",
+          "items": [
+            {
+              "name": "robfig/cron scheduler + bbolt job store",
+              "status": "complete"
+            },
+            {
+              "name": "SQLite cron_runs audit + CRON.md mirror",
+              "status": "complete"
+            },
+            {
+              "name": "Heartbeat [SYSTEM:] + [SILENT] delivery contract",
+              "status": "complete"
+            },
+            {
+              "name": "Architecture planner tasks manager script",
+              "status": "complete",
+              "note": "TDD landed for the main tracked entrypoint: scripts/gormes-architecture-planner-tasks-manager.sh writes .codex/planner/architecture-planner-tasks.md plus report/state artifacts, logs verbose repo/upstream/progress/validation/schedule context, and installs a periodic systemd/cron run. Wrapper compatibility is tracked separately in Phase 1.C because current docs/tests and worktree state disagree about legacy wrapper presence."
+            }
+          ]
+        },
+        "2.E.0": {
+          "name": "OS-AI Spine: Deterministic Subagent Runtime",
+          "priority": "P0",
+          "items": [
+            {
+              "name": "Deterministic subagent runtime",
+              "status": "complete"
+            },
+            {
+              "name": "Max-depth guard + bounded batch execution",
+              "status": "complete"
+            },
+            {
+              "name": "Timeout + cancellation scopes",
+              "status": "complete"
+            },
+            {
+              "name": "Typed result envelope",
+              "status": "complete"
+            },
+            {
+              "name": "Append-only run log",
+              "status": "complete"
+            }
+          ]
+        },
+        "2.E.1": {
+          "name": "OS-AI Spine: Delegation Policy + Child Execution",
+          "priority": "P0",
+          "items": [
+            {
+              "name": "Runner-enforced tool allowlists + blocked-tool policy",
+              "status": "complete",
+              "note": "TDD landed: blocked-tool and allowlist tests now cover the runner execution seam before any child tool call reaches the executor."
+            },
+            {
+              "name": "Tool-call audit in typed child results",
+              "status": "complete",
+              "note": "TDD landed: manager/result and delegate_task output tests now require typed child tool-call events to survive into terminal result envelopes."
+            },
+            {
+              "name": "Real child Hermes stream loop",
+              "status": "complete",
+              "note": "TDD landed: HermesRunner now executes a real child OpenStream loop with token/output streaming, multi-iteration tool_calls continuation through executeChildTool, explicit stream-open error handling, and registry wiring that opts delegate_task into the real runner whenever a live Hermes client is available."
+            }
+          ]
+        },
+        "2.E.2": {
+          "name": "OS-AI Spine: Concurrent-Tool Cancellation",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "Interrupt propagation to concurrent-tool workers",
+              "status": "planned",
+              "note": "TDD: port upstream PR #11907 (interrupt propagation to concurrent-tool workers) as a kernel-side cancellation contract that covers parallel tool_calls fan-out, sidecar sandbox jobs, and delegated subagent children. Freeze the seam with fixture-backed concurrent-tool tests that prove one interrupt cancels every in-flight worker and returns a single coherent cancel envelope before parallel-tool execution or 2.F.5 mid-run steering land on top."
+            }
+          ]
+        },
+        "2.F.1": {
+          "name": "Slash Command Registry + Gateway Dispatch",
+          "priority": "P1",
+          "items": [
+            {
+              "name": "Canonical CommandDef registry",
+              "status": "complete",
+              "note": "TDD landed: internal/gateway now owns one CommandRegistry with ResolveCommand, ParseInboundText, registry-derived help output, and canonical alias handling for /start -> /help."
+            },
+            {
+              "name": "Gateway slash dispatch + per-platform exposure",
+              "status": "complete",
+              "note": "TDD landed: Telegram and Discord parse through the shared gateway command layer, the manager welcome/help text is registry-driven, and deterministic Telegram/Slack exposure helpers now derive from the same source of truth."
+            }
+          ]
+        },
+        "2.F.2": {
+          "name": "Hook Registry + BOOT.md",
+          "priority": "P2",
+          "items": [
+            {
+              "name": "Gateway per-event hook registry",
+              "status": "complete",
+              "note": "TDD landed: manager lifecycle tests now lock before/after receive, direct and placeholder-backed before/after send, and on_error hook emission on the shared gateway boundary."
+            },
+            {
+              "name": "Hook manifest discovery + handler loading",
+              "status": "complete",
+              "note": "TDD landed: HOOK.yaml directories now load executable command handlers with exact, prefix-wildcard, and global event matching, and `gormes gateway` wires the XDG hooks root into the live manager."
+            },
+            {
+              "name": "Built-in BOOT.md startup hook",
+              "status": "complete",
+              "note": "TDD landed: gateway startup now reads $XDG_DATA_HOME/gormes/BOOT.md, runs it through an isolated background boot kernel, and treats missing files or boot execution failures as non-blocking startup conditions."
+            }
+          ]
+        },
+        "2.F.3": {
+          "name": "Restart / Pairing / Status",
+          "priority": "P2",
+          "items": [
+            {
+              "name": "Graceful restart drain + managed shutdown",
+              "status": "complete",
+              "note": "TDD landed: manager shutdown tests now lock drain-until-idle, shutdown timeout, submit rejection during shutdown, and signal-driven root-context cancellation only after the drain path returns."
+            },
+            {
+              "name": "Adapter startup failure cleanup contract",
+              "status": "planned",
+              "note": "TDD: mirror upstream GatewayRunner._safe_adapter_disconnect by proving partially-started channel resources are closed when Connect/Run startup returns false or errors, and that cleanup errors are logged without masking the original startup failure."
+            },
+            {
+              "name": "Active-turn follow-up queue + late-arrival drain policy",
+              "status": "planned",
+              "note": "TDD: decide and freeze Gormes's active-turn follow-up semantics before adding richer interrupt/queue behavior; upstream BasePlatformAdapter now keeps the active-session guard live across pending drains and spawns a late-arrival drain task so follow-ups cannot duplicate agent runs or disappear during cleanup."
+            },
+            {
+              "name": "Drain-timeout resume_pending recovery",
+              "status": "planned",
+              "note": "TDD: add a session read-model flag for restart/shutdown drain timeouts that preserves the session_id and injects a reason-aware resume note on the next turn, while marking only agents still running at timeout and letting hard suspended/stuck-loop state override resume_pending."
+            },
+            {
+              "name": "Pairing read-model schema + atomic persistence",
+              "status": "planned",
+              "note": "TDD: port the minimal read model from upstream `gateway/pairing.py` into an XDG-backed `pairing.json` with atomic writes, deterministic ordering, and per-platform paired/unpaired state before any approval UX."
+            },
+            {
+              "name": "Pairing approval + rate-limit semantics",
+              "status": "planned",
+              "note": "TDD: freeze code generation, expiry, max-pending, failed-attempt lockout, and per-user request rate limiting from upstream PairingStore before adapters start issuing pairing codes."
+            },
+            {
+              "name": "`gormes gateway status` read-only command",
+              "status": "planned",
+              "note": "TDD: add a read-only `gormes gateway status` surface over the shared pairing/runtime model so operators can inspect configured channels plus paired/unpaired state without starting transports."
+            },
+            {
+              "name": "Runtime status JSON + PID/process validation",
+              "status": "planned",
+              "note": "TDD: port the upstream gateway_state.json/PID-file read model with stale PID cleanup and process identity checks before wiring live channel state."
+            },
+            {
+              "name": "Token-scoped gateway locks",
+              "status": "planned",
+              "note": "TDD: port upstream `gateway/status.py` acquire_scoped_lock/release_scoped_lock behavior into an XDG state lock directory keyed by platform credential hash, with stale PID/start-time cleanup, stopped-process detection, and release-on-shutdown coverage before multi-profile adapters share credentials."
+            },
+            {
+              "name": "Gateway /restart command + takeover markers",
+              "status": "planned",
+              "note": "TDD: add a registry-backed gateway /restart path with restart notify/dedup markers, service-manager restart exit semantics, and planned --replace takeover-marker handling so redelivered Telegram restart updates cannot loop a fresh process."
+            },
+            {
+              "name": "Channel lifecycle writers into status model",
+              "status": "planned",
+              "note": "TDD: thread live channel lifecycle updates into the shared pairing/status surface and prove read-model coherence before adapter-specific pairing UX widens."
+            }
+          ]
+        },
+        "2.F.4": {
+          "name": "Home Channel + Operator Surfaces",
+          "priority": "P3",
+          "items": [
+            {
+              "name": "Home channel ownership rules",
+              "status": "planned",
+              "note": "TDD: define home-channel selection, explicit override precedence, and per-platform fallback rules before cross-platform delivery code."
+            },
+            {
+              "name": "Notify-to delivery routing",
+              "status": "planned",
+              "note": "TDD: prove delivery-target expansion from notify-to and home-channel settings before adapter dispatch starts consulting directory state."
+            },
+            {
+              "name": "Channel directory atomic persistence + lookup",
+              "status": "planned",
+              "note": "TDD: port upstream `gateway/channel_directory.py` as an atomic `channel_directory.json` read model with composite `chat_id:thread_id` keys and human name/type lookup before periodic refresh or operator UX."
+            },
+            {
+              "name": "Channel directory refresh + stale-target invalidation",
+              "status": "planned",
+              "note": "TDD: add deterministic refresh/stale-target behavior after manager-source persistence exists, so send-target resolution never depends on adapter-specific cache side effects."
+            },
+            {
+              "name": "Manager remember-source hook",
+              "status": "planned",
+              "note": "TDD: persist allowed inbound SessionSource records through gateway.Manager before periodic refresh or send-target resolution starts depending on the directory."
+            },
+            {
+              "name": "Mirror + sticker cache surfaces",
+              "status": "planned",
+              "note": "TDD: prove cache key and mirror-write contracts before adapter-specific caches land."
+            }
+          ]
+        },
+        "2.F.5": {
+          "name": "Gateway Mid-Run Steering + Active-Turn Policy",
+          "priority": "P2",
+          "items": [
+            {
+              "name": "Steer slash command registry + queue fallback",
+              "status": "planned",
+              "note": "TDD: port upstream PR #12116 `/steer` ingress (see `gateway/run.py` steer handler) as a CommandDef on the shared registry with queue-fallback when no agent is running, explicit missing-argument usage text, and deterministic preview truncation. Keep the mid-run inject hook unimplemented until the next 2.F.5 slice lands."
+            },
+            {
+              "name": "Mid-run steer injection between tool calls",
+              "status": "planned",
+              "note": "TDD: expose a running-agent steer hook on the kernel so `/steer <prompt>` lands BETWEEN tool calls (not at turn boundary) via a single deterministic callback; prove ordering against concurrent-tool fan-out and the 2.E.2 cancellation contract. Must fall back to the 2.F.5 queue slice when the kernel has no live tool-call iteration in flight, and must refuse to duplicate prompts already routed through that fallback."
+            },
+            {
+              "name": "Gateway-handled slash commands bypass active-session guard",
+              "status": "planned",
+              "note": "TDD: mirror upstream PRs #12334 and #511ed4da — registry-resolved gateway slash commands must execute even while an agent is running for that session, without interrupting the running turn and without queuing discardable command text. Keep non-gateway/unknown commands behind the existing busy-state response so only the safe registry surface bypasses the guard; cover both allowed and denied paths with fixture tests before shipping."
+            }
           ]
         },
         "2.G": {
-          "status": "planned",
-          "name": "Skills System",
+          "name": "OS-AI Spine: Skills Runtime",
+          "priority": "P0",
           "items": [
-            "Learning loop foundation",
-            "Pattern extraction"
-          ],
-          "priority": "P0"
+            {
+              "name": "SKILL.md parsing + active store",
+              "status": "complete"
+            },
+            {
+              "name": "Deterministic selection + prompt block",
+              "status": "complete"
+            },
+            {
+              "name": "Kernel injection + usage log",
+              "status": "complete"
+            },
+            {
+              "name": "Inactive candidate drafting",
+              "status": "complete"
+            },
+            {
+              "name": "Explicit promotion flow",
+              "status": "complete"
+            }
+          ]
         }
       }
     },
     "3": {
       "name": "Phase 3 \u2014 The Black Box (Memory)",
-      "status": "in_progress",
-      "deliverable": "SQLite + FTS5 + ontological graph + semantic fusion in Go",
+      "deliverable": "SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes session visibility, audit trails, decay, and cross-chat/session boundaries",
       "subphases": {
         "3.A": {
-          "status": "complete",
           "name": "SQLite + FTS5 Lattice",
           "items": [
-            "SqliteStore",
-            "FTS5 triggers",
-            "Schema migrations v3a->v3d"
+            {
+              "name": "SqliteStore",
+              "status": "complete"
+            },
+            {
+              "name": "FTS5 triggers",
+              "status": "complete"
+            },
+            {
+              "name": "Schema migrations v3a->v3d",
+              "status": "complete"
+            }
           ]
         },
         "3.B": {
-          "status": "complete",
           "name": "Ontological Graph + LLM Extractor",
           "items": [
-            "Extractor",
-            "Entity/relationship upsert",
-            "Dead-letter queue"
+            {
+              "name": "Extractor",
+              "status": "complete"
+            },
+            {
+              "name": "Entity/relationship upsert",
+              "status": "complete"
+            },
+            {
+              "name": "Dead-letter queue",
+              "status": "complete"
+            }
           ]
         },
         "3.C": {
-          "status": "complete",
           "name": "Neural Recall + Context Injection",
           "items": [
-            "RecallProvider",
-            "2-layer seed selection",
-            "CTE traversal",
-            "<memory-context> fence"
+            {
+              "name": "RecallProvider",
+              "status": "complete"
+            },
+            {
+              "name": "2-layer seed selection",
+              "status": "complete"
+            },
+            {
+              "name": "CTE traversal",
+              "status": "complete"
+            },
+            {
+              "name": "<memory-context> fence",
+              "status": "complete"
+            }
           ]
         },
         "3.D": {
-          "status": "complete",
           "name": "Semantic Fusion + Local Embeddings",
           "items": [
-            "Ollama embeddings",
-            "Vector cache",
-            "Cosine similarity recall",
-            "Hybrid fusion"
+            {
+              "name": "Ollama embeddings",
+              "status": "complete"
+            },
+            {
+              "name": "Vector cache",
+              "status": "complete"
+            },
+            {
+              "name": "Cosine similarity recall",
+              "status": "complete"
+            },
+            {
+              "name": "Hybrid fusion",
+              "status": "complete"
+            }
           ]
         },
         "3.D.5": {
-          "status": "complete",
           "name": "Memory Mirror (USER.md sync)",
           "items": [
-            "Async background export",
-            "SQLite as source of truth"
+            {
+              "name": "Async background export",
+              "status": "complete"
+            },
+            {
+              "name": "SQLite as source of truth",
+              "status": "complete"
+            }
           ]
         },
         "3.E.1": {
-          "status": "planned",
           "name": "Session Index Mirror",
+          "priority": "P0",
           "items": [
-            "bbolt sessions.yaml export"
+            {
+              "name": "Read-only bbolt sessions.db -> index.yaml mirror",
+              "status": "complete",
+              "note": "TDD: shipped internal/session SessionIndexMirror with fixed YAML shape, lexically ordered bbolt key export, and atomic temp-file rewrite semantics."
+            },
+            {
+              "name": "Deterministic mirror refresh without mutating session state",
+              "status": "complete",
+              "note": "TDD: shipped a deterministic background refresh loop plus TUI/gateway/telegram runtime wiring, skipping unchanged snapshots while keeping the bbolt session map read-only."
+            }
           ]
         },
         "3.E.2": {
-          "status": "planned",
           "name": "Tool Execution Audit Log",
+          "priority": "P0",
           "items": [
-            "JSONL audit trail"
+            {
+              "name": "Append-only JSONL writer + schema",
+              "status": "complete",
+              "note": "TDD: shipped internal/audit JSONL append writer with a stable envelope (timestamp/source/session_id/agent_id/tool/args/duration_ms/status/result_size_bytes/error) and order-preserving tests."
+            },
+            {
+              "name": "Kernel + delegate_task audit hooks",
+              "status": "complete",
+              "note": "TDD: kernel executeToolCalls now emits audit records, and delegated child-tool execution under delegate_task appends the same JSONL schema through the subagent runtime."
+            },
+            {
+              "name": "Outcome, duration, and error capture",
+              "status": "complete",
+              "note": "TDD: RED/GREEN coverage locks duration_ms, status, and error population for successful and failed tool executions, including delegated child-tool runs."
+            }
           ]
         },
         "3.E.3": {
-          "status": "planned",
           "name": "Transcript Export Command",
+          "priority": "P2",
           "items": [
-            "Markdown export"
+            {
+              "name": "gormes session export <id> --format=markdown",
+              "status": "complete",
+              "note": "Shipped with Cobra wiring and clean missing-session handling; tests pin CLI shape and not-found behavior."
+            },
+            {
+              "name": "Render turns, tool calls, and timestamps from SQLite",
+              "status": "complete",
+              "note": "Markdown export now reads SQLite turns, renders deterministic ordering/timestamps, and includes persisted tool-call metadata."
+            }
           ]
         },
         "3.E.4": {
-          "status": "planned",
           "name": "Extraction State Visibility",
+          "priority": "P1",
           "items": [
-            "gormes memory status"
+            {
+              "name": "gormes memory status command",
+              "status": "complete",
+              "note": "TDD: shipped `gormes memory status` with a SQLite-backed extractor summary, heuristic worker health, and recent dead-letter rendering."
+            },
+            {
+              "name": "Extractor queue depth + dead-letter summary",
+              "status": "complete",
+              "note": "TDD: added deterministic dead-letter error aggregation to `gormes memory status`, with fixture-backed queue, summary, and CLI rendering coverage."
+            }
           ]
         },
         "3.E.5": {
-          "status": "planned",
           "name": "Insights Audit Log",
+          "priority": "P3",
           "items": [
-            "Usage JSONL"
+            {
+              "name": "Append-only daily usage.jsonl writer",
+              "status": "complete",
+              "note": "TDD landed: internal/insights now appends normalized DailyRollup records to usage.jsonl with schema-locked JSONL lines and deterministic append ordering."
+            },
+            {
+              "name": "Session, token, and cost rollups from local runtime",
+              "status": "complete",
+              "note": "TDD: shipped fixture-driven daily rollups plus a telemetry.Snapshot bridge for session counts, token totals, cost sums, and per-model breakdowns."
+            }
           ]
         },
         "3.E.6": {
-          "status": "planned",
           "name": "Memory Decay",
+          "priority": "P1",
           "items": [
-            "Weight attenuation",
-            "last_seen tracking"
+            {
+              "name": "relationships.last_seen schema + backfill",
+              "status": "complete",
+              "note": "TDD landed: schema v3g adds relationships.last_seen, backfills legacy rows from updated_at, and keeps recall decay on COALESCE(NULLIF(last_seen, 0), updated_at) so migrated and fresh rows rank deterministically."
+            },
+            {
+              "name": "Relationship writer freshness updates",
+              "status": "complete",
+              "note": "TDD landed: graph relationship upserts now advance last_seen on every observation while preserving the legacy updated_at timestamp for structural freshness semantics."
+            },
+            {
+              "name": "Deterministic weight attenuation at recall time",
+              "status": "complete",
+              "note": "TDD landed: recall-time decay is now wired through RecallDecayHorizonDays, fixed-clock recall_sql coverage, and ranking assertions that preserve raw fence weights while attenuating candidate ordering."
+            }
           ]
         },
         "3.E.7": {
-          "status": "planned",
           "name": "Cross-Chat Synthesis",
+          "priority": "P2",
           "items": [
-            "Graph unification across chats"
+            {
+              "name": "user_id concept above chat_id",
+              "status": "complete",
+              "note": "TDD landed: internal/session now persists per-session source/chat/user metadata, resolves canonical user_id bindings above chat_id, inherits known chat bindings for resumed sessions, and rejects conflicting chat-to-user merges."
+            },
+            {
+              "name": "Same-chat default recall fence",
+              "status": "complete",
+              "note": "TDD landed: internal/memory recall applies a same-chat default fence to exact, FTS, and semantic seed selection, so named entities from another chat do not leak without explicit scope widening."
+            },
+            {
+              "name": "Opt-in user-scope recall + source filters",
+              "status": "complete",
+              "note": "TDD landed: cross-chat recall widens only through canonical user_id bindings and optional source allowlists, with unresolved user scope falling back to same-chat behavior."
+            },
+            {
+              "name": "Honcho-compatible scope/source tool schema",
+              "status": "planned",
+              "note": "TDD: make honcho_search and honcho_context schemas advertise optional scope and sources while preserving external Honcho-compatible names and keeping omitted fields same-chat by default."
+            },
+            {
+              "name": "Cross-chat deny-path fixtures",
+              "status": "planned",
+              "note": "TDD: prove unknown, unresolved, or conflicting user_id bindings cannot widen recall or session search, and pin same-chat fallback behavior with fixture-backed allow/deny cases before cross-chat access is exposed as shipped."
+            },
+            {
+              "name": "Cross-chat operator evidence",
+              "status": "planned",
+              "note": "TDD: add operator-readable evidence for allowed and denied cross-chat recall paths, including resolved user_id/source scope details, before marking 3.E.7 complete."
+            }
+          ]
+        },
+        "3.E.8": {
+          "name": "Session Lineage + Cross-Source Search",
+          "priority": "P4",
+          "items": [
+            {
+              "name": "parent_session_id lineage for compression splits",
+              "status": "planned",
+              "note": "Execution plan frozen: add parent_session_id + lineage_kind to session.Metadata, keep roots null/primary by default, reject trivial loops, and surface orphan chains in mirrors/status instead of failing silently."
+            },
+            {
+              "name": "Source-filtered session/message search core",
+              "status": "complete",
+              "note": "TDD landed: internal/memory.SearchMessages and SearchSessions search canonical user_id-bound sessions with optional source allowlists, deterministic latest-turn ordering, and split source/chat key normalization."
+            },
+            {
+              "name": "GONCHO user-scope search/context parameters",
+              "status": "complete",
+              "note": "TDD landed: internal/goncho SearchParams and ContextParams accept scope=user plus sources[] and pass them into the session catalog; the Honcho-compatible tool schemas still need to advertise those fields."
+            },
+            {
+              "name": "Lineage-aware source-filtered search hits",
+              "status": "planned",
+              "note": "TDD: once parent_session_id exists, make SearchMessages/SearchSessions expose parent/child lineage context for matched sessions without changing default same-chat recall behavior."
+            },
+            {
+              "name": "Operator-auditable search evidence",
+              "status": "planned",
+              "note": "TDD: add CLI or mirror evidence that shows source filters, user scope, and lineage metadata for session/message search so operators can audit why a cross-source hit appeared."
+            }
           ]
         }
       }
     },
     "4": {
       "name": "Phase 4 \u2014 The Brain Transplant",
-      "status": "planned",
       "deliverable": "Native Go agent orchestrator + prompt builder",
-      "dependency_note": "Build priority: Skills (2.G) \u2192 Subagents (2.E) \u2192 Gateway \u2192 Native Agent Loop",
+      "dependency_note": "Build priority: 2.E0 deterministic subagent runtime -> 2.G static skills + reviewed candidate flow -> runner-enforced delegation policy + wider gateway surface -> native agent loop",
       "subphases": {
         "4.A": {
-          "status": "planned",
           "name": "Provider Adapters",
           "items": [
-            "Anthropic",
-            "Bedrock",
-            "Gemini",
-            "OpenRouter",
-            "Google Code Assist",
-            "Codex"
+            {
+              "name": "Provider interface + stream fixture harness",
+              "status": "in_progress",
+              "note": "TDD: `internal/hermes/client.go` already freezes shared ChatRequest/Message/Event/ToolCall contracts and the Anthropic adapter (`anthropic_client.go`/`anthropic_stream.go`) exercises them; the remaining closeout is a reusable fixture harness that replays provider transcripts, usage, and finish reasons across adapters before Bedrock/Gemini/OpenRouter/Codex land on the same seam. Fixture set must include regression cases for upstream PR #12072 (dropped tool_call on mid-stream stall — partial tool_calls in `internal/hermes/stream.go` pendingCalls must surface on EOF rather than disappear when `finish_reason=\"tool_calls\"` never arrives) and PR #0f778f77 (MiniMax/NVIDIA NIM tool-name duplication in the streaming accumulator) so the contract is locked before any other provider reuses it."
+            },
+            {
+              "name": "Tool-call normalization + continuation contract",
+              "status": "in_progress",
+              "note": "TDD: streamed tool-call accumulation and tool-result continuation payload mapping are locked for the Anthropic adapter in `internal/hermes/stream_tools_test.go` and `anthropic_client_test.go`; the remaining closeout is cross-provider fixture coverage that pins assistant tool-call messages, tool replies, and continuation-safe finish reasons as a shared harness before Bedrock/Gemini/OpenRouter/Codex reuse the seam. Shared fixtures must pin (a) mid-stream stall recovery per upstream PR #12072 — partial tool_calls surfacing on stream EOF rather than being silently dropped from `pendingCalls` — and (b) tool-name accumulator safety per upstream PR #0f778f77 so duplicate-name deltas from MiniMax/NVIDIA NIM-style providers cannot concatenate into invented tool names."
+            },
+            {
+              "name": "Anthropic",
+              "status": "complete",
+              "note": "TDD landed in `internal/hermes`: direct Anthropic Messages API request shaping now preserves cache-control metadata on system/tool-result blocks, streams `thinking`/`text`/`input_json_delta` events into the shared event model, maps Anthropic stop reasons to continuation-safe finish reasons, and covers 429/rate-limit fixtures with `httptest` instead of live credentials."
+            },
+            {
+              "name": "Bedrock",
+              "status": "planned",
+              "note": "Umbrella only: not landed on main. Five codexu/* worker attempts on 2026-04-23 produced candidate Bedrock adapters (`feat(phase4): add bedrock provider adapter` x2, `feat(provider): add bedrock client`, `feat(provider): add native Bedrock adapter`, `feat(gormes): add native bedrock provider adapter`) but none merged — no `bedrock_*.go` file is tracked in `internal/hermes/` and `grep -i bedrock|converse[sS]tream` over that package returns zero matches. Execute via the three dependency-ordered TDD slices below (payload mapping -> stream decoding -> SigV4/credential seam) before another full-rewrite attempt."
+            },
+            {
+              "name": "Bedrock Converse payload mapping (no AWS SDK)",
+              "status": "planned",
+              "note": "TDD first slice: port Bedrock Converse request-payload shaping plus canonical Message->Bedrock tool-aware mapping with pure fixtures and no AWS SDK dependency. Land alongside a request-body golden file that pins role/tool-result block order, reasoning/cache-control passthrough, and max_tokens/temperature translation. Gates the next two slices."
+            },
+            {
+              "name": "Bedrock stream event decoding (SSE fixtures)",
+              "status": "planned",
+              "note": "TDD second slice: decode Bedrock stream reasoning/text/tool-use deltas and stop reasons into the shared `hermes.Event` model from captured SSE fixtures, reusing the Anthropic stream harness where possible. No AWS SDK dependency — the fixture set must cover empty-stream, retry-safe finish, truncated-stream, and tool-call-split events before the SigV4 slice lands."
+            },
+            {
+              "name": "Bedrock SigV4 + credential seam",
+              "status": "planned",
+              "note": "TDD third slice: land minimal SigV4 signing plus a narrow credential seam behind a dep-isolated helper so regional/error handling and eventual full AWS SDK adoption stay off the kernel hot path. Requires the payload-mapping and stream-decoding fixtures to be green first; unit tests must cover signing-determinism, missing-credential failure, and region-override selection without network calls."
+            },
+            {
+              "name": "Gemini",
+              "status": "planned",
+              "note": "TDD: port `agent/gemini_cloudcode_adapter.py` with content-part normalization, tool-call mapping, safety/error payload handling, and no live Google credential dependency in unit tests."
+            },
+            {
+              "name": "OpenRouter",
+              "status": "planned",
+              "note": "TDD: port `agent/openrouter_client.py` as an OpenAI-compatible adapter variant, proving base URL/model selection, provider headers, retryable error mapping, and usage accounting."
+            },
+            {
+              "name": "Google Code Assist",
+              "status": "planned",
+              "note": "TDD: port `agent/google_code_assist.py` only after OAuth/token-store seams are testable; freeze request shaping, quota/error handling, and credential refresh behavior with fake token providers."
+            },
+            {
+              "name": "Codex",
+              "status": "planned",
+              "note": "TDD: add a Codex provider adapter on the shared stream contract, including developer-message role handling, tool-call deltas, and explicit unsupported-feature errors before native Codex routing is allowed. Upstream PR #12360 requires Codex auth state to live under Gormes's own home rather than touching `~/.codex/auth.json`, and upstream PR #2a2e5c0f requires 401/403 token-refresh failures to force a relogin rather than silently retrying with a stale token — freeze both behaviors as fake-auth unit tests in the Codex adapter slice before any live Codex request can fire."
+            },
+            {
+              "name": "Cross-provider reasoning-tag sanitization",
+              "status": "planned",
+              "note": "TDD: port upstream PRs #ec48ec55 (strip `<think>` blocks from stored assistant content), #9489d157 (strip unterminated `<think>` blocks from visible content), and #bd01ec78 (strip all reasoning-tag variants from `/resume` recap) as one shared sanitization contract over `internal/hermes` event/assistant-content boundaries. Pure fixture-driven tests must cover closed `<think>...</think>` blocks, unterminated `<think>...` at stream EOF, and mixed reasoning-tag variants (`<think>`, `<reasoning>`, `<thought>`) without mutating the raw SSE transcript, and must separate (a) what is stored into assistant history, (b) what is rendered to operators, and (c) what `/resume`-style recap surfaces expose. Land before Codex/Gemini/OpenRouter/Bedrock bring new reasoning-model surfaces through the shared harness so each adapter inherits the same storage-vs-render behavior rather than reinventing it."
+            }
           ]
         },
         "4.B": {
-          "status": "planned",
           "name": "Context Engine + Compression",
           "items": [
-            "Long session management",
-            "Context compression"
+            {
+              "name": "Long session management",
+              "status": "planned",
+              "note": "Umbrella only: keep for inventory continuity; execute through the context-engine interface, token-budget status, context-reference, and compression slices below."
+            },
+            {
+              "name": "Context compression",
+              "status": "planned",
+              "note": "Umbrella only: do not execute as one slice. Preserve cache-safe history semantics while the smaller compressor tasks land."
+            },
+            {
+              "name": "ContextEngine interface + status tool contract",
+              "status": "planned",
+              "note": "TDD: port the `agent/context_engine.py` interface, `get_status` payload, update_model_context behavior, and unknown tool error shape before any compressor implementation is wired into the agent loop."
+            },
+            {
+              "name": "Compression token-budget trigger + summary sizing",
+              "status": "planned",
+              "note": "TDD: port threshold calculation, context-length probing, summary token sizing, and ineffective-compression cooldown from `agent/context_compressor.py` with fixed token-count fixtures."
+            },
+            {
+              "name": "Tool-result pruning + protected head/tail summary",
+              "status": "planned",
+              "note": "TDD: freeze old tool-output pruning, protected system/first-turn head messages, recent-tail preservation, and summary prefix compatibility before mutating live message history. Must keep tool-call arguments JSON valid when shrinking per upstream PR #3128d9fc — a pruning pass that truncates an argument string mid-JSON breaks the continuation payload on the next turn, so the head/tail contract has to respect tool-call argument boundaries and never emit partial JSON values."
+            },
+            {
+              "name": "Manual compression feedback + context references",
+              "status": "planned",
+              "note": "TDD: port `manual_compression_feedback.py` and `context_references.py` as separate read/write contracts so user-visible compression feedback and reference handles are testable without a provider call."
+            }
           ]
         },
         "4.C": {
-          "status": "planned",
           "name": "Native Prompt Builder",
           "items": [
-            "System + memory + tools + history assembly"
+            {
+              "name": "System + memory + tools + history assembly",
+              "status": "planned",
+              "note": "Umbrella only: execute through the context-file, role/model guidance, skills snapshot, and memory/session-search prompt slices before replacing the Python bridge."
+            },
+            {
+              "name": "Context-file discovery + injection scan",
+              "status": "planned",
+              "note": "TDD: port SOUL/HERMES/AGENTS/CLAUDE/.cursorrules discovery order, 20k-character truncation, YAML frontmatter stripping, and prompt-injection/invisible-character scan behavior from `agent/prompt_builder.py`."
+            },
+            {
+              "name": "Model-specific role and tool-use guidance",
+              "status": "planned",
+              "note": "TDD: freeze developer-vs-system role selection plus OpenAI/Codex/Gemini/Google operational guidance blocks so provider adapters receive stable prompt roles."
+            },
+            {
+              "name": "Toolset-aware skills prompt snapshot",
+              "status": "planned",
+              "note": "TDD: port skill manifest hashing, in-process/disk snapshot cache, tool/toolset condition filtering, and deterministic ordering before dynamic skills enter native prompt assembly."
+            },
+            {
+              "name": "Memory and session-search guidance assembly",
+              "status": "planned",
+              "note": "TDD: assemble memory guidance, session-search guidance, available tool-name gates, and environment/platform hints without changing existing Phase 3 GONCHO recall semantics."
+            }
           ]
         },
         "4.D": {
-          "status": "planned",
           "name": "Smart Model Routing",
           "items": [
-            "Per-turn model selection"
+            {
+              "name": "Model metadata registry + context limits",
+              "status": "planned",
+              "note": "TDD: port `agent/model_metadata.py` and `agent/models_dev.py` into a read-only Go registry with deterministic context-window, pricing, capability, and provider-family fixtures before routing decisions consume it."
+            },
+            {
+              "name": "Routing policy and fallback selector",
+              "status": "planned",
+              "note": "TDD: port `agent/smart_model_routing.py` as a pure selector over task signals, explicit overrides, provider availability, and fallback_model behavior before any provider call can switch models."
+            },
+            {
+              "name": "Per-turn model selection",
+              "status": "complete",
+              "note": "TDD landed a turn-scoped `PlatformEvent.Model` override in `internal/kernel`, carrying the selected model across tool iterations while request/frame/telemetry state reflects the active turn and `cfg.Model` remains the fallback for later turns."
+            }
           ]
         },
         "4.E": {
-          "status": "planned",
           "name": "Trajectory + Insights",
           "items": [
-            "Self-monitoring telemetry"
+            {
+              "name": "Trajectory writer + redaction gates",
+              "status": "planned",
+              "note": "TDD: port `agent/trajectory.py` as an opt-in writer with deterministic message/tool snapshots, secret redaction, and failure-is-nonfatal behavior before broad telemetry capture."
+            },
+            {
+              "name": "Self-monitoring telemetry",
+              "status": "planned",
+              "note": "TDD: bridge native turn/provider/tool metrics into the existing Phase 3 insights rollup without changing the local `usage.jsonl` schema until compatibility tests pass."
+            }
           ]
         },
         "4.F": {
-          "status": "planned",
           "name": "Title Generation",
           "items": [
-            "Auto-naming sessions"
+            {
+              "name": "Title prompt and truncation contract",
+              "status": "planned",
+              "note": "TDD: port `agent/title_generator.py` prompt inputs, length caps, empty-history fallback, and provider-error fallback with fake model responses before persistence wiring."
+            },
+            {
+              "name": "Auto-naming sessions",
+              "status": "planned",
+              "note": "TDD: update session-title persistence only after the title contract is green, proving titles are generated once, can be manually overridden, and do not mutate historical transcript content."
+            }
           ]
         },
         "4.G": {
-          "status": "planned",
           "name": "Credentials + OAuth",
           "items": [
-            "Token vault",
-            "Multi-account auth"
+            {
+              "name": "Token vault",
+              "status": "planned",
+              "note": "TDD: port credential-file discovery and storage from `tools/credential_files.py` into XDG-scoped paths with permission, missing-file, and profile-isolation tests before providers read tokens."
+            },
+            {
+              "name": "Multi-account auth",
+              "status": "planned",
+              "note": "TDD: port `agent/credential_pool.py` account selection and rotation semantics with fake credential records before any provider adapter relies on account pools."
+            },
+            {
+              "name": "Google OAuth flow + refresh seam",
+              "status": "planned",
+              "note": "TDD: port `agent/google_oauth.py` as a transport-neutral OAuth state machine with device/browser flow fixtures, refresh-token persistence, and cancellation/error cases before Google Code Assist uses it."
+            }
           ]
         },
         "4.H": {
-          "status": "planned",
           "name": "Rate / Retry / Caching",
           "items": [
-            "Provider-side resilience"
+            {
+              "name": "Provider-side resilience",
+              "status": "in_progress",
+              "note": "Umbrella tracker for 4.H closeout. Already shipped: `internal/hermes/errors.go` classifies retryable vs fatal HTTP status plus 'context length' body signals, and `internal/kernel/retry.go` holds a 1s/2s/4s/8s/16s +/-20% reconnect budget wired into open-stream retries. Remaining work is owned by the sibling slices below — `Classified provider-error taxonomy`, `Jittered reconnect backoff schedule`, `Retry-After header parsing + HTTPError hint`, `Kernel retry honors Retry-After hint`, `Prompt-cache capability guard`, and `Provider rate guard + budget telemetry`."
+            },
+            {
+              "name": "Classified provider-error taxonomy",
+              "status": "in_progress",
+              "note": "TDD: `internal/hermes/errors.go` already classifies retryable vs fatal HTTP/auth/context/rate-limit conditions for kernel retries; the remaining closeout is a richer structured taxonomy comparable to `agent/error_classifier.py`, including explicit rate-limit/auth/context/non-retryable envelopes and broader provider fixture tables."
+            },
+            {
+              "name": "Jittered reconnect backoff schedule",
+              "status": "complete",
+              "note": "TDD landed: `internal/kernel/retry.go` RetryBudget applies a 1s/2s/4s/8s/16s +/-20% schedule across five attempts with `retry_test.go` coverage, and the kernel reconnect path consumes it on every open-stream retry. Do not extend this slice; Retry-After plumbing lives in the sibling slices below."
+            },
+            {
+              "name": "Retry-After header parsing + HTTPError hint",
+              "priority": "P1",
+              "status": "planned",
+              "note": "TDD slice 1 of 2: extend `internal/hermes/errors.go` so `HTTPError` carries a parsed Retry-After hint alongside `{Status, Body}`. Cover both integer-seconds and HTTP-date header forms, optional JSON body hints (`retry_after`/`retryAfter`) when the header is absent, a capped upper bound so a malicious provider cannot stall the kernel past the reconnect budget, and deterministic zero-hint behavior when no signal is present. Pure unit tests over table-driven fixtures; no kernel coupling in this slice. Gates the Retry-After hint consumption slice below."
+            },
+            {
+              "name": "Kernel retry honors Retry-After hint",
+              "priority": "P1",
+              "status": "planned",
+              "note": "TDD slice 2 of 2: once `HTTPError` carries a capped Retry-After hint, make `internal/kernel` open-stream retry prefer the provider hint over the jittered schedule when present, and fall back to the existing RetryBudget cleanly when absent. Unit tests must pin (a) hint preferred over schedule, (b) hint capped so it never exceeds the reconnect budget's upper bound, (c) absent hint leaves the jittered schedule untouched, and (d) ctx cancellation still returns promptly from the merged wait. Requires the header parsing slice to be green first; do not widen the already-shipped `Jittered reconnect backoff schedule` coverage."
+            },
+            {
+              "name": "Prompt-cache capability guard",
+              "status": "planned",
+              "note": "TDD: port `agent/prompt_caching.py` model/provider capability checks so cache-control metadata is attached only when the selected provider supports it."
+            },
+            {
+              "name": "Provider rate guard + budget telemetry",
+              "status": "planned",
+              "note": "TDD: port `agent/rate_limit_tracker.py` and `agent/nous_rate_guard.py` as deterministic budget/rate decisions that feed Phase 3 insights without sleeping in unit tests."
+            }
           ]
         }
       }
     },
     "5": {
       "name": "Phase 5 \u2014 The Final Purge",
-      "status": "planned",
       "deliverable": "Python tool scripts ported to Go or WASM",
       "subphases": {
         "5.A": {
-          "status": "planned",
           "name": "Tool Surface Port",
           "items": [
-            "61-tool registry port"
+            {
+              "name": "61-tool registry port",
+              "status": "planned",
+              "note": "Umbrella only: keep for inventory continuity. Execute via registry inventory, pure/core tools, stateful filesystem tools, network tools, and adapter-specific tool groups rather than one bulk port."
+            },
+            {
+              "name": "Tool registry inventory + schema parity harness",
+              "status": "planned",
+              "note": "TDD: snapshot upstream `tools/registry.py`, `toolsets.py`, and discovered schemas into a Go parity fixture that proves names, toolsets, required env vars, and JSON result shapes before porting handlers."
+            },
+            {
+              "name": "Pure core tools first",
+              "status": "planned",
+              "note": "TDD: port side-effect-light tools such as todo, clarify, debug helpers, and local formatting helpers before network/browser/sandbox tools so the native registry can grow without external credentials."
+            },
+            {
+              "name": "Stateful tool migration queue",
+              "status": "planned",
+              "note": "TDD: group file/session/checkpoint/process tools by shared state contracts and prove XDG/path isolation plus rollback semantics before exposing write-capable tools to the native agent loop."
+            }
           ]
         },
         "5.B": {
-          "status": "planned",
           "name": "Sandboxing Backends",
           "items": [
-            "Docker",
-            "Modal",
-            "Daytona",
-            "Singularity"
+            {
+              "name": "Environment interface + file sync contract",
+              "status": "planned",
+              "note": "TDD: port `tools/environments/base.py` and `file_sync.py` into one Go interface with path mapping, upload/download, timeout, and cleanup fixtures before backend-specific code lands."
+            },
+            {
+              "name": "Docker",
+              "status": "planned",
+              "note": "TDD: port Docker execution after the environment interface is green, covering image selection, mount policy, env passthrough allowlists, timeout cleanup, and blocked dangerous mounts."
+            },
+            {
+              "name": "Modal",
+              "status": "planned",
+              "note": "TDD: freeze Modal request/job lifecycle, upload/download mapping, and unavailable-credential behavior as fixtures before any cloud execution path is enabled."
+            },
+            {
+              "name": "Daytona",
+              "status": "planned",
+              "note": "TDD: port Daytona workspace lifecycle with fake API clients, proving create/reuse/delete decisions and workspace path mapping before live credentials are required."
+            },
+            {
+              "name": "Singularity",
+              "status": "planned",
+              "note": "TDD: port Singularity command construction, bind mounts, and timeout cleanup as a local command builder first; live runtime tests stay opt-in."
+            }
           ]
         },
         "5.C": {
-          "status": "planned",
           "name": "Browser Automation",
           "items": [
-            "Chromedp",
-            "Rod"
+            {
+              "name": "Browser action contract + event transcript",
+              "status": "planned",
+              "note": "TDD: port the `tools/browser_tool.py` action schema, page-state transcript, screenshot/result envelopes, and unavailable-backend errors before choosing Chromedp or Rod."
+            },
+            {
+              "name": "Chromedp",
+              "status": "planned",
+              "note": "TDD: bind Chromedp behind the browser action contract with fake page fixtures for navigation, click/type, screenshot, and timeout behavior before live browser smoke tests."
+            },
+            {
+              "name": "Rod",
+              "status": "planned",
+              "note": "TDD: keep Rod as a second backend only after the shared contract is stable, proving backend selection and parity for core actions without diverging schemas."
+            },
+            {
+              "name": "Browser provider bridge + Firecrawl fallback",
+              "status": "planned",
+              "note": "TDD: port `tools/browser_providers/{browserbase,firecrawl}.py` as optional provider adapters with credential gating and deterministic fallback/error results before network-backed browsing is default."
+            }
           ]
         },
         "5.D": {
-          "status": "planned",
           "name": "Vision + Image Generation",
           "items": [
-            "Multimodal in/out"
+            {
+              "name": "Multimodal in/out",
+              "status": "planned",
+              "note": "Umbrella only: split into image input normalization, vision request routing, image-generation request/result storage, and safety/error envelopes before exposing multimodal tools."
+            },
+            {
+              "name": "Vision input normalization + token budget",
+              "status": "planned",
+              "note": "TDD: port `tools/vision_tools.py` image path/URL/base64 normalization, size/token estimation, and unsupported-provider errors using local fixture images."
+            },
+            {
+              "name": "Image generation result contract",
+              "status": "planned",
+              "note": "TDD: port `tools/image_generation_tool.py` schema, output-path handling, binary/result envelope, and provider error mapping before any live image model call."
+            }
           ]
         },
         "5.E": {
-          "status": "planned",
           "name": "TTS / Voice / Transcription",
           "items": [
-            "Voice mode port"
+            {
+              "name": "Voice mode port",
+              "status": "planned",
+              "note": "Umbrella only: split voice-mode state, transcription ingestion, TTS synthesis, and platform delivery hooks before enabling voice across gateways."
+            },
+            {
+              "name": "Transcription tool contract",
+              "status": "planned",
+              "note": "TDD: port `tools/transcription_tools.py` input validation, provider selection, and text/error result shape with local audio fixtures before gateway media hooks call it."
+            },
+            {
+              "name": "TTS synthesis + voice-mode state",
+              "status": "planned",
+              "note": "TDD: port `tools/tts_tool.py`, `tools/voice_mode.py`, and `tools/neutts_synth.py` behind a sidecar-friendly interface with cached samples and nonfatal missing-dependency behavior."
+            }
           ]
         },
         "5.F": {
-          "status": "planned",
           "name": "Skills System (Remaining)",
           "items": [
-            "Skills hub",
-            "Skill registries"
+            {
+              "name": "Skills hub",
+              "status": "planned",
+              "note": "TDD: port `tools/skills_hub.py` and registry lookup as read-only search/install planning first, reusing the Phase 2.G active/inactive store instead of creating another skills root."
+            },
+            {
+              "name": "Skill registries",
+              "status": "planned",
+              "note": "TDD: port clawhub/lobehub/hermes-index registry metadata with cache, signature, and unavailable-network fixtures before write-capable install flows."
+            }
           ]
         },
         "5.G": {
-          "status": "planned",
           "name": "MCP Integration",
           "items": [
-            "MCP client",
-            "OAuth flows"
+            {
+              "name": "MCP client",
+              "status": "planned",
+              "note": "TDD: port `tools/mcp_tool.py` as a lifecycle-managed client with server discovery, schema normalization, timeout/cancel behavior, and deterministic fake MCP servers."
+            },
+            {
+              "name": "OAuth flows",
+              "status": "planned",
+              "note": "TDD: port `tools/mcp_oauth.py` and `mcp_oauth_manager.py` as a reusable OAuth state store with redirect/device fixtures before managed MCP gateways request tokens."
+            },
+            {
+              "name": "Managed tool gateway bridge",
+              "status": "planned",
+              "note": "TDD: port `tools/managed_tool_gateway.py` after the MCP client and OAuth store are green, proving tool discovery and result pass-through without a live external server."
+            }
           ]
         },
         "5.H": {
-          "status": "planned",
           "name": "ACP Integration",
           "items": [
-            "ACP server side"
+            {
+              "name": "ACP server side",
+              "status": "planned",
+              "note": "TDD: port `acp_adapter/` as a protocol server with auth, session lifecycle, tool permission prompts, and event streaming fixtures before editor integrations are advertised."
+            }
           ]
         },
         "5.I": {
-          "status": "planned",
           "name": "Plugins Architecture",
           "items": [
-            "Plugin SDK",
-            "Third-party extensions"
+            {
+              "name": "Plugin SDK",
+              "status": "planned",
+              "note": "TDD: port plugin manifest loading, capability registration, version checks, and isolation boundaries from `plugins/` before third-party extension execution."
+            },
+            {
+              "name": "Third-party extensions",
+              "status": "planned",
+              "note": "TDD: add extension install/enable/disable flows only after the SDK contract is stable, with fixture plugins proving failure containment and no implicit runtime code execution."
+            }
           ]
         },
         "5.J": {
-          "status": "planned",
           "name": "Approval / Security Guards",
           "items": [
-            "Dangerous action gating"
+            {
+              "name": "Dangerous action gating",
+              "status": "planned",
+              "note": "Umbrella only: do not execute as one slice. Use the detector, approval-mode, cron-mode, and policy-integration tasks below before dangerous terminal/file/code tools become available."
+            },
+            {
+              "name": "Dangerous-command detector + blocked-result schema",
+              "status": "planned",
+              "note": "TDD: port upstream dangerous-command pattern detection into a pure Go guard that returns the same blocked tool-result shape agents already understand, without prompting or side effects."
+            },
+            {
+              "name": "Approval mode config normalization",
+              "status": "planned",
+              "note": "TDD: add config parsing for manual/smart/off approval modes, including YAML/TOML boolean edge cases such as bare off, before wiring prompts or smart auxiliary review."
+            },
+            {
+              "name": "Cron dangerous-command approval mode",
+              "status": "planned",
+              "note": "TDD: track upstream approvals.cron_mode drift by marking cron-fired turns as non-interactive and default-denying dangerous commands with an adaptive blocked message, while allowing an explicit approve mode to preserve old auto-approve behavior."
+            },
+            {
+              "name": "Tirith, path, URL, and website policy integration",
+              "status": "planned",
+              "note": "TDD: compose external security findings with dangerous-command warnings into one guard decision so gateway/cron/CLI replays cannot bypass one check after only another was approved."
+            }
           ]
         },
         "5.K": {
-          "status": "planned",
           "name": "Code Execution",
           "items": [
-            "Sandboxed exec"
+            {
+              "name": "Sandboxed exec",
+              "status": "complete",
+              "note": "TDD landed: Go-native `execute_code` now runs guarded `sh`/`python` snippets through a local sandbox contract with runtime selection, stdout/stderr caps, timeout status, and pre-exec filesystem/network blocking while broader backend-specific sandboxes remain Phase 5.B work."
+            }
           ]
         },
         "5.L": {
-          "status": "planned",
           "name": "File Ops + Patches",
           "items": [
-            "Atomic checkpoints"
+            {
+              "name": "Atomic checkpoints",
+              "status": "planned",
+              "note": "TDD: port `tools/{file_operations,file_tools,checkpoint_manager,patch_parser}.py` as checkpoint-first read/write/patch primitives with rollback and path-policy fixtures before agent-visible writes."
+            }
           ]
         },
         "5.M": {
-          "status": "planned",
           "name": "Mixture of Agents",
           "items": [
-            "Multi-model coordination"
+            {
+              "name": "Multi-model coordination",
+              "status": "planned",
+              "note": "TDD: port `tools/mixture_of_agents_tool.py` only after provider routing and subagent envelopes are stable, using fake child model outputs to prove fan-out, aggregation, and failure isolation."
+            }
           ]
         },
         "5.N": {
-          "status": "planned",
           "name": "Misc Operator Tools",
           "items": [
-            "Todo",
-            "Clarify",
-            "Session search",
-            "Debug helpers"
+            {
+              "name": "Todo",
+              "status": "planned",
+              "note": "TDD: port `tools/todo_tool.py` as a small stateful tool with schema/result parity, deterministic persistence, and no dependency on the full file-tools port."
+            },
+            {
+              "name": "Clarify",
+              "note": "TDD: port `tools/clarify_tool.py` as an interruptible prompt contract that preserves gateway/TUI response routing and times out safely in non-interactive cron turns.",
+              "status": "planned"
+            },
+            {
+              "name": "Session search",
+              "status": "planned",
+              "note": "TDD: port `tools/session_search_tool.py` on top of the Phase 3 session catalog, preserving same-chat defaults and opt-in user/source filters."
+            },
+            {
+              "name": "Debug helpers",
+              "status": "planned",
+              "note": "TDD: port `tools/debug_helpers.py` as read-mostly diagnostic tools with redaction and no hidden writes before exposing them to production agents."
+            },
+            {
+              "name": "Cronjob tool API + schedule parser parity",
+              "status": "planned",
+              "note": "TDD: port `tools/cronjob_tools.py` action/update/list surface plus `cron/jobs.py` once, interval, cron-expression, repeat-count, one-shot recovery, and stale recurring fast-forward behavior as fixtures over the Go cron store."
+            },
+            {
+              "name": "Cron prompt/script safety + pre-run script contract",
+              "status": "planned",
+              "note": "TDD: port critical prompt threat scanning, invisible Unicode rejection, script-path confinement under the scripts directory, and configurable pre-run script timeout before exposing cron creation to tools."
+            },
+            {
+              "name": "Cron multi-target delivery + media/live-adapter fallback",
+              "status": "planned",
+              "note": "TDD: port comma-separated deliver targets, home-channel/channel-directory resolution, response wrapping, MEDIA tag extraction, and live-adapter-first delivery fallback from `cron/scheduler.py` without changing the Phase 2.D MVP audit store."
+            }
           ]
         },
         "5.O": {
-          "status": "planned",
           "name": "Hermes CLI Parity",
           "items": [
-            "49-file CLI tree port"
+            {
+              "name": "49-file CLI tree port",
+              "status": "planned",
+              "note": "Umbrella only: keep for inventory continuity, but execution should use smaller command/config/platform/diagnostic slices rather than attempting the whole hermes_cli tree at once."
+            },
+            {
+              "name": "CLI command registry parity + active-turn busy policy",
+              "status": "planned",
+              "note": "TDD: expand the Go command registry toward upstream hermes_cli/commands.py and prove every recognized gateway slash command either has a safe running-agent handler or returns a visible busy response without interrupting or queuing discardable command text."
+            },
+            {
+              "name": "Config, profile, auth, and setup command surfaces",
+              "status": "planned",
+              "note": "TDD: port hermes_cli config/profile/auth/setup/uninstall flows as separate command groups with XDG-safe state paths and no implicit writes outside the selected Gormes home."
+            },
+            {
+              "name": "Gateway, platform, webhook, and cron management CLI",
+              "status": "planned",
+              "note": "TDD: port operator management commands after the shared gateway read models land, so status/pairing/platform/cron commands consume the same stores as the runtime."
+            },
+            {
+              "name": "Diagnostics, backup, logs, and status CLI",
+              "status": "planned",
+              "note": "TDD: port read-mostly diagnostics and backup surfaces independently from mutating setup/auth commands, with fixture-backed output tests before live filesystem integration."
+            }
           ]
         },
         "5.P": {
-          "status": "planned",
           "name": "Docker / Packaging",
           "items": [
-            "OCI image",
-            "Homebrew"
+            {
+              "name": "OCI image",
+              "status": "planned",
+              "note": "TDD: mirror upstream Docker entrypoint/config volume behavior with container smoke tests that run `gormes doctor --offline` and avoid bundling Python runtime paths."
+            },
+            {
+              "name": "Homebrew",
+              "status": "planned",
+              "note": "TDD: add formula/release artifact checks after the static binary and docs install paths are stable, with version, checksum, and install layout fixtures."
+            },
+            {
+              "name": "Unix installer (install.sh) source-backed update flow",
+              "status": "planned",
+              "note": "TDD slice 1 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): port upstream Unix installer semantics into `gormes/www.gormes.ai/internal/site/install.sh` with user-scoped PATH publication, managed checkout under a Hermes-analogy install home, rerun-as-update behavior, and no root-owned target paths. Cover path selection, managed checkout, update-on-rerun, and publish+verify flow via a new `install_unix_test.go` Go test that executes the script under a temporary fake toolchain — no network calls in unit tests. Do not install Hermes/Python/Node: Gormes' current feature set does not require them."
+            },
+            {
+              "name": "Windows installer (install.ps1 + install.cmd) parity",
+              "status": "planned",
+              "note": "TDD slice 2 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): add `gormes/www.gormes.ai/internal/site/install.ps1` (native PowerShell) plus `install.cmd` wrapper that launches it, matching the Unix contract (user-scoped PATH, managed checkout, rerun-as-update, source-backed). Cover content/smoke assertions — PATH publication, managed checkout layout, release branch handling, and stable global command publication — via `install_windows_test.go` over fake toolchains; no live network calls in unit tests."
+            },
+            {
+              "name": "Installer site asset/route coverage",
+              "status": "planned",
+              "note": "TDD slice 3 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): extend `gormes/www.gormes.ai/internal/site/{assets,server,content,static_export}.go` and matching `assets_test.go`/`static_export_test.go` coverage so `/install.sh`, `/install.ps1`, and `/install.cmd` all embed, load, serve, and static-export with the correct MIME and cache behavior. Update landing-page install copy (`content.go` + `home.spec.mjs`) and the top-level `README.md` / `gormes/www.gormes.ai/README.md` install guidance only after the script slices land. This slice freezes the public install-surface contract so downstream docs/site builds do not regress."
+            }
           ]
         },
         "5.Q": {
-          "status": "planned",
-          "name": "TUI Gateway Streaming",
+          "name": "API Server + TUI Gateway Streaming",
           "items": [
-            "SSE streaming to Bubble Tea TUI"
+            {
+              "name": "SSE streaming to Bubble Tea TUI",
+              "status": "planned",
+              "note": "TDD: port the tui_gateway server/render/slash-worker event contract so remote Bubble Tea clients can subscribe to live agent state without the Python gateway process."
+            },
+            {
+              "name": "OpenAI-compatible chat-completions API server",
+              "status": "planned",
+              "note": "TDD: port the upstream gateway/platforms/api_server.py /v1/chat/completions surface with API-key auth, body-size limits, OpenAI content-part normalization, X-Hermes-Session-Id continuity, and streaming/non-streaming error-envelope fixtures before exposing the native Go brain over HTTP."
+            },
+            {
+              "name": "Responses API store + run event stream",
+              "status": "planned",
+              "note": "TDD: port ResponseStore as a bounded persistent read model, previous_response_id chaining, GET/DELETE /v1/responses, POST /v1/runs, GET /v1/runs/{run_id}/events SSE, and orphaned-run cleanup as fixtures before external OpenAI-compatible clients depend on stateful runs."
+            },
+            {
+              "name": "API server health + cron admin endpoints",
+              "status": "planned",
+              "note": "TDD: port /health/detailed plus /api/jobs list/create/update/delete/pause/resume/trigger after the Phase 5.N cronjob store/API parity slices land, reusing the same auth and OpenAI-style error envelope instead of creating a second cron control plane."
+            }
+          ]
+        },
+        "5.R": {
+          "name": "Code Execution Mode Policy",
+          "items": [
+            {
+              "name": "Execution-mode resolver + config precedence",
+              "status": "planned",
+              "note": "TDD slice 1 of 4: pure helper in `internal/tools/execute_code.go` that returns `off`/`project`/`strict` from (a) env var (e.g. `GORMES_EXECUTE_CODE_MODE`), then (b) config key, then (c) default, with unknown values falling back to default and emitting a warning. Table tests only — no sandbox coupling, no CWD/interpreter behavior yet. Freeze the token set here so later slices cannot silently add modes."
+            },
+            {
+              "name": "Strict-mode CWD + interpreter parity",
+              "status": "planned",
+              "note": "TDD slice 2 of 4: strict mode keeps today's behavior frozen — isolated tmpdir CWD plus the canonical interpreter resolved via `LocalCodeSandbox.resolveRuntime`. Fixtures must prove the 5.K blocked-result envelope (status, error, filesystem_access, network_access) is unchanged and that relative imports/filesystem access outside the tmpdir continue to fail. This slice exists only to pin the reference behavior before project-mode lands."
+            },
+            {
+              "name": "Project-mode CWD + active venv detection",
+              "status": "planned",
+              "note": "TDD slice 3 of 4: port upstream `_resolve_python_binary`/`_resolve_cwd` project semantics — session's working directory for CWD and the active virtualenv/conda python when present, falling back to the resolved system interpreter. Unit tests must drive resolution via injected env (`VIRTUAL_ENV`, `CONDA_PREFIX`), not the real host. Do not widen the 5.K filesystem/network blocking contract — project mode still flows through the same `sandboxGuardReason` gate."
+            },
+            {
+              "name": "Default mode selection + config cut-over",
+              "status": "planned",
+              "note": "TDD slice 4 of 4: pick and document Gormes' default mode (recommend `strict` given the self-hosted security-first posture, with `project` opt-in via config). Wire the resolver into `NewExecuteCodeTool` so callers get the right mode without per-call arguments, add a regression test that the 5.K `Sandboxed exec` blocked-result envelope is byte-identical across modes, and update the rationale in `docs/content/building-gormes/core-systems/tool-execution.md` so operators understand the trade-off before flipping the default."
+            }
           ]
         }
       }
     },
     "6": {
       "name": "Phase 6 \u2014 The Learning Loop (Soul)",
-      "status": "planned",
       "deliverable": "Native skill extraction. Compounding intelligence. The feature Hermes doesn't have.",
       "subphases": {
         "6.A": {
-          "status": "planned",
           "name": "Complexity Detector",
           "items": [
-            "Heuristic or LLM-scored signal"
+            {
+              "name": "Heuristic or LLM-scored signal",
+              "status": "planned",
+              "note": "TDD: start with deterministic local signals from transcript length, tool-call count, retries, edits, and operator feedback before adding any LLM scorer, so learning-loop triggers are explainable."
+            }
           ]
         },
         "6.B": {
-          "status": "planned",
           "name": "Skill Extractor",
           "items": [
-            "LLM-assisted pattern distillation"
+            {
+              "name": "LLM-assisted pattern distillation",
+              "status": "planned",
+              "note": "TDD: define the extraction input bundle and output schema with fake model fixtures, including rejection of secrets, one-off tasks, and implementation-specific noise before live generation."
+            }
           ]
         },
         "6.C": {
-          "status": "planned",
           "name": "Skill Storage Format",
           "items": [
-            "Portable SKILL.md format"
+            {
+              "name": "Portable SKILL.md format",
+              "status": "planned",
+              "note": "TDD: extend the Phase 2.G parser/store contract with versioned metadata, provenance, review state, and atomic writes while preserving human-editable SKILL.md files."
+            }
           ]
         },
         "6.D": {
-          "status": "planned",
           "name": "Skill Retrieval + Matching",
           "items": [
-            "Hybrid lexical + semantic lookup"
+            {
+              "name": "Hybrid lexical + semantic lookup",
+              "status": "planned",
+              "note": "TDD: combine lexical tags with Phase 3 semantic embeddings behind a deterministic scorer, proving disabled/unreviewed skills stay excluded from prompt injection."
+            }
           ]
         },
         "6.E": {
-          "status": "planned",
           "name": "Feedback Loop",
           "items": [
-            "Skill effectiveness scoring"
+            {
+              "name": "Skill effectiveness scoring",
+              "status": "planned",
+              "note": "TDD: persist skill-use outcomes, explicit operator feedback, and decay/weight adjustments as auditable records before any automatic promotion or demotion behavior."
+            }
           ]
         },
         "6.F": {
-          "status": "planned",
           "name": "Skill Surface",
           "items": [
-            "TUI + Telegram browsing"
+            {
+              "name": "TUI + Telegram browsing",
+              "status": "planned",
+              "note": "TDD: expose browse/edit/disable/review flows through TUI and gateway commands after the store and feedback records are stable, with permission and active-turn behavior pinned by tests."
+            }
           ]
         }
       }
     }
-  },
-  "stats": {
-    "total_subphases": 52,
-    "complete": 10,
-    "in_progress": 2,
-    "planned": 40,
-    "complete_percentage": 19,
-    "in_progress_percentage": 4
   }
 }

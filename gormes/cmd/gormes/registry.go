@@ -34,6 +34,12 @@ func buildDefaultRegistry(parentCtx context.Context, delegation config.Delegatio
 		Toolset: "todo",
 		CheckFn: func() bool { return todo.Store != nil },
 	})
+	sessionSearch := &tools.SessionSearchTool{}
+	reg.MustRegisterEntry(tools.ToolEntry{
+		Tool:    sessionSearch,
+		Toolset: "session_search",
+		CheckFn: func() bool { return sessionSearch.Backend != nil },
+	})
 	reg.MustRegisterEntry(tools.ToolEntry{
 		Tool:    &tools.ExecuteCodeTool{},
 		Toolset: "code_execution",

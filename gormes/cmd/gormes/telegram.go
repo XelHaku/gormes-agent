@@ -22,7 +22,6 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/memory"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/session"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/telemetry"
-	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
 // telegramCmd runs Gormes as a Telegram bot — the adapter previously
@@ -114,7 +113,7 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 	defer cancel()
 
 	reg := buildDefaultRegistry(rootCtx, cfg.Delegation, cfg.SkillsRoot(), hc, cfg.Hermes.Model)
-	tools.RegisterHonchoTools(reg, goncho.NewService(mstore.DB(), goncho.Config{
+	goncho.RegisterTools(reg, goncho.NewService(mstore.DB(), goncho.Config{
 		WorkspaceID:    "default",
 		ObserverPeerID: "gormes",
 		RecentMessages: 4,

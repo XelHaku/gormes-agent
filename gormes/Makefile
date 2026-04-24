@@ -1,4 +1,4 @@
-.PHONY: build run test test-live lint fmt clean update-readme validate-progress generate-progress
+.PHONY: build run test test-live lint fmt clean update-readme validate-progress generate-progress orchestrator-test orchestrator-test-all orchestrator-lint
 
 BUILD_FLAGS := -trimpath -ldflags="-s -w"
 BINARY_PATH := bin/gormes
@@ -56,3 +56,16 @@ fmt:
 
 clean:
 	rm -rf bin/ coverage.out
+
+orchestrator-test:
+	@bash scripts/orchestrator/tests/run.sh unit
+
+orchestrator-test-all:
+	@bash scripts/orchestrator/tests/run.sh unit integration
+
+orchestrator-lint:
+	@if command -v shellcheck >/dev/null 2>&1; then \
+	  shellcheck scripts/gormes-auto-codexu-orchestrator.sh scripts/orchestrator/lib/*.sh; \
+	else \
+	  echo "shellcheck not installed; skipping"; \
+	fi

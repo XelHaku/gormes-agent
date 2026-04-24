@@ -283,7 +283,7 @@ git commit -m "feat(skills): inject active skills into kernel turns"
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/skills/... -count=1
 go test ./internal/kernel -count=1
 go test ./docs -count=1
@@ -292,7 +292,7 @@ go test ./docs -count=1
 For the full `2.G0` branch gate, run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./... -count=1
 go test ./docs -count=1
 ```

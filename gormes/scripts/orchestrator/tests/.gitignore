@@ -1,0 +1,8 @@
+vendor/
+tmp/
+*.log
+
+# Allow the fixtures/bin directory even though the repo-wide
+# gormes/.gitignore ignores any `bin/` directory.
+!fixtures/bin/
+!fixtures/bin/**

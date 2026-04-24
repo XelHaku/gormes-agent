@@ -1,0 +1,11 @@
+[Unit]
+Description=Gormes orchestrator effectiveness audit (one-shot, fired by timer)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash @AUDIT_PATH@
+# Inherit user PATH + tools. Environment knobs override audit.sh defaults.
+Environment=REPO_ROOT=@REPO_ROOT@
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+TimeoutStartSec=60s
+Nice=10

@@ -83,7 +83,7 @@ The hybrid is **temporary**. The long-term state is 100% Go.
 
 During Phases 1–4, Go is the chassis (orchestrator, state, persistence, platform I/O, agent cognition) and Python is the peripheral library (research tools, legacy skills, ML heavy lifting). Each phase shrinks Python's footprint. Phase 5 deletes the last Python dependency.
 
-Phase 3 (The Black Box) is substantially delivered as of 2026-04-20: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. Remaining Phase 3 work is 3.E — decay, cross-chat synthesis, and the operational-visibility mirrors (session index, insights audit, tool audit, transcript export).
+Phase 3 (The Black Box) is substantially delivered as of 2026-04-23: the SQLite + FTS5 lattice (3.A), ontological graph with async LLM extraction (3.B), lexical/FTS5 recall with `<memory-context>` fence injection (3.C), semantic fusion via Ollama embeddings with cosine similarity recall (3.D), and the operator-facing memory mirror (3.D.5) are all implemented. Phase 3.E is mixed closeout now: session index, tool audit, transcript export, extraction status, and insights logging are shipped; decay freshness, cross-chat deny-path/tool evidence, and parent-session lineage remain.
 
 Phase 1 should be read correctly: it is a tactical Strangler Fig bridge, not a philosophical compromise. It exists to deliver immediate value to existing Hermes users while preserving a clean migration path toward a pure Go runtime that owns the entire lifecycle end to end.
 
@@ -154,7 +154,7 @@ type Subagent struct {
 
 **Why third:** Telegram proves the pattern. Scale to Discord/Slack/WhatsApp/Signal/Email. Platform breadth matters for adoption, but it doesn't differentiate architecturally.
 
-**Status:** 🔨 Shared gateway chassis + `gormes gateway` landed; Telegram (2.B.1) and Discord (2.B.2) are shipped. Wider adapters remain pending.
+**Status:** 🔨 Shared gateway chassis + `gormes gateway` landed; Telegram (2.B.1) and Discord (2.B.2) are shipped. Slack has a private Socket Mode bot but still needs shared runtime registration, WhatsApp has only ingress normalization, and the long-tail regional adapters are advancing as contract-first seams before real transports.
 
 ---
 

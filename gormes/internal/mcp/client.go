@@ -132,7 +132,7 @@ func DialStdio(ctx context.Context, cfg StdioConfig, opts ClientOptions) (*Clien
 		stdin:     stdin,
 		supported: supported,
 		pending:   make(map[int64]chan rpcOutcome),
-		closed:    make(chan struct{}),
+		closed:    make(chan struct{}, 1),
 	}
 	go c.readLoop(bufio.NewReader(stdout))
 

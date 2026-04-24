@@ -10,7 +10,7 @@
 
 **Spec:** [`gormes/docs/superpowers/specs/2026-04-21-gormes-phase2b2-discord-slack-design.md`](../specs/2026-04-21-gormes-phase2b2-discord-slack-design.md)
 
-**Primary Donor References:** PicoClaw Discord edge patterns come from `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/discord/discord.go`. Slack Socket Mode, thread, and ACK behavior come from `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/slack/slack.go`. Shared channel decomposition cues come from `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/base.go`, `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/manager.go`, and `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/split.go`, but none of those runtime ownership patterns should be copied wholesale into Gormes.
+**Primary Donor References:** PicoClaw Discord edge patterns come from `<picoclaw donor repo>/pkg/channels/discord/discord.go`. Slack Socket Mode, thread, and ACK behavior come from `<picoclaw donor repo>/pkg/channels/slack/slack.go`. Shared channel decomposition cues come from `<picoclaw donor repo>/pkg/channels/base.go`, `<picoclaw donor repo>/pkg/channels/manager.go`, and `<picoclaw donor repo>/pkg/channels/split.go`, but none of those runtime ownership patterns should be copied wholesale into Gormes.
 
 ---
 
@@ -57,8 +57,8 @@
 - Modify: `gormes/internal/config/config_test.go`
 
 **Reference donors:**
-- `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/discord/discord.go`
-- `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/slack/slack.go`
+- `<picoclaw donor repo>/pkg/channels/discord/discord.go`
+- `<picoclaw donor repo>/pkg/channels/slack/slack.go`
 
 - [ ] **Step 1: Write the failing config tests**
 
@@ -654,7 +654,7 @@ git commit -m "refactor(gormes): extract shared gateway runtime boot"
 - Create: `gormes/internal/discord/bot_test.go`
 
 **Reference donors:**
-- `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/discord/discord.go`
+- `<picoclaw donor repo>/pkg/channels/discord/discord.go`
 - `gormes/internal/telegram/client.go`
 - `gormes/internal/telegram/bot.go`
 - `gormes/internal/telegram/coalesce.go`
@@ -1518,7 +1518,7 @@ git commit -m "feat(gormes): wire discord command"
 - Create: `gormes/internal/slack/bot_test.go`
 
 **Reference donors:**
-- `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw/pkg/channels/slack/slack.go`
+- `<picoclaw donor repo>/pkg/channels/slack/slack.go`
 - `gormes/internal/telegram/bot.go`
 
 - [ ] **Step 1: Write the failing Slack tests**

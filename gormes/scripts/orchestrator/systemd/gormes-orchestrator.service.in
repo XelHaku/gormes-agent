@@ -1,0 +1,32 @@
+[Unit]
+Description=Gormes autoloop codex orchestrator (forever-loop with companion seam)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@WORKDIR@
+ExecStart=/bin/bash @ORCHESTRATOR_PATH@
+Restart=on-failure
+RestartSec=30s
+TimeoutStopSec=60s
+KillMode=mixed
+KillSignal=SIGTERM
+
+# systemd user services get a minimal PATH; explicitly include the user's
+# ~/.local/bin so codexu/claudeu/opencode/etc. resolve.
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# Companion seam defaults: let the orchestrator schedule planner, doc-improver,
+# and landing-page between cycles. Override by dropping a file in
+# ~/.config/systemd/user/gormes-orchestrator.service.d/override.conf
+Environment=DISABLE_COMPANIONS=0
+Environment=COMPANION_ON_IDLE=1
+Environment=MAX_AGENTS=4
+Environment=MODE=safe
+
+# stdout/stderr go to journald; tail with:
+#   journalctl --user -u gormes-orchestrator -f
+
+[Install]
+WantedBy=default.target

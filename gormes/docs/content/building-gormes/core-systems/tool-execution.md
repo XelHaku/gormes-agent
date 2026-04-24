@@ -21,11 +21,9 @@ Every tool lives behind this interface. Schemas are Go structs — schema drift 
 ## What you get
 
 - **Deterministic execution** — no subprocess spawning for in-process tools
-- **Sandboxed code execution** — `execute_code` stages self-contained Go snippets in `strict` temp workspaces or `project` workspaces under `.gormes/code-execution`, strips secret-bearing env vars, and returns structured stdout/stderr results
 - **Bounded side effects** — ctx cancels; deadlines respected
-- **Fail-closed dangerous action gate** — command-like tool args are scanned for destructive shell payloads before `Tool.Execute` runs
 - **Wire Doctor** — `gormes doctor --offline` validates the registry before a live turn burns tokens
 
 ## Status
 
-✅ Shipped (Phase 2.A + Phase 5.K tracked scope). The registry still executes most tools in-process, and the broader execution surface now includes Go-native `execute_code` with scrubbed `strict`/`project` workspaces, timeout/output caps, and structured results flowing through the same kernel tool loop. Dangerous shell payloads in command-like JSON fields still fail closed before execution in both the kernel and the in-process executor. Interactive terminal-style debug sessions and recursive in-script tool RPC remain future follow-on scope. See [Phase 2](../architecture_plan/phase-2-gateway/).
+✅ Shipped (Phase 2.A), with Phase 5.K now extending the registry to include a guarded `execute_code` tool. The current Go tool set still avoids broad terminal/file mutation surfaces: `execute_code` runs local `sh`/`python` snippets with timeout/output caps and pre-exec filesystem/network blocking, while the wider sandbox backend matrix stays in Phase 5.B and dangerous-action approval remains Phase 5.J. Cron job management remains an operator-tool parity task in Phase 5.N even though the Phase 2.D scheduler/audit bridge is shipped. See [Phase 2](../architecture_plan/phase-2-gateway/) and [Phase 5](../architecture_plan/phase-5-final-purge/).

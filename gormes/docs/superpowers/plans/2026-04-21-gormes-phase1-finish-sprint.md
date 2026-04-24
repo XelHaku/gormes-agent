@@ -15,7 +15,7 @@
 - Focused Phase-1 packages pass:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./cmd/gormes ./internal/tui ./internal/kernel ./internal/doctor ./docs -count=1
 ```
 

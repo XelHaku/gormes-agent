@@ -12,7 +12,7 @@
 
 ## Prerequisites
 
-- Work from `/home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes`.
+- Work from `<repo>/gormes`.
 - Keep edits inside `README.md` and `gormes/docs/**`; do not touch `../../website/docs` or any Python path.
 - Expect `go test ./docs` to be the primary verification command.
 - Treat public proof links in `docs/content/*.md` as GitHub URLs, not local Hugo links, because the roadmap/spec files live outside `docs/content`.

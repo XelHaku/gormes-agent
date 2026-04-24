@@ -1,0 +1,23 @@
+{
+  "phases": {
+    "1": {
+      "name": "Phase One",
+      "subphases": {
+        "1.A": {
+          "name": "Sub A",
+          "items": [
+            {"name": "Item A1", "status": "complete"},
+            {"name": "Item A2", "status": "planned"}
+          ]
+        },
+        "1.B": {
+          "name": "Sub B",
+          "items": [
+            {"name": "Item B1", "status": "complete"},
+            {"name": "Item B2", "status": "planned"}
+          ]
+        }
+      }
+    }
+  }
+}

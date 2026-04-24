@@ -51,7 +51,7 @@ var (
 		"not worth reusing":  {},
 	}
 	gatewayDonorMapPinnedProvenance = []string{
-		"/home/xel/git/sages-openclaw/workspace-mineru/picoclaw",
+		"<picoclaw donor repo>",
 		"6421f146a99df1bebcd4b1ca8de2a289dfca3622",
 		"https://github.com/sipeed/picoclaw",
 		"relative to that donor root, not relative to the Gormes repo",

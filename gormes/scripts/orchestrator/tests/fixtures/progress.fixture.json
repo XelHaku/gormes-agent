@@ -1,0 +1,35 @@
+{
+  "phases": {
+    "1": {
+      "name": "Phase One",
+      "subphases": {
+        "1.A": {
+          "name": "Sub A",
+          "items": [
+            {"name": "Item A1", "status": "complete"},
+            {"name": "Item A2", "status": "in_progress"}
+          ]
+        },
+        "1.B": {
+          "name": "Sub B",
+          "items": [
+            {"name": "Item B1", "status": "planned"},
+            {"name": "Item B2", "status": "planned"}
+          ]
+        }
+      }
+    },
+    "2": {
+      "name": "Phase Two",
+      "subphases": {
+        "2.A": {
+          "name": "Sub 2A",
+          "items": [
+            {"name": "Item 2A1", "status": "planned"},
+            {"name": "Item 2A2", "status": "in_progress"}
+          ]
+        }
+      }
+    }
+  }
+}

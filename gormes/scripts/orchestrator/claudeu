@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+# claudeu: codexu-argv-compatible wrapper around Claude Code CLI (`claude -p`).
+#
+# Accepts the exact argv shape the orchestrator's build_codex_cmd emits:
+#     codexu exec --json -c KEY=VALUE ... --sandbox MODE \
+#         [extra-codex-flags] --output-last-message FINAL_FILE PROMPT
+#
+# Translates to:
+#     claude --print --dangerously-skip-permissions --add-dir "$(pwd)" PROMPT
+#
+# Responsibilities:
+#   1. Parse and ignore codex-specific flags (-c, --sandbox, --json, exec).
+#   2. Run claude with the prompt in print mode.
+#   3. Copy claude's stdout into FINAL_FILE so orchestrator's
+#      collect_final_report_issues finds the 8-section TDD report.
+#   4. Emit a synthetic {"type":"thread.started","thread_id":...} line on our
+#      stdout so extract_session_id() picks up a session id.
+#   5. Forward claude's exit code.
+#
+# Diagnostic logs: $HOME/.cache/claudeu/<timestamp>-<pid>.log unless
+# CLAUDEU_LOG_DIR is set.
+set -Eeuo pipefail
+
+: "${CLAUDEU_LOG_DIR:=$HOME/.cache/claudeu}"
+mkdir -p "$CLAUDEU_LOG_DIR"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+log="$CLAUDEU_LOG_DIR/${stamp}-$$.log"
+
+log_msg() { printf '[%s] %s\n' "$(date -u +%H:%M:%SZ)" "$*" >> "$log"; }
+
+log_msg "claudeu invoked argv-count=$#"
+log_msg "cwd=$(pwd)"
+
+# Preserve the full original argv so we can exec a fallback backend
+# (codexu) transparently if claude reports credit exhaustion.
+ORIG_ARGV=("$@")
+
+# Resolve a real codexu binary for fallback. Prefer $CLAUDEU_FALLBACK_BIN;
+# else scan PATH skipping any bin-shim entry (so we don't loop back to
+# ourselves via the codexu->claudeu symlink).
+resolve_fallback_bin() {
+  if [[ -n "${CLAUDEU_FALLBACK_BIN:-}" && -x "$CLAUDEU_FALLBACK_BIN" ]]; then
+    printf '%s' "$CLAUDEU_FALLBACK_BIN"
+    return 0
+  fi
+  local part
+  IFS=':' read -r -a _parts <<<"$PATH"
+  for part in "${_parts[@]}"; do
+    [[ -z "$part" ]] && continue
+    [[ "$part" == *bin-shim* ]] && continue
+    if [[ -x "$part/codexu" ]]; then
+      printf '%s' "$part/codexu"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Match output that indicates claude is out of credits / rate-limited in a
+# way where retrying with the same backend will keep failing.
+# Patterns cover Anthropic's credit-low message, 429 rate limits, and
+# "insufficient" balance wording across Claude Code CLI and API variants.
+is_credit_exhausted() {
+  local out_file="$1" err_file="$2"
+  grep -iqE \
+    -e 'credit balance is too low' \
+    -e 'credit_balance_too_low' \
+    -e 'insufficient[_ ]credits' \
+    -e 'billing_hard_limit_reached' \
+    -e 'billing[_ ]hard[_ ]limit' \
+    -e 'out of credits' \
+    -e 'rate_limit_exceeded' \
+    -e '429 Too Many Requests' \
+    -e 'exceeded your.*usage limit' \
+    -e 'monthly usage limit' \
+    -e 'quota exceeded' \
+    "$out_file" "$err_file" 2>/dev/null
+}
+
+final_file=""
+prompt=""
+
+while (( $# > 0 )); do
+  case "$1" in
+    exec|--json)
+      shift
+      ;;
+    -c|--sandbox|--model|-m)
+      # Consume flag + value
+      shift
+      [[ $# -gt 0 ]] && shift
+      ;;
+    --enable|--disable|--image|-i)
+      shift
+      [[ $# -gt 0 ]] && shift
+      ;;
+    --output-last-message)
+      final_file="${2:-}"
+      shift
+      [[ $# -gt 0 ]] && shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      if [[ -z "$prompt" ]]; then
+        prompt="$1"
+      else
+        log_msg "WARN: extra positional ignored: $1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+log_msg "parsed final_file=$final_file prompt-bytes=${#prompt}"
+
+if [[ -z "$prompt" ]]; then
+  echo "claudeu: no prompt argument" >&2
+  exit 2
+fi
+
+if ! command -v claude >/dev/null 2>&1; then
+  echo "claudeu: claude CLI not on PATH" >&2
+  exit 127
+fi
+
+tmp_stdout="$(mktemp "$CLAUDEU_LOG_DIR/${stamp}-$$.stdout.XXXXXX")"
+tmp_stderr="$(mktemp "$CLAUDEU_LOG_DIR/${stamp}-$$.stderr.XXXXXX")"
+trap 'rm -f "$tmp_stdout" "$tmp_stderr"' EXIT
+
+log_msg "invoking claude --print --output-format stream-json --dangerously-skip-permissions --add-dir $(pwd) (prompt via stdin)"
+
+# --output-format stream-json makes claude emit NDJSON events on stdout. The
+# final event is {"type":"result","subtype":"success","result":"<full text>",
+# "usage":{"input_tokens":N,"output_tokens":M,"cache_read_input_tokens":K}}.
+# We stream events through to OUR stdout (orchestrator captures this into
+# $LOGS_DIR/*.jsonl), extract the final text for --output-last-message, and
+# emit one extra synthetic {"type":"cost_summary","usage":...} line that
+# audit.sh's cost_block can sum via .usage at the top level.
+#
+# Pipe the prompt via stdin; orchestrator's `exec </dev/null` in the worker
+# subshell closes our inherited stdin so argv-positional doesn't work either.
+set +e
+printf '%s' "$prompt" \
+  | claude \
+      --print \
+      --output-format stream-json \
+      --verbose \
+      --dangerously-skip-permissions \
+      --add-dir "$(pwd)" \
+  > "$tmp_stdout" 2> "$tmp_stderr"
+rc=$?
+set -e
+
+log_msg "claude exited rc=$rc stdout-bytes=$(wc -c <"$tmp_stdout") stderr-bytes=$(wc -c <"$tmp_stderr")"
+
+# If claude failed and the failure matches credit-exhaustion patterns,
+# transparently exec codexu with the original argv so the orchestrator
+# keeps making progress overnight without manual intervention.
+if (( rc != 0 )) && [[ "${CLAUDEU_NO_FALLBACK:-0}" != "1" ]] && is_credit_exhausted "$tmp_stdout" "$tmp_stderr"; then
+  log_msg "credit-exhaustion pattern matched in claude output; attempting codexu fallback"
+  if fallback_bin="$(resolve_fallback_bin)"; then
+    log_msg "FALLBACK TO codexu: $fallback_bin with ${#ORIG_ARGV[@]} original argv"
+    # Record fallback for audit visibility (stderr lands in orchestrator's
+    # stderr file per-worker).
+    printf 'claudeu: credit exhausted; falling back to %s\n' "$fallback_bin" >&2
+    # Persist stderr/stdout before trap cleanup removes tempfiles.
+    {
+      echo "=== claude stderr (pre-fallback) ==="
+      cat "$tmp_stderr"
+      echo "=== end stderr ==="
+    } >> "$log"
+    # exec replaces this process; trap rm -f still fires via EXIT handler
+    # before exec if we explicitly clean up. To avoid losing tempfiles
+    # during the exec, clear the trap.
+    trap - EXIT
+    rm -f "$tmp_stdout" "$tmp_stderr" 2>/dev/null || true
+    exec "$fallback_bin" "${ORIG_ARGV[@]}"
+  else
+    log_msg "WARN: credit exhausted but no codexu fallback binary resolvable; propagating rc=$rc"
+    printf 'claudeu: credit exhausted, no codexu fallback on PATH (set CLAUDEU_FALLBACK_BIN)\n' >&2
+  fi
+fi
+
+# Emit thread.started now that we know we're staying with claude.
+thread_id="claudeu-$$-$(date +%s)"
+printf '{"type":"thread.started","thread_id":"%s"}\n' "$thread_id"
+
+# Stream claude's NDJSON events through to our stdout so the orchestrator's
+# per-worker jsonl file captures them (audit.sh's cost_block scans it).
+if [[ -s "$tmp_stdout" ]]; then
+  cat "$tmp_stdout"
+fi
+
+# Persist stderr content into the log for post-mortem before cleanup trap fires.
+if [[ -s "$tmp_stderr" ]]; then
+  {
+    echo "=== claude stderr ==="
+    cat "$tmp_stderr"
+    echo "=== end stderr ==="
+  } >> "$log"
+  cat "$tmp_stderr" >&2
+fi
+
+# Extract final text from the stream-json "result" event and write to the
+# codexu-style --output-last-message file so collect_final_report_issues
+# finds the 8-section TDD report claude authored.
+final_result=""
+if [[ -s "$tmp_stdout" ]]; then
+  # `first(...)` emits the first matching result event only — claude normally
+  # emits exactly one. Don't pipe to `tail -n1` here: the result text is
+  # multi-line TDD markdown and `tail -n1` would keep only the last line.
+  final_result="$(jq -rc 'first(inputs | select(.type=="result" and .subtype=="success") | .result // empty)' --null-input "$tmp_stdout" 2>/dev/null || true)"
+fi
+
+if [[ -n "$final_file" ]]; then
+  if [[ -n "$final_result" ]]; then
+    printf '%s' "$final_result" > "$final_file"
+    log_msg "wrote final report to $final_file (from result event, ${#final_result} bytes)"
+  else
+    # Fallback: claude crashed before emitting result; dump raw stream so we
+    # at least have SOMETHING for the orchestrator's report validator.
+    cp "$tmp_stdout" "$final_file"
+    log_msg "WARN: no result event found; wrote raw stream to $final_file ($(wc -c <"$tmp_stdout") bytes)"
+  fi
+fi
+
+# Audit's cost_block sums `.usage.input_tokens // 0` across every jsonl
+# event where `.usage != null`. Claude's stream-json result event already
+# has `.usage` at the top level, so audit picks it up automatically.
+# We only emit a synthetic `cost_summary` as a fallback when the result
+# event is missing (e.g. claude crashed mid-run) — that way we avoid
+# double-counting tokens when the result event is present.
+if [[ -s "$tmp_stdout" ]]; then
+  has_result_usage="$(jq -rc 'select(.type=="result" and (.usage // null) != null) | .usage.input_tokens // 0' "$tmp_stdout" 2>/dev/null | head -n1)"
+  if [[ -z "$has_result_usage" ]]; then
+    # Sum across assistant-message usage entries so audit has something
+    # to cost even on a mid-run crash.
+    cost_line="$(jq -sc '
+      [.[] | select(.type=="assistant" and (.message.usage // null) != null) | .message.usage] as $u
+      | if ($u|length) > 0 then
+          {type:"cost_summary", usage: ($u | reduce .[] as $x ({};
+            .input_tokens = ((.input_tokens // 0) + ($x.input_tokens // 0))
+            | .output_tokens = ((.output_tokens // 0) + ($x.output_tokens // 0))
+            | .cache_read_input_tokens = ((.cache_read_input_tokens // 0) + ($x.cache_read_input_tokens // 0))
+          ))}
+        else empty end
+    ' "$tmp_stdout" 2>/dev/null)"
+    if [[ -n "$cost_line" ]]; then
+      printf '%s\n' "$cost_line"
+      log_msg "emitted fallback cost_summary (no result event): $cost_line"
+    fi
+  else
+    log_msg "result event has usage (input_tokens=$has_result_usage); audit will sum it directly"
+  fi
+fi
+
+# Also preserve a copy in the log dir for debugging.
+cp "$tmp_stdout" "$log.stream.jsonl" 2>/dev/null || true
+[[ -n "$final_result" ]] && printf '%s' "$final_result" > "$log.final.md" 2>/dev/null || true
+
+exit "$rc"

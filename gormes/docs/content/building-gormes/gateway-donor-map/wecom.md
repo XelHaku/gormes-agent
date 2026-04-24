@@ -9,15 +9,15 @@ WeCom is one of the clearer China-facing donor candidates because PicoClaw alrea
 
 ## Status
 
-`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now groups WeCom into the Phase `2.B.10` regional/device adapter tranche. Gormes also carries upstream Hermes operator docs for WeCom behavior, but no Go adapter exists yet.
+`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now groups WeCom into the Phase `2.B.10` regional/device adapter tranche. Gormes has a contract-tested shared-bot seam in `internal/channels/wecom` for policy-gated ingress and reply-path behavior, but the real WeCom WebSocket transport/bootstrap binding remains planned.
 
 Evidence level:
 
-- Donor code for this dossier was verified against the external sibling repo at `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- Donor code for this dossier was verified against the external sibling repo at `<picoclaw donor repo>`.
 - The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - The upstream donor repo is `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
-- Current Gormes status and target behavior were verified in-tree against `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` and `gormes/docs/content/upstream-hermes/user-guide/messaging/wecom.md`.
+- Current Gormes status and target behavior were verified in-tree against `gormes/internal/channels/wecom/bot.go`, `gormes/internal/channels/wecom/bot_test.go`, `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md`, and `gormes/docs/content/upstream-hermes/user-guide/messaging/wecom.md`.
 
 Keep the boundary explicit: PicoClaw is donor input for WeCom channel-edge mechanics only. Gormes architecture, session ownership, and gateway/kernel boundaries remain authoritative.
 
@@ -39,7 +39,7 @@ That split matters. WeCom is mostly donor code at the transport layer, but mostl
 
 ## Picoclaw Donor Files
 
-- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
+- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `<picoclaw donor repo>` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
 - `picoclaw/pkg/channels/wecom/wecom.go`
 - `picoclaw/pkg/channels/wecom/protocol.go`
 - `picoclaw/pkg/channels/wecom/media.go`
@@ -70,7 +70,7 @@ Rebuild in Gormes-native form:
 
 ## Gormes Mapping
 
-- `wecom.go` should inform a future `gormes/internal/wecom` adapter split between transport session management and Gormes-facing event submission.
+- `wecom.go` should inform the future `gormes/internal/channels/wecom` runtime split between transport session management and Gormes-facing event submission.
 - `dispatchIncoming` is the donor for parsing inbound WeCom message types, extracting media, and deciding when a turn is stream-capable.
 - `BeginStream` plus `wecomStreamer` maps well to Gormes' adapter-local streaming reply contract. The important idea is that WeCom streaming is tied to an active inbound turn, not to arbitrary outbound messages.
 - `sendActivePush` and `sendActiveMedia` are the donor path for expired-turn fallback and proactive outbound delivery.

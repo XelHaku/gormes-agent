@@ -15,7 +15,7 @@ This file converts the per-phase sprint plans into one conservative execution qu
 |---|---|---|
 | G0 | Baseline stays green | `go test ./internal/progress -count=1` and `go run ./cmd/progress-gen --validate` remain green before starting a new tranche |
 | G1 | Runtime realism landed | Phase 2 `P2-A` complete: real child Hermes stream loop is merged and `go test ./internal/subagent ./internal/hermes ./internal/kernel -count=1 -race` is green |
-| G2 | Shared control plane landed | Phase 2 `P2-B` + `P2-C` complete: canonical commands, BOOT hook, restart/pairing/status, and home-channel surfaces are green |
+| G2 | Shared gateway lifecycle/operator plane landed | Phase 2 remaining `2.B.3` + `2.F.3` + `2.F.4` slices are complete: Slack is registered through the shared manager/command parser, pairing/status read model is green, and home-channel/operator surfaces are green |
 | G3 | Gateway routing substrate landed | Phase 2 `P2-D` complete: session context, delivery routing, and stream fan-out are stable and tested |
 | G4 | Primary adapter wave landed | Phase 2 `P2-E` complete: WhatsApp, Signal, and Email/SMS are on the shared contract |
 | G5 | Phase 2 closed | Phase 2 `P2-F` + `P2-G` complete: long-tail adapters/docs done, `go test ./... -count=1` passes twice, and `go run ./cmd/progress-gen --validate` is green |
@@ -33,7 +33,7 @@ This file converts the per-phase sprint plans into one conservative execution qu
 |---|---|---|---|---|---|
 | 0 | Phase 1 maintenance lane | Phase 1 `P1-A`..`P1-D` | 2-4 days | None | Optional; does not block the critical path unless a Phase 1 regression appears |
 | 1 | Runtime realism | Phase 2 `P2-A` | 3-5 days | G0 | G1 |
-| 2 | Shared command/lifecycle plane | Phase 2 `P2-B` + `P2-C` | 6-10 days | G1 | G2 |
+| 2 | Shared gateway lifecycle/operator plane | Phase 2 remaining `2.B.3` + `2.F.3` + `2.F.4` slices | 8-13 days | G1 | G2 |
 | 3 | Routing substrate | Phase 2 `P2-D` | 4-6 days | G2 | G3 |
 | 4 | Adapter wave 1 | Phase 2 `P2-E` | 8-12 days | G3 | G4 |
 | 5 | Adapter wave 2 + closeout | Phase 2 `P2-F` + `P2-G` | 11-17 days | G4 | G5 |
@@ -47,7 +47,7 @@ This file converts the per-phase sprint plans into one conservative execution qu
 
 ## Critical-path summary
 
-- **Immediate next slice:** Queue 1, Phase 2 `P2-A` (`2.E.1` real child Hermes stream loop).
+- **Immediate next slice:** Queue 2, the remaining Phase 2 shared-gateway/lifecycle/operator plane (`2.B.3` Slack closeout, then `2.F.3` + `2.F.4`).
 - **Architecture unlock:** Queue 8. Phase 4 should not start before Phase 2 is closed and Phase 3 memory closeout is stable.
 - **Learning-loop unlock:** Queue 10. Phase 6 can start once the **Phase 5.F skills plumbing** inside `P5-C` is real, even if the rest of Phase 5 is still finishing.
 - **Conservative total critical path:** about **103-147 engineering days** for Queues 1-12, or roughly **21-30 engineer-weeks**. Phase 1 maintenance adds **2-4 days** only if regression cleanup is needed.

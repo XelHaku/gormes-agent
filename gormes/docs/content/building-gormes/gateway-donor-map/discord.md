@@ -13,7 +13,7 @@ Discord is now shipped in Gormes, so this donor page is about parity gaps and re
 
 Evidence level:
 
-- Donor code for this dossier was verified against the external sibling repo at `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- Donor code for this dossier was verified against the external sibling repo at `<picoclaw donor repo>`.
 - The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - The upstream donor repo is `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
@@ -44,7 +44,7 @@ The voice and TTS surface in `picoclaw/pkg/channels/discord/voice.go` is broader
 
 ## Picoclaw Donor Files
 
-- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
+- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `<picoclaw donor repo>` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
 - `picoclaw/pkg/channels/discord/discord.go`
 - `picoclaw/pkg/channels/discord/voice.go`
 - `picoclaw/pkg/channels/discord/discord_test.go`
@@ -76,7 +76,7 @@ Rebuild in Gormes-native form:
 - `handleMessage` should map to Gormes inbound policy documented in `gormes/docs/content/upstream-hermes/user-guide/messaging/discord.md`: respond to DMs, require mention in server channels by default, preserve thread isolation, and keep session identity explicit.
 - `sendChunk` maps to Gormes outbound delivery, especially reply threading and per-message send timeout.
 - `startTyping` and `stopTyping` map cleanly to shared adapter UX helpers from `gateway-donor-map/shared-adapter-patterns.md`.
-- `voice.go` is best treated as a later `internal/discord/voice.go` companion rather than part of the first `internal/discord/adapter.go`.
+- `voice.go` is best treated as a later `internal/channels/discord/voice.go` companion rather than part of the shipped text adapter.
 
 ## Implementation Notes
 

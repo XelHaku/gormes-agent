@@ -46,7 +46,7 @@ Write the plan with the same task decomposition used below so implementation can
 
 - [ ] **Step 3: Verify docs exist**
 
-Run: `test -f /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/docs/superpowers/specs/2026-04-21-goncho-architecture-design.md && test -f /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/docs/superpowers/plans/2026-04-21-goncho-immediate-slice.md`
+Run: `test -f <repo>/gormes/docs/superpowers/specs/2026-04-21-goncho-architecture-design.md && test -f <repo>/gormes/docs/superpowers/plans/2026-04-21-goncho-immediate-slice.md`
 
 Expected: exit code `0`
 
@@ -100,7 +100,7 @@ func TestContextResultIncludesStableFields(t *testing.T) {
 
 - [ ] **Step 2: Run the tests to watch them fail**
 
-Run: `cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes && go test ./internal/goncho -run Contract -v`
+Run: `cd <repo>/gormes && go test ./internal/goncho -run Contract -v`
 
 Expected: FAIL because `internal/goncho` does not exist yet
 
@@ -129,7 +129,7 @@ type ContextResult struct {
 
 - [ ] **Step 4: Re-run the tests**
 
-Run: `cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes && go test ./internal/goncho -run Contract -v`
+Run: `cd <repo>/gormes && go test ./internal/goncho -run Contract -v`
 
 Expected: PASS
 
@@ -181,7 +181,7 @@ func TestMigrate_3eTo3f_AddsGonchoConclusionsFTS(t *testing.T) {
 
 - [ ] **Step 2: Run the migration tests to verify RED**
 
-Run: `cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes && go test ./internal/memory -run 'Migrate.*Goncho|OpenSqlite_FreshDBIsV3f' -v`
+Run: `cd <repo>/gormes && go test ./internal/memory -run 'Migrate.*Goncho|OpenSqlite_FreshDBIsV3f' -v`
 
 Expected: FAIL because schema version and Goncho tables are not present yet
 
@@ -219,7 +219,7 @@ Also add the FTS table and triggers, then bump the canonical schema version to `
 
 - [ ] **Step 4: Re-run the migration tests**
 
-Run: `cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes && go test ./internal/memory -run 'Migrate.*Goncho|OpenSqlite_FreshDBIsV3f' -v`
+Run: `cd <repo>/gormes && go test ./internal/memory -run 'Migrate.*Goncho|OpenSqlite_FreshDBIsV3f' -v`
 
 Expected: PASS
 
@@ -285,7 +285,7 @@ func TestService_ConcludeAndSearch(t *testing.T) {
 
 - [ ] **Step 2: Run the service tests to verify RED**
 
-Run: `cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes && go test ./internal/goncho -run 'ProfileRoundTrip|ConcludeAndSearch|Context' -v`
+Run: `cd <repo>/gormes && go test ./internal/goncho -run 'ProfileRoundTrip|ConcludeAndSearch|Context' -v`
 
 Expected: FAIL because the service does not exist yet
 
@@ -317,7 +317,7 @@ Implementation rules:
 
 - [ ] **Step 4: Re-run the service tests**
 
-Run: `cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes && go test ./internal/goncho -v`
+Run: `cd <repo>/gormes && go test ./internal/goncho -v`
 
 Expected: PASS
 
@@ -360,7 +360,7 @@ func TestHonchoProfileTool_UsesService(t *testing.T) {
 
 - [ ] **Step 2: Run the tool tests to verify RED**
 
-Run: `cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes && go test ./internal/tools -run Honcho -v`
+Run: `cd <repo>/gormes && go test ./internal/tools -run Honcho -v`
 
 Expected: FAIL because the tools are not implemented yet
 
@@ -388,7 +388,7 @@ In `cmd/gormes/telegram.go`, construct the Goncho service from `mstore.DB()` and
 
 - [ ] **Step 5: Re-run the tool tests**
 
-Run: `cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes && go test ./internal/tools -run Honcho -v`
+Run: `cd <repo>/gormes && go test ./internal/tools -run Honcho -v`
 
 Expected: PASS
 
@@ -402,7 +402,7 @@ Expected: PASS
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/goncho ./internal/tools ./internal/memory ./cmd/gormes -run 'Honcho|Goncho|Migrate|BuildDefaultRegistry' -v
 ```
 

@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Test stub for the GitHub CLI (gh).
+#
+# Supported invocations:
+#   gh auth status           -> exit 0 unless FAKE_GH_AUTH=fail (then write
+#                                "not logged in" to stderr, exit 1).
+#   gh repo view [...]       -> exit 0 (no output).
+#   gh pr create [...]       -> print a fake PR URL on stdout, exit 0.
+#                                If FAKE_GH_PR_CREATE=fail the PR create fails
+#                                with a stderr message and exits 1. If
+#                                FAKE_GH_PR_CREATE=label_missing the first call
+#                                fails with a label-not-found stderr and
+#                                subsequent calls succeed — lets tests exercise
+#                                the --label fallback path.
+#   other subcommands        -> exit 2 (unrecognized).
+#
+# Env:
+#   FAKE_GH_AUTH          fail => auth status fails. Anything else => success.
+#   FAKE_GH_PR_CREATE     fail => pr create always fails.
+#                         label_missing => first call fails with
+#                           "could not add label: 'autoloop-bot' not found"
+#                           remembering state via a stamp file so a retry
+#                           without --label then succeeds.
+#   FAKE_GH_PR_URL        override the PR url printed on success.
+#   FAKE_GH_LOG           trace file (default /dev/null). Appends one line per call.
+#   FAKE_GH_STATE_DIR     where to keep cross-invocation stamps (default: $TMPDIR
+#                           or /tmp).
+set -Eeuo pipefail
+
+LOGF="${FAKE_GH_LOG:-/dev/null}"
+STATE_DIR="${FAKE_GH_STATE_DIR:-${TMPDIR:-/tmp}}"
+PR_URL="${FAKE_GH_PR_URL:-https://github.com/x/y/pull/42}"
+
+{ printf 'fake-gh pid=%s argv=%s\n' "$$" "$*" ; } >> "$LOGF" 2>/dev/null || true
+
+if (( $# == 0 )); then
+  echo "fake-gh: no subcommand" >&2
+  exit 2
+fi
+
+case "$1" in
+  auth)
+    shift
+    if [[ "${1:-}" == "status" ]]; then
+      if [[ "${FAKE_GH_AUTH:-ok}" == "fail" ]]; then
+        echo "You are not logged into any GitHub hosts. Run gh auth login to authenticate." >&2
+        exit 1
+      fi
+      echo "github.com: Logged in as fake-user (oauth_token)" >&2
+      exit 0
+    fi
+    echo "fake-gh: unsupported auth subcommand: ${1:-}" >&2
+    exit 2
+    ;;
+
+  repo)
+    shift
+    if [[ "${1:-}" == "view" ]]; then
+      # Silent success — the real gh prints repo metadata; we don't need it.
+      exit 0
+    fi
+    echo "fake-gh: unsupported repo subcommand: ${1:-}" >&2
+    exit 2
+    ;;
+
+  pr)
+    shift
+    if [[ "${1:-}" == "create" ]]; then
+      shift
+      # Detect whether --label was passed; useful for label-missing scenario.
+      has_label=0
+      for a in "$@"; do
+        if [[ "$a" == "--label" || "$a" == --label=* ]]; then
+          has_label=1
+          break
+        fi
+      done
+
+      case "${FAKE_GH_PR_CREATE:-ok}" in
+        fail)
+          echo "fake-gh: pr create forced failure" >&2
+          exit 1
+          ;;
+        label_missing)
+          if (( has_label == 1 )); then
+            echo "could not add label: 'autoloop-bot' not found" >&2
+            exit 1
+          fi
+          echo "$PR_URL"
+          exit 0
+          ;;
+        *)
+          echo "$PR_URL"
+          exit 0
+          ;;
+      esac
+    fi
+    if [[ "${1:-}" == "list" ]]; then
+      # Return an empty result set; good enough for the daily digest tests.
+      echo ""
+      exit 0
+    fi
+    echo "fake-gh: unsupported pr subcommand: ${1:-}" >&2
+    exit 2
+    ;;
+
+  *)
+    echo "fake-gh: unknown subcommand: $1" >&2
+    exit 2
+    ;;
+esac

@@ -20,20 +20,20 @@ weight: 10
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 64/66 subphases shipped · 2 in progress · 0 planned
+**Overall:** 27/71 subphases shipped · 12 in progress · 32 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
-| Phase 1 — The Dashboard | ✅ | 2/2 subphases |
-| Phase 2 — The Gateway | ✅ | 20/20 subphases |
-| Phase 3 — The Black Box (Memory) | ✅ | 13/13 subphases |
-| Phase 4 — The Brain Transplant | ✅ | 8/8 subphases |
-| Phase 5 — The Final Purge | 🔨 | 15/17 subphases |
-| Phase 6 — The Learning Loop (Soul) | ✅ | 6/6 subphases |
+| Phase 1 — The Dashboard | 🔨 | 2/3 subphases |
+| Phase 2 — The Gateway | 🔨 | 13/23 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
+| Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
+| Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
+| Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 
 ---
 
-## Phase 1 — The Dashboard ✅
+## Phase 1 — The Dashboard 🔨
 
 *Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary*
 
@@ -47,7 +47,13 @@ weight: 10
 
 - [x] Offline tool validation
 
-## Phase 2 — The Gateway ✅
+### 1.C — Automation Reliability 🔨
+
+- [ ] Orchestrator failure-row stabilization for 4-8 workers
+- [ ] Soft-success-nonzero bats coverage
+- [ ] Planner wrapper/test consistency closeout
+
+## Phase 2 — The Gateway 🔨
 
 *Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before the long-tail adapter flood*
 
@@ -71,17 +77,19 @@ weight: 10
 - [x] gormes gateway multi-channel entrypoint
 - [x] Discord
 
-### 2.B.3 — Slack on Shared Chassis ✅
+### 2.B.3 — Slack on Shared Chassis 🔨
 
 - [x] Slack Socket Mode adapter
 - [x] Thread routing + coalesced reply flow
-- [x] Gateway command wiring
+- [ ] Slack CommandRegistry parser wiring
+- [ ] Slack gateway.Channel adapter shim
+- [ ] Slack config + cmd/gormes gateway registration
 
-### 2.B.4 — WhatsApp Adapter ✅
+### 2.B.4 — WhatsApp Adapter 🔨
 
-- [x] Bridge-vs-native runtime decision
+- [ ] Bridge-vs-native runtime decision
 - [x] Inbound normalization + command passthrough
-- [x] Pairing, reconnect, and send contract
+- [ ] Pairing, reconnect, and send contract
 
 ### 2.B.5 — Session Context + Delivery Routing ✅
 
@@ -90,31 +98,52 @@ weight: 10
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 
-### 2.B.6 — Signal Adapter ✅
+### 2.B.6 — Signal Adapter 🔨
 
 - [x] Inbound event normalization + session identity
 - [x] Reply/send contract on shared chassis
+- [ ] Signal transport/bootstrap layer
 
 ### 2.B.7 — Email + SMS Adapters ✅
 
 - [x] Email ingress + outbound delivery contract
 - [x] SMS ingress + outbound delivery contract
 
-### 2.B.8 — Matrix + Mattermost Adapters ✅
+### 2.B.8 — Matrix + Mattermost Adapters 🔨
 
 - [x] Threaded text adapter contract suite
-- [x] Matrix + Mattermost transport wiring
+- [ ] Matrix shared-chassis bot seam
+- [ ] Mattermost shared-chassis bot seam
+- [ ] Matrix real client/bootstrap layer
+- [ ] Mattermost REST/WS bootstrap layer
 
 ### 2.B.9 — Webhook + Trigger Ingress ✅
 
 - [x] Signed event parsing + auth gates
 - [x] Prompt-to-delivery routing bridge
 
-### 2.B.10 — Regional + Device Adapter Flood ✅
+### 2.B.10 — Regional + Device Adapter Flood 🔨
 
 - [x] BlueBubbles + HomeAssistant adapters
-- [x] Feishu + WeChat/WeCom adapters
-- [x] DingTalk + QQ Bot adapters
+- [x] Feishu shared-chassis bot seam
+- [x] WeCom + WeiXin shared-chassis bot seam
+- [x] DingTalk shared-chassis bot seam
+- [x] QQ Bot shared-chassis bot seam
+- [ ] Feishu transport/bootstrap layer
+- [ ] Feishu drive-comment rule + pairing seam
+- [ ] Feishu drive-comment reply workflow
+- [ ] WeCom + WeiXin transport/bootstrap layer
+- [x] DingTalk transport/bootstrap layer
+- [ ] DingTalk real SDK binding
+- [ ] DingTalk AI Cards streaming-update contract
+- [ ] DingTalk emoji reaction send/receive parity
+- [ ] DingTalk media (image/file) attachment routing
+- [ ] QQ Bot transport/bootstrap layer
+
+### 2.B.11 — Discord Forum Channels ⏳
+
+- [ ] Discord forum channel ingress + thread lifecycle
+- [ ] Discord forum media + polish parity
 
 ### 2.C — Thin Mapping Persistence ✅
 
@@ -126,6 +155,7 @@ weight: 10
 - [x] robfig/cron scheduler + bbolt job store
 - [x] SQLite cron_runs audit + CRON.md mirror
 - [x] Heartbeat [SYSTEM:] + [SILENT] delivery contract
+- [x] Architecture planner tasks manager script
 
 ### 2.E.0 — OS-AI Spine: Deterministic Subagent Runtime ✅
 
@@ -141,6 +171,10 @@ weight: 10
 - [x] Tool-call audit in typed child results
 - [x] Real child Hermes stream loop
 
+### 2.E.2 — OS-AI Spine: Concurrent-Tool Cancellation ⏳
+
+- [ ] Interrupt propagation to concurrent-tool workers
+
 ### 2.F.1 — Slash Command Registry + Gateway Dispatch ✅
 
 - [x] Canonical CommandDef registry
@@ -152,16 +186,34 @@ weight: 10
 - [x] Hook manifest discovery + handler loading
 - [x] Built-in BOOT.md startup hook
 
-### 2.F.3 — Restart / Pairing / Status ✅
+### 2.F.3 — Restart / Pairing / Status 🔨
 
 - [x] Graceful restart drain + managed shutdown
-- [x] Pairing state + status surfaces
+- [ ] Adapter startup failure cleanup contract
+- [ ] Active-turn follow-up queue + late-arrival drain policy
+- [ ] Drain-timeout resume_pending recovery
+- [ ] Pairing read-model schema + atomic persistence
+- [ ] Pairing approval + rate-limit semantics
+- [ ] `gormes gateway status` read-only command
+- [ ] Runtime status JSON + PID/process validation
+- [ ] Token-scoped gateway locks
+- [ ] Gateway /restart command + takeover markers
+- [ ] Channel lifecycle writers into status model
 
-### 2.F.4 — Home Channel + Operator Surfaces ✅
+### 2.F.4 — Home Channel + Operator Surfaces ⏳
 
-- [x] Home channel ownership + notify-to routing
-- [x] Channel/contact directory
-- [x] Mirror + sticker cache surfaces
+- [ ] Home channel ownership rules
+- [ ] Notify-to delivery routing
+- [ ] Channel directory atomic persistence + lookup
+- [ ] Channel directory refresh + stale-target invalidation
+- [ ] Manager remember-source hook
+- [ ] Mirror + sticker cache surfaces
+
+### 2.F.5 — Gateway Mid-Run Steering + Active-Turn Policy ⏳
+
+- [ ] Steer slash command registry + queue fallback
+- [ ] Mid-run steer injection between tool calls
+- [ ] Gateway-handled slash commands bypass active-session guard
 
 ### 2.G — OS-AI Spine: Skills Runtime ✅
 
@@ -171,7 +223,7 @@ weight: 10
 - [x] Inactive candidate drafting
 - [x] Explicit promotion flow
 
-## Phase 3 — The Black Box (Memory) ✅
+## Phase 3 — The Black Box (Memory) 🔨
 
 *SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes session visibility, audit trails, decay, and cross-chat/session boundaries*
 
@@ -234,174 +286,242 @@ weight: 10
 
 ### 3.E.6 — Memory Decay ✅
 
-- [x] Relationship last_seen tracking
+- [x] relationships.last_seen schema + backfill
+- [x] Relationship writer freshness updates
 - [x] Deterministic weight attenuation at recall time
 
-### 3.E.7 — Cross-Chat Synthesis ✅
+### 3.E.7 — Cross-Chat Synthesis 🔨
 
 - [x] user_id concept above chat_id
-- [x] Cross-chat entity merge + recall fence
+- [x] Same-chat default recall fence
+- [x] Opt-in user-scope recall + source filters
+- [ ] Honcho-compatible scope/source tool schema
+- [ ] Cross-chat deny-path fixtures
+- [ ] Cross-chat operator evidence
 
-### 3.E.8 — Session Lineage + Cross-Source Search ✅
+### 3.E.8 — Session Lineage + Cross-Source Search 🔨
 
-- [x] parent_session_id lineage for compression splits
-- [x] Source-filtered FTS/session search across chats
+- [ ] parent_session_id lineage for compression splits
+- [x] Source-filtered session/message search core
+- [x] GONCHO user-scope search/context parameters
+- [ ] Lineage-aware source-filtered search hits
+- [ ] Operator-auditable search evidence
 
-## Phase 4 — The Brain Transplant ✅
+## Phase 4 — The Brain Transplant 🔨
 
 *Native Go agent orchestrator + prompt builder*
 
-### 4.A — Provider Adapters ✅
+### 4.A — Provider Adapters 🔨
 
+- [ ] Provider interface + stream fixture harness
+- [ ] Tool-call normalization + continuation contract
 - [x] Anthropic
-- [x] Bedrock
-- [x] Gemini
-- [x] OpenRouter
-- [x] Google Code Assist
-- [x] Codex
+- [ ] Bedrock
+- [ ] Bedrock Converse payload mapping (no AWS SDK)
+- [ ] Bedrock stream event decoding (SSE fixtures)
+- [ ] Bedrock SigV4 + credential seam
+- [ ] Gemini
+- [ ] OpenRouter
+- [ ] Google Code Assist
+- [ ] Codex
+- [ ] Cross-provider reasoning-tag sanitization
 
-### 4.B — Context Engine + Compression ✅
+### 4.B — Context Engine + Compression ⏳
 
-- [x] Long session management
-- [x] Context compression
+- [ ] Long session management
+- [ ] Context compression
+- [ ] ContextEngine interface + status tool contract
+- [ ] Compression token-budget trigger + summary sizing
+- [ ] Tool-result pruning + protected head/tail summary
+- [ ] Manual compression feedback + context references
 
-### 4.C — Native Prompt Builder ✅
+### 4.C — Native Prompt Builder ⏳
 
-- [x] System + memory + tools + history assembly
+- [ ] System + memory + tools + history assembly
+- [ ] Context-file discovery + injection scan
+- [ ] Model-specific role and tool-use guidance
+- [ ] Toolset-aware skills prompt snapshot
+- [ ] Memory and session-search guidance assembly
 
-### 4.D — Smart Model Routing ✅
+### 4.D — Smart Model Routing 🔨
 
+- [ ] Model metadata registry + context limits
+- [ ] Routing policy and fallback selector
 - [x] Per-turn model selection
 
-### 4.E — Trajectory + Insights ✅
+### 4.E — Trajectory + Insights ⏳
 
-- [x] Self-monitoring telemetry
+- [ ] Trajectory writer + redaction gates
+- [ ] Self-monitoring telemetry
 
-### 4.F — Title Generation ✅
+### 4.F — Title Generation ⏳
 
-- [x] Auto-naming sessions
+- [ ] Title prompt and truncation contract
+- [ ] Auto-naming sessions
 
-### 4.G — Credentials + OAuth ✅
+### 4.G — Credentials + OAuth ⏳
 
-- [x] Token vault
-- [x] OAuth browser flow
-- [x] Multi-account auth
+- [ ] Token vault
+- [ ] Multi-account auth
+- [ ] Google OAuth flow + refresh seam
 
-### 4.H — Rate / Retry / Caching ✅
+### 4.H — Rate / Retry / Caching 🔨
 
-- [x] Provider-side resilience
+- [ ] Provider-side resilience
+- [ ] Classified provider-error taxonomy
+- [x] Jittered reconnect backoff schedule
+- [ ] Retry-After header parsing + HTTPError hint
+- [ ] Kernel retry honors Retry-After hint
+- [ ] Prompt-cache capability guard
+- [ ] Provider rate guard + budget telemetry
 
 ## Phase 5 — The Final Purge 🔨
 
 *Python tool scripts ported to Go or WASM*
 
-### 5.A — Tool Surface Port ✅
+### 5.A — Tool Surface Port ⏳
 
-- [x] 61-tool registry port
+- [ ] 61-tool registry port
+- [ ] Tool registry inventory + schema parity harness
+- [ ] Pure core tools first
+- [ ] Stateful tool migration queue
 
-### 5.B — Sandboxing Backends ✅
+### 5.B — Sandboxing Backends ⏳
 
-- [x] Docker
-- [x] Modal
-- [x] Daytona
-- [x] Singularity
+- [ ] Environment interface + file sync contract
+- [ ] Docker
+- [ ] Modal
+- [ ] Daytona
+- [ ] Singularity
 
-### 5.C — Browser Automation ✅
+### 5.C — Browser Automation ⏳
 
-- [x] Chromedp
-- [x] Rod
+- [ ] Browser action contract + event transcript
+- [ ] Chromedp
+- [ ] Rod
+- [ ] Browser provider bridge + Firecrawl fallback
 
-### 5.D — Vision + Image Generation ✅
+### 5.D — Vision + Image Generation ⏳
 
-- [x] Multimodal in/out
+- [ ] Multimodal in/out
+- [ ] Vision input normalization + token budget
+- [ ] Image generation result contract
 
-### 5.E — TTS / Voice / Transcription ✅
+### 5.E — TTS / Voice / Transcription ⏳
 
-- [x] Voice mode port
+- [ ] Voice mode port
+- [ ] Transcription tool contract
+- [ ] TTS synthesis + voice-mode state
 
-### 5.F — Skills System (Remaining) ✅
+### 5.F — Skills System (Remaining) ⏳
 
-- [x] Skills hub
-- [x] Skill registries
-- [x] Skill auto-discovery
+- [ ] Skills hub
+- [ ] Skill registries
 
-### 5.G — MCP Integration ✅
+### 5.G — MCP Integration ⏳
 
-- [x] MCP client
-- [x] OAuth flows
+- [ ] MCP client
+- [ ] OAuth flows
+- [ ] Managed tool gateway bridge
 
-### 5.H — ACP Integration ✅
+### 5.H — ACP Integration ⏳
 
-- [x] ACP server side
+- [ ] ACP server side
 
-### 5.I — Plugins Architecture ✅
+### 5.I — Plugins Architecture ⏳
 
-- [x] Plugin SDK
-- [x] Third-party extensions
+- [ ] Plugin SDK
+- [ ] Third-party extensions
 
-### 5.J — Approval / Security Guards ✅
+### 5.J — Approval / Security Guards ⏳
 
-- [x] Dangerous action gating
+- [ ] Dangerous action gating
+- [ ] Dangerous-command detector + blocked-result schema
+- [ ] Approval mode config normalization
+- [ ] Cron dangerous-command approval mode
+- [ ] Tirith, path, URL, and website policy integration
 
 ### 5.K — Code Execution ✅
 
 - [x] Sandboxed exec
 
-### 5.L — File Ops + Patches ✅
+### 5.L — File Ops + Patches ⏳
 
-- [x] Atomic checkpoints
+- [ ] Atomic checkpoints
 
-### 5.M — Mixture of Agents ✅
+### 5.M — Mixture of Agents ⏳
 
-- [x] Multi-model coordination
+- [ ] Multi-model coordination
 
-### 5.N — Misc Operator Tools ✅
+### 5.N — Misc Operator Tools ⏳
 
-- [x] Todo
-- [x] Clarify
-- [x] Session search
-- [x] Debug helpers
+- [ ] Todo
+- [ ] Clarify
+- [ ] Session search
+- [ ] Debug helpers
+- [ ] Cronjob tool API + schedule parser parity
+- [ ] Cron prompt/script safety + pre-run script contract
+- [ ] Cron multi-target delivery + media/live-adapter fallback
 
-### 5.O — Hermes CLI Parity 🔨
+### 5.O — Hermes CLI Parity ⏳
 
 - [ ] 49-file CLI tree port
+- [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
+- [ ] CLI command registry parity + active-turn busy policy
+- [ ] Config, profile, auth, and setup command surfaces
+- [ ] Gateway, platform, webhook, and cron management CLI
+- [ ] Diagnostics, backup, logs, and status CLI
 
-### 5.P — Docker / Packaging ✅
+### 5.P — Docker / Packaging ⏳
 
-- [x] OCI image
-- [x] Homebrew
+- [ ] OCI image
+- [ ] Homebrew
+- [ ] Unix installer (install.sh) source-backed update flow
+- [ ] Windows installer (install.ps1 + install.cmd) parity
+- [ ] Installer site asset/route coverage
 
-### 5.Q — TUI Gateway Streaming 🔨
+### 5.Q — API Server + TUI Gateway Streaming ⏳
 
+- [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
 - [ ] SSE streaming to Bubble Tea TUI
+- [ ] OpenAI-compatible chat-completions API server
+- [ ] Responses API store + run event stream
+- [ ] API server health + cron admin endpoints
 
-## Phase 6 — The Learning Loop (Soul) ✅
+### 5.R — Code Execution Mode Policy ⏳
+
+- [ ] Execution-mode resolver + config precedence
+- [ ] Strict-mode CWD + interpreter parity
+- [ ] Project-mode CWD + active venv detection
+- [ ] Default mode selection + config cut-over
+
+## Phase 6 — The Learning Loop (Soul) ⏳
 
 *Native skill extraction. Compounding intelligence. The feature Hermes doesn't have.*
 
-### 6.A — Complexity Detector ✅
+### 6.A — Complexity Detector ⏳
 
-- [x] Heuristic or LLM-scored signal
+- [ ] Heuristic or LLM-scored signal
 
-### 6.B — Skill Extractor ✅
+### 6.B — Skill Extractor ⏳
 
-- [x] LLM-assisted pattern distillation
+- [ ] LLM-assisted pattern distillation
 
-### 6.C — Skill Storage Format ✅
+### 6.C — Skill Storage Format ⏳
 
-- [x] Portable SKILL.md format
+- [ ] Portable SKILL.md format
 
-### 6.D — Skill Retrieval + Matching ✅
+### 6.D — Skill Retrieval + Matching ⏳
 
-- [x] Hybrid lexical + semantic lookup
+- [ ] Hybrid lexical + semantic lookup
 
-### 6.E — Feedback Loop ✅
+### 6.E — Feedback Loop ⏳
 
-- [x] Skill effectiveness scoring
+- [ ] Skill effectiveness scoring
 
-### 6.F — Skill Surface ✅
+### 6.F — Skill Surface ⏳
 
-- [x] TUI + Telegram browsing
+- [ ] TUI + Telegram browsing
 
 <!-- PROGRESS:END -->
 

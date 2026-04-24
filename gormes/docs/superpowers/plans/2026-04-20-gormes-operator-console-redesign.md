@@ -12,7 +12,7 @@
 
 ## Prerequisites
 
-- Work from `/home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai` unless a step explicitly targets the repo root.
+- Work from `<repo>/gormes/www.gormes.ai` unless a step explicitly targets the repo root.
 - Keep edits inside `gormes/` only.
 - Re-verify binary-size claims from a fresh local build before hardcoding any number into page copy.
 - Treat `7.9 MB` as stale and forbidden unless a fresh build somehow returns to that value.
@@ -98,7 +98,7 @@ func TestRenderIndex_RendersOperatorConsoleTruth(t *testing.T) {
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go test ./internal/site -run TestRenderIndex_RendersOperatorConsoleTruth
 ```
 
@@ -115,7 +115,7 @@ FAIL
 First refresh the binary size reference:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 make build
 ls -lh bin
 ```
@@ -148,7 +148,7 @@ PhaseNote:    "Current boundary: the Go shell ships now. Transcript memory stays
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go test ./internal/site -run TestRenderIndex_RendersOperatorConsoleTruth
 ```
 
@@ -238,7 +238,7 @@ if strings.Contains(string(body), "7.9 MB") {
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go test ./internal/site
 ```
 
@@ -520,7 +520,7 @@ Adjust `gormes/www.gormes.ai/internal/site/templates/layout.tmpl` so the nav and
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go test ./internal/site
 ```
 
@@ -591,7 +591,7 @@ test('mobile keeps the run-now flow readable', async ({ page }) => {
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 npm run test:e2e
 ```
 
@@ -789,7 +789,7 @@ Keep the existing no-script and reduced-motion rules.
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 npm run test:e2e
 ```
 
@@ -820,7 +820,7 @@ git commit -m "feat(gormes/www): ship operator console styling"
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go test ./...
 ```
 
@@ -835,7 +835,7 @@ ok  	github.com/TrebuchetDynamics/gormes-agent/gormes/www.gormes.ai/internal/sit
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 npm run test:e2e
 ```
 
@@ -850,7 +850,7 @@ Expected:
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 rm -rf dist
 go run ./cmd/www-gormes-export
 test -f dist/index.html

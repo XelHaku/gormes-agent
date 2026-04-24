@@ -5,19 +5,19 @@ weight: 30
 
 # Slack
 
-Slack is now a shipped Phase 2.B adapter, but PicoClaw still donates useful parity material around Socket Mode hardening, thread routing, richer media, and acknowledgment UX.
+Slack is partially ported in Phase 2.B.3, but PicoClaw still donates useful parity material around shared-gateway wiring, Socket Mode hardening, thread routing, richer media, and acknowledgment UX.
 
 ## Status
 
-`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now marks Slack as shipped for Phase 2.B.3. Gormes already has a Go Slack adapter on the shared gateway chassis; this page is now about donor material still worth porting, not about whether Slack is possible at all.
+`gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` now marks Slack as in progress for Phase 2.B.3. Gormes has a Go `internal/slack` Socket Mode bot with threaded replies, placeholder updates, and session persistence, but it is not yet registered as a shared `gateway.Channel` from `cmd/gormes gateway` and still needs shared `CommandRegistry` parsing plus config wiring before the adapter is treated as shipped.
 
 Evidence level:
 
-- Donor code for this dossier was verified against the external sibling repo at `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`.
+- Donor code for this dossier was verified against the external sibling repo at `<picoclaw donor repo>`.
 - The donor commit inspected for this research was `6421f146a99df1bebcd4b1ca8de2a289dfca3622`.
 - The upstream donor repo is `https://github.com/sipeed/picoclaw`.
 - Any `pkg/...` or `docs/...` path listed below is relative to that donor root, not relative to the Gormes repo.
-- Current Gormes status and operator-facing behavior were verified in-tree against `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md` and `gormes/docs/content/upstream-hermes/user-guide/messaging/slack.md`.
+- Current Gormes status and operator-facing behavior were verified in-tree against `gormes/internal/slack/bot.go`, `gormes/cmd/gormes/gateway.go`, `gormes/internal/gateway/commands.go`, `gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md`, and `gormes/docs/content/upstream-hermes/user-guide/messaging/slack.md`.
 
 PicoClaw already demonstrates a viable Slack edge with:
 
@@ -39,11 +39,11 @@ Slack's donor surface is reusable because the hardest parts are genuinely Slack-
 - Slack thread behavior is easy to get subtly wrong, and PicoClaw already codifies the `channel/thread_ts` split plus outbound target resolution helpers.
 - Media upload shape is explicit: per-part local path resolution, `UploadFileV2`, filename/title handling, and thread-aware uploads.
 
-This remains a strong donor because the shipped Slack edge still has parity gaps around richer ack UX, deeper thread handling, and media/attachment polish.
+This remains a strong donor because the current Slack edge still has closeout gaps around shared gateway registration, generic command parsing, richer ack UX, deeper thread handling, and media/attachment polish.
 
 ## Picoclaw Donor Files
 
-- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
+- Provenance note: the following `pkg/...` and `docs/...` paths are relative to the external donor root `<picoclaw donor repo>` at commit `6421f146a99df1bebcd4b1ca8de2a289dfca3622`, not relative to the Gormes repo.
 - `picoclaw/pkg/channels/slack/slack.go`
 - `picoclaw/pkg/channels/slack/slack_test.go`
 - `picoclaw/docs/channels/slack/README.md`
@@ -69,15 +69,17 @@ Rebuild in Gormes-native form:
 
 ## Gormes Mapping
 
-- PicoClaw `Start` maps directly to the current Gormes Slack adapter lifecycle: auth test first, remember `botUserID` and `teamID`, start the event loop, then run the Socket Mode client.
+- PicoClaw `Start` maps directly to the current `internal/slack` lifecycle: auth test first, remember bot identity, start the event loop, then run the Socket Mode client.
 - `handleMessageEvent`, `handleAppMention`, and `handleSlashCommand` map to three distinct ingress paths Gormes will also need.
 - `pendingAcks` maps well to a Gormes adapter-local transient state map keyed by delivery target, not to any shared runtime component.
 - `resolveSlackOutboundTarget` and `resolveSlackMediaOutboundTarget` should inform Gormes' thread routing, especially because Slack replies depend on `thread_ts` rather than a separate topic ID type.
 - `SendMedia` is the donor for outbound file uploads; the lack of a stable posted-message timestamp in `UploadFileV2` should influence Gormes' return contract as well.
+- The remaining Gormes-specific closeout is not another private Slack loop; it is adapting this bot to the shared `gateway.Channel`/`gateway.Manager` path used by Telegram and Discord.
 
 ## Implementation Notes
 
-- Socket Mode should be Gormes' default Slack path unless Phase 2.B.3 explicitly demands inbound webhooks. It avoids public HTTP exposure and matches both PicoClaw and the current upstream Hermes operator story.
+- Socket Mode should remain Gormes' default Slack path unless Phase 2.B.3 explicitly demands inbound webhooks. It avoids public HTTP exposure and matches both PicoClaw and the current upstream Hermes operator story.
+- Route generic slash commands through `gateway.ParseInboundText` rather than the current adapter-local string switch before claiming shared gateway-command parity.
 - Keep `pendingAcks` adapter-local and best-effort. Failed reactions should not fail the turn.
 - Preserve the distinction between channel messages and app mentions. PicoClaw treats mentions as an explicit path that can create a synthetic thread key when no thread exists yet.
 - Thread timestamp handling is not optional. Slack conversations drift into threads immediately, and outbound routing must preserve them.
@@ -92,11 +94,11 @@ Rebuild in Gormes-native form:
 
 ## Port Order Recommendation
 
-1. Keep Socket Mode as the baseline and tighten lifecycle tests before widening features.
-2. Port any missing message, mention, and slash-command edge cases plus thread target resolution.
-3. Add `pendingAcks` only after the current send and reply flow is locked down.
-4. Add file download and upload support after the session and reply model is correct.
-5. Consider alternate inbound paths only after the shared-contract Slack adapter is stable.
+1. Adapt `internal/slack` onto the shared `gateway.Channel`/`gateway.Manager` path and register it from `cmd/gormes gateway`.
+2. Route generic slash commands through `gateway.ParseInboundText` and keep Slack-specific commands as adapter-local affordances only where needed.
+3. Keep Socket Mode as the baseline and tighten lifecycle tests before widening features.
+4. Add `pendingAcks` only after the current send and reply flow is locked down.
+5. Add file download and upload support after the session and reply model is correct.
 
 ## Code References
 

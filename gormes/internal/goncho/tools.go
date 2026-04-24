@@ -1,4 +1,4 @@
-package tools
+package goncho
 
 import (
 	"context"
@@ -7,38 +7,39 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/goncho"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
-// RegisterHonchoTools adds the Honcho-compatible tool surface backed by the
-// in-binary Goncho service.
-func RegisterHonchoTools(reg *Registry, svc *goncho.Service) {
+// RegisterTools adds the Honcho-compatible tool surface backed by the
+// in-binary Goncho service. Keep this package-side so internal/tools remains
+// persistence-free for kernel build-isolation.
+func RegisterTools(reg *tools.Registry, svc *Service) {
 	if reg == nil {
-		panic("tools: nil registry")
+		panic("goncho: nil registry")
 	}
 	if svc == nil {
-		panic("tools: nil goncho service")
+		panic("goncho: nil service")
 	}
-	reg.MustRegisterEntry(ToolEntry{Tool: &HonchoProfileTool{Service: svc}, Toolset: "honcho"})
-	reg.MustRegisterEntry(ToolEntry{Tool: &HonchoSearchTool{Service: svc}, Toolset: "honcho"})
-	reg.MustRegisterEntry(ToolEntry{Tool: &HonchoContextTool{Service: svc}, Toolset: "honcho"})
-	reg.MustRegisterEntry(ToolEntry{Tool: &HonchoReasoningTool{Service: svc}, Toolset: "honcho"})
-	reg.MustRegisterEntry(ToolEntry{Tool: &HonchoConcludeTool{Service: svc}, Toolset: "honcho"})
+	reg.MustRegisterEntry(tools.ToolEntry{Tool: &ProfileTool{Service: svc}, Toolset: "honcho"})
+	reg.MustRegisterEntry(tools.ToolEntry{Tool: &SearchTool{Service: svc}, Toolset: "honcho"})
+	reg.MustRegisterEntry(tools.ToolEntry{Tool: &ContextTool{Service: svc}, Toolset: "honcho"})
+	reg.MustRegisterEntry(tools.ToolEntry{Tool: &ReasoningTool{Service: svc}, Toolset: "honcho"})
+	reg.MustRegisterEntry(tools.ToolEntry{Tool: &ConcludeTool{Service: svc}, Toolset: "honcho"})
 }
 
-type HonchoProfileTool struct {
-	Service *goncho.Service
+type ProfileTool struct {
+	Service *Service
 }
 
-func (*HonchoProfileTool) Name() string { return "honcho_profile" }
-func (*HonchoProfileTool) Description() string {
+func (*ProfileTool) Name() string { return "honcho_profile" }
+func (*ProfileTool) Description() string {
 	return "Read or update the peer card for a peer. Pass card to update; omit it to read."
 }
-func (*HonchoProfileTool) Schema() json.RawMessage {
+func (*ProfileTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string","description":"peer identity"},"card":{"type":"array","items":{"type":"string"},"description":"optional replacement peer card"}},"required":["peer"]}`)
 }
-func (*HonchoProfileTool) Timeout() time.Duration { return 5 * time.Second }
-func (t *HonchoProfileTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
+func (*ProfileTool) Timeout() time.Duration { return 5 * time.Second }
+func (t *ProfileTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
 	var in struct {
 		Peer string   `json:"peer"`
 		Card []string `json:"card"`
@@ -61,20 +62,20 @@ func (t *HonchoProfileTool) Execute(ctx context.Context, args json.RawMessage) (
 	return json.Marshal(out)
 }
 
-type HonchoSearchTool struct {
-	Service *goncho.Service
+type SearchTool struct {
+	Service *Service
 }
 
-func (*HonchoSearchTool) Name() string { return "honcho_search" }
-func (*HonchoSearchTool) Description() string {
+func (*SearchTool) Name() string { return "honcho_search" }
+func (*SearchTool) Description() string {
 	return "Search stored Goncho memory for a peer. Returns raw retrieval results without LLM synthesis."
 }
-func (*HonchoSearchTool) Schema() json.RawMessage {
+func (*SearchTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"max_tokens":{"type":"integer"},"session_key":{"type":"string"}},"required":["peer","query"]}`)
 }
-func (*HonchoSearchTool) Timeout() time.Duration { return 5 * time.Second }
-func (t *HonchoSearchTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
-	var in goncho.SearchParams
+func (*SearchTool) Timeout() time.Duration { return 5 * time.Second }
+func (t *SearchTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
+	var in SearchParams
 	if err := json.Unmarshal(args, &in); err != nil {
 		return nil, fmt.Errorf("honcho_search: invalid args: %w", err)
 	}
@@ -85,20 +86,20 @@ func (t *HonchoSearchTool) Execute(ctx context.Context, args json.RawMessage) (j
 	return json.Marshal(out)
 }
 
-type HonchoContextTool struct {
-	Service *goncho.Service
+type ContextTool struct {
+	Service *Service
 }
 
-func (*HonchoContextTool) Name() string { return "honcho_context" }
-func (*HonchoContextTool) Description() string {
+func (*ContextTool) Name() string { return "honcho_context" }
+func (*ContextTool) Description() string {
 	return "Build a structured Goncho context block: peer card, representation, conclusions, and recent messages."
 }
-func (*HonchoContextTool) Schema() json.RawMessage {
+func (*ContextTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"max_tokens":{"type":"integer"},"session_key":{"type":"string"}},"required":["peer"]}`)
 }
-func (*HonchoContextTool) Timeout() time.Duration { return 5 * time.Second }
-func (t *HonchoContextTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
-	var in goncho.ContextParams
+func (*ContextTool) Timeout() time.Duration { return 5 * time.Second }
+func (t *ContextTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
+	var in ContextParams
 	if err := json.Unmarshal(args, &in); err != nil {
 		return nil, fmt.Errorf("honcho_context: invalid args: %w", err)
 	}
@@ -109,19 +110,19 @@ func (t *HonchoContextTool) Execute(ctx context.Context, args json.RawMessage) (
 	return json.Marshal(out)
 }
 
-type HonchoReasoningTool struct {
-	Service *goncho.Service
+type ReasoningTool struct {
+	Service *Service
 }
 
-func (*HonchoReasoningTool) Name() string { return "honcho_reasoning" }
-func (*HonchoReasoningTool) Description() string {
+func (*ReasoningTool) Name() string { return "honcho_reasoning" }
+func (*ReasoningTool) Description() string {
 	return "Answer a query from Goncho context. This slice uses deterministic synthesis from stored context."
 }
-func (*HonchoReasoningTool) Schema() json.RawMessage {
+func (*ReasoningTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"reasoning_level":{"type":"string"},"max_tokens":{"type":"integer"},"session_key":{"type":"string"}},"required":["peer","query"]}`)
 }
-func (*HonchoReasoningTool) Timeout() time.Duration { return 5 * time.Second }
-func (t *HonchoReasoningTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
+func (*ReasoningTool) Timeout() time.Duration { return 5 * time.Second }
+func (t *ReasoningTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
 	var in struct {
 		Peer           string `json:"peer"`
 		Query          string `json:"query"`
@@ -132,7 +133,7 @@ func (t *HonchoReasoningTool) Execute(ctx context.Context, args json.RawMessage)
 	if err := json.Unmarshal(args, &in); err != nil {
 		return nil, fmt.Errorf("honcho_reasoning: invalid args: %w", err)
 	}
-	contextResult, err := t.Service.Context(ctx, goncho.ContextParams{
+	contextResult, err := t.Service.Context(ctx, ContextParams{
 		Peer:       in.Peer,
 		Query:      in.Query,
 		MaxTokens:  in.MaxTokens,
@@ -156,20 +157,20 @@ func (t *HonchoReasoningTool) Execute(ctx context.Context, args json.RawMessage)
 	return json.Marshal(out)
 }
 
-type HonchoConcludeTool struct {
-	Service *goncho.Service
+type ConcludeTool struct {
+	Service *Service
 }
 
-func (*HonchoConcludeTool) Name() string { return "honcho_conclude" }
-func (*HonchoConcludeTool) Description() string {
+func (*ConcludeTool) Name() string { return "honcho_conclude" }
+func (*ConcludeTool) Description() string {
 	return "Create or delete a Goncho conclusion for a peer."
 }
-func (*HonchoConcludeTool) Schema() json.RawMessage {
+func (*ConcludeTool) Schema() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"conclusion":{"type":"string"},"delete_id":{"type":"integer"},"session_key":{"type":"string"}},"required":["peer"]}`)
 }
-func (*HonchoConcludeTool) Timeout() time.Duration { return 5 * time.Second }
-func (t *HonchoConcludeTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
-	var in goncho.ConcludeParams
+func (*ConcludeTool) Timeout() time.Duration { return 5 * time.Second }
+func (t *ConcludeTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
+	var in ConcludeParams
 	if err := json.Unmarshal(args, &in); err != nil {
 		return nil, fmt.Errorf("honcho_conclude: invalid args: %w", err)
 	}
@@ -180,7 +181,7 @@ func (t *HonchoConcludeTool) Execute(ctx context.Context, args json.RawMessage) 
 	return json.Marshal(out)
 }
 
-func deterministicReasoningAnswer(query string, ctx goncho.ContextResult) string {
+func deterministicReasoningAnswer(query string, ctx ContextResult) string {
 	var b strings.Builder
 	if strings.TrimSpace(query) != "" {
 		b.WriteString("Query: ")

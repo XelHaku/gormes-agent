@@ -6,15 +6,15 @@
 
 **Architecture:** Build one Hugo section with a hub page, one shared-patterns page, and one dossier per channel. Every dossier uses the same fixed template, keeps Hermes/Gormes architecture authoritative, and ends in an explicit reuse recommendation. Surface the new section from existing gateway docs so contributors can find it from the roadmap.
 
-**Tech Stack:** Hugo markdown under `gormes/docs/content`, existing docs navigation patterns, donor references from `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`, verification via `cd gormes && go test ./docs -run TestHugoBuild -count=1`.
+**Tech Stack:** Hugo markdown under `gormes/docs/content`, existing docs navigation patterns, donor references from `<picoclaw donor repo>`, verification via `cd gormes && go test ./docs -run TestHugoBuild -count=1`.
 
 ---
 
 ## Prerequisites
 
 - Approved spec: `gormes/docs/superpowers/specs/2026-04-20-gormes-gateway-donor-map-design.md`
-- Donor repo available locally at `/home/xel/git/sages-openclaw/workspace-mineru/picoclaw`
-- Gormes repo root: `/home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent`
+- Donor repo available locally at `<picoclaw donor repo>`
+- Gormes repo root: `<repo>`
 - Hugo smoke test already exists in `gormes/docs/build_test.go`
 
 ## File Structure Map

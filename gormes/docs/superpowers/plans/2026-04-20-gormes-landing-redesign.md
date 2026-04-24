@@ -249,7 +249,7 @@ Expected: `FAIL` on all three — most likely `rendered page missing "OPEN SOURC
 - [ ] **Step 4: Commit (red tests pinned)**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/www.gormes.ai/internal/site/render_test.go \
         gormes/www.gormes.ai/internal/site/static_export_test.go && \
 git commit -m "test(gormes/www): pin acceptance for landing redesign
@@ -514,7 +514,7 @@ Overwrite `gormes/www.gormes.ai/internal/site/templates/partials/ship_state.tmpl
 Run from the repo root:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git rm gormes/www.gormes.ai/internal/site/templates/partials/command_step.tmpl \
        gormes/www.gormes.ai/internal/site/templates/partials/proof_stat.tmpl \
        gormes/www.gormes.ai/internal/site/templates/partials/ops_module.tmpl
@@ -537,7 +537,7 @@ If a test fails because of a copy mismatch, do NOT loosen the test — fix `cont
 - [ ] **Step 9: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/www.gormes.ai/internal/site/content.go \
         gormes/www.gormes.ai/internal/site/templates/layout.tmpl \
         gormes/www.gormes.ai/internal/site/templates/index.tmpl \
@@ -776,7 +776,7 @@ If you have a browser, open `http://localhost:8080` and check the layout matches
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/www.gormes.ai/internal/site/static/site.css && \
 git commit -m "style(gormes/www): rewrite site.css for redesigned landing
 
@@ -846,7 +846,7 @@ Expected (if installed): two PASS lines. If not installed, the line is skipped �
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent && \
+cd <repo> && \
 git add gormes/www.gormes.ai/tests/home.spec.mjs && \
 git commit -m "test(gormes/www): rewrite Playwright smoke for redesigned landing
 
@@ -920,7 +920,7 @@ Expected: nothing from grep, then `no stale strings`.
 - [ ] **Step 5: Push to main**
 
 ```bash
-git -C /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent push origin main 2>&1 | tail -5
+git -C <repo> push origin main 2>&1 | tail -5
 ```
 
 Expected: `<old>..<new>  main -> main` line.

@@ -351,7 +351,7 @@ func TestGatewayCoreDocReflectsSharedPhase2Surface(t *testing.T) {
 	raw := readDoc(t, "content/building-gormes/core-systems/gateway.md")
 	wants := []string{
 		"Discord adapter",
-		"Slack adapter",
+		"Slack Socket Mode bot",
 		"slash-command registry",
 		"SessionContext prompt injection",
 		"BOOT.md startup hook",
@@ -504,7 +504,7 @@ func TestPhase3IdentityLineageExecutionPlanIsLinkedAndSequenced(t *testing.T) {
 	phase3 := readDoc(t, "content/building-gormes/architecture_plan/phase-3-memory.md")
 	for _, want := range []string{
 		"2026-04-22-gormes-phase3-identity-lineage-execution-plan",
-		"3.E.6.1 -> 3.E.7.2 -> 3.E.8.1 -> 3.E.8.2",
+		"3.E.7 schema exposure -> 3.E.7 deny-path fixtures -> 3.E.7 operator evidence -> 3.E.8 parent_session_id -> 3.E.8 lineage-aware hits/evidence",
 	} {
 		if !strings.Contains(phase3, want) {
 			t.Fatalf("phase-3-memory doc is missing %q", want)

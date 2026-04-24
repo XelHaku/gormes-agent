@@ -262,7 +262,7 @@ git commit -m "feat(subagent): append runtime run logs"
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/subagent -count=1
 go test ./docs -count=1
 ```
@@ -270,7 +270,7 @@ go test ./docs -count=1
 For the final `2.E0` branch gate, run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./... -count=1
 go test ./docs -count=1
 ```

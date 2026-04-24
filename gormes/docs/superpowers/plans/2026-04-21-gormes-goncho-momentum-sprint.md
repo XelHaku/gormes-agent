@@ -19,7 +19,7 @@
 - Focused Phase 1 gate is green:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./cmd/gormes ./internal/tui ./internal/kernel ./internal/doctor ./docs -count=1
 ```
 
@@ -68,7 +68,7 @@ Phase 1 is considered finished when all conditions hold:
 
 ### Verify
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./cmd/gormes ./internal/tui ./internal/kernel ./internal/doctor -count=1
 ```
 
@@ -94,7 +94,7 @@ go test ./cmd/gormes ./internal/tui ./internal/kernel ./internal/doctor -count=1
 
 ### Verify
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./cmd/gormes ./internal/tui ./internal/kernel -count=1
 ```
 
@@ -119,7 +119,7 @@ go test ./cmd/gormes ./internal/tui ./internal/kernel -count=1
 
 ### Verify
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/doctor ./cmd/gormes -count=1
 ```
 
@@ -144,7 +144,7 @@ go test ./internal/doctor ./cmd/gormes -count=1
 
 ### Verify
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./docs -count=1
 go test ./cmd/gormes ./internal/tui ./internal/kernel ./internal/doctor ./docs -count=1
 ```
@@ -159,7 +159,7 @@ go test ./cmd/gormes ./internal/tui ./internal/kernel ./internal/doctor ./docs -
 After every slice:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./cmd/gormes ./internal/tui ./internal/kernel ./internal/doctor ./docs -count=1
 ```
 

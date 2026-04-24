@@ -57,21 +57,21 @@ func TestLoad_RealFile(t *testing.T) {
 	if err := Validate(p); err != nil {
 		t.Fatalf("Validate() = %v, want nil", err)
 	}
-	// Phase 1 must derive as complete (all subphases complete).
-	if got := p.Phases["1"].DerivedStatus(); got != StatusComplete {
-		t.Errorf("Phase 1 = %q, want complete", got)
+	// Phase 1 has an active automation-reliability hardening item -> in_progress.
+	if got := p.Phases["1"].DerivedStatus(); got != StatusInProgress {
+		t.Errorf("Phase 1 = %q, want in_progress", got)
 	}
-	// Phase 2 is fully complete once 2.F.4 lands.
-	if got := p.Phases["2"].DerivedStatus(); got != StatusComplete {
-		t.Errorf("Phase 2 = %q, want complete", got)
+	// Phase 2 has 2.A, 2.B.1, 2.C complete and more planned -> in_progress.
+	if got := p.Phases["2"].DerivedStatus(); got != StatusInProgress {
+		t.Errorf("Phase 2 = %q, want in_progress", got)
 	}
-	// Phase 3 is complete once the final 3.E ledger items land.
-	if got := p.Phases["3"].DerivedStatus(); got != StatusComplete {
-		t.Errorf("Phase 3 = %q, want complete", got)
+	// Phase 3 has most memory subphases shipped, 3.E.* planned -> in_progress.
+	if got := p.Phases["3"].DerivedStatus(); got != StatusInProgress {
+		t.Errorf("Phase 3 = %q, want in_progress", got)
 	}
-	// Phase 4 is complete once Credentials + OAuth ships.
-	if got := p.Phases["4"].DerivedStatus(); got != StatusComplete {
-		t.Errorf("Phase 4 = %q, want complete", got)
+	// Phase 4 has the Anthropic adapter landed while the rest stays planned.
+	if got := p.Phases["4"].DerivedStatus(); got != StatusInProgress {
+		t.Errorf("Phase 4 = %q, want in_progress", got)
 	}
 	// Floor counts — catches mass-deletion regressions without pinning exact values.
 	if n := len(p.Phases); n < 6 {
@@ -83,6 +83,26 @@ func TestLoad_RealFile(t *testing.T) {
 	}
 	if s.Items.Total < 100 {
 		t.Errorf("item total = %d, want >= 100", s.Items.Total)
+	}
+}
+
+func TestLoad_RealFile_Phase4Anthropic(t *testing.T) {
+	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	adapters := p.Phases["4"].Subphases["4.A"]
+	if got := adapters.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 4.A = %q, want in_progress", got)
+	}
+	items := itemsByName(adapters.Items)
+	anthropic := items["Anthropic"]
+	if anthropic.Status != StatusComplete {
+		t.Fatalf("Phase 4.A Anthropic status = %q, want complete", anthropic.Status)
+	}
+	if !strings.Contains(anthropic.Note, "cache-control metadata") || !strings.Contains(anthropic.Note, "rate-limit fixtures") {
+		t.Fatalf("Phase 4.A Anthropic note = %q, want landed adapter detail", anthropic.Note)
 	}
 }
 
@@ -143,14 +163,16 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 	}
 
 	slack := p.Phases["2"].Subphases["2.B.3"]
-	if got := slack.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.B.3 = %q, want complete", got)
+	if got := slack.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.B.3 = %q, want in_progress", got)
 	}
 	slackItems := itemStatusByName(slack.Items)
 	for name, want := range map[string]Status{
-		"Slack Socket Mode adapter":             StatusComplete,
-		"Thread routing + coalesced reply flow": StatusComplete,
-		"Gateway command wiring":                StatusComplete,
+		"Slack Socket Mode adapter":                      StatusComplete,
+		"Thread routing + coalesced reply flow":          StatusComplete,
+		"Slack CommandRegistry parser wiring":            StatusPlanned,
+		"Slack gateway.Channel adapter shim":             StatusPlanned,
+		"Slack config + cmd/gormes gateway registration": StatusPlanned,
 	} {
 		if got := slackItems[name]; got != want {
 			t.Errorf("Phase 2.B.3 item %q = %q, want %q", name, got, want)
@@ -172,217 +194,6 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 		if got := skillItems[name]; got != want {
 			t.Errorf("Phase 2.G item %q = %q, want %q", name, got, want)
 		}
-	}
-}
-
-func TestLoad_RealFile_Phase4Anthropic(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	providers := p.Phases["4"].Subphases["4.A"]
-	if got := providers.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 4.A = %q, want complete", got)
-	}
-	items := itemsByName(providers.Items)
-	anthropic := items["Anthropic"]
-	if anthropic.Status != StatusComplete {
-		t.Fatalf("Phase 4.A Anthropic status = %q, want complete", anthropic.Status)
-	}
-	if !strings.Contains(anthropic.Note, "internal/hermes.NewClient") ||
-		!strings.Contains(anthropic.Note, "tool_use") ||
-		!strings.Contains(anthropic.Note, "cmd/gormes") {
-		t.Fatalf("Phase 4.A Anthropic note = %q, want NewClient/tool_use/cmd wiring detail", anthropic.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase4Codex(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	providers := p.Phases["4"].Subphases["4.A"]
-	items := itemsByName(providers.Items)
-	codex := items["Codex"]
-	if codex.Status != StatusComplete {
-		t.Fatalf("Phase 4.A Codex status = %q, want complete", codex.Status)
-	}
-	if !strings.Contains(codex.Note, "Responses API") ||
-		!strings.Contains(codex.Note, "internal/hermes.NewClient") ||
-		!strings.Contains(codex.Note, "/v1/responses") {
-		t.Fatalf("Phase 4.A Codex note = %q, want Responses/NewClient/request-path detail", codex.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase4Bedrock(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	providers := p.Phases["4"].Subphases["4.A"]
-	items := itemsByName(providers.Items)
-	bedrock := items["Bedrock"]
-	if bedrock.Status != StatusComplete {
-		t.Fatalf("Phase 4.A Bedrock status = %q, want complete", bedrock.Status)
-	}
-	if !strings.Contains(bedrock.Note, "ConverseStream") ||
-		!strings.Contains(bedrock.Note, "AWS SDK") ||
-		!strings.Contains(bedrock.Note, "tool-aware") {
-		t.Fatalf("Phase 4.A Bedrock note = %q, want ConverseStream/AWS SDK/tool-aware detail", bedrock.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase4Gemini(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	providers := p.Phases["4"].Subphases["4.A"]
-	items := itemsByName(providers.Items)
-	gemini := items["Gemini"]
-	if gemini.Status != StatusComplete {
-		t.Fatalf("Phase 4.A Gemini status = %q, want complete", gemini.Status)
-	}
-	if !strings.Contains(gemini.Note, "streamGenerateContent") ||
-		!strings.Contains(gemini.Note, "functionCall") ||
-		!strings.Contains(gemini.Note, "cmd/gormes") {
-		t.Fatalf("Phase 4.A Gemini note = %q, want streamGenerateContent/functionCall/cmd wiring detail", gemini.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase4OpenRouter(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	providers := p.Phases["4"].Subphases["4.A"]
-	items := itemsByName(providers.Items)
-	openrouter := items["OpenRouter"]
-	if openrouter.Status != StatusComplete {
-		t.Fatalf("Phase 4.A OpenRouter status = %q, want complete", openrouter.Status)
-	}
-	if !strings.Contains(openrouter.Note, "/api/v1/chat/completions") ||
-		!strings.Contains(openrouter.Note, "tool_calls") ||
-		!strings.Contains(openrouter.Note, "cmd/gormes") {
-		t.Fatalf("Phase 4.A OpenRouter note = %q, want chat-completions/tool_calls/cmd wiring detail", openrouter.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase4TokenVault(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	credentials := p.Phases["4"].Subphases["4.G"]
-	if got := credentials.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 4.G = %q, want complete", got)
-	}
-	items := itemsByName(credentials.Items)
-	tokenVault := items["Token vault"]
-	if tokenVault.Status != StatusComplete {
-		t.Fatalf("Phase 4.G token vault status = %q, want complete", tokenVault.Status)
-	}
-	if !strings.Contains(tokenVault.Note, "internal/config/token_vault.go") ||
-		!strings.Contains(tokenVault.Note, "auth.json") ||
-		!strings.Contains(tokenVault.Note, "cmd/gormes/llm_client_test.go") ||
-		!strings.Contains(tokenVault.Note, "go test ./internal/config ./cmd/gormes") {
-		t.Fatalf("Phase 4.G token vault note = %q, want package/vault/test detail", tokenVault.Note)
-	}
-	oauthFlow := items["OAuth browser flow"]
-	if oauthFlow.Status != StatusComplete {
-		t.Fatalf("Phase 4.G OAuth browser flow status = %q, want complete", oauthFlow.Status)
-	}
-	if !strings.Contains(oauthFlow.Note, "internal/config/google_oauth.go") ||
-		!strings.Contains(oauthFlow.Note, "cmd/gormes/auth.go") ||
-		!strings.Contains(oauthFlow.Note, "cmd/gormes/auth_test.go") ||
-		!strings.Contains(oauthFlow.Note, "go test ./internal/config ./cmd/gormes") {
-		t.Fatalf("Phase 4.G OAuth browser flow note = %q, want login/test detail", oauthFlow.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase4ContextCompression(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	compression := p.Phases["4"].Subphases["4.B"]
-	if got := compression.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 4.B = %q, want complete", got)
-	}
-	items := itemsByName(compression.Items)
-	longSession := items["Long session management"]
-	if longSession.Status != StatusComplete {
-		t.Fatalf("Phase 4.B long session management status = %q, want complete", longSession.Status)
-	}
-	if !strings.Contains(longSession.Note, "internal/contextengine") ||
-		!strings.Contains(longSession.Note, "internal/kernel") ||
-		!strings.Contains(longSession.Note, "get_status") ||
-		!strings.Contains(longSession.Note, "go test ./internal/contextengine ./internal/kernel") {
-		t.Fatalf("Phase 4.B long session management note = %q, want package/status/test detail", longSession.Note)
-	}
-	compressor := items["Context compression"]
-	if compressor.Status != StatusComplete {
-		t.Fatalf("Phase 4.B context compression status = %q, want complete", compressor.Status)
-	}
-	if !strings.Contains(compressor.Note, "internal/contextengine") ||
-		!strings.Contains(compressor.Note, "SummaryBudget") ||
-		!strings.Contains(compressor.Note, "StepDownContextLength") ||
-		!strings.Contains(compressor.Note, "go test ./internal/contextengine") {
-		t.Fatalf("Phase 4.B context compression note = %q, want package/budget/probe/test detail", compressor.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase4PromptBuilder(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	builder := p.Phases["4"].Subphases["4.C"]
-	if got := builder.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 4.C = %q, want complete", got)
-	}
-	items := itemsByName(builder.Items)
-	assembly := items["System + memory + tools + history assembly"]
-	if assembly.Status != StatusComplete {
-		t.Fatalf("Phase 4.C prompt builder status = %q, want complete", assembly.Status)
-	}
-	if !strings.Contains(assembly.Note, "internal/kernel/prompt_builder.go") ||
-		!strings.Contains(assembly.Note, "hermes.ChatRequest") ||
-		!strings.Contains(assembly.Note, "internal/kernel/prompt_builder_test.go") ||
-		!strings.Contains(assembly.Note, "go test ./internal/kernel") {
-		t.Fatalf("Phase 4.C prompt builder note = %q, want package/request/test detail", assembly.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase4SmartModelRouting(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	routing := p.Phases["4"].Subphases["4.D"]
-	if got := routing.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 4.D = %q, want complete", got)
-	}
-	items := itemsByName(routing.Items)
-	selection := items["Per-turn model selection"]
-	if selection.Status != StatusComplete {
-		t.Fatalf("Phase 4.D per-turn model selection status = %q, want complete", selection.Status)
-	}
-	if !strings.Contains(selection.Note, "internal/kernel/model_routing.go") ||
-		!strings.Contains(selection.Note, "hermes.ChatRequest") ||
-		!strings.Contains(selection.Note, "internal/kernel/model_routing_test.go") ||
-		!strings.Contains(selection.Note, "internal/config/config_test.go") ||
-		!strings.Contains(selection.Note, "go test ./internal/kernel ./internal/config") {
-		t.Fatalf("Phase 4.D routing note = %q, want package/request/config/test detail", selection.Note)
 	}
 }
 
@@ -434,13 +245,16 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if whatsApp.Priority != "P1" {
 		t.Fatalf("Phase 2.B.4 priority = %q, want P1", whatsApp.Priority)
 	}
-	if got := whatsApp.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.B.4 = %q, want complete", got)
+	if got := whatsApp.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.B.4 = %q, want in_progress", got)
 	}
 	whatsAppItems := itemsByName(whatsApp.Items)
 	decision := whatsAppItems["Bridge-vs-native runtime decision"]
-	if !strings.Contains(decision.Note, "TDD") {
-		t.Fatalf("Phase 2.B.4 decision note = %q, want TDD guidance", decision.Note)
+	if decision.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.4 decision status = %q, want planned", decision.Status)
+	}
+	if !strings.Contains(decision.Note, "gateway/platforms/whatsapp.py") || !strings.Contains(decision.Note, "bridge-first") {
+		t.Fatalf("Phase 2.B.4 decision note = %q, want upstream-whatsapp/bridge-first detail", decision.Note)
 	}
 	inbound := whatsAppItems["Inbound normalization + command passthrough"]
 	if inbound.Status != StatusComplete {
@@ -449,20 +263,20 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if !strings.Contains(inbound.Note, "NormalizeInbound") || !strings.Contains(inbound.Note, "ParseInboundText") {
 		t.Fatalf("Phase 2.B.4 inbound normalization note = %q, want NormalizeInbound/ParseInboundText detail", inbound.Note)
 	}
-	contract := whatsAppItems["Pairing, reconnect, and send contract"]
-	if contract.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.4 contract status = %q, want complete", contract.Status)
+	whatsAppPairing := whatsAppItems["Pairing, reconnect, and send contract"]
+	if whatsAppPairing.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.4 pairing/reconnect/send status = %q, want planned", whatsAppPairing.Status)
 	}
-	if !strings.Contains(contract.Note, "whatsapp.Bot") || !strings.Contains(contract.Note, "backoff") || !strings.Contains(contract.Note, "reply-to") {
-		t.Fatalf("Phase 2.B.4 contract note = %q, want whatsapp.Bot/backoff/reply-to detail", contract.Note)
+	if !strings.Contains(whatsAppPairing.Note, "pairing state") || !strings.Contains(whatsAppPairing.Note, "reconnects") {
+		t.Fatalf("Phase 2.B.4 pairing/reconnect/send note = %q, want pairing-state/reconnect detail", whatsAppPairing.Note)
 	}
 
 	signal := p.Phases["2"].Subphases["2.B.6"]
 	if signal.Priority != "P2" {
 		t.Fatalf("Phase 2.B.6 priority = %q, want P2", signal.Priority)
 	}
-	if got := signal.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.B.6 = %q, want complete", got)
+	if got := signal.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.B.6 = %q, want in_progress", got)
 	}
 	signalItems := itemsByName(signal.Items)
 	identity := signalItems["Inbound event normalization + session identity"]
@@ -479,28 +293,12 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if !strings.Contains(replySend.Note, "signal.Bot") || !strings.Contains(replySend.Note, "native group IDs") {
 		t.Fatalf("Phase 2.B.6 reply/send note = %q, want signal.Bot/native group IDs detail", replySend.Note)
 	}
-
-	threadedText := p.Phases["2"].Subphases["2.B.8"]
-	if threadedText.Priority != "P4" {
-		t.Fatalf("Phase 2.B.8 priority = %q, want P4", threadedText.Priority)
+	transport := signalItems["Signal transport/bootstrap layer"]
+	if transport.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.6 transport/bootstrap status = %q, want planned", transport.Status)
 	}
-	if got := threadedText.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.B.8 = %q, want complete", got)
-	}
-	threadedTextItems := itemsByName(threadedText.Items)
-	threadContract := threadedTextItems["Threaded text adapter contract suite"]
-	if threadContract.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.8 contract status = %q, want complete", threadContract.Status)
-	}
-	if !strings.Contains(threadContract.Note, "threadtext") {
-		t.Fatalf("Phase 2.B.8 contract note = %q, want threadtext detail", threadContract.Note)
-	}
-	transportWiring := threadedTextItems["Matrix + Mattermost transport wiring"]
-	if transportWiring.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.8 transport wiring status = %q, want complete", transportWiring.Status)
-	}
-	if !strings.Contains(transportWiring.Note, "internal/channels/matrix") || !strings.Contains(transportWiring.Note, "internal/channels/mattermost") {
-		t.Fatalf("Phase 2.B.8 transport wiring note = %q, want Matrix/Mattermost implementation detail", transportWiring.Note)
+	if !strings.Contains(transport.Note, "signal-cli") || !strings.Contains(transport.Note, "bridge client lifecycle") {
+		t.Fatalf("Phase 2.B.6 transport/bootstrap note = %q, want signal-cli/bridge detail", transport.Note)
 	}
 
 	routing := p.Phases["2"].Subphases["2.B.5"]
@@ -578,8 +376,8 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if lifecycle.Priority != "P2" {
 		t.Fatalf("Phase 2.F.3 priority = %q, want P2", lifecycle.Priority)
 	}
-	if got := lifecycle.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.F.3 = %q, want complete", got)
+	if got := lifecycle.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.F.3 = %q, want in_progress", got)
 	}
 	lifecycleItems := itemsByName(lifecycle.Items)
 	drain := lifecycleItems["Graceful restart drain + managed shutdown"]
@@ -589,35 +387,9 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if !strings.Contains(drain.Note, "TDD") {
 		t.Fatalf("Phase 2.F.3 drain note = %q, want TDD guidance", drain.Note)
 	}
-	pairing := lifecycleItems["Pairing state + status surfaces"]
-	if pairing.Status != StatusComplete {
-		t.Fatalf("Phase 2.F.3 pairing status = %q, want complete", pairing.Status)
-	}
-	if !strings.Contains(pairing.Note, "PairingStore") || !strings.Contains(pairing.Note, "/status") {
-		t.Fatalf("Phase 2.F.3 pairing note = %q, want PairingStore and /status detail", pairing.Note)
-	}
-
 	operator := p.Phases["2"].Subphases["2.F.4"]
 	if operator.Priority != "P3" {
 		t.Fatalf("Phase 2.F.4 priority = %q, want P3", operator.Priority)
-	}
-	if got := operator.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.F.4 = %q, want complete", got)
-	}
-	operatorItems := itemsByName(operator.Items)
-	channelDirectory := operatorItems["Channel/contact directory"]
-	if channelDirectory.Status != StatusComplete {
-		t.Fatalf("Phase 2.F.4 channel directory status = %q, want complete", channelDirectory.Status)
-	}
-	if !strings.Contains(channelDirectory.Note, "ChannelDirectory") || !strings.Contains(channelDirectory.Note, "rename") {
-		t.Fatalf("Phase 2.F.4 channel directory note = %q, want ChannelDirectory/rename detail", channelDirectory.Note)
-	}
-	mirror := operatorItems["Mirror + sticker cache surfaces"]
-	if mirror.Status != StatusComplete {
-		t.Fatalf("Phase 2.F.4 mirror/sticker status = %q, want complete", mirror.Status)
-	}
-	if !strings.Contains(mirror.Note, "StateMirror") || !strings.Contains(mirror.Note, "StickerCache") {
-		t.Fatalf("Phase 2.F.4 mirror/sticker note = %q, want StateMirror/StickerCache detail", mirror.Note)
 	}
 
 	mail := p.Phases["2"].Subphases["2.B.7"]
@@ -643,12 +415,67 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.B.7 sms note = %q, want NormalizeInbound/BuildDelivery detail", sms.Note)
 	}
 
+	webhookIngress := p.Phases["2"].Subphases["2.B.9"]
+	if webhookIngress.Priority != "P4" {
+		t.Fatalf("Phase 2.B.9 priority = %q, want P4", webhookIngress.Priority)
+	}
+	if got := webhookIngress.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.B.9 = %q, want complete", got)
+	}
+	webhookItems := itemsByName(webhookIngress.Items)
+	signed := webhookItems["Signed event parsing + auth gates"]
+	if signed.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.9 signed-ingress status = %q, want complete", signed.Status)
+	}
+	if !strings.Contains(signed.Note, "ParseInbound") || !strings.Contains(signed.Note, "ValidateSignature") {
+		t.Fatalf("Phase 2.B.9 signed-ingress note = %q, want ParseInbound/ValidateSignature detail", signed.Note)
+	}
+	promptBridge := webhookItems["Prompt-to-delivery routing bridge"]
+	if promptBridge.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.9 prompt bridge status = %q, want complete", promptBridge.Status)
+	}
+
+	matrixMattermost := p.Phases["2"].Subphases["2.B.8"]
+	if matrixMattermost.Priority != "P4" {
+		t.Fatalf("Phase 2.B.8 priority = %q, want P4", matrixMattermost.Priority)
+	}
+	if got := matrixMattermost.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.B.8 = %q, want in_progress", got)
+	}
+	matrixItems := itemsByName(matrixMattermost.Items)
+	threadedText := matrixItems["Threaded text adapter contract suite"]
+	if threadedText.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.8 threaded text status = %q, want complete", threadedText.Status)
+	}
+	matrixBot := matrixItems["Matrix shared-chassis bot seam"]
+	if matrixBot.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.8 matrix bot status = %q, want planned", matrixBot.Status)
+	}
+	if !strings.Contains(matrixBot.Note, "internal/channels/threadtext") || !strings.Contains(matrixBot.Note, "thread") {
+		t.Fatalf("Phase 2.B.8 matrix bot note = %q, want threadtext/thread detail", matrixBot.Note)
+	}
+	mattermostBot := matrixItems["Mattermost shared-chassis bot seam"]
+	if mattermostBot.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.8 mattermost bot status = %q, want planned", mattermostBot.Status)
+	}
+	if !strings.Contains(mattermostBot.Note, "internal/channels/threadtext") || !strings.Contains(mattermostBot.Note, "REST/WS") {
+		t.Fatalf("Phase 2.B.8 mattermost bot note = %q, want threadtext/REST-WS detail", mattermostBot.Note)
+	}
+	matrixBootstrap := matrixItems["Matrix real client/bootstrap layer"]
+	if matrixBootstrap.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.8 matrix bootstrap status = %q, want planned", matrixBootstrap.Status)
+	}
+	mattermostBootstrap := matrixItems["Mattermost REST/WS bootstrap layer"]
+	if mattermostBootstrap.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.8 mattermost bootstrap status = %q, want planned", mattermostBootstrap.Status)
+	}
+
 	longTail := p.Phases["2"].Subphases["2.B.10"]
 	if longTail.Priority != "P4" {
 		t.Fatalf("Phase 2.B.10 priority = %q, want P4", longTail.Priority)
 	}
-	if got := longTail.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 2.B.10 = %q, want complete", got)
+	if got := longTail.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 2.B.10 = %q, want in_progress", got)
 	}
 	longTailItems := itemsByName(longTail.Items)
 	blueBubblesHA := longTailItems["BlueBubbles + HomeAssistant adapters"]
@@ -658,19 +485,127 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if !strings.Contains(blueBubblesHA.Note, "internal/channels/bluebubbles") || !strings.Contains(blueBubblesHA.Note, "internal/channels/homeassistant") {
 		t.Fatalf("Phase 2.B.10 BlueBubbles + HomeAssistant adapters note = %q, want BlueBubbles/HomeAssistant contract detail", blueBubblesHA.Note)
 	}
-	feishuWeChat := longTailItems["Feishu + WeChat/WeCom adapters"]
-	if feishuWeChat.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.10 Feishu + WeChat/WeCom adapters status = %q, want complete", feishuWeChat.Status)
+	feishu := longTailItems["Feishu shared-chassis bot seam"]
+	if feishu.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 Feishu shared-chassis bot seam status = %q, want complete", feishu.Status)
 	}
-	if !strings.Contains(feishuWeChat.Note, "TDD landed") {
-		t.Fatalf("Phase 2.B.10 Feishu + WeChat/WeCom adapters note = %q, want TDD landed guidance", feishuWeChat.Note)
+	if !strings.Contains(feishu.Note, "internal/channels/feishu") {
+		t.Fatalf("Phase 2.B.10 Feishu shared-chassis bot seam note = %q, want Feishu detail", feishu.Note)
 	}
-	dingTalkQQ := longTailItems["DingTalk + QQ Bot adapters"]
-	if dingTalkQQ.Status != StatusComplete {
-		t.Fatalf("Phase 2.B.10 DingTalk + QQ Bot adapters status = %q, want complete", dingTalkQQ.Status)
+	weComWeiXin := longTailItems["WeCom + WeiXin shared-chassis bot seam"]
+	if weComWeiXin.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 WeCom + WeiXin shared-chassis bot seam status = %q, want complete", weComWeiXin.Status)
 	}
-	if !strings.Contains(dingTalkQQ.Note, "TDD landed") {
-		t.Fatalf("Phase 2.B.10 DingTalk + QQ Bot adapters note = %q, want TDD landed guidance", dingTalkQQ.Note)
+	if !strings.Contains(weComWeiXin.Note, "internal/channels/wecom") || !strings.Contains(weComWeiXin.Note, "internal/channels/weixin") {
+		t.Fatalf("Phase 2.B.10 WeCom + WeiXin shared-chassis bot seam note = %q, want WeCom/WeiXin detail", weComWeiXin.Note)
+	}
+	dingTalk := longTailItems["DingTalk shared-chassis bot seam"]
+	if dingTalk.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 DingTalk shared-chassis bot seam status = %q, want complete", dingTalk.Status)
+	}
+	if !strings.Contains(dingTalk.Note, "internal/channels/dingtalk") {
+		t.Fatalf("Phase 2.B.10 DingTalk shared-chassis bot seam note = %q, want DingTalk detail", dingTalk.Note)
+	}
+	qqBot := longTailItems["QQ Bot shared-chassis bot seam"]
+	if qqBot.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 QQ Bot shared-chassis bot seam status = %q, want complete", qqBot.Status)
+	}
+	if !strings.Contains(qqBot.Note, "internal/channels/qqbot") {
+		t.Fatalf("Phase 2.B.10 QQ Bot shared-chassis bot seam note = %q, want QQ detail", qqBot.Note)
+	}
+	feishuTransport := longTailItems["Feishu transport/bootstrap layer"]
+	if feishuTransport.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.10 Feishu transport/bootstrap status = %q, want planned", feishuTransport.Status)
+	}
+	weComTransport := longTailItems["WeCom + WeiXin transport/bootstrap layer"]
+	if weComTransport.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.10 WeCom + WeiXin transport/bootstrap status = %q, want planned", weComTransport.Status)
+	}
+	dingTalkTransport := longTailItems["DingTalk transport/bootstrap layer"]
+	if dingTalkTransport.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 DingTalk transport/bootstrap status = %q, want complete", dingTalkTransport.Status)
+	}
+	if !strings.Contains(dingTalkTransport.Note, "DecideRuntime") || !strings.Contains(dingTalkTransport.Note, "ReplySender") {
+		t.Fatalf("Phase 2.B.10 DingTalk transport/bootstrap note = %q, want DecideRuntime/ReplySender detail", dingTalkTransport.Note)
+	}
+	dingTalkSDK := longTailItems["DingTalk real SDK binding"]
+	if dingTalkSDK.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.10 DingTalk real SDK binding status = %q, want planned", dingTalkSDK.Status)
+	}
+	if !strings.Contains(dingTalkSDK.Note, "real DingTalk SDK") {
+		t.Fatalf("Phase 2.B.10 DingTalk real SDK binding note = %q, want real SDK detail", dingTalkSDK.Note)
+	}
+	qqTransport := longTailItems["QQ Bot transport/bootstrap layer"]
+	if qqTransport.Status != StatusPlanned {
+		t.Fatalf("Phase 2.B.10 QQ Bot transport/bootstrap status = %q, want planned", qqTransport.Status)
+	}
+
+	lifecycleStore := lifecycleItems["Pairing read-model schema + atomic persistence"]
+	if lifecycleStore.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.3 pairing read model status = %q, want planned", lifecycleStore.Status)
+	}
+	if !strings.Contains(lifecycleStore.Note, "gateway/pairing.py") || !strings.Contains(lifecycleStore.Note, "pairing.json") {
+		t.Fatalf("Phase 2.F.3 pairing read model note = %q, want pairing-donor/pairing.json detail", lifecycleStore.Note)
+	}
+	approval := lifecycleItems["Pairing approval + rate-limit semantics"]
+	if approval.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.3 pairing approval status = %q, want planned", approval.Status)
+	}
+	if !strings.Contains(approval.Note, "rate limiting") || !strings.Contains(approval.Note, "lockout") {
+		t.Fatalf("Phase 2.F.3 pairing approval note = %q, want rate-limit/lockout detail", approval.Note)
+	}
+	statusReadout := lifecycleItems["`gormes gateway status` read-only command"]
+	if statusReadout.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.3 gateway status readout status = %q, want planned", statusReadout.Status)
+	}
+	if !strings.Contains(statusReadout.Note, "gormes gateway status") || !strings.Contains(statusReadout.Note, "configured channels") {
+		t.Fatalf("Phase 2.F.3 gateway status readout note = %q, want command/configured-channels detail", statusReadout.Note)
+	}
+	statusJSON := lifecycleItems["Runtime status JSON + PID/process validation"]
+	if statusJSON.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.3 runtime status JSON status = %q, want planned", statusJSON.Status)
+	}
+	tokenLocks := lifecycleItems["Token-scoped gateway locks"]
+	if tokenLocks.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.3 token-scoped locks status = %q, want planned", tokenLocks.Status)
+	}
+	if !strings.Contains(tokenLocks.Note, "acquire_scoped_lock") || !strings.Contains(tokenLocks.Note, "credential hash") {
+		t.Fatalf("Phase 2.F.3 token-scoped locks note = %q, want upstream lock/credential-hash detail", tokenLocks.Note)
+	}
+	restartMarkers := lifecycleItems["Gateway /restart command + takeover markers"]
+	if restartMarkers.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.3 restart markers status = %q, want planned", restartMarkers.Status)
+	}
+	if !strings.Contains(restartMarkers.Note, "/restart") || !strings.Contains(restartMarkers.Note, "takeover-marker") {
+		t.Fatalf("Phase 2.F.3 restart markers note = %q, want restart/takeover-marker detail", restartMarkers.Note)
+	}
+	lifecycleWriters := lifecycleItems["Channel lifecycle writers into status model"]
+	if lifecycleWriters.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.3 lifecycle writers status = %q, want planned", lifecycleWriters.Status)
+	}
+
+	if got := operator.DerivedStatus(); got != StatusPlanned {
+		t.Fatalf("Phase 2.F.4 = %q, want planned", got)
+	}
+	operatorItems := itemsByName(operator.Items)
+	homeRules := operatorItems["Home channel ownership rules"]
+	if homeRules.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.4 home channel ownership status = %q, want planned", homeRules.Status)
+	}
+	notifyRoute := operatorItems["Notify-to delivery routing"]
+	if notifyRoute.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.4 notify-to routing status = %q, want planned", notifyRoute.Status)
+	}
+	directory := operatorItems["Channel directory atomic persistence + lookup"]
+	if directory.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.4 channel directory contract status = %q, want planned", directory.Status)
+	}
+	if !strings.Contains(directory.Note, "gateway/channel_directory.py") || !strings.Contains(directory.Note, "channel_directory.json") {
+		t.Fatalf("Phase 2.F.4 channel directory contract note = %q, want channel-directory-donor/json detail", directory.Note)
+	}
+	rememberSource := operatorItems["Manager remember-source hook"]
+	if rememberSource.Status != StatusPlanned {
+		t.Fatalf("Phase 2.F.4 manager remember-source status = %q, want planned", rememberSource.Status)
 	}
 }
 
@@ -702,205 +637,29 @@ func TestLoad_RealFile_Phase3Ledger(t *testing.T) {
 	}
 
 	sessionSearch := p.Phases["3"].Subphases["3.E.8"]
-	if got := sessionSearch.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 3.E.8 = %q, want complete", got)
+	if got := sessionSearch.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 3.E.8 = %q, want in_progress", got)
 	}
 	e8Items := itemsByName(sessionSearch.Items)
 	lineage := e8Items["parent_session_id lineage for compression splits"]
-	if lineage.Status != StatusComplete {
-		t.Fatalf("Phase 3.E.8 lineage status = %q, want complete", lineage.Status)
+	if lineage.Status != StatusPlanned {
+		t.Fatalf("Phase 3.E.8 lineage status = %q, want planned", lineage.Status)
 	}
-	if !strings.Contains(lineage.Note, "lineage_orphan") || !strings.Contains(lineage.Note, "lineage_kind") {
-		t.Fatalf("Phase 3.E.8 lineage note = %q, want lineage_orphan/lineage_kind detail", lineage.Note)
-	}
-	search := e8Items["Source-filtered FTS/session search across chats"]
+	search := e8Items["Source-filtered session/message search core"]
 	if search.Status != StatusComplete {
 		t.Fatalf("Phase 3.E.8 source-filtered search status = %q, want complete", search.Status)
 	}
-	if !strings.Contains(search.Note, "SearchMessages") || !strings.Contains(search.Note, "scope=user") {
-		t.Fatalf("Phase 3.E.8 source-filtered search note = %q, want SearchMessages/scope=user detail", search.Note)
+	if !strings.Contains(search.Note, "SearchMessages") ||
+		!strings.Contains(search.Note, "source allowlists") ||
+		!strings.Contains(search.Note, "split source/chat key") {
+		t.Fatalf("Phase 3.E.8 source-filtered search note = %q, want SearchMessages/source/split-key detail", search.Note)
 	}
-}
-
-func TestLoad_RealFile_Phase5BrowserAutomation(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
+	gonchoScope := e8Items["GONCHO user-scope search/context parameters"]
+	if gonchoScope.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.8 GONCHO scope status = %q, want complete", gonchoScope.Status)
 	}
-
-	browser := p.Phases["5"].Subphases["5.C"]
-	if got := browser.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 5.C = %q, want complete", got)
-	}
-
-	items := itemsByName(browser.Items)
-	chromedp := items["Chromedp"]
-	if chromedp.Status != StatusComplete {
-		t.Fatalf("Phase 5.C Chromedp status = %q, want complete", chromedp.Status)
-	}
-	if !strings.Contains(chromedp.Note, "browser_navigate") || !strings.Contains(chromedp.Note, "BROWSER_CDP_URL") {
-		t.Fatalf("Phase 5.C Chromedp note = %q, want browser_navigate/BROWSER_CDP_URL detail", chromedp.Note)
-	}
-
-	rod := items["Rod"]
-	if rod.Status != StatusComplete {
-		t.Fatalf("Phase 5.C Rod status = %q, want complete", rod.Status)
-	}
-	if !strings.Contains(rod.Note, "browser_navigate") || !strings.Contains(rod.Note, "BROWSER_DRIVER") {
-		t.Fatalf("Phase 5.C Rod note = %q, want browser_navigate/BROWSER_DRIVER detail", rod.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase5VoiceModePort(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	voice := p.Phases["5"].Subphases["5.E"]
-	if got := voice.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 5.E = %q, want complete", got)
-	}
-
-	items := itemsByName(voice.Items)
-	mode := items["Voice mode port"]
-	if mode.Status != StatusComplete {
-		t.Fatalf("Phase 5.E voice mode status = %q, want complete", mode.Status)
-	}
-	if !strings.Contains(mode.Note, "internal/gateway/voice_mode.go") ||
-		!strings.Contains(mode.Note, "/voice") ||
-		!strings.Contains(mode.Note, "gateway_voice_mode.json") {
-		t.Fatalf("Phase 5.E voice mode note = %q, want voice_mode.go,/voice,gateway_voice_mode.json detail", mode.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase5MCPClient(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	mcp := p.Phases["5"].Subphases["5.G"]
-	if got := mcp.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 5.G = %q, want complete", got)
-	}
-
-	items := itemsByName(mcp.Items)
-	client := items["MCP client"]
-	if client.Status != StatusComplete {
-		t.Fatalf("Phase 5.G MCP client status = %q, want complete", client.Status)
-	}
-	if !strings.Contains(client.Note, "internal/mcp/client.go") ||
-		!strings.Contains(client.Note, "notifications/initialized") ||
-		!strings.Contains(client.Note, "tools/list") ||
-		!strings.Contains(client.Note, "tools/call") {
-		t.Fatalf("Phase 5.G MCP client note = %q, want internal/mcp/client.go + handshake/tool RPC detail", client.Note)
-	}
-
-	oauth := items["OAuth flows"]
-	if oauth.Status != StatusComplete {
-		t.Fatalf("Phase 5.G OAuth flows status = %q, want complete", oauth.Status)
-	}
-	if !strings.Contains(oauth.Note, "internal/mcp/oauth.go") ||
-		!strings.Contains(oauth.Note, "mcp-tokens") ||
-		!strings.Contains(oauth.Note, "LoadOAuthAccessToken") ||
-		!strings.Contains(oauth.Note, "go test ./internal/mcp") {
-		t.Fatalf("Phase 5.G OAuth flows note = %q, want oauth.go,mcp-tokens,LoadOAuthAccessToken,test detail", oauth.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase5ACPServer(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	acp := p.Phases["5"].Subphases["5.H"]
-	if got := acp.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 5.H = %q, want complete", got)
-	}
-
-	items := itemsByName(acp.Items)
-	server := items["ACP server side"]
-	if server.Status != StatusComplete {
-		t.Fatalf("Phase 5.H ACP server status = %q, want complete", server.Status)
-	}
-	if !strings.Contains(server.Note, "internal/acp/server.go") ||
-		!strings.Contains(server.Note, "session/prompt") ||
-		!strings.Contains(server.Note, "cmd/gormes/acp.go") ||
-		!strings.Contains(server.Note, "acp_registry/agent.json") {
-		t.Fatalf("Phase 5.H ACP server note = %q, want server.go,session/prompt,acp.go,agent.json detail", server.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase5AtomicCheckpoints(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	checkpoints := p.Phases["5"].Subphases["5.L"]
-	if got := checkpoints.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 5.L = %q, want complete", got)
-	}
-
-	items := itemsByName(checkpoints.Items)
-	atomic := items["Atomic checkpoints"]
-	if atomic.Status != StatusComplete {
-		t.Fatalf("Phase 5.L atomic checkpoints status = %q, want complete", atomic.Status)
-	}
-	if !strings.Contains(atomic.Note, "internal/tools/checkpoints.go") ||
-		!strings.Contains(atomic.Note, "list/diff/restore") ||
-		!strings.Contains(atomic.Note, "${XDG_DATA_HOME}/gormes/checkpoints") {
-		t.Fatalf("Phase 5.L atomic checkpoints note = %q, want checkpoints.go/list-diff-restore/XDG detail", atomic.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase6ComplexityDetector(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	detector := p.Phases["6"].Subphases["6.A"]
-	if got := detector.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 6.A = %q, want complete", got)
-	}
-
-	items := itemsByName(detector.Items)
-	signal := items["Heuristic or LLM-scored signal"]
-	if signal.Status != StatusComplete {
-		t.Fatalf("Phase 6.A signal status = %q, want complete", signal.Status)
-	}
-	if !strings.Contains(signal.Note, "internal/learning/runtime.go") ||
-		!strings.Contains(signal.Note, "internal/kernel/kernel.go") ||
-		!strings.Contains(signal.Note, "${XDG_DATA_HOME}/gormes/learning/complexity.jsonl") {
-		t.Fatalf("Phase 6.A signal note = %q, want runtime.go/kernel.go/XDG log detail", signal.Note)
-	}
-}
-
-func TestLoad_RealFile_Phase5SandboxedExec(t *testing.T) {
-	p, err := Load("../../docs/content/building-gormes/architecture_plan/progress.json")
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	codeExec := p.Phases["5"].Subphases["5.K"]
-	if got := codeExec.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 5.K = %q, want complete", got)
-	}
-
-	items := itemsByName(codeExec.Items)
-	sandboxed := items["Sandboxed exec"]
-	if sandboxed.Status != StatusComplete {
-		t.Fatalf("Phase 5.K sandboxed exec status = %q, want complete", sandboxed.Status)
-	}
-	if !strings.Contains(sandboxed.Note, "internal/tools/code_execution.go") ||
-		!strings.Contains(sandboxed.Note, "ProcessRegistry") ||
-		!strings.Contains(sandboxed.Note, "`strict`") ||
-		!strings.Contains(sandboxed.Note, "`project`") ||
-		!strings.Contains(sandboxed.Note, "cmd/gormes/registry.go") {
-		t.Fatalf("Phase 5.K sandboxed exec note = %q, want code_execution.go/ProcessRegistry/strict/project/registry wiring detail", sandboxed.Note)
+	if !strings.Contains(gonchoScope.Note, "scope=user") || !strings.Contains(gonchoScope.Note, "Honcho-compatible tool schemas") {
+		t.Fatalf("Phase 3.E.8 GONCHO scope note = %q, want scope/tool-schema detail", gonchoScope.Note)
 	}
 }
 
@@ -984,10 +743,23 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	if decay.Priority != "P1" {
 		t.Fatalf("Phase 3.E.6 priority = %q, want P1", decay.Priority)
 	}
+	if got := decay.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 3.E.6 = %q, want complete", got)
+	}
 	decayItems := itemsByName(decay.Items)
-	lastSeen := decayItems["Relationship last_seen tracking"]
-	if !strings.Contains(lastSeen.Note, "TDD") {
+	lastSeen := decayItems["relationships.last_seen schema + backfill"]
+	if lastSeen.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.6 last_seen status = %q, want complete", lastSeen.Status)
+	}
+	if !strings.Contains(lastSeen.Note, "COALESCE") {
 		t.Fatalf("Phase 3.E.6 last_seen note = %q, want TDD guidance", lastSeen.Note)
+	}
+	writerFreshness := decayItems["Relationship writer freshness updates"]
+	if writerFreshness.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.6 writer freshness status = %q, want complete", writerFreshness.Status)
+	}
+	if !strings.Contains(writerFreshness.Note, "last_seen") {
+		t.Fatalf("Phase 3.E.6 writer freshness note = %q, want last_seen detail", writerFreshness.Note)
 	}
 
 	export := p.Phases["3"].Subphases["3.E.3"]
@@ -1011,8 +783,8 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	if crossChat.Priority != "P2" {
 		t.Fatalf("Phase 3.E.7 priority = %q, want P2", crossChat.Priority)
 	}
-	if got := crossChat.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 3.E.7 = %q, want complete", got)
+	if got := crossChat.DerivedStatus(); got != StatusInProgress {
+		t.Fatalf("Phase 3.E.7 = %q, want in_progress", got)
 	}
 	crossChatItems := itemsByName(crossChat.Items)
 	userID := crossChatItems["user_id concept above chat_id"]
@@ -1022,14 +794,33 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	if !strings.Contains(userID.Note, "internal/session") || !strings.Contains(userID.Note, "chat-to-user merges") {
 		t.Fatalf("Phase 3.E.7 user_id note = %q, want session metadata + conflict detail", userID.Note)
 	}
-	mergeFence := crossChatItems["Cross-chat entity merge + recall fence"]
-	if mergeFence.Status != StatusComplete {
-		t.Fatalf("Phase 3.E.7 recall fence status = %q, want complete", mergeFence.Status)
+	sameChatFence := crossChatItems["Same-chat default recall fence"]
+	if sameChatFence.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.7 same-chat fence status = %q, want complete", sameChatFence.Status)
 	}
-	if !strings.Contains(mergeFence.Note, "same-chat default") ||
-		!strings.Contains(mergeFence.Note, "canonical user_id") ||
-		!strings.Contains(mergeFence.Note, "source filters") {
-		t.Fatalf("Phase 3.E.7 recall fence note = %q, want same-chat/user_id/source detail", mergeFence.Note)
+	if !strings.Contains(sameChatFence.Note, "same-chat") || !strings.Contains(sameChatFence.Note, "do not leak") {
+		t.Fatalf("Phase 3.E.7 same-chat fence note = %q, want same-chat/no-leak detail", sameChatFence.Note)
+	}
+	userScopeRecall := crossChatItems["Opt-in user-scope recall + source filters"]
+	if userScopeRecall.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.7 user-scope recall status = %q, want complete", userScopeRecall.Status)
+	}
+	if !strings.Contains(userScopeRecall.Note, "canonical user_id") ||
+		!strings.Contains(userScopeRecall.Note, "source allowlists") ||
+		!strings.Contains(userScopeRecall.Note, "same-chat") {
+		t.Fatalf("Phase 3.E.7 user-scope recall note = %q, want user_id/source/same-chat detail", userScopeRecall.Note)
+	}
+	toolSchema := crossChatItems["Honcho-compatible scope/source tool schema"]
+	if toolSchema.Status != StatusPlanned {
+		t.Fatalf("Phase 3.E.7 tool schema status = %q, want planned", toolSchema.Status)
+	}
+	denyFixtures := crossChatItems["Cross-chat deny-path fixtures"]
+	if denyFixtures.Status != StatusPlanned {
+		t.Fatalf("Phase 3.E.7 deny-path fixtures status = %q, want planned", denyFixtures.Status)
+	}
+	operatorEvidence3E7 := crossChatItems["Cross-chat operator evidence"]
+	if operatorEvidence3E7.Status != StatusPlanned {
+		t.Fatalf("Phase 3.E.7 operator evidence status = %q, want planned", operatorEvidence3E7.Status)
 	}
 
 	insights := p.Phases["3"].Subphases["3.E.5"]
@@ -1056,19 +847,13 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 	if lineage.Priority != "P4" {
 		t.Fatalf("Phase 3.E.8 priority = %q, want P4", lineage.Priority)
 	}
-
-	telemetry := p.Phases["4"].Subphases["4.E"]
-	if got := telemetry.DerivedStatus(); got != StatusComplete {
-		t.Fatalf("Phase 4.E = %q, want complete", got)
+	lineageItems := itemsByName(lineage.Items)
+	lineageHits := lineageItems["Lineage-aware source-filtered search hits"]
+	if lineageHits.Status != StatusPlanned {
+		t.Fatalf("Phase 3.E.8 lineage-aware search hits status = %q, want planned", lineageHits.Status)
 	}
-	telemetryItems := itemsByName(telemetry.Items)
-	selfMonitoring := telemetryItems["Self-monitoring telemetry"]
-	if selfMonitoring.Status != StatusComplete {
-		t.Fatalf("Phase 4.E telemetry status = %q, want complete", selfMonitoring.Status)
-	}
-	if !strings.Contains(selfMonitoring.Note, "turn outcome counters") ||
-		!strings.Contains(selfMonitoring.Note, "tool execution") ||
-		!strings.Contains(selfMonitoring.Note, "TUI sidebar") {
-		t.Fatalf("Phase 4.E telemetry note = %q, want turn/tool/sidebar detail", selfMonitoring.Note)
+	operatorEvidence := lineageItems["Operator-auditable search evidence"]
+	if operatorEvidence.Status != StatusPlanned {
+		t.Fatalf("Phase 3.E.8 operator evidence status = %q, want planned", operatorEvidence.Status)
 	}
 }

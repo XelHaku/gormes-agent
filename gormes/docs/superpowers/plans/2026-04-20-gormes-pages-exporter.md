@@ -53,7 +53,7 @@ Add a shared-render test that asserts the homepage can be rendered without `http
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go test ./internal/site -run 'Test(Render|Export)'
 ```
 
@@ -81,7 +81,7 @@ Keep the implementation small: parse embedded templates, render `DefaultPage()` 
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go test ./internal/site -run 'Test(Render|Export)'
 ```
 
@@ -106,7 +106,7 @@ Keep `cmd/www-gormes` responsible only for listen flag parsing and `http.ListenA
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go run ./cmd/www-gormes-export
 test -f dist/index.html
 test -f dist/static/site.css
@@ -124,7 +124,7 @@ Expected: exit code `0` and both files present.
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/www.gormes.ai
+cd <repo>/gormes/www.gormes.ai
 go test ./...
 ```
 

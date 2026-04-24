@@ -166,7 +166,7 @@ func TestHermesRunner_CancelledDuringStreamReturnsInterrupted(t *testing.T) {
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/subagent -run 'TestHermesRunner_(StopCompletesAndStreamsOutput|CancelledDuringStreamReturnsInterrupted)' -count=1
 ```
 
@@ -338,7 +338,7 @@ func emitSubagentEvent(ctx context.Context, events chan<- SubagentEvent, ev Suba
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/subagent -run 'TestHermesRunner_(StopCompletesAndStreamsOutput|CancelledDuringStreamReturnsInterrupted)' -count=1
 ```
 
@@ -347,7 +347,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent
+cd <repo>
 git add gormes/internal/subagent/hermes_runner.go gormes/internal/subagent/hermes_runner_test.go
 git commit -m "feat(subagent): add hermes-backed child runner core"
 ```
@@ -469,7 +469,7 @@ func TestHermesRunner_StreamErrorReturnsFailed(t *testing.T) {
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/subagent -run 'TestHermesRunner_(ToolCallsRoundTripThroughExecuteChildTool|StreamErrorReturnsFailed)' -count=1
 ```
 
@@ -613,7 +613,7 @@ haveFinal:
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/subagent -run 'TestHermesRunner_(ToolCallsRoundTripThroughExecuteChildTool|StreamErrorReturnsFailed|StopCompletesAndStreamsOutput|CancelledDuringStreamReturnsInterrupted)' -count=1
 go test ./internal/subagent ./internal/hermes ./internal/kernel -count=1 -race
 ```
@@ -623,7 +623,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent
+cd <repo>
 git add gormes/internal/subagent/hermes_runner.go gormes/internal/subagent/hermes_runner_test.go gormes/internal/subagent/runner.go
 git commit -m "feat(subagent): add real child stream loop with tool calls"
 ```
@@ -686,7 +686,7 @@ func TestBuildDefaultRegistryDelegationToolExecutesRealChildLoop(t *testing.T) {
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./cmd/gormes -run 'TestBuildDefaultRegistryDelegationToolExecutesRealChildLoop' -count=1
 ```
 
@@ -745,7 +745,7 @@ func buildDefaultRegistry(
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./cmd/gormes ./internal/subagent -run 'TestBuildDefaultRegistryDelegationToolExecutesRealChildLoop|TestDelegateTool' -count=1
 go test ./cmd/gormes ./internal/subagent ./internal/hermes ./internal/kernel -count=1
 ```
@@ -755,7 +755,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent
+cd <repo>
 git add gormes/cmd/gormes/registry.go gormes/cmd/gormes/registry_test.go gormes/cmd/gormes/main.go gormes/cmd/gormes/gateway.go gormes/cmd/gormes/telegram.go gormes/cmd/gormes/doctor.go
 git commit -m "feat(subagent): wire delegate_task to real hermes child runner"
 ```
@@ -793,7 +793,7 @@ git commit -m "feat(subagent): wire delegate_task to real hermes child runner"
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go run ./cmd/progress-gen --write
 ```
 
@@ -804,7 +804,7 @@ Expected: `_index.md` and `README.md` regenerated.
 Run:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/subagent ./internal/hermes ./internal/kernel ./cmd/gormes ./internal/progress ./docs -count=1
 go test ./internal/subagent ./internal/hermes ./internal/kernel -count=1 -race
 go run ./cmd/progress-gen --validate
@@ -815,7 +815,7 @@ Expected: PASS on all commands.
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent
+cd <repo>
 git add gormes/docs/content/building-gormes/architecture_plan/progress.json gormes/docs/content/building-gormes/architecture_plan/phase-2-gateway.md gormes/docs/content/building-gormes/architecture_plan/subsystem-inventory.md gormes/docs/content/building-gormes/architecture_plan/why-go.md gormes/docs/content/building-gormes/architecture_plan/_index.md README.md
 git commit -m "docs(phase2): mark real child stream loop complete"
 ```
@@ -825,7 +825,7 @@ git commit -m "docs(phase2): mark real child stream loop complete"
 Run before claiming Queue 1 complete:
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/subagent ./internal/hermes ./internal/kernel ./cmd/gormes ./internal/progress ./docs -count=1
 go test ./internal/subagent ./internal/hermes ./internal/kernel -count=1 -race
 go run ./cmd/progress-gen --validate

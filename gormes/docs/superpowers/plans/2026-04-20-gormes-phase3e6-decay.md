@@ -39,7 +39,7 @@
 - [ ] **Step 1: Locate the current `RecallConfig` and `withDefaults`**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 grep -nE "type RecallConfig|withDefaults" internal/memory/recall.go
 ```
 
@@ -78,7 +78,7 @@ func TestRecallConfig_WithDefaults_DecayHorizon(t *testing.T) {
 - [ ] **Step 3: Run, expect FAIL**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/memory/... -run TestRecallConfig_WithDefaults_DecayHorizon -v 2>&1 | tail -5
 ```
 
@@ -117,7 +117,7 @@ In the same file, find `func (c *RecallConfig) withDefaults()`. Append after the
 - [ ] **Step 6: Run, expect PASS**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test -race ./internal/memory/... -run TestRecallConfig_WithDefaults_DecayHorizon -v -timeout 30s
 go vet ./...
 ```
@@ -285,7 +285,7 @@ func TestRecall_DecayDisabledWhenHorizonNegative(t *testing.T) {
 - [ ] **Step 2: Run, expect FAIL**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/memory/... -run "TestTraverseNeighborhood_DecayFiltersStaleEdges|TestRecall_DecayDisabledWhenHorizonNegative" -v 2>&1 | tail -15
 ```
 
@@ -426,7 +426,7 @@ Change to:
 - [ ] **Step 6: Run, expect PASS**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test -race ./internal/memory/... -run "TestTraverseNeighborhood_DecayFiltersStaleEdges|TestRecall_DecayDisabledWhenHorizonNegative" -v -timeout 30s
 ```
 
@@ -564,7 +564,7 @@ func TestRecall_DecayRawWeightInFenceUnchanged(t *testing.T) {
 - [ ] **Step 2: Run, expect FAIL**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/memory/... -run "TestEnumerateRelationships_DecayOrdersByEffectiveWeight|TestRecall_DecayRawWeightInFenceUnchanged" -v 2>&1 | tail -10
 ```
 
@@ -676,7 +676,7 @@ Change to:
 - [ ] **Step 5: Run, expect PASS**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test -race ./internal/memory/... -run "TestEnumerateRelationships_DecayOrdersByEffectiveWeight|TestRecall_DecayRawWeightInFenceUnchanged" -v -timeout 30s
 ```
 
@@ -758,7 +758,7 @@ func TestLoad_RecallDecayHorizonDays(t *testing.T) {
 - [ ] **Step 2: Run, expect FAIL**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test ./internal/config/... -run TestLoad_RecallDecayHorizonDays -v 2>&1 | tail -5
 ```
 
@@ -797,7 +797,7 @@ Place it alongside the other Recall-related fields (e.g., near `RecallDepth`).
 - [ ] **Step 6: Run, expect PASS**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test -race ./internal/config/... -run TestLoad_RecallDecayHorizonDays -v
 go vet ./...
 go build ./...
@@ -846,7 +846,7 @@ EOF
 - [ ] **Step 1: Full sweep under -race (skip Ollama)**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 go test -race ./... -count=1 -timeout 240s -skip Integration_Ollama
 go vet ./...
 ```
@@ -856,7 +856,7 @@ Expected: all packages green (except pre-existing docs Hugo drift — unrelated 
 - [ ] **Step 2: Binary size**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 make build
 ls -lh bin/gormes
 ```
@@ -866,7 +866,7 @@ Expected: `bin/gormes` stays at ~17 MB (no new deps, no new code paths).
 - [ ] **Step 3: Kernel isolation**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 (go list -deps ./internal/kernel | grep -E "ncruces|internal/memory|internal/session|internal/cron") \
   && echo "VIOLATION" || echo "OK: kernel isolated"
 ```
@@ -878,7 +878,7 @@ Expected: `OK`. 3.E.6 is memory-package-local.
 Confirm the `weight` and `updated_at` columns are untouched by decay (the audit-preserving invariant):
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 git diff bdaffd25..HEAD -- internal/memory/graph.go
 ```
 
@@ -887,7 +887,7 @@ Expected: empty diff. The extractor's `ON CONFLICT DO UPDATE` path (the only wri
 - [ ] **Step 5: Offline doctor still works**
 
 ```bash
-cd /home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes
+cd <repo>/gormes
 ./bin/gormes doctor --offline
 ```
 

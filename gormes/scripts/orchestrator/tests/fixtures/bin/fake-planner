@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Fake planner companion for integration tests.
+# Writes a marker file and exits with FAKE_PLANNER_RC (default 0).
+set -Eeuo pipefail
+marker_dir="${FAKE_COMPANION_MARKER_DIR:-/tmp}"
+mkdir -p "$marker_dir"
+printf '%s planner cycle=%s promoted=%s\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  "${ORCH_CURRENT_CYCLE:-?}" \
+  "${PROMOTED_LAST_CYCLE:-?}" \
+  >> "$marker_dir/planner.marker"
+exit "${FAKE_PLANNER_RC:-0}"

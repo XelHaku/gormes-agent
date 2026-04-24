@@ -84,7 +84,7 @@ func (m *StateMirror) StartRefresh(interval time.Duration, log *slog.Logger) *St
 	r := &StateMirrorRefresher{
 		mirror: m,
 		ticker: time.NewTicker(interval),
-		stop:   make(chan struct{}),
+		stop:   make(chan struct{}, 1),
 		log:    log,
 	}
 	r.wg.Add(1)

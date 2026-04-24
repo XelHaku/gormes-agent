@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Fake planner companion for the candidate-refill integration test.
+# When invoked, appends a "Phase 99" with 6 planned items to the progress.json
+# living at the canonical orchestrator path inside the current repo.
+# Accepts (and ignores) the env vars that run_companion --sync sets:
+# AUTO_COMMIT, AUTO_PUSH, PLANNER_INSTALL_SCHEDULE.
+set -Eeuo pipefail
+
+marker_dir="${FAKE_COMPANION_MARKER_DIR:-/tmp}"
+mkdir -p "$marker_dir"
+printf '%s planner-refill cycle=%s pwd=%s\n' \
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  "${ORCH_CURRENT_CYCLE:-?}" \
+  "$(pwd)" \
+  >> "$marker_dir/planner-refill.marker"
+
+# Orchestrator cd's into $GIT_ROOT before invoking the companion, so
+# $(pwd) is the integration worktree. Prefer the canonical path.
+repo="$(pwd)"
+progress="$repo/docs/content/building-gormes/architecture_plan/progress.json"
+if [[ ! -f "$progress" ]]; then
+  progress="$repo/progress.json"
+fi
+[[ -f "$progress" ]] || {
+  echo "fake-planner-refill: no progress.json found under $repo" >&2
+  exit 1
+}
+
+tmp="$(mktemp)"
+jq '.phases["99"] = {
+  name: "Test Refill Phase",
+  subphases: {
+    "99.A": {
+      name: "refill-sub",
+      items: [
+        {name: "refill-item-1", status: "planned"},
+        {name: "refill-item-2", status: "planned"},
+        {name: "refill-item-3", status: "planned"},
+        {name: "refill-item-4", status: "planned"},
+        {name: "refill-item-5", status: "planned"},
+        {name: "refill-item-6", status: "planned"}
+      ]
+    }
+  }
+}' "$progress" > "$tmp" && mv "$tmp" "$progress"
+
+# Commit the change so the orchestrator's integration-branch flow sees it
+# when write_candidates_file re-runs from the same worktree.
+if git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
+  git -C "$repo" -c user.email=t@t -c user.name=T add "$progress" >/dev/null 2>&1 || true
+  git -C "$repo" -c user.email=t@t -c user.name=T commit -q -m "fake-planner-refill: add refill phase" >/dev/null 2>&1 || true
+fi
+
+exit 0

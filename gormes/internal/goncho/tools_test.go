@@ -1,4 +1,4 @@
-package tools
+package goncho
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/goncho"
 	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/memory"
+	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/tools"
 )
 
 func TestHonchoTools_RegisterExpectedNames(t *testing.T) {
@@ -36,8 +36,8 @@ func TestHonchoProfileTool_UsesService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exec := NewInProcessToolExecutor(reg)
-	ch, err := exec.Execute(ctx, ToolRequest{
+	exec := tools.NewInProcessToolExecutor(reg)
+	ch, err := exec.Execute(ctx, tools.ToolRequest{
 		ToolName: "honcho_profile",
 		Input:    json.RawMessage(`{"peer":"telegram:6586915095"}`),
 	})
@@ -45,7 +45,7 @@ func TestHonchoProfileTool_UsesService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var outputs []ToolEvent
+	var outputs []tools.ToolEvent
 	for ev := range ch {
 		outputs = append(outputs, ev)
 	}
@@ -62,7 +62,7 @@ func TestHonchoReasoningTool_ReturnsDeterministicAnswer(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
-	if _, err := svc.Conclude(ctx, goncho.ConcludeParams{
+	if _, err := svc.Conclude(ctx, ConcludeParams{
 		Peer:       "telegram:6586915095",
 		Conclusion: "The user prefers exact evidence-first reports.",
 		SessionKey: "telegram:6586915095",
@@ -70,8 +70,8 @@ func TestHonchoReasoningTool_ReturnsDeterministicAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exec := NewInProcessToolExecutor(reg)
-	ch, err := exec.Execute(ctx, ToolRequest{
+	exec := tools.NewInProcessToolExecutor(reg)
+	ch, err := exec.Execute(ctx, tools.ToolRequest{
 		ToolName: "honcho_reasoning",
 		Input: json.RawMessage(`{
 			"peer":"telegram:6586915095",
@@ -84,7 +84,7 @@ func TestHonchoReasoningTool_ReturnsDeterministicAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var outputs []ToolEvent
+	var outputs []tools.ToolEvent
 	for ev := range ch {
 		outputs = append(outputs, ev)
 	}
@@ -99,7 +99,7 @@ func TestHonchoReasoningTool_ReturnsDeterministicAnswer(t *testing.T) {
 	}
 }
 
-func newTestHonchoRegistry(t *testing.T) (*Registry, *goncho.Service, func()) {
+func newTestHonchoRegistry(t *testing.T) (*tools.Registry, *Service, func()) {
 	t.Helper()
 
 	store, err := memory.OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
@@ -107,13 +107,13 @@ func newTestHonchoRegistry(t *testing.T) (*Registry, *goncho.Service, func()) {
 		t.Fatalf("OpenSqlite: %v", err)
 	}
 
-	reg := NewRegistry()
-	svc := goncho.NewService(store.DB(), goncho.Config{
+	reg := tools.NewRegistry()
+	svc := NewService(store.DB(), Config{
 		WorkspaceID:    "default",
 		ObserverPeerID: "gormes",
 		RecentMessages: 4,
 	}, nil)
-	RegisterHonchoTools(reg, svc)
+	RegisterTools(reg, svc)
 
 	return reg, svc, func() {
 		if err := store.Close(context.Background()); err != nil {

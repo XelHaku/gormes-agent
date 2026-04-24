@@ -5,8 +5,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/TrebuchetDynamics/gormes-agent/gormes/internal/progress"
 )
 
 func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
@@ -51,9 +49,11 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		"Phase 4",
 		"Phase 5",
 		"Phase 6",
-		// Status tone classes driven by the live embedded progress data.
-		"roadmap-status-shipped",
+		// Status tone classes driven by current phase-level data.
 		"roadmap-status-progress",
+		"roadmap-status-planned",
+		// Complete work still appears at item level even when no whole phase is complete.
+		"roadmap-item-shipped",
 		// Structural class anchors
 		"roadmap-phase",
 		// Footer — brand text + company anchor + license
@@ -110,15 +110,6 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 	trackerRE := regexp.MustCompile(`\d+/\d+ shipped`)
 	if !trackerRE.MatchString(text) {
 		t.Errorf("missing N/M shipped progress tracker label; body:\n%s", text)
-	}
-}
-
-func TestToneFor_UsesLaterToneForPlannedPhase5(t *testing.T) {
-	if got := toneFor(progress.StatusPlanned, "5"); got != "later" {
-		t.Fatalf("toneFor(planned, 5) = %q, want later", got)
-	}
-	if got := toneFor(progress.StatusPlanned, "6"); got != "planned" {
-		t.Fatalf("toneFor(planned, 6) = %q, want planned", got)
 	}
 }
 

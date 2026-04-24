@@ -50,7 +50,7 @@
 ## Conventions
 
 - Module import path: `github.com/TrebuchetDynamics/gormes-agent/gormes/internal/progress`
-- All tests run with `go test ./...` from `/home/xel/git/sages-openclaw/workspace-mineru/golang-hermes-agent/gormes/`
+- All tests run with `go test ./...` from `<repo>/gormes/`
 - Test style: plain `*testing.T`, `t.Fatalf`/`t.Errorf`, no external assertion libs
 - Commit messages: `feat(progress):`, `test(progress):`, `docs(progress):`, `build(progress):`
 

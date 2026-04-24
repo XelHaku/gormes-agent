@@ -29,3 +29,10 @@ Upstream Hermes has a `skills/` directory with hand-authored SKILL.md files. It 
 ## Current status
 
 ⏳ Planned — see [Phase 6](../architecture_plan/phase-6-learning-loop/) for the sub-phase breakdown.
+
+Execution should be TDD-first and local-signal-first:
+
+- Start with deterministic complexity signals from transcript length, tool-call count, retries, edits, and operator feedback.
+- Extend the Phase 2.G SKILL.md store with versioned metadata, provenance, review state, and atomic writes before generated skills persist.
+- Use fake-model extraction fixtures to prove secret stripping and one-off task rejection before live LLM generation.
+- Keep disabled or unreviewed skills out of prompt injection until retrieval, feedback, and operator review surfaces are all test-covered.
