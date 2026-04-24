@@ -1473,6 +1473,11 @@
               "note": "Umbrella only: keep for inventory continuity, but execution should use smaller command/config/platform/diagnostic slices rather than attempting the whole hermes_cli tree at once."
             },
             {
+              "name": "Deterministic helper-file ports (banner/output/tips/webhook/dump)",
+              "status": "planned",
+              "note": "TDD-first prerequisite slice for the larger 5.O command-group slices below. Port the pure-function helper surface from upstream hermes_cli as foundational primitives before any command-group or active-turn policy work lands on top: `hermes_cli/banner.py` -> `internal/cli/banner.go` (FormatContextLength, DisplayToolsetName, FormatBannerVersionLabel), `hermes_cli/cli_output.py` -> `internal/cli/output.go` (shared print/prompt helpers), `hermes_cli/tips.py` -> `internal/cli/tips.go` (tip corpus + GetRandomTip/PickRandomTip selector), `hermes_cli/webhook.py` -> `internal/cli/webhook.go` (deterministic helpers), `hermes_cli/dump.py` -> `internal/cli/dump.go` (deterministic helpers). Each helper file lands behind pure-function unit tests with fixed inputs/outputs — no terminal/TTY coupling, no config file reads, no time-of-day non-determinism. Evidence of granularity mismatch on main: as of planner run 2026-04-24, `git log --all --since='2026-04-23' --oneline | grep -cE 'feat\\(cli\\)|feat\\(tuigateway\\)'` reports **54 worker commits** across codexu/* branches attempting these helper ports with **zero** merged to main, and `internal/cli/` currently contains only `parity.go`/`root_test.go` — the larger command-group slices (`CLI command registry parity + active-turn busy policy`, `Config/profile/auth/setup`, `Gateway/platform/webhook/cron`, `Diagnostics/backup/logs/status`) are too big a jump from the current tree and must not consume the helper-file ports. Keep this slice strictly additive and pure-function — no command-registry wiring in this slice."
+            },
+            {
               "name": "CLI command registry parity + active-turn busy policy",
               "status": "planned",
               "note": "TDD: expand the Go command registry toward upstream hermes_cli/commands.py and prove every recognized gateway slash command either has a safe running-agent handler or returns a visible busy response without interrupting or queuing discardable command text."
@@ -1528,9 +1533,14 @@
           "name": "API Server + TUI Gateway Streaming",
           "items": [
             {
+              "name": "Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)",
+              "status": "planned",
+              "note": "TDD-first prerequisite slice for the `SSE streaming to Bubble Tea TUI` and API-server slices below. Port the pure-function helper surface from upstream `tui_gateway/` as foundational primitives before any transport/lifecycle work lands: `_load_tool_progress_mode` -> ParseToolProgressMode/ToolProgressEnabled, `_normalize_completion_path` -> NormalizeCompletionPath, `_estimate_image_tokens`/`_image_meta` -> EstimateImageTokens/ImageMeta/ReadImageMeta, upstream tool-progress helpers -> FormatToolDuration/CountList/ToolSummary, personality validator + renderer, and the upstream `PlatformEvent` struct surface for the remote Bubble Tea TUI. Each helper lands behind pure-function unit tests with fixed inputs/outputs — no HTTP, no SSE, no JSON-RPC dispatch, no Bubble Tea program in this slice. Evidence of granularity mismatch on main: as of planner run 2026-04-24, `internal/tuigateway/` does not exist in the tree, and `git log --all --since='2026-04-23'` shows **repeated worker attempts** on codexu/* branches for each of these helpers (tool-progress mode, completion-path, image primitives, tool-progress helpers, personality validator, PlatformEvent, RemoteClient, JSONRPCDispatcher, NewGatewayMux) with **zero** merged to main — confirming the `SSE streaming to Bubble Tea TUI` slice is too big a jump from the current tree and must not consume the helper-file ports. Keep this slice strictly additive and pure-function — no NewRemoteClient, no NewGatewayMux, no SSE dial in this slice; those land in the SSE-streaming slice once the primitives are green."
+            },
+            {
               "name": "SSE streaming to Bubble Tea TUI",
               "status": "planned",
-              "note": "TDD: port the tui_gateway server/render/slash-worker event contract so remote Bubble Tea clients can subscribe to live agent state without the Python gateway process."
+              "note": "TDD: port the tui_gateway server/render/slash-worker event contract so remote Bubble Tea clients can subscribe to live agent state without the Python gateway process. Depends on the `Deterministic helper-file ports` slice above — this slice owns the transport/lifecycle wiring (DialSSE, NewRemoteClient, NewGatewayMux, JSONRPCDispatcher, PostPlatformEvent, `--remote <url>` threading through runTUI) that consumes the frozen helper primitives. Do not widen the helper-primitives contract here."
             },
             {
               "name": "OpenAI-compatible chat-completions API server",

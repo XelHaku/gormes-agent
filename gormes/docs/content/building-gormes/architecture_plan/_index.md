@@ -466,6 +466,7 @@ weight: 10
 ### 5.O — Hermes CLI Parity ⏳
 
 - [ ] 49-file CLI tree port
+- [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
 - [ ] CLI command registry parity + active-turn busy policy
 - [ ] Config, profile, auth, and setup command surfaces
 - [ ] Gateway, platform, webhook, and cron management CLI
@@ -481,6 +482,7 @@ weight: 10
 
 ### 5.Q — API Server + TUI Gateway Streaming ⏳
 
+- [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
 - [ ] SSE streaming to Bubble Tea TUI
 - [ ] OpenAI-compatible chat-completions API server
 - [ ] Responses API store + run event stream
