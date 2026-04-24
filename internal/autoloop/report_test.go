@@ -118,6 +118,10 @@ func TestParseFinalReportRejectsLegacyBadFixtures(t *testing.T) {
 		"bad-acceptance-fail.final.md",
 		"bad-no-red-exit.final.md",
 		"bad-no-commit-hash.final.md",
+		"bad-all-zero-exits.final.md",
+		"bad-empty.final.md",
+		"bad-missing-branch.final.md",
+		"bad-missing-section.final.md",
 	}
 
 	for _, fixture := range fixtures {
