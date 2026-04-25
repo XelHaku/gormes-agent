@@ -607,10 +607,10 @@
             },
             {
               "name": "GBrain minion-orchestrator routing policy",
-              "status": "planned",
+              "status": "complete",
               "priority": "P2",
               "contract": "Durable-job routing separates deterministic restart-survivable work from live LLM subagents, following GBrain's unified minion-orchestrator skill while keeping Gormes Go-native subagent APIs",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -641,7 +641,7 @@
                 "Child-agent trust cannot submit privileged deterministic shell jobs through the durable-job route.",
                 "Existing delegate_task and subagent manager APIs remain Go-native and are not renamed to Minions."
               ],
-              "note": "GBrain v0.20.4 merged the older `gbrain-jobs` intent into the unified `minion-orchestrator` skill. Gormes should borrow the routing policy first: deterministic durable work and LLM subagents share an operator-visible control plane, but shell-like work stays privileged and no Postgres queue is imported in this slice.",
+              "note": "Complete: TDD landed a pure Gormes routing policy fixture in internal/subagent/minion_policy_test.go. Deterministic shell/cron-like work routes to a privileged durable-job lane for operator/system trust, judgment-heavy LLM work stays on the live Go-native delegate_task subagent lane, child-agent trust is denied for deterministic durable submits, and no GBrain queue/executor/supervisor runtime was imported.",
               "write_scope": [
                 "internal/subagent/",
                 "internal/cron/",
