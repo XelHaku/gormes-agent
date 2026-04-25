@@ -2,9 +2,11 @@ package subagent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,6 +60,10 @@ type ManagerOpts struct {
 
 	// RunLogPath enables append-only JSONL run logging when non-empty.
 	RunLogPath string
+
+	// DurableLedger enables SQLite-backed restart/replay state when non-nil.
+	// It is additive to RunLogPath; delegate_task output remains unchanged.
+	DurableLedger *DurableLedger
 
 	// ToolExecutor is injected into every spawned child config so runners can
 	// enforce allowlists at tool-execution time.
@@ -151,6 +157,9 @@ func (m *manager) Spawn(ctx context.Context, cfg SubagentConfig) (*Subagent, err
 
 	m.children[sa.ID] = sa
 	m.opts.Registry.Register(sa)
+	if err := m.startDurableLedger(sa); err != nil {
+		slog.Warn("subagent: durable ledger start failed", "subagent_id", sa.ID, "err", err)
+	}
 
 	go m.run(sa)
 	return sa, nil
@@ -220,6 +229,9 @@ func (m *manager) run(sa *Subagent) {
 	close(internalEvents)
 	<-forwarderDone
 	result.ToolCalls = mergeToolCallAudit(result.ToolCalls, capturedToolCalls)
+	if err := m.finishDurableLedger(sa, result); err != nil {
+		slog.Warn("subagent: durable ledger finish failed", "subagent_id", sa.ID, "err", err)
+	}
 
 	if sa.timeoutCancel != nil {
 		sa.timeoutCancel()
@@ -339,6 +351,79 @@ func (m *manager) appendRunLog(sa *Subagent, result *SubagentResult) error {
 		return nil
 	}
 	return m.runLogger.append(sa, result)
+}
+
+func (m *manager) startDurableLedger(sa *Subagent) error {
+	if m.opts.DurableLedger == nil {
+		return nil
+	}
+	progress, err := json.Marshal(map[string]any{
+		"goal":  sa.cfg.Goal,
+		"phase": "started",
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := m.opts.DurableLedger.Submit(context.Background(), DurableJobSubmission{
+		ID:       sa.ID,
+		Kind:     WorkKindLLMSubagent,
+		ParentID: sa.ParentID,
+		Depth:    sa.Depth,
+		Progress: progress,
+	}); err != nil {
+		return err
+	}
+	lockUntil := time.Now().UTC().Add(24 * time.Hour)
+	if sa.cfg.Timeout > 0 {
+		lockUntil = time.Now().UTC().Add(sa.cfg.Timeout + time.Minute)
+	}
+	_, ok, err := m.opts.DurableLedger.ClaimJob(context.Background(), sa.ID, DurableClaim{
+		WorkerID:  sa.ID,
+		LockUntil: lockUntil,
+	})
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("durable job %s was not claimable", sa.ID)
+	}
+	return nil
+}
+
+func (m *manager) finishDurableLedger(sa *Subagent, result *SubagentResult) error {
+	if m.opts.DurableLedger == nil {
+		return nil
+	}
+	resultJSON, err := json.Marshal(map[string]any{
+		"exit_reason": result.ExitReason,
+		"iterations":  result.Iterations,
+		"status":      string(result.Status),
+		"summary":     result.Summary,
+	})
+	if err != nil {
+		return err
+	}
+	switch result.Status {
+	case StatusCompleted:
+		_, _, err = m.opts.DurableLedger.Complete(context.Background(), sa.ID, sa.ID, resultJSON)
+		return err
+	case StatusFailed, StatusError:
+		errorText := strings.TrimSpace(result.Error)
+		if errorText == "" {
+			errorText = result.ExitReason
+		}
+		_, _, err = m.opts.DurableLedger.Fail(context.Background(), sa.ID, sa.ID, errorText)
+		return err
+	case StatusInterrupted:
+		reason := strings.TrimSpace(result.ExitReason)
+		if reason == "" {
+			reason = result.Error
+		}
+		_, _, err = m.opts.DurableLedger.Cancel(context.Background(), sa.ID, reason)
+		return err
+	default:
+		return nil
+	}
 }
 
 func normalizeResult(sa *Subagent, result *SubagentResult) *SubagentResult {

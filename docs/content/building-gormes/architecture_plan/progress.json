@@ -657,10 +657,10 @@
             },
             {
               "name": "Durable subagent/job ledger",
-              "status": "planned",
+              "status": "complete",
               "priority": "P2",
               "contract": "SQLite-first job ledger records restartable subagent and deterministic work state with claim, progress, result, error, parent-child, and cancellation fields",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -692,7 +692,7 @@
                 "Subagent and cron/deterministic job fixtures use the same ledger contract without changing existing public delegate_task behavior.",
                 "Status or doctor output distinguishes append-only run logs from durable restart/replay support."
               ],
-              "note": "Keep this blocked behind the policy row. The first implementation should be the smallest SQLite-first ledger needed for cron/subagent replay; claim/renew/complete/fail/cancel and parent child_done events matter before pause/resume, attachments, supervisor, or full GBrain queue parity.",
+              "note": "Complete: TDD landed a SQLite-first durable ledger in internal/subagent with submit, claim, claim-by-id, expired-lock reclaim, renew, progress, complete, fail, cancel intent, parent child_done events, and restart/replay status. Cron executor and subagent manager can opt into the same ledger without changing append-only run logs or delegate_task output, and internal/doctor distinguishes append-only logs from durable restart/replay availability.",
               "write_scope": [
                 "internal/subagent/",
                 "internal/cron/",

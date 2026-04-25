@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
 	hermesclient "github.com/TrebuchetDynamics/gormes-agent/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/kernel"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/subagent"
 )
 
 // KernelAPI is the narrow slice of *kernel.Kernel the Executor needs.
@@ -30,11 +32,12 @@ type Runner interface {
 // once at startup (cmd/gormes/telegram.go) and pass the same Executor
 // to the Scheduler.
 type ExecutorConfig struct {
-	Kernel      KernelAPI
-	JobStore    *Store
-	RunStore    *RunStore
-	Sink        DeliverySink
-	CallTimeout time.Duration // default 60s when zero
+	Kernel        KernelAPI
+	JobStore      *Store
+	RunStore      *RunStore
+	DurableLedger *subagent.DurableLedger
+	Sink          DeliverySink
+	CallTimeout   time.Duration // default 60s when zero
 }
 
 func (c *ExecutorConfig) withDefaults() {
@@ -67,6 +70,8 @@ func (e *Executor) Run(ctx context.Context, job Job) {
 	startedAt := time.Now().Unix()
 	sessionID := fmt.Sprintf("cron:%s:%d", job.ID, startedAt)
 	promptHash := shortHash(job.Prompt)
+	const durableWorker = "cron-executor"
+	durableActive := e.startDurableCronRun(ctx, sessionID, job, promptHash, durableWorker)
 
 	// Subscribe BEFORE Submit so we don't miss the final frame.
 	frames := e.cfg.Kernel.Render()
@@ -116,6 +121,7 @@ func (e *Executor) Run(ctx context.Context, job Job) {
 			Delivered:  false,
 			ErrorMsg:   submitErr.Error(),
 		}
+		e.failDurableCronRun(sessionID, durableWorker, durableActive, run.ErrorMsg)
 		e.recordAndUpdateJob(ctx, job, run)
 		return
 	}
@@ -138,6 +144,7 @@ func (e *Executor) Run(ctx context.Context, job Job) {
 			OutputPreview: truncate(notice, 200),
 			ErrorMsg:      "context deadline exceeded",
 		}
+		e.failDurableCronRun(sessionID, durableWorker, durableActive, run.ErrorMsg)
 		e.recordAndUpdateJob(ctx, job, run)
 		return
 	}
@@ -155,6 +162,7 @@ func (e *Executor) Run(ctx context.Context, job Job) {
 			Delivered:         false,
 			SuppressionReason: "silent",
 		}
+		e.completeDurableCronRun(sessionID, durableWorker, durableActive, run)
 		e.recordAndUpdateJob(ctx, job, run)
 		return
 	}
@@ -174,6 +182,7 @@ func (e *Executor) Run(ctx context.Context, job Job) {
 			OutputPreview:     truncate(notice, 200),
 			ErrorMsg:          "agent returned empty response",
 		}
+		e.failDurableCronRun(sessionID, durableWorker, durableActive, run.ErrorMsg)
 		e.recordAndUpdateJob(ctx, job, run)
 		return
 	}
@@ -192,7 +201,79 @@ func (e *Executor) Run(ctx context.Context, job Job) {
 	if delivErr != nil {
 		run.ErrorMsg = fmt.Sprintf("delivery: %v", delivErr)
 	}
+	e.completeDurableCronRun(sessionID, durableWorker, durableActive, run)
 	e.recordAndUpdateJob(ctx, job, run)
+}
+
+func (e *Executor) startDurableCronRun(ctx context.Context, id string, job Job, promptHash, workerID string) bool {
+	if e.cfg.DurableLedger == nil {
+		return false
+	}
+	progress, err := durableCronProgress(job, promptHash, "queued")
+	if err != nil {
+		e.log.Warn("cron: durable ledger progress encode failed", "job_id", job.ID, "err", err)
+		return false
+	}
+	if _, err := e.cfg.DurableLedger.Submit(ctx, subagent.DurableJobSubmission{
+		ID:       id,
+		Kind:     subagent.WorkKindCronJob,
+		Progress: progress,
+	}); err != nil {
+		e.log.Warn("cron: durable ledger submit failed", "job_id", job.ID, "err", err)
+		return false
+	}
+	_, ok, err := e.cfg.DurableLedger.ClaimJob(ctx, id, subagent.DurableClaim{
+		WorkerID:  workerID,
+		LockUntil: time.Now().UTC().Add(e.cfg.CallTimeout + time.Minute),
+	})
+	if err != nil || !ok {
+		e.log.Warn("cron: durable ledger claim failed", "job_id", job.ID, "ok", ok, "err", err)
+		return false
+	}
+	progress, err = durableCronProgress(job, promptHash, "submitted")
+	if err != nil {
+		e.log.Warn("cron: durable ledger progress encode failed", "job_id", job.ID, "err", err)
+		return true
+	}
+	if ok, err := e.cfg.DurableLedger.UpdateProgress(ctx, id, workerID, progress); err != nil || !ok {
+		e.log.Warn("cron: durable ledger progress update failed", "job_id", job.ID, "ok", ok, "err", err)
+	}
+	return true
+}
+
+func (e *Executor) completeDurableCronRun(id, workerID string, active bool, run Run) {
+	if e.cfg.DurableLedger == nil || !active {
+		return
+	}
+	raw, err := json.Marshal(map[string]any{
+		"delivered": run.Delivered,
+		"status":    run.Status,
+	})
+	if err != nil {
+		e.log.Warn("cron: durable ledger result encode failed", "job_id", run.JobID, "err", err)
+		return
+	}
+	if _, ok, err := e.cfg.DurableLedger.Complete(context.Background(), id, workerID, raw); err != nil || !ok {
+		e.log.Warn("cron: durable ledger complete failed", "job_id", run.JobID, "ok", ok, "err", err)
+	}
+}
+
+func (e *Executor) failDurableCronRun(id, workerID string, active bool, errorText string) {
+	if e.cfg.DurableLedger == nil || !active {
+		return
+	}
+	if _, ok, err := e.cfg.DurableLedger.Fail(context.Background(), id, workerID, errorText); err != nil || !ok {
+		e.log.Warn("cron: durable ledger fail failed", "ledger_job_id", id, "ok", ok, "err", err)
+	}
+}
+
+func durableCronProgress(job Job, promptHash, phase string) (json.RawMessage, error) {
+	return json.Marshal(map[string]any{
+		"cron_job_id": job.ID,
+		"job_name":    job.Name,
+		"phase":       phase,
+		"prompt_hash": promptHash,
+	})
 }
 
 func (e *Executor) recordAndUpdateJob(ctx context.Context, job Job, run Run) {
