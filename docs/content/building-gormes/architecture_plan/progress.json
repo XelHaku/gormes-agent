@@ -2885,9 +2885,9 @@
             },
             {
               "name": "Model pricing/capability registry fixtures",
-              "status": "planned",
+              "status": "complete",
               "contract": "Read-only model metadata exposes deterministic pricing, capability flags, provider family, and raw context facts before routing consumes them",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -2908,9 +2908,6 @@
               "not_ready_when": [
                 "The slice implements smart routing decisions or provider calls instead of read-only metadata fixtures."
               ],
-              "blocked_by": [
-                "Provider-enforced context-length resolver"
-              ],
               "unblocks": [
                 "Routing policy and fallback selector"
               ],
@@ -2919,7 +2916,7 @@
                 "Missing pricing and missing capability values remain explicit unknowns.",
                 "Registry fixtures are embedded or local-testdata only and never require live models.dev access."
               ],
-              "note": "Split out from the former broad metadata row so autoloop workers can first land read-only model facts before any routing selector consumes them.",
+              "note": "TDD landed: internal/hermes/model_registry_test.go covers default embedded fixture lookup for provider/model family, raw context window, max output, pricing fields, and capability flags; explicit unknown pricing/capability states for sparse entries; and stale embedded snapshot status. The registry is static in internal/hermes/model_registry.go and performs no live models.dev access or routing decisions.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -2929,7 +2926,12 @@
               ],
               "done_signal": [
                 "Model registry fixtures expose pricing, capability, provider-family, and raw context metadata with explicit unknown states."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T06:39:53Z",
+                "last_success": "2026-04-25T06:39:53Z"
+              }
             },
             {
               "name": "Routing policy and fallback selector",
