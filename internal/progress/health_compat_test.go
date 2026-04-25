@@ -181,3 +181,53 @@ func TestSaveProgress_IdempotentOnRealCheckedInFile(t *testing.T) {
 	}
 	t.Fatalf("SaveProgress not idempotent: lengths differ pass1=%d pass2=%d", len(pass1), len(pass2))
 }
+
+func TestSaveProgress_IdempotentWithBothHealthAndVerdict(t *testing.T) {
+	src := filepath.Join("..", "..", "docs", "content", "building-gormes", "architecture_plan", "progress.json")
+	original, err := os.ReadFile(src)
+	if err != nil {
+		t.Skipf("checked-in progress.json not found, skipping: %v", err)
+	}
+
+	tmp1 := filepath.Join(t.TempDir(), "progress.json")
+	if err := os.WriteFile(tmp1, original, 0o644); err != nil {
+		t.Fatalf("write tmp1: %v", err)
+	}
+
+	// Mutation that touches BOTH blocks on the same row.
+	if err := ApplyHealthUpdates(tmp1, []HealthUpdate{{
+		PhaseID:    "1",
+		SubphaseID: "1.A",
+		ItemName:   "Bubble Tea shell",
+		Mutate: func(h *RowHealth) {
+			h.AttemptCount = 1
+		},
+	}}); err != nil {
+		t.Fatalf("first ApplyHealthUpdates: %v", err)
+	}
+	// Now stamp a PlannerVerdict on the same row via direct Load+Save.
+	prog, _ := Load(tmp1)
+	prog.Phases["1"].Subphases["1.A"].Items[0].PlannerVerdict = &PlannerVerdict{
+		ReshapeCount: 2,
+		LastOutcome:  "still_failing",
+	}
+	if err := SaveProgress(tmp1, prog); err != nil {
+		t.Fatalf("SaveProgress 1: %v", err)
+	}
+	pass1, _ := os.ReadFile(tmp1)
+
+	// Round-trip 2: Load + SaveProgress with no mutation. Must be byte-equal.
+	tmp2 := filepath.Join(t.TempDir(), "progress.json")
+	if err := os.WriteFile(tmp2, pass1, 0o644); err != nil {
+		t.Fatalf("write tmp2: %v", err)
+	}
+	prog2, _ := Load(tmp2)
+	if err := SaveProgress(tmp2, prog2); err != nil {
+		t.Fatalf("SaveProgress 2: %v", err)
+	}
+	pass2, _ := os.ReadFile(tmp2)
+
+	if !bytes.Equal(pass1, pass2) {
+		t.Fatalf("SaveProgress not idempotent with both blocks; len pass1=%d pass2=%d", len(pass1), len(pass2))
+	}
+}
