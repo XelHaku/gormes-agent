@@ -37,13 +37,13 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 28/72 subphases shipped · 13 in progress · 31 planned
+**Overall:** 28/73 subphases shipped · 13 in progress · 32 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
 | Phase 2 — The Gateway | 🔨 | 11/19 subphases |
-| Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 11/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
@@ -296,6 +296,14 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] GONCHO user-scope search/context parameters
 - [ ] Lineage-aware source-filtered search hits
 - [ ] Operator-auditable search evidence
+
+### 3.F — Goncho Honcho Memory Parity ⏳
+
+- [ ] Goncho context representation options
+- [ ] Goncho search filter grammar
+- [ ] Directional peer cards and representation scopes
+- [ ] Goncho queue status read model
+- [ ] Goncho summary context budget
 
 ## Phase 4 — The Brain Transplant 🔨
 

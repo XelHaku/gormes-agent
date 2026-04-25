@@ -68,7 +68,7 @@ Gormes is not a wrapper around Hermes. It is a **strangler fig rewrite** — eac
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
 | Phase 2 — The Gateway | 🔨 | 11/19 subphases |
-| Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
+| Phase 3 — The Black Box (Memory) | 🔨 | 11/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
