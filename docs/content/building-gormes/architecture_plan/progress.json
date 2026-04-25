@@ -18,13 +18,13 @@
       "candidate_policy": [
         "Skip rows with blocked_by until ready_when is satisfied.",
         "Skip slice_size=umbrella rows until they are split.",
-        "Default cmd/autoloop runs cap eligible roadmap work at Phase 3 unless MAX_PHASE is explicitly overridden.",
+        "Default cmd/builder-loop runs cap eligible roadmap work at Phase 3 unless MAX_PHASE is explicitly overridden.",
         "MAX_AGENTS is a safety cap: if fewer metadata-ready rows are available, run fewer workers instead of selecting filler or random work.",
         "Each worker runs in an isolated git worktree under RUN_ROOT/worktrees and promotion rejects committed paths outside the selected row's write_scope.",
-        "When git worktrees are available and MAX_AGENTS is greater than 1, cmd/autoloop launches selected workers concurrently, then validates and promotes each branch through the same ledgered safety gates.",
-        "When PRE_PROMOTION_VERIFY_COMMANDS is configured, cmd/autoloop verifies the worker branch before cherry-picking, repairs failures on that worker branch, and keeps main untouched until the gate passes.",
-        "After all promotions, cmd/autoloop runs the mandatory post-promotion full-suite gate before emitting run_completed or health_updated.",
-        "On post-promotion gate failure, cmd/autoloop starts one backend repair attempt by default, requires the checkout to be clean, reruns the suite, and records final health only if the gate passes.",
+        "When git worktrees are available and MAX_AGENTS is greater than 1, cmd/builder-loop launches selected workers concurrently, then validates and promotes each branch through the same ledgered safety gates.",
+        "When PRE_PROMOTION_VERIFY_COMMANDS is configured, cmd/builder-loop verifies the worker branch before cherry-picking, repairs failures on that worker branch, and keeps main untouched until the gate passes.",
+        "After all promotions, cmd/builder-loop runs the mandatory post-promotion full-suite gate before emitting run_completed or health_updated.",
+        "On post-promotion gate failure, cmd/builder-loop starts one backend repair attempt by default, requires the checkout to be clean, reruns the suite, and records final health only if the gate passes.",
         "Backend worker failures preserve captured stderr/stdout detail in the ledger so repair and planner loops can diagnose the real failure instead of only seeing backend_failed.",
         "Prefer contract rows with write_scope, test_commands, and done_signal.",
         "Inject selected progress metadata into the worker prompt instead of asking workers to rescan the whole roadmap."
@@ -168,7 +168,7 @@
                 "system"
               ],
               "degraded_mode": "Planner callers using the old wrapper names continue to exec the renamed planner-tasks manager instead of failing before a run can start.",
-              "fixture": "internal/architectureplanneragent_test.go",
+              "fixture": "internal/plannerloopagent_test.go",
               "source_refs": [
                 "docs/superpowers/plans/2026-04-23-gormes-architecture-task-manager-script.md",
                 "scripts/gormes-architecture-planner-tasks-manager.sh",
@@ -214,13 +214,13 @@
                 "system"
               ],
               "degraded_mode": "Rows with repeated worker failures are skipped or demoted with visible health/quarantine evidence instead of being retried indefinitely.",
-              "fixture": "internal/progress/health_test.go and internal/autoloop/health_writer_test.go",
+              "fixture": "internal/progress/health_test.go and internal/builderloop/health_writer_test.go",
               "source_refs": [
                 "docs/superpowers/specs/2026-04-24-reactive-autoloop-design.md",
                 "internal/progress/health.go",
-                "internal/autoloop/health_writer.go",
-                "internal/autoloop/candidates.go",
-                "internal/autoloop/run_health_test.go"
+                "internal/builderloop/health_writer.go",
+                "internal/builderloop/candidates.go",
+                "internal/builderloop/run_health_test.go"
               ],
               "ready_when": [
                 "RowHealth is a typed progress field and autoloop can batch health updates after worker outcomes."
@@ -236,15 +236,15 @@
                 "Autoloop writes success/failure health updates, quarantines rows after threshold failures, clears stale quarantines after spec changes, and emits trigger events.",
                 "Candidate selection skips active quarantines by default, exposes stale quarantines for reset, and applies deterministic failure penalties."
               ],
-              "note": "Complete: internal/progress now owns RowHealth plus ItemSpecHash and ApplyHealthUpdates; internal/autoloop writes batched run health, quarantines repeated failures with current spec hashes, clears stale quarantines, emits planner trigger events, filters active quarantines, and demotes rows with repeated failures/backends tried.",
+              "note": "Complete: internal/progress now owns RowHealth plus ItemSpecHash and ApplyHealthUpdates; internal/builderloop writes batched run health, quarantines repeated failures with current spec hashes, clears stale quarantines, emits planner trigger events, filters active quarantines, and demotes rows with repeated failures/backends tried.",
               "write_scope": [
                 "internal/progress/",
-                "internal/autoloop/",
+                "internal/builderloop/",
                 "internal/plannertriggers/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/progress ./internal/autoloop ./internal/plannertriggers -count=1"
+                "go test ./internal/progress ./internal/builderloop ./internal/plannertriggers -count=1"
               ],
               "done_signal": [
                 "Health writer, candidate selection, and progress preservation tests prove quarantine state is runtime-owned, typed, and stale-spec recoverable."
@@ -267,13 +267,13 @@
                 "system"
               ],
               "degraded_mode": "Rows that resist planner reshapes are marked needs_human and removed from default autoloop selection instead of silently cycling.",
-              "fixture": "internal/architectureplanner/lifecycle_test.go",
+              "fixture": "internal/plannerloop/lifecycle_test.go",
               "source_refs": [
                 "docs/superpowers/specs/2026-04-24-planner-self-healing-design.md",
-                "internal/architectureplanner/verdict.go",
-                "internal/architectureplanner/evaluation.go",
-                "internal/architectureplanner/retry.go",
-                "internal/autoloop/candidates_health_test.go"
+                "internal/plannerloop/verdict.go",
+                "internal/plannerloop/evaluation.go",
+                "internal/plannerloop/retry.go",
+                "internal/builderloop/candidates_health_test.go"
               ],
               "ready_when": [
                 "Autoloop row health blocks and planner trigger events exist on main."
@@ -291,14 +291,14 @@
               ],
               "note": "Complete: architectureplanner now records planner ledger events, consumes trigger/cursor state, evaluates previous reshapes against autoloop outcomes, retries validation failures with feedback, stamps PlannerVerdict reshape counts/outcomes, escalates persistent failures to needs_human, and exposes needs-human rows in status while autoloop skips them by default.",
               "write_scope": [
-                "internal/architectureplanner/",
-                "internal/autoloop/",
+                "internal/plannerloop/",
+                "internal/builderloop/",
                 "internal/progress/",
-                "cmd/architecture-planner-loop/",
+                "cmd/planner-loop/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/architectureplanner ./internal/autoloop ./internal/progress -count=1"
+                "go test ./internal/plannerloop ./internal/builderloop ./internal/progress -count=1"
               ],
               "done_signal": [
                 "Planner lifecycle tests prove trigger consumption, reshape self-evaluation, PlannerVerdict stamping, sticky needs_human escalation, and autoloop candidate skipping."
@@ -321,13 +321,13 @@
                 "system"
               ],
               "degraded_mode": "Planner status reports porting/converged/owned buckets and recent promotions so Gormes-original surfaces stop receiving fabricated upstream refs.",
-              "fixture": "internal/architectureplanner/divergence_lifecycle_test.go",
+              "fixture": "internal/plannerloop/divergence_lifecycle_test.go",
               "source_refs": [
                 "docs/superpowers/specs/2026-04-25-planner-divergence-awareness-design.md",
                 "internal/progress/health.go",
-                "internal/architectureplanner/implscan.go",
-                "internal/architectureplanner/drift.go",
-                "internal/architectureplanner/status.go"
+                "internal/plannerloop/implscan.go",
+                "internal/plannerloop/drift.go",
+                "internal/plannerloop/status.go"
               ],
               "ready_when": [
                 "PlannerVerdict and RowHealth preservation are validated on main."
@@ -337,18 +337,18 @@
               ],
               "acceptance": [
                 "Provenance and DriftState round-trip through progress and survive autoloop writes.",
-                "Implementation inventory lists Gormes-original paths under cmd/autoloop, cmd/architecture-planner-loop, internal/autoloop, internal/architectureplanner, internal/plannertriggers, and progress health schema.",
+                "Implementation inventory lists Gormes-original paths under cmd/builder-loop, cmd/planner-loop, internal/builderloop, internal/plannerloop, internal/plannertriggers, and progress health schema.",
                 "Status output buckets drift states and records forward-only drift promotions."
               ],
               "note": "Complete: progress now has typed Provenance and DriftState blocks; architectureplanner scans Gormes-original cmd/internal paths, injects implementation inventory and drift-state guidance into prompts, records forward drift promotions, and renders drift-state status buckets without treating owned surfaces as upstream-led.",
               "write_scope": [
                 "internal/progress/",
-                "internal/architectureplanner/",
-                "cmd/architecture-planner-loop/",
+                "internal/plannerloop/",
+                "cmd/planner-loop/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/progress ./internal/architectureplanner -count=1"
+                "go test ./internal/progress ./internal/plannerloop -count=1"
               ],
               "done_signal": [
                 "Divergence lifecycle and status tests prove provenance preservation, implementation inventory, forward-only drift promotions, and owned/porting/converged status reporting."
@@ -490,7 +490,7 @@
               "test_commands": [
                 "go test ./internal/slack -run 'TestBot_MessageCommandsUseSharedGatewayRegistry|TestRealClient_HandleSlashCommand_ForwardsGatewayCommandEvent' -count=1",
                 "go test ./internal/gateway -run 'TestParseInboundText|TestSlackSubcommandMap' -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Focused Slack and gateway command tests prove Slack ingress consumes the shared registry for message and slash-command paths."
@@ -550,7 +550,7 @@
               "test_commands": [
                 "go test ./internal/slack -run 'TestSlackChannel|TestBot_MessageCommandsUseSharedGatewayRegistry' -count=1",
                 "go test ./internal/slack ./internal/gateway -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Slack Channel shim tests prove gateway.Manager can consume Slack ingress/send through gateway.Channel while legacy Socket Mode adapter tests remain green."
@@ -616,7 +616,7 @@
               "test_commands": [
                 "go test ./cmd/gormes ./internal/config ./internal/slack ./internal/doctor -run 'Test.*Slack' -count=1",
                 "go test ./cmd/gormes ./internal/config ./internal/slack ./internal/doctor -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Gateway registration tests prove Slack can be enabled through config and status/doctor output without requiring live Slack credentials."
@@ -1002,7 +1002,7 @@
               ],
               "test_commands": [
                 "go test ./internal/gateway ./internal/channels/discord -run TestDiscordSessionSourceMetadata -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Discord session-source metadata fixtures prove guild, parent-channel, and triggering-message IDs flow into session context without route regressions."
@@ -1559,7 +1559,7 @@
               "test_commands": [
                 "go test ./internal/gateway -run 'Test.*ResumePending|Test.*Drain' -count=1",
                 "go test ./internal/gateway ./internal/session -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Resume-pending fixtures prove drain-timeout sessions retain identity, inject exactly one restart note, and lose to hard non-resumable states."
@@ -1624,7 +1624,7 @@
               ],
               "test_commands": [
                 "go test ./internal/gateway -run TestPairingStore -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Pairing store fixtures prove atomic persistence, deterministic readout, corrupt-state degradation, and per-platform pending/approved separation without code generation or adapter UX."
@@ -1695,7 +1695,7 @@
               "test_commands": [
                 "go test ./internal/gateway -run TestPairingApproval -count=1",
                 "go test ./internal/gateway -run TestPairingStore -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Pairing approval fixtures prove code entropy/expiry, pending limits, lockout, per-user rate limiting, and Telegram from_user fallback without adapter sends or agent sessions."
@@ -1759,7 +1759,7 @@
               "test_commands": [
                 "go test ./internal/gateway -run TestUnauthorizedDM -count=1",
                 "go test ./internal/gateway -run TestPairingApproval -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Unauthorized-DM fixtures prove deny, pair, and ignore modes never start an agent session for unknown users."
@@ -1829,7 +1829,7 @@
                 "go test ./cmd/gormes -run TestGatewayStatusCommand -count=1",
                 "go test ./internal/gateway -run TestRenderStatusSummary -count=1",
                 "go test ./cmd/gormes ./internal/gateway ./internal/config -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Gateway status command and pure renderer tests prove configured channel, pairing, and runtime status can be inspected without starting transports."
@@ -1900,7 +1900,7 @@
               "test_commands": [
                 "go test ./internal/gateway -run 'TestRuntimeStatus.*PID|TestRuntimeStatusStore' -count=1",
                 "go test ./cmd/gormes ./internal/gateway -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "PID validation fixtures prove gateway_state.json cannot report a stale, stopped, or pid-reused process as running."
@@ -1968,7 +1968,7 @@
               "test_commands": [
                 "go test ./internal/gateway -run TestTokenScopedGatewayLock -count=1",
                 "go test ./internal/gateway ./internal/config -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Token-lock fixtures prove same-token exclusion, different-token independence, stale cleanup, and safe release without exposing raw credential material."
@@ -2037,7 +2037,7 @@
               "test_commands": [
                 "go test ./internal/gateway -run TestGatewayRestartCommand -count=1",
                 "go test ./cmd/gormes ./internal/gateway -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Restart-command fixtures prove registry policy, takeover marker write/read/expiry, duplicate suppression, and service-manager exit semantics without live service control."
@@ -2098,7 +2098,7 @@
               "test_commands": [
                 "go test ./internal/session -run TestExpiryFinalizedMigration -count=1",
                 "go test ./internal/session ./internal/gateway -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Session metadata fixtures prove legacy memory_flushed records migrate to expiry_finalized and new writes contain no hidden memory-flush fields."
@@ -2159,7 +2159,7 @@
               "test_commands": [
                 "go test ./internal/gateway -run TestSessionExpiryHooks -count=1",
                 "go test ./internal/session ./internal/gateway -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Expiry hook fixtures prove one-shot cleanup, bounded retry/give-up evidence, persisted finalization state, and zero memory-flush task launches."
@@ -3751,7 +3751,7 @@
               ],
               "test_commands": [
                 "go test ./internal/goncho ./internal/memory ./internal/config ./cmd/gormes -run TestGonchoDream -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Dream scheduler fixtures prove threshold, cooldown, idle, dedupe, manual scheduling, cancellation, and doctor/status degraded evidence without LLM execution."
@@ -4167,7 +4167,7 @@
               "test_commands": [
                 "go test ./internal/hermes -run 'TestBuildCodexResponsesPayload|TestCodexResponsesRoleContent' -count=1",
                 "go test ./internal/hermes -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Codex Responses role-content fixtures prove assistant list-content replay uses output_text while user list-content remains input_text."
@@ -4537,7 +4537,7 @@
               "test_commands": [
                 "go test ./internal/hermes -run TestContextCompressorHeadroom -count=1",
                 "go test ./internal/hermes -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Headroom fixtures prove tool-schema overhead plus 12000 reserved tokens lower auxiliary-bound thresholds and clamp at the 64000-token floor without provider calls."
@@ -4605,7 +4605,7 @@
               "test_commands": [
                 "go test ./internal/hermes -run TestContextCompressorProviderCap -count=1",
                 "go test ./internal/hermes -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Provider-cap compression fixtures prove the auxiliary feasibility path forwards provider identity, uses the 272000 Codex cap, and reports fallback/source evidence without live provider calls."
@@ -4676,7 +4676,7 @@
               "test_commands": [
                 "go test ./internal/hermes -run 'TestContextCompressor(SinglePrompt|ProviderCap|Headroom|Budget)' -count=1",
                 "go test ./internal/hermes -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Single-prompt compression fixtures prove auxiliary-bound thresholds use aux_context directly, preserve provider-cap evidence, and no longer reserve tool-schema or flush-memory headroom."
@@ -5224,7 +5224,7 @@
               "test_commands": [
                 "go test ./internal/hermes -run TestUnsupportedTemperatureRetry -count=1",
                 "go test ./internal/hermes -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Unsupported-temperature fixtures prove one stripped retry, no retry for unrelated errors, and no temperature in Codex Responses payloads."
@@ -5288,7 +5288,7 @@
               "test_commands": [
                 "go test ./internal/hermes -run 'Test.*Temperature|TestBuildCodexResponsesPayload' -count=1",
                 "go test ./internal/hermes -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Codex Responses temperature fixtures and generated progress docs explain the no-temperature rule without memory-flush donor references."
@@ -5353,7 +5353,7 @@
               "test_commands": [
                 "go test ./internal/hermes -run TestUnsupportedParameterRetry -count=1",
                 "go test ./internal/hermes -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Unsupported-parameter fixtures prove generic detector coverage, preserved temperature retry behavior, max_tokens-to-max_completion_tokens retry, and no retry when MaxTokens is absent."
@@ -5430,7 +5430,7 @@
               "test_commands": [
                 "go test ./internal/kernel -run 'TestKernel_StreamInterruptSuppressesRetry|TestRetryBudget_WaitRespectsContextCancel' -count=1",
                 "go test ./internal/kernel -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Kernel interrupt retry fixtures prove cancel-before-retry, context-cancel-during-backoff, no-cancel retry recovery, and interrupted memory-sync suppression."
@@ -5592,7 +5592,7 @@
               "test_commands": [
                 "go test ./internal/tools -run TestToolParityManifestHermesB35D692F -count=1",
                 "go test ./internal/tools -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Tool parity tests prove the embedded manifest reflects Hermes b35d692f Discord, cron, Feishu, and platform-toolset schema drift before handlers port."
@@ -5656,7 +5656,7 @@
               ],
               "test_commands": [
                 "go test ./internal/tools ./internal/config -run TestDiscordToolset -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Discord toolset fixtures prove split descriptors, platform scoping, default-off behavior, and dynamic schema dropping without live Discord API calls."
@@ -5733,7 +5733,7 @@
               "test_commands": [
                 "go test ./internal/tools -run TestProcessNotification -count=1",
                 "go test ./internal/tools -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Process-notification fixtures prove mutual exclusion, per-session 1/15s throttling, three-strike promotion, suppress-after-exit, and global overflow trip/release behavior without spawning processes."
@@ -6123,7 +6123,7 @@
               "test_commands": [
                 "go test ./internal/plugins ./internal/apiserver -run 'Test.*PageScopedSlot|TestDashboardPluginsEndpoint' -count=1",
                 "go test ./internal/plugins ./internal/apiserver -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Page-scoped slot fixtures prove colon-bearing Hermes slot names round-trip through plugin manifests and disabled dashboard inventory without enabling a React/Vite runtime."
@@ -6389,7 +6389,7 @@
               "test_commands": [
                 "go test ./internal/cron -run TestCronContextFrom -count=1",
                 "go test ./internal/cron ./internal/tools ./cmd/gormes -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Cron context_from fixtures prove validation, clearing, most-recent-output injection, truncation, and graceful skip behavior over the Go cron store."
@@ -6587,7 +6587,7 @@
               "test_commands": [
                 "go test ./cmd/gormes -run TestOneshotFlags -count=1",
                 "go test ./cmd/gormes ./internal/config -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Oneshot flag fixtures prove top-level parsing, provider-without-model exit 2, env fallback, and no TUI/gateway startup during resolution."
@@ -6650,7 +6650,7 @@
               "test_commands": [
                 "go test ./cmd/gormes -run TestOneshotFinalOutput -count=1",
                 "go test ./cmd/gormes ./internal/kernel -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Oneshot output fixtures prove one fake kernel turn, stdout-only final content, stderr-only setup failures, and no TUI/gateway/provider startup."
@@ -6716,7 +6716,7 @@
               "test_commands": [
                 "go test ./cmd/gormes -run TestOneshotSafety -count=1",
                 "go test ./cmd/gormes ./internal/cli ./internal/tools ./internal/kernel -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Oneshot safety fixtures prove clarify/noninteractive behavior, dangerous-command audit evidence, trust-class boundaries, and no stdout contamination."
@@ -6778,7 +6778,7 @@
               ],
               "test_commands": [
                 "go test ./internal/cli ./internal/config ./internal/tools -run TestPlatformToolsetConfig -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Toolset config fixtures prove platform-default stripping, MCP preservation/no_mcp, numeric normalization, and Discord platform restrictions."
@@ -6845,7 +6845,7 @@
               "test_commands": [
                 "go test ./internal/cli ./internal/plugins ./internal/tools -run 'Test.*Toolset|TestFirstPartySpotify' -count=1",
                 "go test ./internal/cli ./internal/plugins ./internal/tools -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Effective-toolset fixtures prove duplicate bundled plugin keys are collapsed, built-in labels win, unique plugin toolsets survive, and no plugin runtime executes."
@@ -6910,7 +6910,7 @@
               "test_commands": [
                 "go test ./internal/cli -run TestServiceRestartParser -count=1",
                 "go test ./internal/cli -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "RestartSec parser fixtures prove bounded duration parsing, default/malformed evidence, and no live service-manager dependency."
@@ -6972,7 +6972,7 @@
               "test_commands": [
                 "go test ./internal/cli -run TestServiceRestartPoller -count=1",
                 "go test ./internal/cli -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Service restart poller fixtures prove cooldown-aware active polling, timeout/crash evidence, hard-restart fallback, and no live service-manager dependency."
@@ -7060,7 +7060,7 @@
               ],
               "test_commands": [
                 "(cd www.gormes.ai && go test ./internal/site -run TestInstallUnix -count=1)",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Unix installer tests and docs prove the root/FHS vs user-scoped policy and keep the served installer byte-equal to the canonical script."
@@ -7182,7 +7182,7 @@
               "test_commands": [
                 "go test ./cmd/gormes ./internal/tui ./internal/cli -run 'Test.*TUI.*Bundle|Test.*Native.*TUI|Test.*Doctor.*TUI' -count=1",
                 "go test ./cmd/gormes ./internal/tui ./internal/cli -count=1",
-                "go run ./cmd/autoloop progress validate"
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
                 "Focused fixtures prove Gormes TUI startup/status remains independent from Hermes Node/Ink bundle rebuild checks and public install copy still promises no runtime npm dependency."

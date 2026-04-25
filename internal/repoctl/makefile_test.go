@@ -26,9 +26,9 @@ func TestMakefileUsesAutoloopRepoHelpers(t *testing.T) {
 	}
 
 	for _, required := range []string{
-		"go run ./cmd/autoloop repo benchmark record",
-		"go run ./cmd/autoloop progress write",
-		"go run ./cmd/autoloop repo readme update",
+		"go run ./cmd/builder-loop repo benchmark record",
+		"go run ./cmd/builder-loop progress write",
+		"go run ./cmd/builder-loop repo readme update",
 	} {
 		if !strings.Contains(makefile, required) {
 			t.Fatalf("Makefile missing %q", required)

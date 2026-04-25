@@ -1,21 +1,21 @@
 # Autoloop Internals
 
 The orchestrator wrapper and CLI implementation now live in Go under
-`cmd/autoloop` and `internal/autoloop`. This directory contains transitional
+`cmd/builder-loop` and `internal/builderloop`. This directory contains transitional
 wrappers, systemd templates, and historical notes for the old shell entrypoints.
 Full runtime parity remains staged follow-up work.
 
 ## Layout
 
-- `*.sh` — tiny compatibility wrappers that exec `go run ./cmd/autoloop ...`
+- `*.sh` — tiny compatibility wrappers that exec `go run ./cmd/builder-loop ...`
   for implemented Go commands.
-- `systemd/` — templates rendered or installed by `autoloop service ...`.
+- `systemd/` — templates rendered or installed by `builder-loop service ...`.
 - `FROZEN.md` — freeze policy and the active Go-port exception.
 
 ## Running tests
 
 ```sh
-go test ./internal/autoloop ./cmd/autoloop -count=1
+go test ./internal/builderloop ./cmd/builder-loop -count=1
 ```
 
 ## Legacy shell
@@ -34,7 +34,7 @@ remain shell outside this cutover.
 
 ## Backends
 
-`internal/autoloop` owns backend adapters. `BACKEND` (env var) or the equivalent
+`internal/builderloop` owns backend adapters. `BACKEND` (env var) or the equivalent
 CLI flag selects which agent CLI drives workers. The worker contract is
 unchanged across backends; each backend only translates argv.
 

@@ -943,8 +943,8 @@ Required work:
    that floor; leave higher-phase items at their current granularity.
 4. Keep documentation synchronized when progress or roadmap wording changes.
 5. Run validation after any doc/progress edits:
-   - go run ./cmd/autoloop progress write
-   - go run ./cmd/autoloop progress validate
+   - go run ./cmd/builder-loop progress write
+   - go run ./cmd/builder-loop progress validate
    - go test ./internal/progress -count=1
    - go test ./docs -count=1
 
@@ -1101,8 +1101,8 @@ run_validation() {
 
   (
     cd "$REPO_ROOT"
-    go run ./cmd/autoloop progress write
-    go run ./cmd/autoloop progress validate
+    go run ./cmd/builder-loop progress write
+    go run ./cmd/builder-loop progress validate
     go test ./internal/progress -count=1
     go test ./docs -count=1
   ) >>"$VALIDATION_LOG" 2>&1 || {

@@ -209,8 +209,8 @@ log_file="${GO_LOG:?}"
 printf '%q ' "$@" >> "$log_file"
 printf '\n' >> "$log_file"
 case "$*" in
-  "run ./cmd/autoloop progress write") echo "progress: _index.md regenerated" ;;
-  "run ./cmd/autoloop progress validate") echo "progress: validated 2 phases" ;;
+  "run ./cmd/builder-loop progress write") echo "progress: _index.md regenerated" ;;
+  "run ./cmd/builder-loop progress validate") echo "progress: validated 2 phases" ;;
   "test ./internal/progress -count=1") echo "ok github.com/example/internal/progress 0.001s" ;;
   "test ./docs -count=1") echo "ok github.com/example/docs 0.001s" ;;
   *) echo "unexpected go invocation: $*" >&2; exit 1 ;;
@@ -387,8 +387,8 @@ exit 0
 	}
 	goLog := string(goLogData)
 	for _, want := range []string{
-		"run ./cmd/autoloop progress write",
-		"run ./cmd/autoloop progress validate",
+		"run ./cmd/builder-loop progress write",
+		"run ./cmd/builder-loop progress validate",
 		"test ./internal/progress -count=1",
 		"test ./docs -count=1",
 	} {
@@ -521,8 +521,8 @@ log_file="${GO_LOG:?}"
 printf '%q ' "$@" >> "$log_file"
 printf '\n' >> "$log_file"
 case "$*" in
-  "run ./cmd/autoloop progress write") echo "progress: _index.md regenerated" ;;
-  "run ./cmd/autoloop progress validate") echo "progress: validated 2 phases" ;;
+  "run ./cmd/builder-loop progress write") echo "progress: _index.md regenerated" ;;
+  "run ./cmd/builder-loop progress validate") echo "progress: validated 2 phases" ;;
   "test ./internal/progress -count=1") echo "ok github.com/example/internal/progress 0.001s" ;;
   "test ./docs -count=1") echo "ok github.com/example/docs 0.001s" ;;
   *) echo "unexpected go invocation: $*" >&2; exit 1 ;;
@@ -605,8 +605,8 @@ esac
 	}
 	goLog := string(goLogData)
 	for _, want := range []string{
-		"run ./cmd/autoloop progress write",
-		"run ./cmd/autoloop progress validate",
+		"run ./cmd/builder-loop progress write",
+		"run ./cmd/builder-loop progress validate",
 		"test ./internal/progress -count=1",
 		"test ./docs -count=1",
 	} {

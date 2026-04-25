@@ -11,9 +11,9 @@ case "${1:-}" in
     exec "$LEGACY_ORCHESTRATOR" "$@"
     ;;
   run|audit|digest|service)
-    exec go run ./cmd/autoloop "$@"
+    exec go run ./cmd/builder-loop "$@"
     ;;
   *)
-    exec go run ./cmd/autoloop run "$@"
+    exec go run ./cmd/builder-loop run "$@"
     ;;
 esac

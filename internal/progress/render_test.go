@@ -328,7 +328,7 @@ func TestRenderAutoloopHandoff(t *testing.T) {
 		AgentQueue:      "docs/content/building-gormes/autoloop/agent-queue.md",
 		ProgressSchema:  "docs/content/building-gormes/autoloop/progress-schema.md",
 		CandidateSource: "docs/content/building-gormes/architecture_plan/progress.json",
-		UnitTest:        "go test ./internal/autoloop ./cmd/autoloop -count=1",
+		UnitTest:        "go test ./internal/builderloop ./cmd/builder-loop -count=1",
 		CandidatePolicy: []string{"Skip blocked rows.", "Skip umbrella rows."},
 	}}}
 
@@ -340,7 +340,7 @@ func TestRenderAutoloopHandoff(t *testing.T) {
 		"- Candidate source: `docs/content/building-gormes/architecture_plan/progress.json`",
 		"- Agent queue: `docs/content/building-gormes/autoloop/agent-queue.md`",
 		"- Progress schema: `docs/content/building-gormes/autoloop/progress-schema.md`",
-		"- Unit tests: `go test ./internal/autoloop ./cmd/autoloop -count=1`",
+		"- Unit tests: `go test ./internal/builderloop ./cmd/builder-loop -count=1`",
 		"## Candidate Policy",
 		"- Skip blocked rows.",
 		"- Skip umbrella rows.",

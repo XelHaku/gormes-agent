@@ -34,36 +34,36 @@ go run ./cmd/gormes --offline
 To preview what the autoloop would select without starting worker agents:
 
 ```sh
-go run ./cmd/autoloop run --dry-run
+go run ./cmd/builder-loop run --dry-run
 ```
 
 To preview the architecture planner context without starting a planner agent:
 
 ```sh
-go run ./cmd/architecture-planner-loop run --dry-run
+go run ./cmd/planner-loop run --dry-run
 ```
 
 Optional repo health checks:
 
 ```sh
 make validate-progress
-go run ./cmd/autoloop progress validate
+go run ./cmd/builder-loop progress validate
 ```
 
 `make validate-progress` is not required to run Gormes. It is a read-only check
 for this repository's roadmap/progress data. The Makefile expands it to:
 
 ```sh
-go run ./cmd/autoloop progress validate
+go run ./cmd/builder-loop progress validate
 ```
 
 The shape of a Go command is:
 
 ```sh
-go run ./cmd/autoloop progress write
+go run ./cmd/builder-loop progress write
 ```
 
-Read it as: "compile and run the command in `./cmd/autoloop`, then pass it the
+Read it as: "compile and run the command in `./cmd/builder-loop`, then pass it the
 arguments `progress write`." `go run` uses a temporary build; it does not
 install anything.
 
@@ -71,13 +71,13 @@ To build real binaries instead:
 
 ```sh
 go build -o bin/gormes ./cmd/gormes
-go build -o bin/autoloop ./cmd/autoloop
-go build -o bin/architecture-planner-loop ./cmd/architecture-planner-loop
+go build -o bin/builder-loop ./cmd/builder-loop
+go build -o bin/planner-loop ./cmd/planner-loop
 
 ./bin/gormes --offline
-./bin/autoloop run --dry-run
-./bin/autoloop progress validate
-./bin/architecture-planner-loop run --dry-run
+./bin/builder-loop run --dry-run
+./bin/builder-loop progress validate
+./bin/planner-loop run --dry-run
 ```
 
 ## Commands
@@ -85,8 +85,8 @@ go build -o bin/architecture-planner-loop ./cmd/architecture-planner-loop
 | Command | Role | Typical invocation |
 |---|---|---|
 | `gormes` | User-facing runtime and TUI. Use `--offline` when you only want to see the UI without a running API server. | `go run ./cmd/gormes --offline` |
-| `autoloop` | Self-development and repo control-plane CLI. It executes roadmap phase work, audits/digests runs, validates/regenerates progress docs, and records repo benchmark/readme metadata. | `go run ./cmd/autoloop run --dry-run` |
-| `architecture-planner-loop` | Planning improvement CLI. It studies local Hermes/GBrain/Honcho sources plus upstream and building-gormes docs, then asks `codexu` or `claudeu` to refine the architecture plan and progress rows. Dry-run mode only writes planner context and prompt artifacts. | `go run ./cmd/architecture-planner-loop run --dry-run` |
+| `autoloop` | Self-development and repo control-plane CLI. It executes roadmap phase work, audits/digests runs, validates/regenerates progress docs, and records repo benchmark/readme metadata. | `go run ./cmd/builder-loop run --dry-run` |
+| `architecture-planner-loop` | Planning improvement CLI. It studies local Hermes/GBrain/Honcho sources plus upstream and building-gormes docs, then asks `codexu` or `claudeu` to refine the architecture plan and progress rows. Dry-run mode only writes planner context and prompt artifacts. | `go run ./cmd/planner-loop run --dry-run` |
 
 ## Common Recipes
 
@@ -112,19 +112,19 @@ make build
 Update README benchmark text from `benchmarks.json`:
 
 ```sh
-go run ./cmd/autoloop repo readme update
+go run ./cmd/builder-loop repo readme update
 ```
 
 Preview what autoloop would select:
 
 ```sh
-go run ./cmd/autoloop run --dry-run
+go run ./cmd/builder-loop run --dry-run
 ```
 
 Preview what the architecture planner would study:
 
 ```sh
-go run ./cmd/architecture-planner-loop run --dry-run
+go run ./cmd/planner-loop run --dry-run
 ```
 
 ## How They Fit Together
@@ -157,8 +157,8 @@ for the command-specific contract.
 The root `Makefile` wires these commands into normal contributor workflows:
 
 ```sh
-make validate-progress  # go run ./cmd/autoloop progress validate
-make generate-progress  # go run ./cmd/autoloop progress write
+make validate-progress  # go run ./cmd/builder-loop progress validate
+make generate-progress  # go run ./cmd/builder-loop progress write
 make build              # build gormes, record repo metrics, refresh generated docs
 ```
 

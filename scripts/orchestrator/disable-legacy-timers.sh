@@ -3,4 +3,4 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 cd "$REPO_ROOT"
-exec go run ./cmd/autoloop service disable legacy-timers "$@"
+exec go run ./cmd/builder-loop service disable legacy-timers "$@"
