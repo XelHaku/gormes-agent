@@ -146,6 +146,14 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	statePath := filepath.Join(cfg.RunRoot, "planner_state.json")
 	validationLogPath := filepath.Join(cfg.RunRoot, "validation.log")
 
+	// L4 self-evaluation: correlate the planner's own ledger with autoloop's
+	// to surface whether previous reshapes unstuck the row, are still
+	// failing, or haven't been retried yet. Errors are swallowed so a missing
+	// or corrupt ledger never blocks the run; the planner just gets an empty
+	// PreviousReshapes section in that case (handled by formatPreviousReshapes).
+	ledgerPath := filepath.Join(cfg.RunRoot, "state", "runs.jsonl")
+	bundle.PreviousReshapes, _ = Evaluate(ledgerPath, autoloopLedgerPath(cfg), cfg.EvaluationWindow, now)
+
 	if err := writeContext(contextPath, bundle); err != nil {
 		return RunSummary{}, err
 	}
@@ -153,8 +161,6 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	if err := os.WriteFile(promptPath, []byte(prompt), 0o644); err != nil {
 		return RunSummary{}, err
 	}
-
-	ledgerPath := filepath.Join(cfg.RunRoot, "state", "runs.jsonl")
 
 	summary := RunSummary{
 		RunID:         runID,

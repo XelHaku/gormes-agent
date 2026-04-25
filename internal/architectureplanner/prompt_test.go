@@ -107,3 +107,61 @@ func TestBuildPrompt_RecentAutoloopSignalsOmittedWhenEmpty(t *testing.T) {
 		t.Fatal("Recent Autoloop Signals section should be omitted when no events")
 	}
 }
+
+func TestBuildPrompt_SelfEvaluationClauseAlwaysPresent(t *testing.T) {
+	// SELF-EVALUATION (SOFT RULE) is unconditional, like the HARD/SOFT
+	// quarantine clauses. The data section beneath it appears only when
+	// PreviousReshapes is non-empty.
+	bundle := ContextBundle{}
+	prompt := BuildPrompt(bundle, nil)
+	if !strings.Contains(prompt, "SELF-EVALUATION (SOFT RULE)") {
+		t.Fatalf("BuildPrompt must include SELF-EVALUATION clause unconditionally\nprompt:\n%s", prompt)
+	}
+	// The DATA section header (a markdown ## with the "Last 7 Days"
+	// qualifier) should be omitted when no reshapes are present. The
+	// SOFT clause itself mentions "Previous Reshape Outcomes" by name to
+	// tell the LLM what the missing section means, so we look for the
+	// concrete header instead.
+	if strings.Contains(prompt, "## Previous Reshape Outcomes (Last 7 Days)") {
+		t.Fatal("Previous Reshape Outcomes data section should be omitted when no reshapes")
+	}
+}
+
+func TestBuildPrompt_PreviousReshapesSectionRendersAllBuckets(t *testing.T) {
+	bundle := ContextBundle{
+		PreviousReshapes: []ReshapeOutcome{
+			{
+				PhaseID: "2", SubphaseID: "2.B", ItemName: "row-unstuck",
+				ReshapedAt: "2026-04-24T12:00:00Z", ReshapedBy: "planner-1",
+				Outcome: "unstuck", LastSuccess: "2026-04-24T13:00:00Z",
+			},
+			{
+				PhaseID: "3", SubphaseID: "3.A", ItemName: "row-stuck",
+				ReshapedAt: "2026-04-24T12:00:00Z", ReshapedBy: "planner-1",
+				Outcome: "still_failing", AutoloopRuns: 4, LastFailure: "report_validation_failed",
+			},
+			{
+				PhaseID: "4", SubphaseID: "4.A", ItemName: "row-untouched",
+				ReshapedAt: "2026-04-24T12:00:00Z", ReshapedBy: "planner-1",
+				Outcome: "no_attempts_yet",
+			},
+		},
+	}
+	prompt := BuildPrompt(bundle, nil)
+	wants := []string{
+		"## Previous Reshape Outcomes (Last 7 Days)",
+		"UNSTUCK (1):",
+		"STILL FAILING (1):",
+		"NO ATTEMPTS YET (1):",
+		"row-unstuck",
+		"row-stuck",
+		"row-untouched",
+		"autoloop attempted 4 times",
+		"report_validation_failed",
+	}
+	for _, want := range wants {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("BuildPrompt missing %q\nprompt:\n%s", want, prompt)
+		}
+	}
+}
