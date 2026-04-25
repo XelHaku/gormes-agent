@@ -43,22 +43,25 @@ func TestContextCompressorProviderCapForwardsProviderIdentityBeforeBudgeting(t *
 	}
 
 	status := got.Budget.Status()
-	wantThreshold := 272_000 - status.ToolSchemaTokens - contextCompressorRequestFixedHeadroomTokens
 	if status.AuxiliaryContextLength != 272_000 {
 		t.Fatalf("budget AuxiliaryContextLength = %d, want provider-resolved 272000", status.AuxiliaryContextLength)
 	}
 	if status.AuxiliaryContextSource != ModelContextSourceProviderCap {
 		t.Fatalf("budget AuxiliaryContextSource = %q, want %q", status.AuxiliaryContextSource, ModelContextSourceProviderCap)
 	}
-	if status.ThresholdTokens != wantThreshold {
-		t.Fatalf("ThresholdTokens = %d, want provider cap minus tool/system headroom = %d", status.ThresholdTokens, wantThreshold)
+	if status.ThresholdTokens != 272_000 {
+		t.Fatalf("ThresholdTokens = %d, want provider-resolved auxiliary cap 272000", status.ThresholdTokens)
 	}
-	if status.ThresholdTokens >= 272_000 {
-		t.Fatalf("ThresholdTokens = %d, want below provider-resolved auxiliary cap", status.ThresholdTokens)
+	if status.ThresholdSource != ContextCompressorThresholdSourceProviderCap {
+		t.Fatalf("ThresholdSource = %q, want %q", status.ThresholdSource, ContextCompressorThresholdSourceProviderCap)
 	}
-	if !status.HeadroomClamped {
-		t.Fatalf("HeadroomClamped = false, want provider-cap threshold to reserve auxiliary request headroom")
-	}
+	assertCompressorStatusEvidence(t, status, map[string]any{
+		"auxiliary_context_source": string(ModelContextSourceProviderCap),
+		"threshold_source":         string(ContextCompressorThresholdSourceProviderCap),
+	}, []string{
+		"request_headroom_tokens",
+		"headroom_clamped",
+	})
 }
 
 func TestContextCompressorProviderCapDoesNotBorrowCodexCapForOpenAIOrEmptyProvider(t *testing.T) {
@@ -89,8 +92,11 @@ func TestContextCompressorProviderCapDoesNotBorrowCodexCapForOpenAIOrEmptyProvid
 	if openAIStatus.AuxiliaryContextSource != ModelContextSourceModelsDev {
 		t.Fatalf("openai AuxiliaryContextSource = %q, want %q", openAIStatus.AuxiliaryContextSource, ModelContextSourceModelsDev)
 	}
-	if openAIStatus.AuxiliaryContextLength == 272_000 || openAIStatus.HeadroomClamped {
-		t.Fatalf("openai budget borrowed Codex cap or clamped unexpectedly: %#v", openAIStatus)
+	if openAIStatus.AuxiliaryContextLength == 272_000 || openAIStatus.ThresholdTokens == 272_000 {
+		t.Fatalf("openai budget borrowed Codex cap unexpectedly: %#v", openAIStatus)
+	}
+	if openAIStatus.ThresholdSource != ContextCompressorThresholdSourceMainContext {
+		t.Fatalf("openai ThresholdSource = %q, want %q", openAIStatus.ThresholdSource, ContextCompressorThresholdSourceMainContext)
 	}
 
 	missing := NewContextCompressorAuxiliaryBudget(ContextCompressorAuxiliaryBudgetConfig{
