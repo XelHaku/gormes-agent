@@ -85,10 +85,10 @@ type Item struct {
 	DegradedMode   string         `json:"degraded_mode,omitempty"`
 	Fixture        string         `json:"fixture,omitempty"`
 	SourceRefs     []string       `json:"source_refs,omitempty"`
-	BlockedBy      []string       `json:"blocked_by,omitempty"`
-	Unblocks       []string       `json:"unblocks,omitempty"`
 	ReadyWhen      []string       `json:"ready_when,omitempty"`
 	NotReadyWhen   []string       `json:"not_ready_when,omitempty"`
+	BlockedBy      []string       `json:"blocked_by,omitempty"`
+	Unblocks       []string       `json:"unblocks,omitempty"`
 	Acceptance     []string       `json:"acceptance,omitempty"`
 	Note           string         `json:"note,omitempty"`
 	WriteScope     []string       `json:"write_scope,omitempty"`
