@@ -125,7 +125,7 @@ func DefaultPage() LandingPage {
 			{Label: "Roadmap", Href: "#roadmap"},
 			{Label: "GitHub", Href: "https://github.com/TrebuchetDynamics/gormes-agent"},
 		},
-		HeroKicker:   "§ 01 · OPEN SOURCE · MIT LICENSE · UNDER CONSTRUCTION",
+		HeroKicker:   "§ 01 · OPEN SOURCE · MIT · UNDER CONSTRUCTION",
 		HeroHeadline: "One Go Binary. No Python. No Drift.",
 		HeroLines: []string{
 			"Gormes is a Go-native runtime for AI agents.",

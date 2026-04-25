@@ -831,7 +831,17 @@ a:focus-visible,
      the headline larger on mobile than the desktop cap, which
      was the root cause of the v10 fold regression). */
   .hero-inner {
-    padding: 44px var(--pad) 32px;
+    /* Topbar-to-headline stack tightened on mobile: 28px above the
+       kicker (was 44) so the topnav, kicker, and headline sit as
+       one compact unit instead of stretching to fill the upper
+       viewport. */
+    padding: 28px var(--pad) 32px;
+  }
+  .kicker {
+    /* Tighter gap to headline on mobile only — 10px (was 18) so
+       the kicker reads as a label attached to the title, not a
+       separate paragraph above it. */
+    margin-bottom: 10px;
   }
   .hero-title {
     margin-bottom: 14px;
