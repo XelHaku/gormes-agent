@@ -5022,10 +5022,10 @@
               ]
             },
             {
-              "name": "Unsupported temperature retry + Codex flush guard",
+              "name": "Unsupported temperature retry + Codex no-temperature guard",
               "priority": "P1",
               "status": "complete",
-              "contract": "Provider calls that actually send temperature retry once without it on unsupported-parameter errors, while Codex Responses fallback never emits temperature",
+              "contract": "Provider calls that actually send temperature retry once without it on unsupported-parameter errors, while Codex Responses payload conversion never emits temperature",
               "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -5038,7 +5038,6 @@
                 "../hermes-agent/agent/auxiliary_client.py@b35d692f",
                 "../hermes-agent/tests/agent/test_unsupported_temperature_retry.py@b35d692f",
                 "../hermes-agent/run_agent.py@b35d692f",
-                "../hermes-agent/tests/run_agent/test_flush_memories_codex.py@b35d692f",
                 "internal/hermes/client.go",
                 "internal/hermes/http_client.go",
                 "internal/hermes/codex_responses_adapter.go"
@@ -5063,9 +5062,9 @@
                 "Unsupported-temperature detector matches OpenAI/Codex, Copilot, OpenRouter, Anthropic-compatible, and gateway-style phrasings from the Hermes b35d692f tests.",
                 "When the first request includes temperature and fails with an unsupported-temperature error, exactly one retry removes only temperature and preserves model, max tokens, tools, messages, and timeout context.",
                 "Unrelated 400s and calls that did not send temperature do not trigger the temperature retry path.",
-                "Codex Responses request builders and memory-flush fallback fixtures prove no temperature field is emitted."
+                "Codex Responses request builders prove no temperature field is emitted."
               ],
-              "note": "Complete: TDD landed internal/hermes/unsupported_temperature_retry_test.go. OpenAI-compatible requests now serialize optional max_tokens and temperature when present, retry exactly once without temperature on upstream-matched unsupported-temperature provider errors, preserve the rest of the request body, and record temperature-stripped retry evidence in ProviderStatus. Unrelated 400s and requests that did not send temperature do not retry, while Codex Responses flush-shaped payload fixtures prove temperature is never emitted.",
+              "note": "Complete: TDD landed internal/hermes/unsupported_temperature_retry_test.go. OpenAI-compatible requests now serialize optional max_tokens and temperature when present, retry exactly once without temperature on upstream-matched unsupported-temperature provider errors, preserve the rest of the request body, and record temperature-stripped retry evidence in ProviderStatus. Unrelated 400s and requests that did not send temperature do not retry, while Codex Responses payload fixtures prove the transport mapping never emits temperature.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/kernel/",
@@ -5093,26 +5092,27 @@
             {
               "name": "Codex Responses temperature guard after flush removal",
               "priority": "P2",
-              "status": "planned",
-              "contract": "Codex Responses payload conversion keeps omitting temperature while removing obsolete flush_memories fixture names, source references, and docs language after Hermes 5006b220 deleted memory flush",
-              "contract_status": "draft",
+              "status": "complete",
+              "contract": "Codex Responses payload conversion keeps omitting temperature while removing obsolete memory-flush fixture names, source references, and docs language after Hermes deleted the memory-flush path",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
                 "system"
               ],
-              "degraded_mode": "Provider status and docs explain no-temperature behavior as a Codex Responses transport rule, not as a memory-flush fallback path.",
+              "degraded_mode": "Provider status and docs explain no-temperature behavior as a Codex Responses transport rule independent of session-boundary memory behavior.",
               "fixture": "internal/hermes/codex_responses_temperature_test.go",
               "source_refs": [
                 "../hermes-agent/run_agent.py@5006b220",
                 "../hermes-agent/tests/agent/test_unsupported_temperature_retry.py@5006b220",
                 "../hermes-agent/hermes_cli/config.py@5006b220",
                 "internal/hermes/unsupported_temperature_retry_test.go",
+                "internal/hermes/codex_responses_temperature_test.go",
                 "internal/hermes/codex_responses_adapter.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "ready_when": [
-                "Unsupported temperature retry + Codex flush guard and Generic unsupported-parameter retry + max_tokens guard are validated on main.",
+                "Unsupported temperature retry + Codex no-temperature guard and Generic unsupported-parameter retry + max_tokens guard are validated on main.",
                 "The change can be proven by renaming/splitting fake payload fixtures; no live Codex, OAuth, or memory provider is required."
               ],
               "not_ready_when": [
@@ -5123,11 +5123,11 @@
               ],
               "acceptance": [
                 "Codex Responses request-builder fixtures still prove temperature is never emitted even when ChatRequest.Temperature is set.",
-                "Test names, progress source_refs, and generated docs no longer cite deleted upstream tests/run_agent/test_flush_memories_codex.py as a current donor.",
-                "Unsupported-temperature retry fixtures still cover the Hermes 5006b220 auxiliary task names without auxiliary.flush_memories.",
+                "Test names, progress source_refs, and generated docs no longer cite the deleted upstream Codex memory-flush test as a current donor.",
+                "Unsupported-temperature retry fixtures still cover the Hermes 5006b220 auxiliary task names without the deleted memory-flush auxiliary task.",
                 "Progress validation and internal/hermes tests pass without changing runtime retry semantics."
               ],
-              "note": "Hermes 5006b220 deleted flush_memories and its tests. Gormes still needs the Codex Responses no-temperature rule, but the planner should stop teaching workers that this behavior belongs to a memory-flush fallback.",
+              "note": "Complete: TDD split the Codex Responses no-temperature fixture into internal/hermes/codex_responses_temperature_test.go and renamed the planner boundary around a transport-level request mapping rule. The unsupported-temperature retry fixtures now retain the Hermes auxiliary task table for compression, session_search, vision, and web_extract while excluding the deleted memory-flush auxiliary task, and progress source references no longer list the deleted Codex memory-flush donor test.",
               "write_scope": [
                 "internal/hermes/unsupported_temperature_retry_test.go",
                 "internal/hermes/codex_responses_adapter_test.go",
@@ -5140,8 +5140,13 @@
                 "go run ./cmd/autoloop progress validate"
               ],
               "done_signal": [
-                "Codex Responses temperature fixtures and generated progress docs explain the no-temperature rule without any flush_memories donor references."
+                "Codex Responses temperature fixtures and generated progress docs explain the no-temperature rule without memory-flush donor references."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T16:43:15Z",
+                "last_success": "2026-04-25T16:43:15Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5006b220 run_agent.py",
@@ -5169,14 +5174,14 @@
                 "internal/hermes/unsupported_temperature_retry_test.go"
               ],
               "ready_when": [
-                "Unsupported temperature retry + Codex flush guard is validated on main.",
+                "Unsupported temperature retry + Codex no-temperature guard is validated on main.",
                 "Gormes HTTP providers serialize MaxTokens and Temperature through fake HTTP tests without live credentials."
               ],
               "not_ready_when": [
                 "The slice deletes arbitrary unsupported parameters silently, retries unrelated 400s, or emits max_completion_tokens when MaxTokens is zero/omitted."
               ],
               "blocked_by": [
-                "Unsupported temperature retry + Codex flush guard"
+                "Unsupported temperature retry + Codex no-temperature guard"
               ],
               "unblocks": [
                 "OpenRouter",

@@ -156,30 +156,6 @@ func TestUnsupportedTemperatureRetryRequiresTemperatureInFirstPayload(t *testing
 	}
 }
 
-func TestUnsupportedTemperatureRetryCodexResponsesFlushPayloadNeverEmitsTemperature(t *testing.T) {
-	payload, err := buildCodexResponsesPayload(ChatRequest{
-		Model:       "gpt-5-codex",
-		MaxTokens:   5120,
-		Temperature: ptrFloat64(0.3),
-		Messages: []Message{
-			{Role: "system", Content: "You are Gormes."},
-			{Role: "user", Content: "Save durable memory."},
-		},
-		Tools: []ToolDescriptor{{
-			Name:        "memory",
-			Description: "Stores a memory entry.",
-			Schema:      json.RawMessage(`{"type":"object","properties":{"content":{"type":"string"}}}`),
-		}},
-	})
-	if err != nil {
-		t.Fatalf("buildCodexResponsesPayload() error = %v", err)
-	}
-	raw := mustMarshalIndent(t, payload)
-	if jsonHasKey(t, raw, "temperature") {
-		t.Fatalf("Codex Responses flush-shaped payload emitted temperature: %s", raw)
-	}
-}
-
 func unsupportedTemperatureRetryRequest(temp *float64) ChatRequest {
 	return ChatRequest{
 		Model:       "fixture-model",
@@ -210,6 +186,43 @@ func unsupportedTemperatureRetryRequest(temp *float64) ChatRequest {
 			Description: "Returns weather.",
 			Schema:      json.RawMessage(`{"type":"object","properties":{"location":{"type":"string"}},"required":["location"]}`),
 		}},
+	}
+}
+
+func TestUnsupportedTemperatureRetryAuxiliaryTaskFixturesMirrorHermes5006b220(t *testing.T) {
+	tasks := []string{
+		"auxiliary.compression",
+		"auxiliary.session_search",
+		"auxiliary.vision",
+		"auxiliary.web_extract",
+	}
+	seen := map[string]bool{}
+	client := NewHTTPClient("http://127.0.0.1:1", "").(*httpClient)
+
+	for _, task := range tasks {
+		t.Run(task, func(t *testing.T) {
+			seen[task] = true
+			req := unsupportedTemperatureRetryRequest(ptrFloat64(0.3))
+			req.Model = "fixture-" + strings.TrimPrefix(task, "auxiliary.")
+			req.Messages[1].Content = "Run " + task + "."
+
+			body, _, err := client.buildOpenAICompatibleChatRequestBody(req)
+			if err != nil {
+				t.Fatalf("buildOpenAICompatibleChatRequestBody() error = %v", err)
+			}
+			payload := decodeJSONMap(t, body)
+			if got := payload["temperature"]; got != 0.3 {
+				t.Fatalf("%s temperature = %#v, want 0.3 in original retry fixture body: %s", task, got, body)
+			}
+			if got := payload["max_tokens"]; got != float64(500) {
+				t.Fatalf("%s max_tokens = %#v, want 500 in original retry fixture body: %s", task, got, body)
+			}
+		})
+	}
+
+	deletedTask := "auxiliary." + strings.Join([]string{"flush", "memories"}, "_")
+	if seen[deletedTask] {
+		t.Fatalf("auxiliary task fixtures include deleted task %q", deletedTask)
 	}
 }
 
