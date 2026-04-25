@@ -8,8 +8,8 @@
         {{range .HeroLines}}<p>{{.}}</p>{{end}}
       </div>
       <div class="hero-note">
-        <span class="hero-note-stamp">{{.HeroFilterStamp}}</span>
-        <span class="hero-note-body">{{.HeroFilterLine}}</span>
+        <p class="hero-note-stamp">{{.HeroFilterStamp}}</p>
+        <p class="hero-note-body">{{.HeroFilterLine}}</p>
       </div>
       <div class="hero-ctas">
         <a class="btn btn-primary" href="{{.PrimaryCTA.Href}}">{{.PrimaryCTA.Label}}</a>
@@ -42,6 +42,7 @@
         {{range .WhyPainBullets}}<li>{{.}}</li>{{end}}
       </ul>
     </div>
+    <h3 class="why-fix-subhead">{{.WhyFixSubhead}}</h3>
     <div class="features-grid">
       {{range .FeatureCards}}{{template "feature_card" .}}{{end}}
     </div>

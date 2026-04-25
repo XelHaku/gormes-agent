@@ -274,7 +274,14 @@ a:focus-visible,
   flex-direction: column;
   gap: 4px;
 }
+/* Stamp and body are <p> elements (block-level) so text-extraction
+   tools and screen readers always see the line break between
+   "Early-stage." and the body line. Spans are inline by default
+   and would concatenate to "Early-stage.Reliability-first..." in
+   selection/extraction even though flex made them visually
+   stacked. Margin reset to 0 since flex+gap owns the spacing. */
 .hero-note-stamp {
+  margin: 0;
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 700;
@@ -283,6 +290,7 @@ a:focus-visible,
   color: var(--accent);
 }
 .hero-note-body {
+  margin: 0;
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted-strong);
@@ -521,6 +529,20 @@ a:focus-visible,
   position: absolute;
   left: 0;
   font-weight: 700;
+}
+
+/* "How Gormes fixes it" — eyebrow above the fix cards. Mono caps
+   in accent color so it reads as a section transition between the
+   pain block and the solution row, not a third section title.
+   Tighter than .section-title; sits flush against the cards. */
+.why-fix-subhead {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 16px;
 }
 
 .features-grid {

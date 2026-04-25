@@ -34,8 +34,8 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		`class="hero-note-body"`,
 		"Early-stage.",
 		"Reliability-first runtime for developers who ship agents, not demos.",
-		// Trimmed primary nav.
-		`<a href="#install">Install</a>`,
+		// v19 trimmed nav further: "Install" removed (duplicated the
+		// INSTALL CTA button below). Roadmap + GitHub only.
 		`<a href="#roadmap">Roadmap</a>`,
 		`<a href="https://github.com/TrebuchetDynamics/gormes-agent">GitHub</a>`,
 		// Install — clearer structure and promoted source-backed note.
@@ -51,9 +51,12 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		// Copy button (clipboard JS is allowed for this widget only)
 		`class="copy-btn"`,
 		"navigator.clipboard.writeText",
-		// Features — pain frame before technical cards.
+		// Features — pain frame before technical cards. v19 split
+		// the combined headline into pain + fix-subhead.
 		"WHY GORMES",
-		"Why Hermes breaks in production — and how Gormes fixes it.",
+		"Why Hermes breaks in production",
+		`class="why-fix-subhead"`,
+		"How Gormes fixes it",
 		"Hermes breaks in production because:",
 		"environments drift",
 		"installs fail",

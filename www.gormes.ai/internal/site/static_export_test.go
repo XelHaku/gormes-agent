@@ -30,15 +30,18 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		"Reliability-first runtime for developers who ship agents, not demos.",
 		`class="hero-note-stamp"`,
 		`class="hero-note-body"`,
-		`<a href="#install">Install</a>`,
+		// v19 dropped duplicate "Install" nav link.
 		`<a href="#roadmap">Roadmap</a>`,
 		`<a href="https://github.com/TrebuchetDynamics/gormes-agent">GitHub</a>`,
 		"curl -fsSL https://gormes.ai/install.sh | sh",
 		"irm https://gormes.ai/install.ps1 | iex",
 		"Source-backed for now",
 		"Read the installer source →",
-		// Features: pain frame before technical fix cards.
-		"Why Hermes breaks in production — and how Gormes fixes it.",
+		// Features: pain frame before technical fix cards. v19 split
+		// the combined headline into pain + fix-subhead.
+		"Why Hermes breaks in production",
+		"How Gormes fixes it",
+		`class="why-fix-subhead"`,
 		"Hermes breaks in production because:",
 		"environments drift",
 		"installs fail",
