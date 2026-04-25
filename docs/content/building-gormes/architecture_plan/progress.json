@@ -2193,9 +2193,9 @@
             {
               "name": "Operator-auditable search evidence",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Goncho/Honcho-compatible search surfaces operator evidence for user scope, source filters, and session lineage on every widened cross-source search hit",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -2226,7 +2226,7 @@
                 "JSON output includes the same search evidence fields so autoloop and docs tests can assert them without parsing text.",
                 "Search evidence reports orphan/unavailable lineage explicitly and does not widen recall when scope=user is denied or session directory evidence is missing."
               ],
-              "note": "TDD: extend Goncho search result evidence rather than search behavior. Add a focused cmd/gormes/goncho_search_evidence_test.go seeded with current, child, orphan, and chat-only sessions; thread memory.SearchLineage from internal/memory.SearchMessages through goncho.SearchHit and the doctor report/formatter; preserve the existing honcho_search and honcho_context names while keeping the implementation under internal/goncho.",
+              "note": "Complete: TDD landed cmd/gormes/goncho_search_evidence_test.go with seeded current, child, orphan, and chat-only sessions. Goncho search results now thread memory.SearchLineage through goncho.SearchHit into doctor text/JSON evidence, including source allowlists, user-scope decisions, sessions considered, widened session counts, orphan/unavailable lineage statuses, and same-chat fallback evidence when the session directory is missing, without changing search ranking or default recall fences.",
               "write_scope": [
                 "cmd/gormes/goncho.go",
                 "cmd/gormes/goncho_search_evidence_test.go",

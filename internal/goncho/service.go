@@ -717,6 +717,7 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams, c
 			if err != nil {
 				return turnFallbackResult{}, err
 			}
+			fallback = attachUnavailableLineageToTurnHits(fallback)
 			return turnFallbackResult{Results: fallback, ScopeEvidence: &evidence}, nil
 		}
 		metas, err := s.sessions.ListMetadataByUserID(ctx, userID)
@@ -733,6 +734,7 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams, c
 			if err != nil {
 				return turnFallbackResult{}, err
 			}
+			fallback = attachUnavailableLineageToTurnHits(fallback)
 			return turnFallbackResult{Results: fallback, ScopeEvidence: &evidence}, nil
 		}
 		hits, err := memory.SearchMessages(ctx, s.db, metas, filter, limit)
@@ -741,6 +743,7 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams, c
 			if err != nil {
 				return turnFallbackResult{}, err
 			}
+			fallback = attachUnavailableLineageToTurnHits(fallback)
 			return turnFallbackResult{Results: fallback, ScopeEvidence: &evidence}, nil
 		}
 		if err != nil {
@@ -753,6 +756,7 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams, c
 				OriginSource: hit.Source,
 				Content:      hit.Content,
 				SessionKey:   hit.SessionID,
+				Lineage:      searchLineageFromMemory(hit.Lineage),
 			})
 		}
 		return turnFallbackResult{Results: out, ScopeEvidence: &evidence}, nil
@@ -765,7 +769,38 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams, c
 	if err != nil {
 		return turnFallbackResult{}, err
 	}
+	results = attachUnavailableLineageToTurnHits(results)
 	return turnFallbackResult{Results: results}, nil
+}
+
+func searchLineageFromMemory(lineage memory.SearchLineage) *SearchLineage {
+	status := strings.TrimSpace(lineage.Status)
+	if status == "" &&
+		strings.TrimSpace(lineage.ParentSessionID) == "" &&
+		strings.TrimSpace(lineage.LineageKind) == "" &&
+		len(lineage.ChildSessionIDs) == 0 {
+		return nil
+	}
+	if status == "" {
+		status = memory.SearchLineageStatusUnavailable
+	}
+	return &SearchLineage{
+		ParentSessionID: strings.TrimSpace(lineage.ParentSessionID),
+		LineageKind:     strings.TrimSpace(lineage.LineageKind),
+		ChildSessionIDs: append([]string(nil), lineage.ChildSessionIDs...),
+		Status:          status,
+	}
+}
+
+func attachUnavailableLineageToTurnHits(hits []SearchHit) []SearchHit {
+	for i := range hits {
+		if hits[i].Source != "turn" || hits[i].Lineage != nil {
+			continue
+		}
+		lineage := SearchLineage{Status: memory.SearchLineageStatusUnavailable}
+		hits[i].Lineage = &lineage
+	}
+	return hits
 }
 
 type userBindingResolver interface {

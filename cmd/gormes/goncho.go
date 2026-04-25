@@ -714,14 +714,31 @@ func formatContextSearchResults(results []goncho.SearchHit) string {
 	var b strings.Builder
 	b.WriteString("search_results:\n")
 	for _, hit := range results {
-		fmt.Fprintf(&b, "- source=%s origin_source=%s session_key=%s content=%q\n",
+		fmt.Fprintf(&b, "- source=%s origin_source=%s session_key=%s",
 			valueOrNone(hit.Source),
 			valueOrNone(hit.OriginSource),
 			valueOrNone(hit.SessionKey),
-			hit.Content,
 		)
+		appendSearchLineageEvidence(&b, hit.Lineage)
+		fmt.Fprintf(&b, " content=%q\n", hit.Content)
 	}
 	return b.String()
+}
+
+func appendSearchLineageEvidence(b *strings.Builder, lineage *goncho.SearchLineage) {
+	if lineage == nil {
+		return
+	}
+	fmt.Fprintf(b, " lineage_status=%s", valueOrNone(lineage.Status))
+	if lineage.ParentSessionID != "" {
+		fmt.Fprintf(b, " parent_session_id=%s", lineage.ParentSessionID)
+	}
+	if lineage.LineageKind != "" {
+		fmt.Fprintf(b, " lineage_kind=%s", lineage.LineageKind)
+	}
+	if len(lineage.ChildSessionIDs) > 0 {
+		fmt.Fprintf(b, " child_session_ids=%s", strings.Join(lineage.ChildSessionIDs, ","))
+	}
 }
 
 func presentWord(ok bool) string {

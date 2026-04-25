@@ -140,11 +140,21 @@ type SearchParams struct {
 
 // SearchHit is one result entry returned by search.
 type SearchHit struct {
-	ID           int64  `json:"id,omitempty"`
-	Source       string `json:"source"`
-	OriginSource string `json:"origin_source,omitempty"`
-	Content      string `json:"content"`
-	SessionKey   string `json:"session_key,omitempty"`
+	ID           int64          `json:"id,omitempty"`
+	Source       string         `json:"source"`
+	OriginSource string         `json:"origin_source,omitempty"`
+	Content      string         `json:"content"`
+	SessionKey   string         `json:"session_key,omitempty"`
+	Lineage      *SearchLineage `json:"lineage,omitempty"`
+}
+
+// SearchLineage is operator evidence for the session lineage attached to a
+// search hit.
+type SearchLineage struct {
+	ParentSessionID string   `json:"parent_session_id,omitempty"`
+	LineageKind     string   `json:"lineage_kind,omitempty"`
+	ChildSessionIDs []string `json:"child_session_ids,omitempty"`
+	Status          string   `json:"status"`
 }
 
 // SearchResultSet is the stable JSON shape for honcho_search.

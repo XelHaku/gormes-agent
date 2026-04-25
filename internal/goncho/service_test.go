@@ -2,6 +2,7 @@ package goncho
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"testing"
 	"time"
@@ -260,6 +261,94 @@ func TestService_SearchUserScopeRespectsSourceFilter(t *testing.T) {
 	}
 }
 
+func TestServiceSearchUserScopeReturnsLineageEvidenceForWidenedHits(t *testing.T) {
+	store, dir, svc, cleanup := newTestServiceWithDirectory(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	for _, meta := range []session.Metadata{
+		{SessionID: "sess-current", Source: "discord", ChatID: "chan-9", UserID: "user-juan"},
+		{SessionID: "sess-parent", Source: "telegram", ChatID: "42", UserID: "user-juan"},
+		{
+			SessionID:       "sess-child",
+			Source:          "telegram",
+			ChatID:          "42",
+			UserID:          "user-juan",
+			ParentSessionID: "sess-parent",
+			LineageKind:     session.LineageKindCompression,
+		},
+		{
+			SessionID:       "sess-orphan",
+			Source:          "telegram",
+			ChatID:          "42",
+			UserID:          "user-juan",
+			ParentSessionID: "sess-missing",
+			LineageKind:     session.LineageKindFork,
+		},
+	} {
+		if err := dir.PutMetadata(ctx, meta); err != nil {
+			t.Fatalf("PutMetadata(%s): %v", meta.SessionID, err)
+		}
+	}
+	now := time.Now().Unix()
+	for _, turn := range []struct {
+		sessionID string
+		chatID    string
+		content   string
+		ts        int64
+	}{
+		{"sess-current", "discord:chan-9", "Atlas current Discord fallback evidence.", now - 40},
+		{"sess-child", "telegram:42", "Atlas child Telegram lineage evidence.", now - 30},
+		{"sess-orphan", "telegram:42", "Atlas orphan Telegram lineage evidence.", now - 20},
+		{"sess-chat-only", "telegram:42", "Atlas legacy chat-only lineage evidence.", now - 10},
+	} {
+		if _, err := store.DB().ExecContext(ctx,
+			`INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES (?, 'user', ?, ?, ?)`,
+			turn.sessionID, turn.content, turn.ts, turn.chatID,
+		); err != nil {
+			t.Fatalf("insert turn %s: %v", turn.sessionID, err)
+		}
+	}
+
+	got, err := svc.Search(ctx, SearchParams{
+		Peer:       "user-juan",
+		Query:      "Atlas",
+		MaxTokens:  400,
+		SessionKey: "discord:chan-9",
+		Scope:      "user",
+		Sources:    []string{"telegram"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ScopeEvidence == nil ||
+		got.ScopeEvidence.Decision != memory.CrossChatDecisionAllowed ||
+		got.ScopeEvidence.SessionsConsidered != 3 ||
+		got.ScopeEvidence.WidenedSessionsConsidered != 3 ||
+		!slices.Equal(got.ScopeEvidence.SourceAllowlist, []string{"telegram"}) {
+		t.Fatalf("ScopeEvidence = %+v, want allowed telegram lineage evidence", got.ScopeEvidence)
+	}
+
+	raw, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("Marshal SearchResultSet: %v", err)
+	}
+	var wire serviceSearchEvidenceWire
+	if err := json.Unmarshal(raw, &wire); err != nil {
+		t.Fatalf("Unmarshal SearchResultSet wire shape: %v\n%s", err, raw)
+	}
+	if len(wire.Results) != 3 {
+		t.Fatalf("Results len = %d, want 3: %+v", len(wire.Results), wire.Results)
+	}
+	hits := make(map[string]serviceSearchHitWire, len(wire.Results))
+	for _, hit := range wire.Results {
+		hits[hit.SessionKey] = hit
+	}
+	assertServiceSearchLineageEvidence(t, hits, "sess-child", "telegram", "ok", "sess-parent", "compression")
+	assertServiceSearchLineageEvidence(t, hits, "sess-orphan", "telegram", "orphan", "sess-missing", "fork")
+	assertServiceSearchLineageEvidence(t, hits, "sess-chat-only", "telegram", "unavailable", "", "")
+}
+
 func TestService_SearchUserScopeUnknownCurrentBindingFallsBackSameSession(t *testing.T) {
 	store, dir, svc, cleanup := newTestServiceWithDirectory(t)
 	defer cleanup()
@@ -316,6 +405,41 @@ func TestService_SearchUserScopeUnknownCurrentBindingFallsBackSameSession(t *tes
 	}
 	if got.Results[0].Content != "Atlas same-session fallback note." {
 		t.Fatalf("Search result = %+v, want same-session fallback only", got.Results[0])
+	}
+}
+
+type serviceSearchEvidenceWire struct {
+	Results []serviceSearchHitWire `json:"results"`
+}
+
+type serviceSearchHitWire struct {
+	Source       string                   `json:"source"`
+	OriginSource string                   `json:"origin_source"`
+	SessionKey   string                   `json:"session_key"`
+	Lineage      serviceSearchLineageWire `json:"lineage"`
+}
+
+type serviceSearchLineageWire struct {
+	Status          string `json:"status"`
+	ParentSessionID string `json:"parent_session_id"`
+	LineageKind     string `json:"lineage_kind"`
+}
+
+func assertServiceSearchLineageEvidence(t *testing.T, hits map[string]serviceSearchHitWire, sessionKey, originSource, status, parentSessionID, lineageKind string) {
+	t.Helper()
+
+	hit, ok := hits[sessionKey]
+	if !ok {
+		t.Fatalf("missing search hit for %s in %+v", sessionKey, hits)
+	}
+	if hit.Source != "turn" || hit.OriginSource != originSource {
+		t.Fatalf("hit %s = %+v, want turn from %s", sessionKey, hit, originSource)
+	}
+	if hit.Lineage.Status != status ||
+		hit.Lineage.ParentSessionID != parentSessionID ||
+		hit.Lineage.LineageKind != lineageKind {
+		t.Fatalf("hit %s lineage = %+v, want status %q parent %q kind %q",
+			sessionKey, hit.Lineage, status, parentSessionID, lineageKind)
 	}
 }
 
