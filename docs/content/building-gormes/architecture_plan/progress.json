@@ -5372,9 +5372,9 @@
             {
               "name": "Streaming interrupt retry suppression",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Kernel stream cancellation and /stop-style events abort retry loops before any fresh provider stream is opened",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -5403,7 +5403,7 @@
                 "A no-cancel control fixture still retries normally after a transient stream error so the fix does not disable Route-B recovery.",
                 "Interrupted turns continue to skip memory sync instead of persisting partial assistant content."
               ],
-              "note": "Hermes 7c17accb fixed a bug where /stop closed the current stream but the retry loop opened a fresh connection. Gormes already routes retry through context cancellation, but needs a narrow regression fixture so future kernel changes cannot reintroduce a post-cancel reconnect.",
+              "note": "Complete: TDD landed `internal/kernel/stream_interrupt_retry_test.go` so retryable stream setup failures cannot open a fresh provider stream after PlatformEventCancel is queued, parent context cancellation during reconnect backoff suppresses retry, and the no-cancel control still recovers through Route-B retry. The kernel retry wait now drains platform control events before/during reconnect backoff and interrupted turns continue to call SkipMemorySync without finalizing partial assistant content.",
               "write_scope": [
                 "internal/kernel/stream_interrupt_retry_test.go",
                 "internal/kernel/kernel.go",

@@ -368,12 +368,16 @@ toolLoop:
 				cancelRun()
 				classification := hermes.ClassifyProviderError(err)
 				if classification.Class == hermes.ClassRetryable && !retryBudget.Exhausted() {
+					if k.retryInterrupted(ctx) {
+						cancelled = true
+						break toolLoop
+					}
 					decision := retryBudget.NextDelayDecision(err)
 					k.retryStatus = retryStatusWithDecision(k.retryStatus, decision, classification)
 					k.phase = PhaseReconnecting
 					k.lastError = "reconnecting: " + err.Error()
 					k.emitFrame("reconnecting")
-					if werr := Wait(ctx, decision.Delay); werr != nil {
+					if k.waitForRetryDelay(ctx, decision.Delay) {
 						cancelled = true
 						break toolLoop
 					}
@@ -408,6 +412,10 @@ toolLoop:
 			case streamOutcomeFatal:
 				break toolLoop
 			case streamOutcomeRetryable:
+				if k.retryInterrupted(ctx) {
+					cancelled = true
+					break toolLoop
+				}
 				if retryBudget.Exhausted() {
 					k.retryStatus.LastDecision = RetryDecisionBudgetExhaust
 					k.phase = PhaseFailed
@@ -423,7 +431,7 @@ toolLoop:
 				})
 				k.phase = PhaseReconnecting
 				k.emitFrame("reconnecting")
-				if werr := Wait(ctx, decision.Delay); werr != nil {
+				if k.waitForRetryDelay(ctx, decision.Delay) {
 					cancelled = true
 					break toolLoop
 				}
@@ -578,6 +586,62 @@ const (
 	streamOutcomeRetryable
 	streamOutcomeFatal
 )
+
+func (k *Kernel) waitForRetryDelay(ctx context.Context, d time.Duration) bool {
+	if k.retryInterrupted(ctx) {
+		return true
+	}
+	if d <= 0 {
+		return k.retryInterrupted(ctx)
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return true
+		case e := <-k.events:
+			if k.handleRetryEvent(e) {
+				return true
+			}
+		case <-timer.C:
+			return k.retryInterrupted(ctx)
+		}
+	}
+}
+
+func (k *Kernel) retryInterrupted(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+	}
+	for {
+		select {
+		case e := <-k.events:
+			if k.handleRetryEvent(e) {
+				return true
+			}
+		default:
+			return false
+		}
+	}
+}
+
+func (k *Kernel) handleRetryEvent(e PlatformEvent) bool {
+	switch e.Kind {
+	case PlatformEventCancel, PlatformEventQuit:
+		return true
+	case PlatformEventSubmit:
+		k.lastError = ErrTurnInFlight.Error()
+		k.emitFrame("still processing previous turn")
+	case PlatformEventResetSession:
+		if e.ack != nil {
+			e.ack <- ErrResetDuringTurn
+		}
+	}
+	return false
+}
 
 // streamInner runs one stream attempt. Pumps events from hermes.Stream.Recv
 // into a bounded channel, multiplexes over the kernel's platform events and
