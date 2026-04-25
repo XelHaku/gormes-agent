@@ -155,7 +155,89 @@ func TestReasoningContentEchoPadsAssistantToolCallReplayForThinkingProviders(t *
 	}
 }
 
-func TestReasoningContentEchoPreservesExplicitReasoningFields(t *testing.T) {
+func TestReasoningContentEchoIsolationUsesEmptyPlaceholderForGenericReasoning(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		model    string
+		baseURL  string
+	}{
+		{
+			name:     "deepseek provider name",
+			provider: "deepseek",
+			model:    "fixture-model",
+			baseURL:  "https://proxy.example.test",
+		},
+		{
+			name:     "kimi provider name",
+			provider: "kimi-coding",
+			model:    "kimi-k2",
+			baseURL:  "https://proxy.example.test",
+		},
+		{
+			name:     "moonshot host",
+			provider: "custom",
+			model:    "kimi-k2",
+			baseURL:  "https://api.moonshot.ai",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			messages := captureOpenAICompatibleMessages(t, &httpClient{
+				baseURL:  tt.baseURL,
+				provider: tt.provider,
+				http:     captureRequestHTTPClient(t),
+			}, ChatRequest{
+				Model:  tt.model,
+				Stream: true,
+				Messages: []Message{
+					{Role: "user", Content: "run terminal"},
+					{
+						Role:    "assistant",
+						Content: "Calling terminal.",
+						Reasoning: &ReasoningContent{
+							Text: "stored reasoning from a prior provider",
+						},
+						ToolCalls: []ToolCall{{
+							ID:        "call_terminal",
+							Name:      "terminal",
+							Arguments: json.RawMessage(`{"cmd":"pwd"}`),
+						}},
+					},
+					{
+						Role:    "assistant",
+						Content: "No tool call here.",
+						Reasoning: &ReasoningContent{
+							Text: "storage-only non-tool reasoning",
+						},
+					},
+				},
+			})
+
+			toolAssistant := messages[1]
+			if got, ok := toolAssistant["reasoning_content"].(string); !ok || got != "" {
+				t.Fatalf("assistant tool-call reasoning_content = %v (present=%v), want empty string", toolAssistant["reasoning_content"], ok)
+			}
+			if _, ok := toolAssistant["reasoning"]; ok {
+				t.Fatalf("assistant request leaked storage-only reasoning field: %+v", toolAssistant)
+			}
+			if got := toolAssistant["content"]; got != "Calling terminal." {
+				t.Fatalf("assistant content = %v, want ordinary content preserved", got)
+			}
+
+			nonToolAssistant := messages[2]
+			if _, ok := nonToolAssistant["reasoning_content"]; ok {
+				t.Fatalf("non-tool assistant got reasoning_content padding: %+v", nonToolAssistant)
+			}
+			if _, ok := nonToolAssistant["reasoning"]; ok {
+				t.Fatalf("non-tool assistant leaked storage-only reasoning field: %+v", nonToolAssistant)
+			}
+		})
+	}
+}
+
+func TestReasoningContentEchoPreservesExplicitReasoningContent(t *testing.T) {
 	tests := []struct {
 		name    string
 		message Message
@@ -167,21 +249,8 @@ func TestReasoningContentEchoPreservesExplicitReasoningFields(t *testing.T) {
 				Role:             "assistant",
 				Content:          "Calling terminal.",
 				ReasoningContent: stringPtr("vendor trace"),
-				ToolCalls: []ToolCall{{
-					ID:        "call_terminal",
-					Name:      "terminal",
-					Arguments: json.RawMessage(`{"cmd":"pwd"}`),
-				}},
-			},
-			want: "vendor trace",
-		},
-		{
-			name: "normalized reasoning",
-			message: Message{
-				Role:    "assistant",
-				Content: "Calling terminal.",
 				Reasoning: &ReasoningContent{
-					Text: "normalized trace",
+					Text: "storage-only trace from another provider",
 				},
 				ToolCalls: []ToolCall{{
 					ID:        "call_terminal",
@@ -189,7 +258,7 @@ func TestReasoningContentEchoPreservesExplicitReasoningFields(t *testing.T) {
 					Arguments: json.RawMessage(`{"cmd":"pwd"}`),
 				}},
 			},
-			want: "normalized trace",
+			want: "vendor trace",
 		},
 	}
 
@@ -233,6 +302,9 @@ func TestReasoningContentEchoLeavesNonThinkingProvidersUntouched(t *testing.T) {
 				Role:             "assistant",
 				Content:          "Calling terminal.",
 				ReasoningContent: stringPtr("stored trace for another provider"),
+				Reasoning: &ReasoningContent{
+					Text: "storage-only generic reasoning",
+				},
 				ToolCalls: []ToolCall{{
 					ID:        "call_terminal",
 					Name:      "terminal",
