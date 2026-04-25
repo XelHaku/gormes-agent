@@ -115,8 +115,10 @@ func RenderStatus(opts RenderStatusOptions) (string, error) {
 // the empty string when prog is nil so the section disappears entirely on
 // a fresh checkout where progress.json has not been seeded yet.
 //
-// Subphase IDs are emitted as "phaseID.subphaseID" to keep them unambiguous
-// across phases (e.g. "2.B" vs "5.B").
+// Subphase IDs are emitted as "phaseID.subphaseID" — the same convention
+// diffSubphaseStates uses for DriftPromotion.SubphaseID, so a row in the
+// ledger forensics section names the same identifier the operator just
+// read in the bucket list.
 func renderDriftStateBuckets(prog *progress.Progress) string {
 	if prog == nil {
 		return ""

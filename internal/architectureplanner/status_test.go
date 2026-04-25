@@ -232,4 +232,125 @@ func TestRenderStatus_MissingFilesProducesEmptySections(t *testing.T) {
 			t.Errorf("missing-files render missing %q\n--- output ---\n%s", want, out)
 		}
 	}
+	// Drift state buckets only render when a progress.json exists; with a
+	// missing file the section disappears entirely (no header, no zero-count
+	// lines) so the operator isn't shown a misleading "PORTING (0)" on a
+	// fresh checkout.
+	if strings.Contains(out, "Drift state by subphase:") {
+		t.Errorf("missing-files render should omit drift bucket header; got\n%s", out)
+	}
+	if strings.Contains(out, "Recent drift promotions") {
+		t.Errorf("missing-files render should omit drift promotions; got\n%s", out)
+	}
+}
+
+// TestRenderDriftStateBuckets_BucketsAllThreeStates synthesises a Progress
+// doc with one subphase per status (porting/converged/owned) plus a fourth
+// subphase with no DriftState block (default => porting bucket). Confirms
+// each bucket reports the correct count and member list, and that the
+// no-DriftState subphase falls into the PORTING bucket per the documented
+// default.
+func TestRenderDriftStateBuckets_BucketsAllThreeStates(t *testing.T) {
+	prog := &progress.Progress{
+		Meta: progress.Meta{Version: "1"},
+		Phases: map[string]progress.Phase{
+			"2": {
+				Name: "Phase Two",
+				Subphases: map[string]progress.Subphase{
+					"2.A": {
+						Name:       "Sub A — explicit porting",
+						DriftState: &progress.DriftState{Status: "porting"},
+					},
+					"2.B": {
+						Name:       "Sub B — converged",
+						DriftState: &progress.DriftState{Status: "converged"},
+					},
+					"2.C": {
+						Name: "Sub C — no drift_state (default porting)",
+					},
+				},
+			},
+			"5": {
+				Name: "Phase Five",
+				Subphases: map[string]progress.Subphase{
+					"5.O": {
+						Name:       "Sub O — owned",
+						DriftState: &progress.DriftState{Status: "owned"},
+					},
+				},
+			},
+		},
+	}
+
+	out := renderDriftStateBuckets(prog)
+
+	for _, want := range []string{
+		"Drift state by subphase:",
+		// 2.A is explicit porting; 2.C has no DriftState (default porting).
+		// Format is phaseID.subphaseID per diffSubphaseStates' SubphaseID
+		// convention so the bucket and the ledger forensics agree on IDs.
+		"PORTING (2): 2.2.A, 2.2.C",
+		"CONVERGED (1): 2.2.B",
+		"OWNED (1): 5.5.O",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("renderDriftStateBuckets missing %q\n--- output ---\n%s", want, out)
+		}
+	}
+}
+
+// TestRenderRecentDriftPromotions_EmptyOmitsHeader verifies the section
+// disappears entirely when no DriftPromotions are present in the supplied
+// ledger window. Operators on a quiet week should not see a noisy
+// "Recent drift promotions: (none)" line — they should see nothing.
+func TestRenderRecentDriftPromotions_EmptyOmitsHeader(t *testing.T) {
+	// Empty events slice.
+	if got := renderRecentDriftPromotions(nil, 7); got != "" {
+		t.Errorf("nil events should yield empty string, got %q", got)
+	}
+	// Events present but none carry DriftPromotions.
+	events := []LedgerEvent{
+		{TS: "2026-04-25T10:00:00Z", RunID: "r1", Status: "ok"},
+		{TS: "2026-04-25T11:00:00Z", RunID: "r2", Status: "no_changes"},
+	}
+	if got := renderRecentDriftPromotions(events, 7); got != "" {
+		t.Errorf("events without promotions should yield empty string, got %q", got)
+	}
+}
+
+// TestRenderRecentDriftPromotions_ListsRecentEvents exercises the rendered
+// format: window-day count in the header, one line per promotion, and
+// each line names the SubphaseID, from, to, ts, and run_id. Multiple
+// promotions in a single LedgerEvent are flattened into separate lines.
+func TestRenderRecentDriftPromotions_ListsRecentEvents(t *testing.T) {
+	events := []LedgerEvent{
+		{
+			TS:    "2026-04-25T10:00:00Z",
+			RunID: "P-1001",
+			DriftPromotions: []DriftPromotion{
+				{SubphaseID: "2.B", From: "porting", To: "converged", Reason: "matches upstream"},
+			},
+		},
+		{
+			TS:    "2026-04-25T11:00:00Z",
+			RunID: "P-1002",
+			DriftPromotions: []DriftPromotion{
+				{SubphaseID: "5.O", From: "porting", To: "owned"},
+				{SubphaseID: "5.P", From: "converged", To: "owned"},
+			},
+		},
+	}
+
+	out := renderRecentDriftPromotions(events, 7)
+
+	for _, want := range []string{
+		"Recent drift promotions (last 7d):",
+		"- 2.B: porting → converged (2026-04-25T10:00:00Z, run P-1001)",
+		"- 5.O: porting → owned (2026-04-25T11:00:00Z, run P-1002)",
+		"- 5.P: converged → owned (2026-04-25T11:00:00Z, run P-1002)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("renderRecentDriftPromotions missing %q\n--- output ---\n%s", want, out)
+		}
+	}
 }
