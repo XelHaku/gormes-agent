@@ -541,6 +541,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
 - [x] TUI mouse tracking config + slash toggle
+- [ ] Native TUI bundle independence check
 - [ ] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
 - [x] Responses API store + run event stream

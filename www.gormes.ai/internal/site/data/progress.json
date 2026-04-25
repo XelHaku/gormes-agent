@@ -2164,6 +2164,11 @@
               "done_signal": [
                 "Expiry hook fixtures prove one-shot cleanup, bounded retry/give-up evidence, persisted finalization state, and zero memory-flush task launches."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T18:18:51Z",
+                "last_success": "2026-04-25T18:18:51Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 gateway/run.py",
@@ -6717,9 +6722,9 @@
                 "Oneshot safety fixtures prove clarify/noninteractive behavior, dangerous-command audit evidence, trust-class boundaries, and no stdout contamination."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T18:05:57Z",
-                "last_success": "2026-04-25T18:05:57Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T18:18:51Z",
+                "last_success": "2026-04-25T18:18:51Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -6972,6 +6977,11 @@
               "done_signal": [
                 "Service restart poller fixtures prove cooldown-aware active polling, timeout/crash evidence, hard-restart fallback, and no live service-manager dependency."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T18:18:51Z",
+                "last_success": "2026-04-25T18:18:51Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 hermes_cli/main.py",
@@ -7126,6 +7136,62 @@
               "done_signal": [
                 "TUI mouse fixtures prove config defaulting, slash parsing, runtime toggling, and terminal mode enable/disable output."
               ]
+            },
+            {
+              "name": "Native TUI bundle independence check",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Gormes TUI startup and install/update status stay Go-native and never depend on Hermes' Node/Ink dist bundle freshness checks",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "TUI and doctor/status output report native Go TUI availability instead of asking operators to run npm install/build or repair packages/hermes-ink/dist/ink-bundle.js.",
+              "fixture": "cmd/gormes/tui_bundle_independence_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/main.py@ee0728c6",
+                "../hermes-agent/tests/hermes_cli/test_tui_npm_install.py@ee0728c6",
+                "cmd/gormes/main.go",
+                "internal/tui/",
+                "www.gormes.ai/internal/site/content.go"
+              ],
+              "ready_when": [
+                "Bubble Tea shell and local TUI startup seams exist in Gormes.",
+                "Hermes ee0728c6 adds a Python/Node `_tui_build_needed` regression around missing `packages/hermes-ink/dist/ink-bundle.js` even when `dist/entry.js` exists."
+              ],
+              "not_ready_when": [
+                "The slice ports Hermes `_tui_build_needed`, adds Node/npm/package-lock/node_modules checks to Gormes startup, or edits remote TUI SSE transport behavior."
+              ],
+              "acceptance": [
+                "A focused fixture runs the Gormes TUI startup/build-preflight path from a temp working directory that contains Hermes-style `ui-tui/dist/entry.js` and `node_modules/ink` but lacks `packages/hermes-ink/dist/ink-bundle.js`, and proves no npm/node/package-manager command is invoked.",
+                "Offline doctor or startup status describes the TUI as native Go/Bubble Tea and does not require `HERMES_TUI_DIR`, `package-lock.json`, `node_modules`, or `ink-bundle.js`.",
+                "Landing/docs install messaging continues to state no runtime npm/Node dependency and does not inherit Hermes first-launch TUI rebuild instructions."
+              ],
+              "note": "Hermes ee0728c6 fixed a Python/Node first-launch regression by rebuilding when the bundled Ink dist file is stale. Gormes should not port that rebuild path; freeze the intentional divergence with a fixture so future CLI/TUI work does not reintroduce npm or Hermes Ink bundle checks.",
+              "write_scope": [
+                "cmd/gormes/",
+                "internal/tui/",
+                "internal/cli/",
+                "docs/content/building-gormes/architecture_plan/progress.json",
+                "docs/content/building-gormes/architecture_plan/phase-5-final-purge.md",
+                "www.gormes.ai/internal/site/content.go"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes ./internal/tui ./internal/cli -run 'Test.*TUI.*Bundle|Test.*Native.*TUI|Test.*Doctor.*TUI' -count=1",
+                "go test ./cmd/gormes ./internal/tui ./internal/cli -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Focused fixtures prove Gormes TUI startup/status remains independent from Hermes Node/Ink bundle rebuild checks and public install copy still promises no runtime npm dependency."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:ee0728c6 hermes_cli/main.py",
+                "note": "Hermes defines the stale Ink bundle regression; Gormes owns a native Go TUI and should encode the divergence explicitly."
+              }
             },
             {
               "name": "SSE streaming to Bubble Tea TUI",
@@ -7443,7 +7509,12 @@
               "status": "planned",
               "note": "TDD: port /health/detailed plus /api/jobs list/create/update/delete/pause/resume/trigger after the Phase 5.N cronjob store/API parity slices land, reusing the same auth and OpenAI-style error envelope instead of creating a second cron control plane."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-25T18:18:54Z",
+            "origin_decision": "Hermes still leads API server, remote TUI, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 adds a Node/Ink bundle rebuild regression that Gormes should track as an explicit no-Node divergence row instead of importing Hermes first-launch build machinery."
+          }
         },
         "5.R": {
           "name": "Code Execution Mode Policy",

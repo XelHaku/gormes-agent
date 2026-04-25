@@ -216,7 +216,8 @@ Gormes tracks these as small rows: 4.H unsupported-temperature retry, 5.N
 installer policy.
 
 Latest upstream sync delta (2026-04-25): commits `6e561ffa`, `97d54f0e`,
-`af22421e`, `cf2fabc4`, `d635e2df`, `7c17accb`, and `648b8991` add
+`af22421e`, `cf2fabc4`, `d635e2df`, `7c17accb`, `648b8991`, and
+`ee0728c6` add
 planner-relevant contracts tracked in progress.json:
 
 - update/service restart verification now polls active status instead of doing
@@ -230,11 +231,16 @@ planner-relevant contracts tracked in progress.json:
 - stream retries must check cancellation before opening a fresh connection, so
   `/stop` cannot be negated by a retry loop;
 - Codex Responses assistant replay messages must serialize text parts as
-  `output_text`, while user messages keep `input_text`.
+  `output_text`, while user messages keep `input_text`;
+- Hermes TUI first-launch rebuild checks now treat a missing
+  `packages/hermes-ink/dist/ink-bundle.js` as stale even when `dist/entry.js`
+  exists, which Gormes tracks as an explicit native-TUI/no-Node divergence row
+  rather than a Node/Ink build port.
 
 Gormes tracks these as small rows in 5.O service restart polling, 5.A terminal
 notification throttling, 5.I dashboard slot inventory, and 4.B provider-aware
-auxiliary compression. The 4.B provider-cap slice is complete on main; the
+auxiliary compression, with a new 5.Q native TUI bundle-independence fixture
+for the `ee0728c6` drift. The 4.B provider-cap slice is complete on main; the
 remaining rows stay fixture-first until their local substrates exist.
 
 Previous context sync delta (2026-04-25): upstream commit `5401a008` changed

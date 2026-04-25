@@ -24,5 +24,6 @@ the row in `progress.json` before assigning it.
 <!-- PROGRESS:START kind=next-slices -->
 | Phase | Slice | Contract | Trust class | Fixture | Why now |
 |---|---|---|---|---|---|
+| 5 / 5.Q | Native TUI bundle independence check | Gormes TUI startup and install/update status stay Go-native and never depend on Hermes' Node/Ink dist bundle freshness checks | operator, system | `cmd/gormes/tui_bundle_independence_test.go` | Contract metadata is present; ready for a focused spec or fixture slice. |
 | 7 / 7.E | BlueBubbles iMessage bubble formatting parity | BlueBubbles outbound iMessage sends are non-editable, markdown-stripped, paragraph-split bubbles without pagination suffixes | gateway, system | `internal/channels/bluebubbles/bot_test.go` | Unblocks BlueBubbles iMessage session-context prompt guidance. |
 <!-- PROGRESS:END -->
