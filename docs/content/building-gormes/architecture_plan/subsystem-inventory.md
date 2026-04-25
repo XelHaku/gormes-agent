@@ -124,7 +124,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Error classifier output type | `agent/error_classifier.py` — `ClassifiedError` class | 4.H | 🔨 partial — `internal/hermes/errors.go` exposes retryable/fatal/unknown plus provider-error kinds, and `HTTPError.RetryAfter` parsing is landed; upstream-style structured `ClassifiedError` envelopes remain unported |
 | Local edit snapshot | `agent/*` — `LocalEditSnapshot` (for checkpoint rewind) | 5.L | ⏳ planned |
 | Context engine | `agent/context_engine.py` | 4.B | 🔨 partial — Go `ContextEngine` status/tool boundary is validated in `internal/hermes/context_engine.go` and kernel fixtures; compressor budget state, pruning, summaries, and references remain split follow-up slices |
-| Context compressor | `agent/context_compressor.py` + `manual_compression_feedback.py` | 4.B | ⏳ planned — status boundary is landed; next pure budget slice must mirror Hermes `5401a008` model-switch recalculation for `threshold_tokens`, `tail_token_budget`, and `max_summary_tokens` before protected head/tail pruning, old tool-output pruning, and manual feedback |
+| Context compressor | `agent/context_compressor.py` + `manual_compression_feedback.py` | 4.B | ⏳ planned — status boundary, model-switch budgets, and provider-cap lookup are landed; next pure slice must reconcile Hermes `5006b220` single-prompt auxiliary threshold behavior after `flush_memories` removal before protected head/tail pruning, old tool-output pruning, and manual feedback |
 | Context references | `agent/context_references.py` | 4.B | ⏳ planned — keep separate from compression so reference handles can be tested without provider calls |
 | Prompt builder | `agent/prompt_builder.py` | 4.C | ⏳ planned — split into context-file discovery/injection scan, model-specific role guidance, skills prompt snapshots, and memory/session-search guidance |
 | Smart model routing | `agent/smart_model_routing.py` + `model_metadata.py` + `models_dev.py` | 4.D | 🔨 in progress — provider-enforced context limits, read-only model pricing/capability registry, pure routing selector, and turn-scoped `PlatformEvent.Model` -> `hermes.ChatRequest.Model` override are fixture-backed on main; remaining rows should be integration/status surfaces, not another selector port |
@@ -219,7 +219,7 @@ The upstream `hermes_cli/` has 49 Python files. Grouped by capability:
 
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
-| CLI entry + setup + uninstall | `hermes_cli/{main,setup,uninstall,env_loader,commands,callbacks,completion}.py` | 5.O | ⏳ planned — include upstream busy-command guards so `/compress` and other long actions produce deterministic active-turn responses |
+| CLI entry + setup + uninstall | `hermes_cli/{main,setup,uninstall,env_loader,commands,callbacks,completion,oneshot}.py` | 5.O | ⏳ planned — include upstream busy-command guards, top-level `-z/--oneshot` parser/execution slices, and RestartSec-aware update polling so `/compress`, one-shot calls, and service restarts produce deterministic operator-visible behavior |
 | Auth commands (base) | `hermes_cli/{auth,auth_commands}.py` | 5.O | ⏳ planned |
 | Provider-specific auth | `hermes_cli/{copilot_auth,dingtalk_auth}.py` + (`hermes_cli/nous_subscription.py` for Nous) | 5.O | ⏳ planned |
 | Backup / dump / debug | `hermes_cli/{backup,dump,debug,logs,doctor,status}.py` | 5.O | ⏳ planned |

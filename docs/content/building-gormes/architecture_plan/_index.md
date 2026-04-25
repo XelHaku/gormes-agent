@@ -198,6 +198,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Runtime status JSON + PID/process validation
 - [ ] Token-scoped gateway locks
 - [ ] Gateway /restart command + takeover markers
+- [ ] Session expiry finalization without memory flush
 - [x] Channel lifecycle writers into status model
 
 ### 2.F.4 — Home Channel + Operator Surfaces ⏳
@@ -360,6 +361,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Aux compression headroom for system and tool schemas
 - [x] Aux compression provider-aware context cap
 - [ ] Tool-result pruning + protected head/tail summary
+- [ ] Aux compression single-prompt threshold reconciliation
 - [ ] Manual compression feedback + context references
 
 ### 4.C — Native Prompt Builder ⏳
@@ -400,6 +402,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Provider-side resilience
 - [x] Classified provider-error taxonomy
 - [x] Unsupported temperature retry + Codex flush guard
+- [ ] Codex Responses temperature guard after flush removal
 - [x] Generic unsupported-parameter retry + max_tokens guard
 - [x] Jittered reconnect backoff schedule
 - [x] Retry-After header parsing + HTTPError hint
@@ -512,6 +515,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] CLI command registry parity + active-turn busy policy
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
+- [ ] Top-level oneshot flag and model/provider resolver
+- [ ] Oneshot stdout-only kernel execution
 - [x] Platform toolset config persistence + MCP sentinel
 - [x] Effective toolset picker dedupes bundled plugin keys
 - [ ] Gateway, platform, webhook, and cron management CLI
