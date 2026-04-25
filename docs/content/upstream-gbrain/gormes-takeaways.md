@@ -72,6 +72,7 @@ The handler can remain ordinary Go.
 | `BrainEngine` | `internal/memory` SQLite store and GONCHO service | Define a narrower knowledge read/write interface before adding more providers. |
 | `pages` plus `links` provenance | entities, relationships, USER.md mirror | Add relationship evidence/provenance fields and reviewed promotion. |
 | hybrid search | FTS5, graph traversal, semantic recall | Add a retrieval eval harness and stable score breakdown. |
+| Code Cathedral II call graph + two-pass retrieval | optional code-context evidence for skill/retrieval explanations | Start with synthetic parent-scope/call-edge fixtures and capped high-fan-out behavior; do not embed GBrain's TypeScript indexer or tree-sitter WASM in the runtime. |
 | Minions SQL queue | subagent manager, cron, audit logs | Add a durable job ledger for long work and child runs. |
 | `subagent_messages` and tool ledger | run logs and transcript export | Persist child-agent messages/tool calls enough to resume or replay. |
 | skills resolver and checks | `internal/skills` active/inactive store | Add resolver conformance, routing evals, conflict checks, and promotion evidence. |
@@ -186,6 +187,22 @@ promotion. Borrow GBrain's checks:
 - usage logs tie selected skills to turn outcome
 
 This will matter before Phase 6 learning-loop extraction writes new skills.
+
+### 5a. Keep Code Context Optional And Explained
+
+GBrain `f718c59` proves that code retrieval gets better when chunks know their
+qualified symbol, parent scope, and call edges. Gormes should not make a code
+indexer part of the hot path yet. The first Go target is only an evidence shape
+that skill retrieval can consume:
+
+- symbol name and optional parent-scope path;
+- caller/callee edges with a deterministic fan-out cap;
+- stale or unavailable reason;
+- score contribution shown in the skill selection explanation.
+
+That lets the learning loop benefit from code-context donors later without
+silently requiring tree-sitter, WASM grammars, repository-wide backfill, or a
+second database.
 
 ### 6. Define Degraded Mode As A Product Contract
 

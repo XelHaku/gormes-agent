@@ -33,6 +33,7 @@ show degraded mode to operators
 | Provider-neutral events | Hermes | Adapters own provider quirks; `internal/hermes` emits one stream/tool-call contract. |
 | Durable jobs | GBrain | Cron, long work, and subagents get restartable ledgers and operator inspection. |
 | Provenance-rich memory | GBrain | Entities and relationships carry source turn, extractor, confidence, freshness, and review state. |
+| Explainable code-context retrieval | GBrain | Parent-scope symbols and call edges become optional evidence for skill/retrieval explanations, not a required TypeScript indexer in the runtime. |
 | Skills as reviewed code | GBrain + Hermes | Skills have metadata, resolver tests, inactive drafts, review, feedback, and version history. |
 | Visible degraded mode | GBrain + Hermes | Missing embeddings, provider limits, stale extraction, plugin/tool gaps, and dead letters surface in status/doctor/audit. |
 

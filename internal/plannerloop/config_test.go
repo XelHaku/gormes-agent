@@ -1,6 +1,7 @@
 package plannerloop
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -43,6 +44,32 @@ func TestConfigFromEnvDefaultsToArchitecturePlannerPaths(t *testing.T) {
 	}
 	if cfg.BackendTimeout != 20*time.Minute {
 		t.Fatalf("BackendTimeout = %s, want 20m", cfg.BackendTimeout)
+	}
+}
+
+func TestConfigFromEnvPreservesLegacyRunRootWhenCanonicalOnlyHasTriggers(t *testing.T) {
+	root := t.TempDir()
+	legacy := filepath.Join(root, ".codex", "architecture-planner")
+	canonical := filepath.Join(root, ".codex", "planner-loop")
+	if err := os.MkdirAll(legacy, 0o755); err != nil {
+		t.Fatalf("MkdirAll(legacy) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(legacy, "planner_state.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(legacy state) error = %v", err)
+	}
+	if err := os.MkdirAll(canonical, 0o755); err != nil {
+		t.Fatalf("MkdirAll(canonical) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(canonical, "triggers.jsonl"), nil, 0o644); err != nil {
+		t.Fatalf("WriteFile(canonical triggers) error = %v", err)
+	}
+
+	cfg, err := ConfigFromEnv(root, MapEnv(map[string]string{}))
+	if err != nil {
+		t.Fatalf("ConfigFromEnv() error = %v", err)
+	}
+	if cfg.RunRoot != legacy {
+		t.Fatalf("RunRoot = %q, want legacy state root %q", cfg.RunRoot, legacy)
 	}
 }
 

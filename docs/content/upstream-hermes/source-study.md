@@ -13,10 +13,35 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `d635e2df`
+- Upstream commit: `f93d4624`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `ded2c478`
+- Gormes commit: `1747b964`
 - Date: 2026-04-25
+
+## 2026-04-25 Drift Check
+
+The synchronized Hermes head is now `f93d4624`. New drift since the earlier
+provider/compression notes is concentrated in the TUI, CLI startup, and
+provider replay surface:
+
+- `283c8fd6` and its child commits move model/provider overrides into TUI
+  launch, resolve short model aliases statically, and avoid provider catalog
+  network lookup during startup.
+- `edc78e25`, `31d7f195`, `bd66e55a`, and `1735ced9` harden the Node/Ink TUI
+  selection-copy path: SSH shortcut handling, rendered spaces, code-block
+  indentation, and bounds clamping.
+- `f93d4624` reorders `_copy_reasoning_content_for_api` so DeepSeek/Kimi
+  replay of assistant tool-call turns injects an empty `reasoning_content`
+  placeholder before promoting generic stored `reasoning`. That prevents
+  reasoning emitted by one provider from leaking into another provider's
+  continuation request.
+
+Gormes should not import Hermes' Node/Ink runtime. The planner split the drift
+into native Go rows under Phase 5.Q: one for TUI model override/static alias
+startup, one for native selection/copy parity-or-divergence, and the existing
+no-Node bundle independence row. The provider replay drift is tracked as a
+small Phase 4.A row against `internal/hermes/http_client.go` and
+`internal/hermes/reasoning_content_echo_test.go`.
 
 ## High-Level Shape
 
@@ -53,13 +78,13 @@ packages owned by the kernel, gateway, tools, memory, and provider layers.
 Core upstream evidence files at study time:
 
 - `run_agent.py` - `AIAgent`, provider routing, prompt use, tool loop,
-  fallback, interrupts, memory hooks, and persistence; 12,883 lines.
-- `cli.py` - legacy interactive terminal experience; 11,126 lines.
+  fallback, interrupts, memory hooks, and persistence; 12,662 lines.
+- `cli.py` - legacy interactive terminal experience; 11,116 lines.
 - `gateway/run.py` - `GatewayRunner`, session routing, slash commands,
   platform adapters, cached agents, progress delivery, active-turn control;
-  11,290 lines.
+  11,147 lines.
 - `hermes_cli/main.py` - top-level `hermes` command implementation and setup
-  flows; 9,145 lines.
+  flows; 9,272 lines.
 - `hermes_cli/commands.py` - central slash command registry feeding CLI,
   gateway help, Telegram menus, Discord commands, and Slack mappings.
 - `hermes_cli/runtime_provider.py` and `hermes_cli/auth.py` - provider,
@@ -78,7 +103,7 @@ Core upstream evidence files at study time:
   child credentials, and timeout diagnostics.
 - `plugins/`, `skills/`, and `optional-skills/` - extension and procedural
   knowledge surfaces.
-- `tests/` - 767 `test*.py` files across agent, gateway, CLI, tools, cron,
+- `tests/` - 741 `test*.py` files across agent, gateway, CLI, tools, cron,
   plugins, memory, ACP, provider, and session storage behavior.
 
 Gormes already has smaller equivalents for several contracts:

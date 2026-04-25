@@ -36,3 +36,4 @@ Execution should be TDD-first and local-signal-first:
 - Extend the Phase 2.G SKILL.md store with versioned metadata, provenance, review state, and atomic writes before generated skills persist.
 - Use fake-model extraction fixtures to prove secret stripping and one-off task rejection before live LLM generation.
 - Keep disabled or unreviewed skills out of prompt injection until retrieval, feedback, and operator review surfaces are all test-covered.
+- Treat GBrain Code Cathedral II as optional retrieval evidence: parent-scope and call-edge context may improve skill matching later, but the base learning loop must not require a TypeScript indexer, tree-sitter WASM, or repository-wide backfill.

@@ -2180,7 +2180,12 @@
               "status": "complete",
               "note": "TDD landed: internal/gateway.RuntimeStatusStore persists gateway_state.json atomically, gateway.Manager writes gateway/channel lifecycle states into that shared model, and focused tests prove read-model coherence for start, stop, and startup-failure paths before pairing UX widens."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "converged",
+            "last_upstream_check": "2026-04-25T22:23:30Z",
+            "origin_decision": "Hermes restart, pairing, status, and session-expiry finalization donor behavior is now represented by validated Go gateway/session rows. Recent Hermes edc78e25 drift is TUI-focused, not gateway-lifecycle drift, so future restart/session-expiry drift should become new small 2.F.3 rows only when upstream changes this surface again."
+          }
         },
         "2.F.4": {
           "name": "Home Channel + Operator Surfaces",
@@ -3770,8 +3775,8 @@
           ],
           "drift_state": {
             "status": "converged",
-            "last_upstream_check": "2026-04-25T14:29:29Z",
-            "origin_decision": "Honcho e659b6b remains the latest synchronized memory donor, and all Goncho/Honcho parity rows are validated on main including the Go-native dream scheduler intent contract. Keep the internal implementation named Goncho while preserving honcho_* public tool compatibility; future Honcho drift should become new small rows rather than keeping this subphase porting."
+            "last_upstream_check": "2026-04-25T22:23:30Z",
+            "origin_decision": "Honcho e659b6b remains the latest synchronized memory donor for core memory docs, and all Goncho/Honcho parity rows are validated on main including host integration, SillyTavern mapping, filter grammar, streaming chat persistence, and Go-native dream scheduler intent. Honcho MCP self-hosted HONCHO_API_URL drift is now tracked under Phase 5.G MCP config/env resolution rather than reopening internal Goncho memory. Keep the implementation named Goncho while preserving honcho_* public tool compatibility."
           }
         }
       }
@@ -3926,6 +3931,69 @@
                 "attempt_count": 1,
                 "last_attempt": "2026-04-25T06:55:51Z",
                 "last_success": "2026-04-25T06:55:51Z"
+              }
+            },
+            {
+              "name": "DeepSeek/Kimi cross-provider reasoning isolation",
+              "status": "complete",
+              "contract": "DeepSeek and Kimi replay of assistant tool-call turns injects an empty reasoning_content placeholder before promoting generic stored reasoning from another provider",
+              "contract_status": "validated",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports cross-provider reasoning isolation as unavailable until replay fixtures prove prior-provider reasoning is not forwarded to DeepSeek/Kimi tool-call continuations.",
+              "fixture": "internal/hermes/reasoning_content_echo_test.go",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@f93d4624:_copy_reasoning_content_for_api",
+                "../hermes-agent/run_agent.py@f93d4624:_needs_deepseek_tool_reasoning",
+                "internal/hermes/http_client.go:openAICompatibleReasoningContent",
+                "internal/hermes/reasoning_content_echo_test.go",
+                "docs/content/upstream-hermes/source-study.md"
+              ],
+              "ready_when": [
+                "DeepSeek/Kimi reasoning_content echo for tool-call replay is validated, so provider detection and basic empty-placeholder behavior already exist.",
+                "The slice can use the existing captureRequestHTTPClient fixture; no live provider credentials or provider adapter rewrites are required."
+              ],
+              "not_ready_when": [
+                "The slice changes non-thinking provider payloads, strips explicit same-provider reasoning_content, or stores hidden reasoning text in ordinary assistant content.",
+                "The slice attempts OpenRouter, Codex Responses, Bedrock, or generic reasoning-tag sanitization behavior beyond the DeepSeek/Kimi replay ordering bug."
+              ],
+              "unblocks": [
+                "OpenRouter",
+                "Cross-provider reasoning-tag sanitization",
+                "Codex stream repair + tool-call leak sanitizer"
+              ],
+              "acceptance": [
+                "A DeepSeek replay fixture with an assistant tool-call message containing generic Reasoning but no explicit ReasoningContent sends reasoning_content=\"\" instead of the generic reasoning text.",
+                "The same isolation fixture passes for Kimi/Moonshot provider detection.",
+                "An explicit ReasoningContent string on the assistant tool-call message is still preserved verbatim.",
+                "Non-tool assistant turns and non-thinking providers still omit reasoning_content and the storage-only reasoning field from outgoing API payloads."
+              ],
+              "note": "Complete: TDD landed DeepSeek/Kimi cross-provider reasoning isolation in `internal/hermes/reasoning_content_echo_test.go` and `internal/hermes/http_client.go`. Replay fixtures now prove provider-native `ReasoningContent` is preserved, but generic storage-only `Message.Reasoning` from a prior provider is not forwarded to DeepSeek/Kimi/Moonshot assistant tool-call continuations; those turns receive `reasoning_content=\"\"` instead. Non-tool assistant turns and non-thinking provider payloads still omit `reasoning_content` and never serialize the storage-only `reasoning` field.",
+              "write_scope": [
+                "internal/hermes/http_client.go",
+                "internal/hermes/reasoning_content_echo_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestReasoningContentEcho.*Isolation|TestReasoningContentEcho.*Preserves|TestReasoningContentEcho.*Untouched' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Reasoning echo fixtures prove DeepSeek/Kimi replay sends empty reasoning_content for prior-provider generic reasoning, preserves explicit reasoning_content, and leaves non-thinking payloads untouched."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T23:40:17Z",
+                "last_success": "2026-04-25T23:40:17Z"
+              },
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:f93d4624 run_agent.py",
+                "note": "Hermes changed provider replay ordering to avoid cross-provider reasoning leakage; Gormes should port the behavior as a focused provider-boundary fixture."
               }
             },
             {
@@ -5926,19 +5994,267 @@
             {
               "name": "MCP client",
               "status": "planned",
-              "note": "TDD: port `tools/mcp_tool.py` as a lifecycle-managed client with server discovery, schema normalization, timeout/cancel behavior, and deterministic fake MCP servers."
+              "slice_size": "umbrella",
+              "execution_owner": "tools",
+              "not_ready_when": [
+                "The row is assigned as one all-MCP migration instead of the config, discovery, OAuth, and managed-gateway slices below."
+              ],
+              "unblocks": [
+                "MCP server config/env resolver",
+                "MCP fake-server discovery + tool schema normalization",
+                "MCP OAuth state store + noninteractive auth errors",
+                "Managed tool gateway bridge"
+              ],
+              "note": "Umbrella only: Hermes' MCP surface spans config persistence, stdio/HTTP transports, dynamic discovery, OAuth, sampling, and managed tool gateways. Execute the dependency-ordered rows below; do not assign this umbrella row directly."
             },
             {
-              "name": "OAuth flows",
+              "name": "MCP server config/env resolver",
               "status": "planned",
-              "note": "TDD: port `tools/mcp_oauth.py` and `mcp_oauth_manager.py` as a reusable OAuth state store with redirect/device fixtures before managed MCP gateways request tokens."
+              "contract": "Gormes parses Hermes-compatible mcp_servers config into safe stdio/HTTP server definitions with env validation, timeout defaults, header redaction, and Honcho MCP self-hosted URL support before any live MCP connection starts",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "MCP status reports disabled, invalid transport, invalid env, missing SDK, or secret-redacted config errors instead of launching partial servers.",
+              "fixture": "internal/tools/mcp_config_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/mcp_config.py@edc78e25",
+                "../hermes-agent/tools/mcp_tool.py@edc78e25",
+                "../hermes-agent/tests/hermes_cli/test_mcp_config.py@edc78e25",
+                "../honcho/mcp/src/config.ts@51497f1",
+                "../honcho/mcp/README.md@51497f1",
+                "internal/cli/toolset_config.go"
+              ],
+              "ready_when": [
+                "Platform toolset config persistence + MCP sentinel is validated on main, so unknown MCP server names and no_mcp suppression already round-trip safely.",
+                "This slice can use in-memory YAML/JSON fixtures and must not import an MCP SDK or spawn subprocesses."
+              ],
+              "not_ready_when": [
+                "The slice opens stdio/HTTP transports, performs OAuth, probes tools, starts managed gateways, or treats HONCHO_API_URL as global Goncho configuration instead of a server-local MCP env binding."
+              ],
+              "unblocks": [
+                "MCP fake-server discovery + tool schema normalization",
+                "MCP OAuth state store + noninteractive auth errors"
+              ],
+              "acceptance": [
+                "Config fixtures parse stdio servers with command, args, env, timeout, connect_timeout, and sampling fields.",
+                "HTTP fixtures parse url, headers, timeout, and connect_timeout while redacting Authorization and token-like values from status/errors.",
+                "Invalid env var names, servers with both command and url, and servers with neither command nor url fail before runtime startup.",
+                "A Honcho MCP fixture preserves HONCHO_API_URL only as the configured server env value and never exposes it as a request header or Goncho memory setting."
+              ],
+              "note": "Honcho 51497f1 added HONCHO_API_URL for self-hosted MCP Workers. Keep that as MCP server configuration evidence, not as a hosted-Honcho dependency for internal Goncho memory.",
+              "write_scope": [
+                "internal/tools/mcp_config.go",
+                "internal/tools/mcp_config_test.go",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools ./internal/config -run 'Test.*MCP.*Config|Test.*MCP.*Env|Test.*Honcho.*MCP' -count=1",
+                "go test ./internal/tools ./internal/config -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "MCP config fixtures prove transport/env parsing, redaction, invalid-config degradation, no live SDK startup, and HONCHO_API_URL server-local handling."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 hermes_cli/mcp_config.py",
+                "note": "Hermes defines the MCP server config shape; Honcho contributes the self-hosted MCP env drift; Gormes owns the Go config resolver."
+              }
+            },
+            {
+              "name": "MCP fake-server discovery + tool schema normalization",
+              "status": "planned",
+              "contract": "Gormes discovers tools from deterministic fake MCP stdio and HTTP servers, normalizes schemas into native tool descriptors, and degrades reconnect/timeout/cancel paths without corrupting the TUI",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "MCP discovery/status reports unavailable SDK, connect timeout, schema rejection, reconnect backoff, and stderr-log locations without registering unsafe descriptors.",
+              "fixture": "internal/tools/mcp_client_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/mcp_tool.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_tool.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_dynamic_discovery.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_structured_content.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_stability.py@edc78e25",
+                "internal/tools/tool.go"
+              ],
+              "ready_when": [
+                "MCP server config/env resolver is validated, so server definitions are typed and redacted before connection.",
+                "Fake stdio/HTTP MCP servers can be represented with in-process test doubles; no network credentials or npm packages are required."
+              ],
+              "not_ready_when": [
+                "The slice implements OAuth, managed tool gateways, sampling LLM callbacks, or live third-party MCP server smoke tests."
+              ],
+              "blocked_by": [
+                "MCP server config/env resolver"
+              ],
+              "unblocks": [
+                "Managed tool gateway bridge"
+              ],
+              "acceptance": [
+                "Fake stdio and HTTP transports expose tool/list and call-tool fixtures that become native tools with deterministic names, descriptions, schemas, and timeouts.",
+                "Structured content and text content results are normalized without leaking raw protocol envelopes into model-facing output.",
+                "tools/list_changed-style discovery updates replace stale descriptors deterministically.",
+                "Server stderr is routed to an MCP log path or disabled sink and never writes directly to the TUI/stdout stream in tests.",
+                "Connect timeout, call timeout, cancellation, reconnect backoff, and schema rejection all produce visible degraded evidence."
+              ],
+              "note": "Split discovery/schema normalization from OAuth and managed gateways so the first runnable MCP client slice can land over fake servers only.",
+              "write_scope": [
+                "internal/tools/mcp_client.go",
+                "internal/tools/mcp_client_test.go",
+                "internal/tools/mcp_config.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run 'Test.*MCP.*Client|Test.*MCP.*Discovery|Test.*MCP.*Schema|Test.*MCP.*Timeout' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Fake MCP server fixtures prove discovery, schema normalization, structured result conversion, stderr isolation, timeout/cancel degradation, and dynamic descriptor refresh."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:edc78e25 tools/mcp_tool.py",
+                "note": "Hermes remains the donor for MCP runtime behavior; Gormes ports it behind native fake-server fixtures first."
+              }
+            },
+            {
+              "name": "MCP OAuth state store + noninteractive auth errors",
+              "status": "planned",
+              "contract": "MCP OAuth tokens, redirect/device state, expiry, and 401 session-expired recovery persist in a reusable store while noninteractive runs return actionable auth-required errors",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "MCP calls that need auth report oauth_required, token_expired, or noninteractive_auth_unavailable instead of launching a browser or retrying forever.",
+              "fixture": "internal/tools/mcp_oauth_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/mcp_oauth.py@edc78e25",
+                "../hermes-agent/tools/mcp_oauth_manager.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_oauth.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_oauth_manager.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_tool_401_handling.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_tool_session_expired.py@edc78e25"
+              ],
+              "ready_when": [
+                "MCP server config/env resolver is validated, so per-server OAuth settings and status redaction are available without live transports."
+              ],
+              "not_ready_when": [
+                "The slice starts a managed gateway, opens a real browser in tests, calls a live OAuth provider, or changes generic provider credential storage."
+              ],
+              "blocked_by": [
+                "MCP server config/env resolver"
+              ],
+              "unblocks": [
+                "Managed tool gateway bridge"
+              ],
+              "acceptance": [
+                "OAuth state fixtures persist access token, refresh token, expiry, scopes, issuer, and redirect/device pending state with secrets redacted in status.",
+                "Expired tokens are refreshed when a fake refresher is available and otherwise report token_expired with the server name.",
+                "401 and session-expired tool responses clear the usable token and return oauth_required evidence.",
+                "Noninteractive mode never opens a browser or blocks on device-code input; it returns noninteractive_auth_unavailable."
+              ],
+              "note": "OAuth stays separate from MCP discovery so fake-server descriptor work can land without auth state or browser behavior.",
+              "write_scope": [
+                "internal/tools/mcp_oauth.go",
+                "internal/tools/mcp_oauth_test.go",
+                "internal/tools/mcp_config.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run 'Test.*MCP.*OAuth|Test.*MCP.*401|Test.*MCP.*SessionExpired' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "MCP OAuth fixtures prove state persistence, refresh/expiry handling, 401 recovery, secret redaction, and noninteractive auth-required errors."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:edc78e25 tools/mcp_oauth.py",
+                "note": "Hermes defines MCP OAuth lifecycle behavior; Gormes keeps it in a native tools package store."
+              }
             },
             {
               "name": "Managed tool gateway bridge",
               "status": "planned",
-              "note": "TDD: port `tools/managed_tool_gateway.py` after the MCP client and OAuth store are green, proving tool discovery and result pass-through without a live external server."
+              "contract": "Managed tool gateway bridges expose discovered remote tools through the same MCP descriptor/call contract as local fake servers without requiring live external services in tests",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Managed gateway status reports gateway_unavailable, auth_required, schema_rejected, and tool_call_failed evidence without registering half-discovered tools.",
+              "fixture": "internal/tools/managed_tool_gateway_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/managed_tool_gateway.py@edc78e25",
+                "../hermes-agent/tests/tools/test_managed_tool_gateway.py@edc78e25",
+                "../hermes-agent/tools/mcp_tool.py@edc78e25",
+                "internal/tools/"
+              ],
+              "ready_when": [
+                "MCP fake-server discovery + tool schema normalization and MCP OAuth state store + noninteractive auth errors are validated on main."
+              ],
+              "not_ready_when": [
+                "The slice contacts a live managed gateway, performs real OAuth, introduces provider-specific managed tools, or bypasses the MCP descriptor/call normalization layer."
+              ],
+              "blocked_by": [
+                "MCP fake-server discovery + tool schema normalization",
+                "MCP OAuth state store + noninteractive auth errors"
+              ],
+              "acceptance": [
+                "A fake managed gateway returns a tool inventory that normalizes through the same descriptor path as MCP fake servers.",
+                "Tool calls pass through request IDs, arguments, timeouts, and cancellation to the fake gateway and normalize success/error results.",
+                "Auth-required and unavailable gateway responses reuse the MCP OAuth/degraded evidence contracts.",
+                "No live external server, credential, or network dependency is required by unit tests."
+              ],
+              "note": "TDD: port `tools/managed_tool_gateway.py` only after MCP config, discovery, and OAuth stores are green, proving tool discovery and result pass-through without a live external server.",
+              "write_scope": [
+                "internal/tools/managed_tool_gateway.go",
+                "internal/tools/managed_tool_gateway_test.go",
+                "internal/tools/mcp_client.go",
+                "internal/tools/mcp_oauth.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run 'Test.*Managed.*Gateway|Test.*MCP.*Gateway' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Managed-gateway fixtures prove inventory discovery, pass-through calls, auth/unavailable degradation, and zero live-service dependency over the shared MCP descriptor path."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T22:17:23Z"
+              },
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:edc78e25 tools/managed_tool_gateway.py",
+                "note": "Hermes defines managed gateway behavior; Gormes ports it after native MCP config/discovery/OAuth contracts."
+              }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-25T22:23:30Z",
+            "origin_decision": "Hermes still leads MCP runtime behavior across stdio/HTTP discovery, OAuth, and managed gateways. Honcho 51497f1 adds self-hosted MCP Worker HONCHO_API_URL config, so Gormes tracks that drift in the first config/env slice while keeping internal Goncho memory local."
+          }
         },
         "5.H": {
           "name": "ACP Integration",
@@ -6435,7 +6751,128 @@
             {
               "name": "Deterministic helper-file ports (banner/output/tips/webhook/dump)",
               "status": "planned",
-              "note": "TDD-first prerequisite slice for the larger 5.O command-group slices below. Port the pure-function helper surface from upstream hermes_cli as foundational primitives before any command-group or active-turn policy work lands on top: `hermes_cli/banner.py` -> `internal/cli/banner.go` (FormatContextLength, DisplayToolsetName, FormatBannerVersionLabel), `hermes_cli/cli_output.py` -> `internal/cli/output.go` (shared print/prompt helpers), `hermes_cli/tips.py` -> `internal/cli/tips.go` (tip corpus + GetRandomTip/PickRandomTip selector), `hermes_cli/webhook.py` -> `internal/cli/webhook.go` (deterministic helpers), `hermes_cli/dump.py` -> `internal/cli/dump.go` (deterministic helpers). Each helper file lands behind pure-function unit tests with fixed inputs/outputs — no terminal/TTY coupling, no config file reads, no time-of-day non-determinism. Evidence of granularity mismatch on main: as of planner run 2026-04-24, `git log --all --since='2026-04-23' --oneline | grep -cE 'feat\\(cli\\)|feat\\(tuigateway\\)'` reports **54 worker commits** across codexu/* branches attempting these helper ports with **zero** merged to main, and `internal/cli/` currently contains only `parity.go`/`root_test.go` — the larger command-group slices (`CLI command registry parity + active-turn busy policy`, `Config/profile/auth/setup`, `Gateway/platform/webhook/cron`, `Diagnostics/backup/logs/status`) are too big a jump from the current tree and must not consume the helper-file ports. Keep this slice strictly additive and pure-function — no command-registry wiring in this slice."
+              "slice_size": "umbrella",
+              "execution_owner": "tools",
+              "not_ready_when": [
+                "The row is assigned as one combined hermes_cli helper-file migration instead of the two pure-helper slices below."
+              ],
+              "unblocks": [
+                "CLI banner/output formatting helpers",
+                "CLI tips/dump/webhook deterministic helpers"
+              ],
+              "note": "Umbrella only: keep for inventory continuity after repeated helper-port collisions. Execute through `CLI banner/output formatting helpers` first, then `CLI tips/dump/webhook deterministic helpers`; command registry, config/auth/setup, management CLI, and diagnostics rows must not consume this whole helper surface."
+            },
+            {
+              "name": "CLI banner/output formatting helpers",
+              "status": "planned",
+              "contract": "Pure CLI banner and output formatting helpers match upstream deterministic text behavior without terminal or command-registry coupling",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "CLI command rows continue to render minimal fallback output until banner/version/toolset formatting helpers are fixture-backed.",
+              "fixture": "internal/cli/banner_output_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/banner.py@edc78e25",
+                "../hermes-agent/hermes_cli/cli_output.py@edc78e25",
+                "internal/cli/parity.go",
+                "internal/cli/root_test.go"
+              ],
+              "ready_when": [
+                "Only pure formatting helpers are needed; no command registry, config read/write, TTY prompt, or live gateway state is required."
+              ],
+              "not_ready_when": [
+                "The slice opens a terminal, reads real config files, registers Cobra commands, or ports tips/webhook/dump helpers in the same change."
+              ],
+              "unblocks": [
+                "CLI tips/dump/webhook deterministic helpers"
+              ],
+              "acceptance": [
+                "FormatContextLength, DisplayToolsetName, and banner version labels match upstream golden fixtures.",
+                "Output helpers return strings or writer-bound functions with deterministic newline and prompt behavior.",
+                "Tests run without terminal/TTY detection, clock access, config files, or network calls."
+              ],
+              "note": "Split from the prior all-helper 5.O row so workers can land the banner/output foundation without colliding with tips, webhook, dump, or command registry work.",
+              "write_scope": [
+                "internal/cli/banner.go",
+                "internal/cli/banner_output_test.go",
+                "internal/cli/output.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run 'Test.*Banner|Test.*Output|Test.*ToolsetName|Test.*ContextLength' -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Focused internal/cli fixtures prove banner and output helper formatting with no TTY, config, or command-registry dependency."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 hermes_cli/banner.py",
+                "note": "Hermes defines the operator-visible text helpers; Gormes ports them as pure Go helpers before command wiring."
+              }
+            },
+            {
+              "name": "CLI tips/dump/webhook deterministic helpers",
+              "status": "planned",
+              "contract": "Pure tips, dump, and webhook helper ports are deterministic and file/config inert before CLI command groups consume them",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Tips, support dumps, and webhook helper output stay unavailable or minimal until fixed-input fixtures prove deterministic behavior.",
+              "fixture": "internal/cli/tips_dump_webhook_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/tips.py@edc78e25",
+                "../hermes-agent/hermes_cli/dump.py@edc78e25",
+                "../hermes-agent/hermes_cli/webhook.py@edc78e25",
+                "internal/cli/"
+              ],
+              "ready_when": [
+                "CLI banner/output formatting helpers are validated, so shared formatting helpers exist for dump/webhook output."
+              ],
+              "not_ready_when": [
+                "The slice reads real Hermes/Gormes homes, opens network webhooks, registers commands, or uses random/time behavior without injected deterministic inputs."
+              ],
+              "blocked_by": [
+                "CLI banner/output formatting helpers"
+              ],
+              "unblocks": [
+                "CLI command registry parity + active-turn busy policy"
+              ],
+              "acceptance": [
+                "Tip selection uses injected deterministic selection and stable corpus ordering.",
+                "Dump helpers produce redacted support-summary fixtures from in-memory config/status inputs only.",
+                "Webhook helpers normalize URLs/payload labels without sending network requests."
+              ],
+              "note": "Second pure-helper slice after banner/output; keeps tips, dump, and webhook helper behavior out of the broader command-registry port.",
+              "write_scope": [
+                "internal/cli/tips.go",
+                "internal/cli/dump.go",
+                "internal/cli/webhook.go",
+                "internal/cli/tips_dump_webhook_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run 'Test.*Tips|Test.*Dump|Test.*Webhook' -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Pure helper fixtures prove tips, dump, and webhook output from fixed inputs with no filesystem, clock, random, or network dependency."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 hermes_cli/tips.py",
+                "note": "Hermes defines helper semantics; Gormes ports deterministic helper contracts before command wiring."
+              }
             },
             {
               "name": "PTY bridge protocol adapter",
@@ -6489,7 +6926,67 @@
             {
               "name": "CLI command registry parity + active-turn busy policy",
               "status": "planned",
-              "note": "TDD: expand the Go command registry toward upstream hermes_cli/commands.py and prove every recognized gateway slash command either has a safe running-agent handler or returns a visible busy response without interrupting or queuing discardable command text."
+              "contract": "CLI slash/command registry parity declares active-turn policy for every recognized command before handlers can mutate runtime state",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Unknown or not-yet-ported commands return visible unavailable/busy evidence instead of entering the kernel as ordinary prompt text.",
+              "fixture": "internal/cli/command_registry_policy_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/commands.py@edc78e25",
+                "../hermes-agent/ui-tui/src/app/slash/commands/core.ts@edc78e25",
+                "internal/gateway/commands.go",
+                "internal/cli/"
+              ],
+              "ready_when": [
+                "CLI tips/dump/webhook deterministic helpers are validated, so command registry output can reuse pure helper formatting."
+              ],
+              "not_ready_when": [
+                "The slice implements config/auth/setup flows, opens provider credentials, or ports command handlers before the registry policy table is fixture-locked."
+              ],
+              "blocked_by": [
+                "CLI tips/dump/webhook deterministic helpers"
+              ],
+              "unblocks": [
+                "Busy command guard for compression and long CLI actions",
+                "Gateway, platform, webhook, and cron management CLI",
+                "Diagnostics, backup, logs, and status CLI"
+              ],
+              "acceptance": [
+                "Every recognized CLI/gateway slash command has a stable active-turn policy: bypass, queue, busy-reject, or unavailable.",
+                "Gateway-safe commands remain invokable during active turns while mutating/long-running commands return busy evidence.",
+                "Unknown commands share the existing gateway unknown-command behavior and do not enter the model prompt as command text."
+              ],
+              "note": "TDD: expand the Go command registry toward upstream hermes_cli/commands.py as a policy table first, not as a handler port. This keeps busy-state semantics, gateway bypass, and unavailable evidence testable before config/auth/setup or management commands land.",
+              "write_scope": [
+                "internal/cli/",
+                "internal/gateway/commands.go",
+                "internal/gateway/commands_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli ./internal/gateway -run 'Test.*Command.*Policy|Test.*Slash|Test.*Busy' -count=1",
+                "go test ./internal/cli ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Command-registry policy fixtures prove every recognized command has explicit active-turn behavior and unknown commands do not leak into model prompts."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T21:04:49Z",
+                "last_outcome": "no_attempts_yet"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 hermes_cli/commands.py",
+                "note": "Hermes defines the command inventory; Gormes owns the Go policy table and active-turn degradation."
+              }
             },
             {
               "name": "Busy command guard for compression and long CLI actions",
@@ -6538,7 +7035,74 @@
             {
               "name": "Config, profile, auth, and setup command surfaces",
               "status": "planned",
-              "note": "TDD: port hermes_cli config/profile/auth/setup/uninstall flows as separate command groups with XDG-safe state paths and no implicit writes outside the selected Gormes home."
+              "slice_size": "umbrella",
+              "execution_owner": "tools",
+              "not_ready_when": [
+                "The row is assigned as one combined config/profile/auth/setup migration instead of the pure profile, auth-status, setup, and uninstall slices."
+              ],
+              "unblocks": [
+                "CLI profile path and active-profile store",
+                "CLI auth status read model before provider setup",
+                "Setup/uninstall dry-run command contracts"
+              ],
+              "note": "Umbrella only: Hermes config/profile/auth/setup/uninstall spans profile roots, alias wrappers, auth stores, provider setup prompts, and destructive uninstall behavior. Execute dependency-ordered pure helper rows first; do not assign this umbrella row directly."
+            },
+            {
+              "name": "CLI profile path and active-profile store",
+              "status": "planned",
+              "contract": "Gormes models Hermes profile names, active-profile selection, and profile-root resolution as pure XDG-scoped helpers before command UI, alias wrappers, cloning, or export/import behavior is ported",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Profile commands report invalid profile names, missing profiles, reserved-name collisions, and unset active profile state without writing outside the selected Gormes config/data roots.",
+              "fixture": "internal/cli/profile_store_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/profiles.py@edc78e25",
+                "../hermes-agent/tests/hermes_cli/test_profiles.py@edc78e25",
+                "internal/config/config.go",
+                "cmd/gormes/main.go"
+              ],
+              "ready_when": [
+                "This slice only defines validation, path resolution, active-profile read/write, and environment resolution helpers.",
+                "No command UI, alias wrapper, service file, tar export/import, clone-all copy, or provider credential migration is required."
+              ],
+              "not_ready_when": [
+                "The slice creates shell wrapper scripts, copies profile directories, mutates provider credentials, or changes runtime config loading for non-profile commands."
+              ],
+              "unblocks": [
+                "CLI auth status read model before provider setup",
+                "Setup/uninstall dry-run command contracts"
+              ],
+              "acceptance": [
+                "Profile name validation accepts lowercase alphanumeric, underscore, and hyphen names up to 64 characters, keeps default as a special alias, and rejects uppercase, spaces, leading punctuation, empty names, and reserved subcommand names.",
+                "Default and named profile directories resolve under Gormes XDG roots without reading or writing legacy Hermes profile directories.",
+                "Active-profile read/write helpers persist only the selected name plus explicit missing/unset evidence.",
+                "Profile environment resolution returns the effective GORMES profile root for default and named profiles without mutating process-wide environment variables in tests."
+              ],
+              "note": "Split from the broad config/profile/auth/setup bucket so workers can land the pure profile contract before risky command wiring, alias wrappers, cloning, auth-store migration, or uninstall behavior.",
+              "write_scope": [
+                "internal/cli/profile_store.go",
+                "internal/cli/profile_store_test.go",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli ./internal/config -run 'Test.*Profile.*Store|Test.*Profile.*Path|Test.*Active.*Profile' -count=1",
+                "go test ./internal/cli ./internal/config -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Profile helper fixtures prove validation, path resolution, active-profile persistence, environment resolution, and no writes outside selected Gormes roots."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 hermes_cli/profiles.py",
+                "note": "Hermes defines the multi-profile operator contract; Gormes should first express it as Go-native XDG helper behavior."
+              }
             },
             {
               "name": "Top-level oneshot flag and model/provider resolver",
@@ -6864,7 +7428,78 @@
             {
               "name": "Gateway, platform, webhook, and cron management CLI",
               "status": "planned",
-              "note": "TDD: port operator management commands after the shared gateway read models land, so status/pairing/platform/cron commands consume the same stores as the runtime."
+              "slice_size": "umbrella",
+              "execution_owner": "tools",
+              "not_ready_when": [
+                "The row is assigned as one management-CLI migration instead of separate gateway read-model, cron admin, webhook helper, and platform command slices."
+              ],
+              "unblocks": [
+                "Gateway management CLI read-model closeout",
+                "Cron management CLI over native store",
+                "Webhook/platform management CLI helpers"
+              ],
+              "note": "Umbrella only: status, pairing, platform toolsets, webhook helpers, and cron admin commands must consume existing Gormes stores instead of copying Hermes' Python command tree wholesale."
+            },
+            {
+              "name": "Gateway management CLI read-model closeout",
+              "status": "planned",
+              "contract": "Gateway management CLI exposes read-only status, pairing, runtime-validation, and channel-availability evidence over existing Gormes stores before mutating start/stop/restart commands widen the surface",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Gateway CLI reports missing runtime state, invalid PID/process evidence, missing pairing store, disabled channels, and unsupported mutating commands instead of inventing a second management state model.",
+              "fixture": "cmd/gormes/gateway_management_cli_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/gateway.py@edc78e25",
+                "../hermes-agent/hermes_cli/pairing.py@edc78e25",
+                "../hermes-agent/hermes_cli/status.py@edc78e25",
+                "../hermes-agent/tests/hermes_cli/test_gateway_runtime_health.py@edc78e25",
+                "cmd/gormes/gateway_status.go",
+                "internal/gateway/status.go",
+                "internal/gateway/pairing_store.go"
+              ],
+              "ready_when": [
+                "`gormes gateway status` already reads the native runtime status and pairing stores.",
+                "This slice is read-only; it must not start, stop, restart, install, or supervise live gateway services."
+              ],
+              "not_ready_when": [
+                "The slice invokes systemd/sc.exe, opens live channel clients, changes service restart polling, or creates another gateway state file."
+              ],
+              "unblocks": [
+                "Webhook/platform management CLI helpers",
+                "Cron management CLI over native store"
+              ],
+              "acceptance": [
+                "A gateway management fixture renders configured channels, pairing status, runtime validation, Slack/Discord/Telegram availability, and missing-state evidence from fake stores.",
+                "Unsupported mutating management commands return a stable unavailable error with a pointer to the existing service/restart helper rows.",
+                "PID validation output reuses the existing runtime status validation model and never shells out to a live service manager in tests.",
+                "The fixture proves no duplicate management state file or Python Hermes command path is read."
+              ],
+              "note": "Gormes already has a native gateway status read model. This row closes the CLI handoff around read-only management evidence before future mutating gateway/platform command rows are assigned.",
+              "write_scope": [
+                "cmd/gormes/gateway_status.go",
+                "cmd/gormes/gateway_management_cli_test.go",
+                "internal/gateway/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes ./internal/gateway -run 'Test.*Gateway.*Management|Test.*Gateway.*Status|Test.*Pairing|Test.*Runtime.*Validation' -count=1",
+                "go test ./cmd/gormes ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Gateway management fixtures prove read-only status/pairing/runtime evidence, explicit unavailable mutating commands, and no live service-manager dependency."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 hermes_cli/gateway.py",
+                "note": "Hermes defines the operator command expectations; Gormes must consume its existing Go read models rather than recreate Python state."
+              }
             },
             {
               "name": "Service RestartSec parser helper",
@@ -6991,7 +7626,77 @@
             {
               "name": "Diagnostics, backup, logs, and status CLI",
               "status": "planned",
-              "note": "TDD: port read-mostly diagnostics and backup surfaces independently from mutating setup/auth commands, with fixture-backed output tests before live filesystem integration."
+              "slice_size": "umbrella",
+              "execution_owner": "tools",
+              "not_ready_when": [
+                "The row is assigned as one combined diagnostics/backup/logs/status migration instead of log snapshot, status summary, backup manifest, and optional upload slices."
+              ],
+              "unblocks": [
+                "CLI log snapshot reader",
+                "CLI status summary over native stores",
+                "Backup manifest dry-run contract"
+              ],
+              "note": "Umbrella only: read-mostly diagnostics, log capture, status, backup, and optional support-upload behavior must be split so workers do not mix local redaction and filesystem inventory with network uploads or archive writes."
+            },
+            {
+              "name": "CLI log snapshot reader",
+              "status": "planned",
+              "contract": "Gormes captures redacted local log snapshots for agent, gateway, error, tool-audit, and builder-loop logs from XDG paths without network upload or archive creation",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Diagnostics report missing logs, rotated-log fallback, truncation, redaction, and unreadable-file evidence without failing the whole doctor/status command.",
+              "fixture": "internal/cli/log_snapshot_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/debug.py@edc78e25",
+                "../hermes-agent/hermes_cli/logs.py@edc78e25",
+                "../hermes-agent/tests/hermes_cli/test_debug.py@edc78e25",
+                "../hermes-agent/tests/hermes_cli/test_logs.py@edc78e25",
+                "internal/cli/",
+                "internal/config/config.go",
+                "cmd/gormes/doctor.go"
+              ],
+              "ready_when": [
+                "This slice is a pure local file reader with injected root paths and fixture log files.",
+                "No paste upload, support bundle archive, live provider status, or backup write behavior is required."
+              ],
+              "not_ready_when": [
+                "The slice uploads to paste.rs/dpaste, creates tar/zip backups, reads legacy Hermes logs as authoritative state, or changes `gormes doctor` exit codes."
+              ],
+              "unblocks": [
+                "CLI status summary over native stores",
+                "Backup manifest dry-run contract"
+              ],
+              "acceptance": [
+                "Fixtures read small log files and return full plus tail text for agent, gateway, error, tool-audit, and builder-loop log classes.",
+                "Missing primary logs fall back to rotated log names when available and otherwise emit file-not-found evidence.",
+                "Large logs are capped by byte and line limits with truncation evidence.",
+                "Secrets shaped like API keys, bearer tokens, and configured proxy keys are redacted before rendering."
+              ],
+              "note": "Split first from the diagnostics umbrella because Hermes debug/log behavior mixes local capture, redaction, optional upload, and backup-like support bundles. Gormes should land local capture before any network or archive surface.",
+              "write_scope": [
+                "internal/cli/log_snapshot.go",
+                "internal/cli/log_snapshot_test.go",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli ./internal/config -run 'Test.*Log.*Snapshot|Test.*Diagnostic.*Log|Test.*Redact' -count=1",
+                "go test ./internal/cli ./internal/config -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Log snapshot fixtures prove local log capture, rotated fallback, truncation evidence, redaction, and no network/archive side effects."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 hermes_cli/debug.py",
+                "note": "Hermes defines operator log/debug expectations; Gormes ports the local diagnostic contract first over XDG paths."
+              }
             }
           ]
         },
@@ -7089,7 +7794,125 @@
             {
               "name": "Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)",
               "status": "planned",
-              "note": "TDD-first prerequisite slice for the `SSE streaming to Bubble Tea TUI` and API-server slices below. Port the pure-function helper surface from upstream `tui_gateway/` as foundational primitives before any transport/lifecycle work lands: `_load_tool_progress_mode` -> ParseToolProgressMode/ToolProgressEnabled, `_normalize_completion_path` -> NormalizeCompletionPath, `_estimate_image_tokens`/`_image_meta` -> EstimateImageTokens/ImageMeta/ReadImageMeta, upstream tool-progress helpers -> FormatToolDuration/CountList/ToolSummary, personality validator + renderer, and the upstream `PlatformEvent` struct surface for the remote Bubble Tea TUI. Each helper lands behind pure-function unit tests with fixed inputs/outputs — no HTTP, no SSE, no JSON-RPC dispatch, no Bubble Tea program in this slice. Evidence of granularity mismatch on main: as of planner run 2026-04-24, `internal/tuigateway/` does not exist in the tree, and `git log --all --since='2026-04-23'` shows **repeated worker attempts** on codexu/* branches for each of these helpers (tool-progress mode, completion-path, image primitives, tool-progress helpers, personality validator, PlatformEvent, RemoteClient, JSONRPCDispatcher, NewGatewayMux) with **zero** merged to main — confirming the `SSE streaming to Bubble Tea TUI` slice is too big a jump from the current tree and must not consume the helper-file ports. Keep this slice strictly additive and pure-function — no NewRemoteClient, no NewGatewayMux, no SSE dial in this slice; those land in the SSE-streaming slice once the primitives are green."
+              "slice_size": "umbrella",
+              "execution_owner": "gateway",
+              "not_ready_when": [
+                "The row is assigned as one combined tui_gateway helper migration instead of the two pure-helper slices below."
+              ],
+              "unblocks": [
+                "TUI gateway progress/completion helpers",
+                "TUI gateway image/personality/platform-event helpers"
+              ],
+              "note": "Umbrella only: repeated worker attempts showed this combined helper surface was too broad. Execute through `TUI gateway progress/completion helpers` first, then `TUI gateway image/personality/platform-event helpers`; no HTTP, SSE, JSON-RPC, or Bubble Tea program belongs in this umbrella row."
+            },
+            {
+              "name": "TUI gateway progress/completion helpers",
+              "status": "planned",
+              "contract": "Pure TUI gateway helper functions normalize tool-progress mode, completion paths, and tool summary formatting from fixed inputs",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Remote TUI streaming remains unavailable while status can report missing progress/completion helper coverage.",
+              "fixture": "internal/tuigateway/progress_completion_test.go",
+              "source_refs": [
+                "../hermes-agent/tui_gateway/server.py@edc78e25",
+                "../hermes-agent/tui_gateway/render.py@edc78e25",
+                "../hermes-agent/tests/test_tui_gateway_server.py@edc78e25",
+                "internal/tui/"
+              ],
+              "ready_when": [
+                "No transport or lifecycle code is required; helpers can be implemented as pure functions under internal/tuigateway with table tests."
+              ],
+              "not_ready_when": [
+                "The slice opens HTTP/SSE connections, starts a Bubble Tea program, adds a remote client, or ports image/personality/platform-event helpers."
+              ],
+              "unblocks": [
+                "TUI gateway image/personality/platform-event helpers"
+              ],
+              "acceptance": [
+                "Tool-progress mode parsing and enabled/disabled decisions match upstream fixtures.",
+                "Completion paths normalize consistently for empty, relative, absolute, and home-directory-shaped inputs.",
+                "Tool duration/count/list summary helpers are deterministic and side-effect free."
+              ],
+              "note": "First split from the prior 5.Q helper umbrella so workers can land progress and completion primitives before any remote TUI transport or media/personality helper work.",
+              "write_scope": [
+                "internal/tuigateway/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tuigateway -run 'Test.*Progress|Test.*Completion|Test.*ToolSummary' -count=1",
+                "go test ./internal/tuigateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Pure internal/tuigateway fixtures prove progress mode, completion path, and tool-summary helpers without transport or Bubble Tea dependencies."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 tui_gateway/server.py",
+                "note": "Hermes defines the remote TUI helper semantics; Gormes keeps the first port as pure Go helpers."
+              }
+            },
+            {
+              "name": "TUI gateway image/personality/platform-event helpers",
+              "status": "planned",
+              "contract": "Pure TUI gateway media, personality, and platform-event helpers expose stable structs and validation without remote transport",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Remote TUI image/personality/platform-event features report unavailable until helper validation is fixture-backed.",
+              "fixture": "internal/tuigateway/media_personality_event_test.go",
+              "source_refs": [
+                "../hermes-agent/tui_gateway/server.py@edc78e25",
+                "../hermes-agent/tui_gateway/render.py@edc78e25",
+                "../hermes-agent/tests/test_tui_gateway_server.py@edc78e25",
+                "internal/kernel/frame.go",
+                "internal/tui/"
+              ],
+              "ready_when": [
+                "TUI gateway progress/completion helpers are validated, so internal/tuigateway package scaffolding exists."
+              ],
+              "not_ready_when": [
+                "The slice creates NewRemoteClient, NewGatewayMux, SSE dialers, JSON-RPC dispatchers, or live image reads outside temp fixtures."
+              ],
+              "blocked_by": [
+                "TUI gateway progress/completion helpers"
+              ],
+              "unblocks": [
+                "SSE streaming to Bubble Tea TUI"
+              ],
+              "acceptance": [
+                "Image token estimates and metadata parsing use temp fixture files and bounded reads only.",
+                "Personality validation/rendering returns deterministic messages for supported, missing, and invalid values.",
+                "PlatformEvent structs round-trip JSON for submit, cancel, resize, progress, and image metadata without starting transport."
+              ],
+              "note": "Second pure-helper split; this creates the media/personality/event schema foundation that remote TUI transport can consume later.",
+              "write_scope": [
+                "internal/tuigateway/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tuigateway -run 'Test.*Image|Test.*Personality|Test.*PlatformEvent|Test.*Media' -count=1",
+                "go test ./internal/tuigateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Media/personality/platform-event fixtures prove deterministic helper behavior and JSON schema without remote transport."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 tui_gateway/server.py",
+                "note": "Hermes defines remote TUI helper schemas; Gormes ports them as inert Go helper contracts before transport."
+              }
             },
             {
               "name": "TUI mouse tracking config + slash toggle",
@@ -7194,9 +8017,188 @@
               }
             },
             {
+              "name": "TUI launch model override + static alias resolver",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Gormes TUI honors top-level --model/--provider and GORMES_INFERENCE_* overrides at startup without network model lookup or oneshot-only coupling",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Startup returns an actionable model/provider ambiguity error instead of silently using stale configured defaults or performing network catalog lookup.",
+              "fixture": "cmd/gormes/tui_model_override_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/main.py@283c8fd6",
+                "../hermes-agent/hermes_cli/models.py@283c8fd6",
+                "../hermes-agent/tui_gateway/server.py@283c8fd6",
+                "../hermes-agent/tests/hermes_cli/test_models.py@283c8fd6",
+                "../hermes-agent/tests/hermes_cli/test_tui_resume_flow.py@283c8fd6",
+                "cmd/gormes/main.go",
+                "internal/config/config.go",
+                "internal/hermes/model_registry.go"
+              ],
+              "ready_when": [
+                "Top-level oneshot model/provider resolution is validated, but runTUI currently ignores --model/--provider flags and uses cfg.Hermes.Model directly.",
+                "Gormes has a static embedded model registry that can resolve short aliases without OpenRouter or provider network calls."
+              ],
+              "not_ready_when": [
+                "The slice changes oneshot stdout capture, opens provider catalog network calls during startup, or ports Hermes Node/Ink UI code."
+              ],
+              "unblocks": [
+                "SSE streaming to Bubble Tea TUI"
+              ],
+              "acceptance": [
+                "`gormes --offline --model sonnet --provider anthropic` starts the TUI/kernel with the resolved Anthropic model without calling api_server health or network model catalogs in the focused fixture.",
+                "A provider override without an explicit model returns the same exit-code-2 ambiguity class as oneshot resolution.",
+                "Resume/session startup still persists the same TUI session key and does not mutate persisted config defaults."
+              ],
+              "note": "Hermes 283c8fd6 moved model/provider overrides into TUI launch and fixed startup alias resolution to avoid network lookup. Gormes already parses top-level flags for oneshot; add a TUI-specific fixture before remote TUI transport so model state is not silently stale.",
+              "write_scope": [
+                "cmd/gormes/main.go",
+                "cmd/gormes/tui_model_override_test.go",
+                "internal/config/",
+                "internal/hermes/model_registry.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes -run TestTUIModelOverride -count=1",
+                "go test ./cmd/gormes ./internal/config ./internal/hermes -run 'Test.*TUI.*Model|Test.*OneshotInference|Test.*ModelRegistry' -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "TUI startup fixtures prove --model/--provider/env override behavior, static alias resolution, exit-code-2 ambiguity errors, and no network catalog lookup."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:283c8fd6 hermes_cli/main.py",
+                "note": "Hermes defines launch override semantics; Gormes adapts them to the native Cobra/Bubble Tea startup path."
+              }
+            },
+            {
+              "name": "Native TUI terminal-selection divergence contract",
+              "status": "planned",
+              "contract": "Gormes documents and fixture-locks a terminal-native selection model for the Bubble Tea TUI, with no advertised custom copy hotkey until a Go-native implementation exists",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator"
+              ],
+              "degraded_mode": "TUI status/help reports terminal-native selection behavior and does not advertise SSH/local copy shortcuts, rendered-space copy, or clipboard semantics that Gormes cannot honor.",
+              "fixture": "internal/tui/selection_copy_test.go",
+              "source_refs": [
+                "../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.ts@edc78e25",
+                "../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.test.ts@edc78e25",
+                "../hermes-agent/ui-tui/src/lib/platform.ts@edc78e25",
+                "../hermes-agent/ui-tui/src/app/useInputHandlers.ts@edc78e25",
+                "../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.ts@31d7f195",
+                "internal/tui/",
+                "docs/content/upstream-hermes/user-guide/tui.md"
+              ],
+              "ready_when": [
+                "Gormes native TUI has mouse tracking toggles but no custom selection/copy implementation.",
+                "Upstream Hermes edc78e25 and 31d7f195 fixed SSH copy shortcuts, rendered-space preservation, indentation, and bounds clamping in the Node/Ink TUI."
+              ],
+              "not_ready_when": [
+                "The slice ports Hermes Ink, adds Node/npm dependencies, calls OSC clipboard APIs, changes remote TUI transport, or implements custom selection copying in the same change."
+              ],
+              "acceptance": [
+                "TUI help/status fixtures say selection uses the operator's terminal selection until a native Gormes copy mode is explicitly implemented.",
+                "No fake copy hotkey, SSH copy shortcut, or clipboard command is advertised in help/status output.",
+                "Docs state the divergence from Hermes' custom Ink selection stack and point future parity work at a separate Go-native fixture.",
+                "The solution remains native Go/Bubble Tea with no Hermes Ink bundle, Node, OSC clipboard dependency, or npm runtime requirement."
+              ],
+              "note": "The local TUI currently has mouse tracking but no custom selection/copy stack. Freeze that as an explicit terminal-native divergence now so public docs and status do not imply Hermes Ink parity; a later row can add Go-native copy fixtures if the product decision changes.",
+              "write_scope": [
+                "internal/tui/",
+                "cmd/gormes/",
+                "docs/content/building-gormes/architecture_plan/progress.json",
+                "docs/content/building-gormes/architecture_plan/phase-5-final-purge.md"
+              ],
+              "test_commands": [
+                "go test ./internal/tui ./cmd/gormes -run 'Test.*Selection|Test.*Copy|Test.*TUI.*Help' -count=1",
+                "go test ./internal/tui ./cmd/gormes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Native TUI fixtures and docs prove Gormes advertises terminal-native selection honestly and remains independent from Hermes Ink/Node clipboard behavior."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 ui-tui/packages/hermes-ink/src/ink/selection.ts",
+                "note": "Hermes defines custom Ink selection behavior; Gormes currently owns a native Bubble Tea divergence that should be explicit before remote TUI work widens."
+              }
+            },
+            {
               "name": "SSE streaming to Bubble Tea TUI",
               "status": "planned",
-              "note": "TDD: port the tui_gateway server/render/slash-worker event contract so remote Bubble Tea clients can subscribe to live agent state without the Python gateway process. Depends on the `Deterministic helper-file ports` slice above — this slice owns the transport/lifecycle wiring (DialSSE, NewRemoteClient, NewGatewayMux, JSONRPCDispatcher, PostPlatformEvent, `--remote <url>` threading through runTUI) that consumes the frozen helper primitives. Do not widen the helper-primitives contract here."
+              "contract": "Remote Bubble Tea clients can consume native Gormes turn events over SSE without the Python tui_gateway process",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "TUI status reports remote streaming unavailable while local Bubble Tea mode continues to work.",
+              "fixture": "internal/tuigateway/sse_stream_test.go",
+              "source_refs": [
+                "../hermes-agent/tui_gateway/server.py@edc78e25",
+                "../hermes-agent/tui_gateway/ws.py@edc78e25",
+                "../hermes-agent/tui_gateway/event_publisher.py@edc78e25",
+                "../hermes-agent/tests/test_tui_gateway_server.py@edc78e25",
+                "internal/tui/",
+                "internal/kernel/"
+              ],
+              "ready_when": [
+                "TUI gateway image/personality/platform-event helpers are validated.",
+                "TUI launch model override + static alias resolver is either validated or deliberately excluded from remote startup in this slice."
+              ],
+              "not_ready_when": [
+                "The slice widens pure helper semantics, imports upstream React/Node code, or uses the Python tui_gateway process as the runtime."
+              ],
+              "blocked_by": [
+                "TUI gateway image/personality/platform-event helpers",
+                "TUI launch model override + static alias resolver"
+              ],
+              "unblocks": [
+                "Dashboard PTY chat sidecar contract"
+              ],
+              "acceptance": [
+                "DialSSE/NewRemoteClient consumes fixture SSE frames into native kernel/tui events with reconnect and cancellation behavior covered.",
+                "NewGatewayMux or equivalent exposes submit/cancel/resize/platform-event endpoints over native Go HTTP handlers.",
+                "`--remote <url>` startup threading is fixture-covered without starting api_server, Python, Node, or a live provider."
+              ],
+              "note": "TDD: port only the transport/lifecycle wiring after helper rows land. This slice owns DialSSE/NewRemoteClient/NewGatewayMux/JSONRPC-style dispatch/PostPlatformEvent and `--remote <url>` threading through runTUI; helper primitives and TUI launch model semantics stay in their own rows.",
+              "write_scope": [
+                "internal/tuigateway/",
+                "cmd/gormes/",
+                "internal/tui/",
+                "internal/kernel/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tuigateway ./cmd/gormes ./internal/tui ./internal/kernel -run 'Test.*SSE|Test.*RemoteTUI|Test.*GatewayMux|Test.*PlatformEvent' -count=1",
+                "go test ./internal/tuigateway ./cmd/gormes ./internal/tui ./internal/kernel -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Remote TUI fixtures prove SSE event consumption, submit/cancel/resize dispatch, remote startup wiring, and no Python/Node dependency."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T21:04:49Z",
+                "last_outcome": "no_attempts_yet"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 tui_gateway/server.py",
+                "note": "Hermes defines the remote TUI event contract; Gormes owns the native Go transport and Bubble Tea adaptation."
+              }
             },
             {
               "name": "OpenAI-compatible chat-completions API server",
@@ -7507,13 +8509,72 @@
             {
               "name": "API server health + cron admin endpoints",
               "status": "planned",
-              "note": "TDD: port /health/detailed plus /api/jobs list/create/update/delete/pause/resume/trigger after the Phase 5.N cronjob store/API parity slices land, reusing the same auth and OpenAI-style error envelope instead of creating a second cron control plane."
+              "contract": "Native API server exposes detailed health and cron admin endpoints over the same scheduler/store contracts as CLI and tools",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "HTTP health reports cron/admin unavailable until the Phase 5.N cronjob store and parser parity slices are validated.",
+              "fixture": "internal/apiserver/health_cron_admin_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/api_server.py@edc78e25",
+                "../hermes-agent/cron/scheduler.py@edc78e25",
+                "../hermes-agent/tools/cronjob_tools.py@edc78e25",
+                "internal/apiserver/",
+                "internal/cron/",
+                "internal/tools/"
+              ],
+              "ready_when": [
+                "Cronjob tool API + schedule parser parity, Cron prompt/script safety + pre-run script contract, and Cron multi-target delivery + media/live-adapter fallback have stable native store contracts."
+              ],
+              "not_ready_when": [
+                "The slice creates a second cron control plane, bypasses OpenAI-style error envelopes, or exposes admin writes before auth/body-limit fixtures are in place."
+              ],
+              "blocked_by": [
+                "Cronjob tool API + schedule parser parity",
+                "Cron prompt/script safety + pre-run script contract",
+                "Cron multi-target delivery + media/live-adapter fallback"
+              ],
+              "acceptance": [
+                "/health/detailed reports provider, response-store, run-event, cron, and gateway degraded state without leaking secrets.",
+                "/api/jobs list/create/update/delete/pause/resume/trigger reuse the native cron store and schedule parser fixtures.",
+                "Auth failures, malformed bodies, missing jobs, and store-disabled states use the same error envelope and request-size limits as the OpenAI-compatible APIs."
+              ],
+              "note": "TDD: keep HTTP admin behind the 5.N cron store/parser/delivery rows so API, CLI, and tool control all share one native scheduler/store contract instead of copying Hermes' Python control plane.",
+              "write_scope": [
+                "internal/apiserver/",
+                "internal/cron/",
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/apiserver ./internal/cron ./internal/tools -run 'Test.*Health|Test.*Cron.*Admin|Test.*Jobs' -count=1",
+                "go test ./internal/apiserver ./internal/cron ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "API fixtures prove detailed health plus cron admin CRUD/pause/resume/trigger over native store contracts with shared auth/error-envelope behavior."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T21:04:49Z",
+                "last_outcome": "no_attempts_yet"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 gateway/platforms/api_server.py",
+                "note": "Hermes defines the API shape; Gormes gates it on native cron store parity."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T18:18:54Z",
-            "origin_decision": "Hermes still leads API server, remote TUI, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 adds a Node/Ink bundle rebuild regression that Gormes should track as an explicit no-Node divergence row instead of importing Hermes first-launch build machinery."
+            "last_upstream_check": "2026-04-25T21:13:17Z",
+            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, and edc78e25/31d7f195 add Ink selection-copy fixes that Gormes must either adapt natively or document as a terminal-native divergence."
           }
         },
         "5.R": {
@@ -7626,7 +8687,123 @@
             {
               "name": "Hybrid lexical + semantic lookup",
               "status": "planned",
-              "note": "TDD: combine lexical tags with Phase 3 semantic embeddings behind a deterministic scorer, proving disabled/unreviewed skills stay excluded from prompt injection."
+              "contract": "Reviewed skills are selected by a deterministic lexical plus semantic scorer while disabled and unreviewed drafts remain excluded from prompt injection",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Skill status reports semantic lookup unavailable or review-gated instead of silently injecting low-confidence or unreviewed skills.",
+              "fixture": "internal/skills/hybrid_lookup_test.go",
+              "source_refs": [
+                "docs/content/upstream-gbrain/gormes-takeaways.md",
+                "../gbrain/src/core/search/hybrid.ts@f718c59",
+                "../gbrain/src/core/search/two-pass.ts@f718c59",
+                "internal/skills/selector.go",
+                "internal/memory/semantic_sql.go"
+              ],
+              "ready_when": [
+                "Portable SKILL.md format is validated so skills carry review state, triggers, exclusions, and provenance metadata.",
+                "Phase 3 semantic embedding lookup remains optional and can be stubbed in unit fixtures without Ollama."
+              ],
+              "not_ready_when": [
+                "The slice injects disabled/unreviewed skills, requires live embeddings in unit tests, or ports GBrain's PGLite/Postgres search runtime."
+              ],
+              "blocked_by": [
+                "Portable SKILL.md format"
+              ],
+              "unblocks": [
+                "Code Cathedral II code-context retrieval fixtures",
+                "Skill effectiveness scoring"
+              ],
+              "acceptance": [
+                "Lexical trigger/exclusion scores and semantic scores combine into a stable explanation per selected skill.",
+                "Disabled, invalid, and unreviewed skills are excluded before scoring and reported in status evidence.",
+                "Missing semantic embeddings degrade to lexical-only selection with an explicit reason."
+              ],
+              "note": "TDD: combine lexical tags with Phase 3 semantic embeddings behind a deterministic scorer, using GBrain f718c59 retrieval lessons as donor evidence without importing its database/runtime.",
+              "write_scope": [
+                "internal/skills/",
+                "internal/memory/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/skills ./internal/memory -run 'Test.*Hybrid.*Skill|Test.*Skill.*Lookup|Test.*Semantic' -count=1",
+                "go test ./internal/skills ./internal/memory -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Skill lookup fixtures prove deterministic lexical+semantic selection, review gating, semantic degraded mode, and score explanations."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T21:04:49Z",
+                "last_outcome": "no_attempts_yet"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:f718c59 src/core/search/hybrid.ts",
+                "note": "GBrain informs retrieval scoring; Gormes adapts it to reviewed SKILL.md assets and SQLite/optional embeddings."
+              }
+            },
+            {
+              "name": "Code Cathedral II code-context retrieval fixtures",
+              "status": "planned",
+              "contract": "Learning-loop retrieval can consume code-context evidence with parent-scope and call-edge explanations without importing GBrain's TypeScript indexer",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Skill retrieval reports code-context unavailable rather than pretending call-graph or parent-scope evidence exists.",
+              "fixture": "internal/skills/code_context_retrieval_test.go",
+              "source_refs": [
+                "../gbrain/docs/designs/CODE_CATHEDRAL_II.md@f718c59",
+                "../gbrain/src/core/chunkers/code.ts@f718c59",
+                "../gbrain/src/core/chunkers/edge-extractor.ts@f718c59",
+                "../gbrain/src/core/search/two-pass.ts@f718c59",
+                "../gbrain/test/parent-scope.test.ts@f718c59",
+                "../gbrain/test/two-pass.test.ts@f718c59",
+                "../gbrain/test/code-edges.test.ts@f718c59"
+              ],
+              "ready_when": [
+                "Hybrid lexical + semantic lookup is validated and can accept optional external evidence in fixtures."
+              ],
+              "not_ready_when": [
+                "The slice embeds tree-sitter WASM, ports GBrain's reindex-code CLI, creates a separate code database, or runs repository-wide indexing in unit tests."
+              ],
+              "blocked_by": [
+                "Hybrid lexical + semantic lookup"
+              ],
+              "acceptance": [
+                "Synthetic code-context fixtures carry symbol, parent scope, and call-edge fields into skill retrieval explanations.",
+                "High-fan-out call edges are capped deterministically and reported as capped evidence.",
+                "When code context is absent or stale, skill lookup falls back to lexical/semantic scoring with explicit degraded evidence."
+              ],
+              "note": "GBrain f718c59 Code Cathedral II adds call-graph edges, two-pass retrieval, and parent-scope chunks. Gormes should first define the tiny evidence contract a learning-loop selector can consume; a Go code indexer is a later decision.",
+              "write_scope": [
+                "internal/skills/",
+                "internal/insights/",
+                "docs/content/building-gormes/architecture_plan/progress.json",
+                "docs/content/upstream-gbrain/"
+              ],
+              "test_commands": [
+                "go test ./internal/skills ./internal/insights -run 'Test.*Code.*Context|Test.*Call.*Edge|Test.*Parent.*Scope' -count=1",
+                "go test ./internal/skills ./internal/insights -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Code-context retrieval fixtures prove parent-scope/call-edge evidence is optional, capped, explained, and never requires a GBrain runtime import."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:f718c59 docs/designs/CODE_CATHEDRAL_II.md",
+                "note": "GBrain's Code Cathedral II is donor evidence for code-context retrieval, not a subsystem to embed."
+              }
             }
           ]
         },

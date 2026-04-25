@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/cmdrunner"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/plannerloop"
@@ -19,15 +20,12 @@ func TestRunDryRunPrintsPlannerSummary(t *testing.T) {
 	t.Setenv("RUN_ROOT", filepath.Join(repoRoot, ".codex", "planner"))
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
 	withWorkingDir(t, repoRoot)
 
-	if err := run(context.Background(), []string{"run", "--dry-run"}); err != nil {
+	if err := run(context.Background(), deps, []string{"run", "--dry-run"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -49,15 +47,12 @@ func TestRunBackendFlagUsesClaudeu(t *testing.T) {
 	t.Setenv("RUN_ROOT", filepath.Join(repoRoot, ".codex", "planner"))
 	t.Setenv("PLANNER_VALIDATE", "0")
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}, {}, {}, {}}}
-	oldRunner := commandRunner
-	commandRunner = runner
-	t.Cleanup(func() {
-		commandRunner = oldRunner
-	})
+	deps := defaultDeps()
+	deps.runner = runner
 
 	withWorkingDir(t, repoRoot)
 
-	if err := run(context.Background(), []string{"run", "--backend", "claudeu"}); err != nil {
+	if err := run(context.Background(), deps, []string{"run", "--backend", "claudeu"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -77,23 +72,16 @@ func TestRunStatusAndShowReportUseConfiguredRunRoot(t *testing.T) {
 	withWorkingDir(t, repoRoot)
 
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}, {}, {}, {}}}
-	oldRunner := commandRunner
-	commandRunner = runner
-	t.Cleanup(func() {
-		commandRunner = oldRunner
-	})
-	if err := run(context.Background(), []string{"run"}); err != nil {
+	deps := defaultDeps()
+	deps.runner = runner
+	if err := run(context.Background(), deps, []string{"run"}); err != nil {
 		t.Fatalf("run() setup error = %v", err)
 	}
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps.stdout = &stdout
 
-	if err := run(context.Background(), []string{"status"}); err != nil {
+	if err := run(context.Background(), deps, []string{"status"}); err != nil {
 		t.Fatalf("status error = %v", err)
 	}
 	if !strings.Contains(stdout.String(), "Last run UTC:") {
@@ -101,11 +89,61 @@ func TestRunStatusAndShowReportUseConfiguredRunRoot(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if err := run(context.Background(), []string{"show-report"}); err != nil {
+	if err := run(context.Background(), deps, []string{"show-report"}); err != nil {
 		t.Fatalf("show-report error = %v", err)
 	}
 	if !strings.Contains(stdout.String(), "# Architecture Planner Loop Run") {
 		t.Fatalf("show-report output missing report:\n%s", stdout.String())
+	}
+}
+
+func TestDoctorUsesPlannerRunStatusForPlannerDrift(t *testing.T) {
+	repoRoot := writeCommandFixture(t)
+	runRoot := filepath.Join(repoRoot, ".codex", "planner")
+	builderRoot := filepath.Join(repoRoot, ".codex", "builder-loop")
+	t.Setenv("RUN_ROOT", runRoot)
+	t.Setenv("BUILDER_LOOP_RUN_ROOT", builderRoot)
+	writeCommandFile(t, filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"), `{
+  "meta": {
+    "version": "2.0",
+    "last_updated": "2026-04-25",
+    "links": {
+      "github_readme": "https://example.test/readme",
+      "landing_page": "https://example.test",
+      "docs_site": "https://example.test/docs",
+      "source_code": "https://example.test/src"
+    }
+  },
+  "phases": {
+    "1": {
+      "name": "Phase 1 Test",
+      "deliverable": "test deliverable",
+      "subphases": {
+        "1.A": {
+          "name": "First subphase",
+          "items": [{"name": "item one", "status": "planned"}]
+        }
+      }
+    }
+  }
+}`)
+	withWorkingDir(t, repoRoot)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	writeCommandFile(t, filepath.Join(runRoot, "state", "runs.jsonl"), `{"ts":"`+now+`","run_id":"run-1","backend":"codexu","mode":"safe","status":"ok"}`+"\n")
+	writeCommandFile(t, filepath.Join(builderRoot, "state", "runs.jsonl"), `{"ts":"`+now+`","event":"health_updated"}`+"\n")
+
+	var stdout bytes.Buffer
+	deps := defaultDeps()
+	deps.stdout = &stdout
+	if err := run(context.Background(), deps, []string{"doctor"}); err != nil {
+		t.Fatalf("doctor error = %v", err)
+	}
+	if strings.Contains(stdout.String(), "planner ledger") {
+		t.Fatalf("doctor emitted planner ledger warning for final run status:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "doctor: ok") {
+		t.Fatalf("doctor output missing ok:\n%s", stdout.String())
 	}
 }
 
@@ -118,11 +156,10 @@ func TestServiceInstallWritesUnits(t *testing.T) {
 	withWorkingDir(t, repoRoot)
 
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}}}
-	oldRunner := commandRunner
-	commandRunner = runner
-	t.Cleanup(func() { commandRunner = oldRunner })
+	deps := defaultDeps()
+	deps.runner = runner
 
-	if err := run(context.Background(), []string{"service", "install"}); err != nil {
+	if err := run(context.Background(), deps, []string{"service", "install"}); err != nil {
 		t.Fatalf("service install error = %v", err)
 	}
 
@@ -188,7 +225,8 @@ func TestParseRunOptions_QuotedMultiwordKeywordsSplitOnWhitespace(t *testing.T) 
 }
 
 func TestRunRejectsUnknownCommand(t *testing.T) {
-	err := run(context.Background(), []string{"unknown"})
+	deps := defaultDeps()
+	err := run(context.Background(), deps, []string{"unknown"})
 	if err == nil {
 		t.Fatal("run() error = nil, want error")
 	}
@@ -202,11 +240,10 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 
 func TestPrintRunSummaryEchoesKeywords(t *testing.T) {
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() { commandStdout = oldStdout })
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
-	if err := printRunSummary(plannerloop.RunSummary{Backend: "codexu", Mode: "safe"}, true, []string{"hermes-issues", "memory"}); err != nil {
+	if err := printRunSummary(deps, plannerloop.RunSummary{Backend: "codexu", Mode: "safe"}, true, []string{"hermes-issues", "memory"}); err != nil {
 		t.Fatalf("printRunSummary error = %v", err)
 	}
 
@@ -217,11 +254,10 @@ func TestPrintRunSummaryEchoesKeywords(t *testing.T) {
 
 func TestPrintRunSummaryOmitsKeywordsWhenEmpty(t *testing.T) {
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() { commandStdout = oldStdout })
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
-	if err := printRunSummary(plannerloop.RunSummary{Backend: "codexu", Mode: "safe"}, true, nil); err != nil {
+	if err := printRunSummary(deps, plannerloop.RunSummary{Backend: "codexu", Mode: "safe"}, true, nil); err != nil {
 		t.Fatalf("printRunSummary error = %v", err)
 	}
 
@@ -241,6 +277,91 @@ func TestResolveRepoRootPrefersFlag(t *testing.T) {
 	}
 	if got, want := args, []string{"run"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("args = %v, want %v", got, want)
+	}
+}
+
+func TestClassifyExitCodes(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "parse", err: errParse, want: exitParseError},
+		{name: "deadline", err: context.DeadlineExceeded, want: exitBackendTimeout},
+		{name: "canceled", err: context.Canceled, want: exitBackendTimeout},
+		{name: "other", err: errors.New("boom"), want: exitInternal},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyExit(tc.err); got != tc.want {
+				t.Fatalf("classifyExit(%v) = %d, want %d", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSubcommandHelpPrintsScopedUsage(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "run", args: []string{"run", "--help"}, want: "usage: planner-loop run"},
+		{name: "doctor", args: []string{"doctor", "-h"}, want: "usage: planner-loop doctor"},
+		{name: "trigger", args: []string{"trigger", "--help"}, want: "usage: planner-loop trigger <reason>"},
+		{name: "service", args: []string{"service", "--help"}, want: "usage: planner-loop service install"},
+		{name: "service install", args: []string{"service", "install", "--help"}, want: "usage: planner-loop service install"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			deps := defaultDeps()
+			deps.stdout = &stdout
+			withWorkingDir(t, t.TempDir())
+
+			if err := run(context.Background(), deps, tc.args); err != nil {
+				t.Fatalf("run() error = %v", err)
+			}
+			if !strings.Contains(stdout.String(), tc.want) {
+				t.Fatalf("stdout = %q, want substring %q", stdout.String(), tc.want)
+			}
+		})
+	}
+}
+
+func TestTriggerAppendsManualEvent(t *testing.T) {
+	repoRoot := writeCommandFixture(t)
+	triggersPath := filepath.Join(repoRoot, "triggers.jsonl")
+	t.Setenv("PLANNER_TRIGGERS_PATH", triggersPath)
+	withWorkingDir(t, repoRoot)
+
+	var stdout bytes.Buffer
+	deps := defaultDeps()
+	deps.stdout = &stdout
+
+	if err := run(context.Background(), deps, []string{"trigger", "operator-asked-for-refresh"}); err != nil {
+		t.Fatalf("run(trigger) error = %v", err)
+	}
+
+	body, err := os.ReadFile(triggersPath)
+	if err != nil {
+		t.Fatalf("read triggers.jsonl: %v", err)
+	}
+	if !strings.Contains(string(body), `"reason":"operator-asked-for-refresh"`) {
+		t.Fatalf("triggers.jsonl missing reason:\n%s", body)
+	}
+	if !strings.Contains(string(body), `"kind":"manual"`) {
+		t.Fatalf("triggers.jsonl missing kind=manual:\n%s", body)
+	}
+	if !strings.Contains(stdout.String(), "trigger: appended manual event") {
+		t.Fatalf("stdout = %q, want trigger confirmation", stdout.String())
+	}
+}
+
+func TestTriggerRequiresReason(t *testing.T) {
+	repoRoot := writeCommandFixture(t)
+	withWorkingDir(t, repoRoot)
+	deps := defaultDeps()
+	if err := run(context.Background(), deps, []string{"trigger"}); !errors.Is(err, errParse) {
+		t.Fatalf("err = %v, want errParse", err)
 	}
 }
 

@@ -16,15 +16,15 @@ leverage.
 | 2 | Replace mutually-exclusive backend flags with `--backend <name>`     | done         |
 | 3 | Push env reads into `*.ConfigFromEnv` (kill cmd/-side allowlists)    | done         |
 | 4 | Graceful shutdown via `signal.NotifyContext`                         | done         |
-| 5 | Per-subcommand `--help`                                              | open         |
-| 6 | `planner-loop doctor` actually diagnoses drift                       | open         |
+| 5 | Per-subcommand `--help`                                              | done         |
+| 6 | `planner-loop doctor` actually diagnoses drift                       | done         |
 | 7 | Show keywords in planner run summary                                 | done         |
-| 8 | `planner-loop trigger <reason>` verb                                 | open         |
-| 9 | Move `progress` and `repo` subcommands out of `builder-loop`         | open         |
-| 10 | Collapse `progress write` to a table-driven loop                    | open         |
-| 11 | Replace package-level test-seam globals with a `cliDeps` struct     | open         |
-| 12 | Structured exit codes                                                | partial      |
-| 13 | `--format json` for read-only commands                               | open         |
+| 8 | `planner-loop trigger <reason>` verb                                 | done         |
+| 9 | Move `progress` and `repo` subcommands out of `builder-loop`         | done         |
+| 10 | Collapse `progress write` to a table-driven loop                    | done         |
+| 11 | Replace package-level test-seam globals with a `cliDeps` struct     | done         |
+| 12 | Structured exit codes                                                | done         |
+| 13 | `--format json` for read-only commands                               | done         |
 | 14 | `--repo-root` / `REPO_ROOT` flag                                     | done         |
 | 15 | `digest --output` should refuse to clobber unless `--force`          | done         |
 
@@ -139,6 +139,15 @@ loop changes.
 under a single `cmd/gormes <verb>` parent. Update Makefile,
 documentation, and any wrapper scripts.
 
+**Status (2026-04-25).** New `cmd/progress` and `cmd/repoctl` binaries
+exist as standalone entry points. The shared progress logic moved to a
+new `internal/progressctl` package; `internal/repoctl` already existed
+so `cmd/repoctl` is a direct wrapper. The `builder-loop progress …` and
+`builder-loop repo …` subcommands keep working — they now delegate to
+the same internal packages — so existing automation does not break.
+Future cleanup: drop the builder-loop subcommands once operators have
+migrated, and update Makefile + READMEs.
+
 ### 10. Collapse `progress write` to a table-driven loop
 
 `cmd/builder-loop/progress.go:42-94` is nine near-identical
@@ -173,6 +182,20 @@ from "no candidates this cycle" (retry quickly) from "backend timeout"
 backend-timeout=20, verify-failed=30, internal=1) and `os.Exit` with the
 right value.
 
+**Status (2026-04-25).** Wired in both binaries. The classifyExit
+helper maps:
+- `errors.Is(err, errParse)` → 2 (parse / config)
+- `errors.Is(err, builderloop.ErrPostPromotionVerifyFailed)` → 30
+  (builder-loop only)
+- `errors.Is(err, context.DeadlineExceeded | context.Canceled)` → 20
+  (backend timeout / signal)
+- everything else → 1 (internal)
+
+The "no-work=10" code is intentionally not used: a 0-candidates run is
+a normal idle tick, not a failure. systemd `Restart=on-failure` would
+flap if 10 were emitted on every uneventful tick. Operators who want
+flap on idle can wrap with a script.
+
 ### 13. `--format json` for read-only commands
 
 `digest`, `audit`, `status`, `doctor`, and `progress validate` print human
@@ -181,6 +204,22 @@ prose. External tooling that wants this state currently parses
 
 **Fix.** Each command grows a `--format text|json` flag (default text).
 JSON output is documented and stable enough to script against.
+
+**Status (2026-04-25).** All five commands (`progress validate`,
+`builder-loop doctor`, `planner-loop doctor`, `digest`, `audit`,
+`status`) now accept `--format text|json`.
+
+JSON shapes:
+- `progress validate`: `{"ok":true,"phases":N}`
+- `doctor` (both): `{"ok":true,"warnings":[...]}`
+- `digest`: `{"<event>":<count>,...}` — full event-count map from a new
+  `internal/builderloop.DigestLedgerCounts(path)` companion to the
+  text-emitting `DigestLedger`.
+- `audit`: `{"summary":"<text>"}` — the structured audit data lives in
+  the audit dir's `report.ndjson`/`report.csv` already, so the wrapper
+  exists primarily to give scripts a stable JSON object to parse.
+- `status`: `{"status":"<text>"}` — same rationale; structured planner
+  state lives in `planner_state.json`.
 
 ### 14. `--repo-root` / `REPO_ROOT` flag
 

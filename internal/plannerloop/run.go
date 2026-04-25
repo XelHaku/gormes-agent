@@ -2,13 +2,18 @@ package plannerloop
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/builderloop"
@@ -56,6 +61,44 @@ type stateFile struct {
 	SyncResults  []RepoSyncResult `json:"sync_results,omitempty"`
 }
 
+var ErrPlannerRunInProgress = errors.New("planner run already in progress")
+
+type plannerRunLock struct {
+	file *os.File
+}
+
+func acquirePlannerRunLock(runRoot string, now time.Time) (*plannerRunLock, error) {
+	if err := os.MkdirAll(runRoot, 0o755); err != nil {
+		return nil, err
+	}
+	lockPath := filepath.Join(runRoot, "run.lock")
+	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = file.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, fmt.Errorf("%w: %s", ErrPlannerRunInProgress, lockPath)
+		}
+		return nil, err
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	_ = file.Truncate(0)
+	_, _ = file.WriteString(fmt.Sprintf("pid=%d\nstarted_utc=%s\n", os.Getpid(), now.UTC().Format(time.RFC3339)))
+	return &plannerRunLock{file: file}, nil
+}
+
+func (lock *plannerRunLock) release() {
+	if lock == nil || lock.file == nil {
+		return
+	}
+	_ = syscall.Flock(int(lock.file.Fd()), syscall.LOCK_UN)
+	_ = lock.file.Close()
+}
+
 func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	cfg := opts.Config
 	now := opts.Now
@@ -68,9 +111,12 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		runner = cmdrunner.ExecRunner{}
 	}
 
-	if err := os.MkdirAll(cfg.RunRoot, 0o755); err != nil {
+	runLock, err := acquirePlannerRunLock(cfg.RunRoot, now)
+	if err != nil {
 		return RunSummary{}, err
 	}
+	defer runLock.release()
+
 	if cfg.MergeOpenPullRequests && !opts.DryRun {
 		if _, err := builderloop.MergeOpenPullRequests(ctx, builderloop.PullRequestIntakeOptions{
 			Runner:         runner,
@@ -199,6 +245,10 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	if err != nil {
 		return RunSummary{}, fmt.Errorf("planner: load before-doc: %w", err)
 	}
+	beforeRuntime, err := snapshotRuntimeSources(cfg.RepoRoot)
+	if err != nil {
+		return RunSummary{}, fmt.Errorf("planner: snapshot runtime sources: %w", err)
+	}
 
 	argv, err := plannerBackendCommand(cfg.Backend, cfg.Mode, rawReportPath)
 	if err != nil {
@@ -255,6 +305,26 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 				Attempts:      attempts,
 			})
 			return RunSummary{}, commandError(argv[0], result)
+		}
+		if vErr := validateRuntimeSourceScope(beforeRuntime, cfg.RepoRoot); vErr != nil {
+			attempt.Status = "validation_rejected"
+			attempt.Detail = vErr.Error()
+			attempts = append(attempts, attempt)
+			appendPlannerLedger(ledgerPath, LedgerEvent{
+				TS:            now.UTC().Format(time.RFC3339),
+				RunID:         runID,
+				Trigger:       trigger,
+				TriggerEvents: triggerEventIDs,
+				Backend:       cfg.Backend,
+				Mode:          cfg.Mode,
+				Status:        "validation_rejected",
+				Detail:        vErr.Error(),
+				BeforeStats:   computeStats(beforeDoc),
+				Keywords:      opts.Keywords,
+				RetryAttempt:  attempt.Index,
+				Attempts:      attempts,
+			})
+			return RunSummary{}, fmt.Errorf("planner: regeneration rejected: %w", vErr)
 		}
 
 		// Reload progress.json after the backend's edits and check Health
@@ -480,7 +550,7 @@ func writeState(path string, state stateFile) error {
 }
 
 func commandError(name string, result cmdrunner.Result) error {
-	output := plannerFailureDetail(result)
+	output := commandFailureOutput(result)
 	if output == "" {
 		return fmt.Errorf("%s failed: %w", name, result.Err)
 	}
@@ -488,16 +558,96 @@ func commandError(name string, result cmdrunner.Result) error {
 }
 
 func plannerFailureDetail(result cmdrunner.Result) string {
+	output := commandFailureOutput(result)
+	if result.Err != nil {
+		errText := result.Err.Error()
+		if output == "" {
+			return errText
+		}
+		if !strings.Contains(output, errText) {
+			return errText + ": " + output
+		}
+	}
+	return output
+}
+
+func commandFailureOutput(result cmdrunner.Result) string {
 	if output := strings.TrimSpace(result.Stderr); output != "" {
 		return output
 	}
 	if output := strings.TrimSpace(result.Stdout); output != "" {
 		return output
 	}
-	if result.Err != nil {
-		return result.Err.Error()
-	}
 	return ""
+}
+
+type runtimeSourceSnapshot map[string][sha256.Size]byte
+
+func snapshotRuntimeSources(repoRoot string) (runtimeSourceSnapshot, error) {
+	snapshot := make(runtimeSourceSnapshot)
+	for _, rootRel := range []string{"cmd", "internal"} {
+		root := filepath.Join(repoRoot, rootRel)
+		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				if os.IsNotExist(walkErr) {
+					return nil
+				}
+				return walkErr
+			}
+			if entry.IsDir() || filepath.Ext(path) != ".go" {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(repoRoot, path)
+			if err != nil {
+				return err
+			}
+			snapshot[filepath.ToSlash(rel)] = sha256.Sum256(data)
+			return nil
+		})
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+	}
+	return snapshot, nil
+}
+
+func validateRuntimeSourceScope(before runtimeSourceSnapshot, repoRoot string) error {
+	after, err := snapshotRuntimeSources(repoRoot)
+	if err != nil {
+		return fmt.Errorf("snapshot runtime sources: %w", err)
+	}
+	changes := diffRuntimeSources(before, after)
+	if len(changes) == 0 {
+		return nil
+	}
+	return fmt.Errorf("planner output modified runtime source files: %s", strings.Join(changes, ", "))
+}
+
+func diffRuntimeSources(before, after runtimeSourceSnapshot) []string {
+	var changes []string
+	for path, afterHash := range after {
+		beforeHash, ok := before[path]
+		switch {
+		case !ok:
+			changes = append(changes, "added "+path)
+		case beforeHash != afterHash:
+			changes = append(changes, "modified "+path)
+		}
+	}
+	for path := range before {
+		if _, ok := after[path]; !ok {
+			changes = append(changes, "deleted "+path)
+		}
+	}
+	sort.Strings(changes)
+	return changes
 }
 
 // loadProgressForValidation reads progress.json for the health-preservation

@@ -332,10 +332,6 @@ func openAICompatibleReasoningContent(msg Message, provider, model, baseURL stri
 	if msg.ReasoningContent != nil {
 		return msg.ReasoningContent
 	}
-	if msg.Reasoning != nil && msg.Reasoning.Text != "" {
-		text := msg.Reasoning.Text
-		return &text
-	}
 	empty := ""
 	return &empty
 }

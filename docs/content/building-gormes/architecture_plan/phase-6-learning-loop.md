@@ -18,7 +18,7 @@ The Learning Loop is the first Gormes-original core system — not a port. It de
 | 6.A — Complexity Detector | ⏳ planned | Deterministic local signals first: transcript length, tool-call count, retries, edits, and operator feedback before any LLM scorer |
 | 6.B — Skill Extractor | ⏳ planned | LLM-assisted pattern distillation from the conversation + tool-call trace, with fake-model fixtures and secret/noise rejection gates |
 | 6.C — Skill Storage Format | ⏳ planned | Portable, human-editable SKILL.md with versioned metadata, provenance, review state, and atomic writes |
-| 6.D — Skill Retrieval + Matching | ⏳ planned | Hybrid lexical + Phase 3 semantic lookup for relevant reviewed skills at turn start |
+| 6.D — Skill Retrieval + Matching | ⏳ planned | Hybrid lexical + Phase 3 semantic lookup for relevant reviewed skills at turn start, plus optional Code Cathedral II-style code-context evidence after the base scorer is stable |
 | 6.E — Feedback Loop | ⏳ planned | Persist skill-use outcomes, explicit operator feedback, and auditable weight adjustments |
 | 6.F — Skill Surface (TUI + Telegram) | ⏳ planned | Browse, edit, disable, and review skills from the TUI or messaging edge after store/feedback contracts are stable |
 
@@ -43,6 +43,13 @@ Gormes should combine the useful parts:
 - generated skill drafts are inactive until reviewed;
 - updates preserve version history and source evidence;
 - secret stripping and one-off task rejection are mandatory gates.
+
+GBrain `f718c59` adds Code Cathedral II: qualified symbols, parent-scope chunks,
+call-graph edges, and two-pass retrieval. For Gormes this is a retrieval
+evidence lesson, not a runtime dependency. Phase 6.D now keeps that drift as a
+small blocked row: define synthetic code-context evidence and fan-out caps that
+the skill scorer can explain before any tree-sitter, WASM grammar, or repo-wide
+backfill decision.
 
 The learning loop is allowed to draft and improve skills only after the storage,
 resolver, review, and feedback records are testable. Otherwise "self-improving"

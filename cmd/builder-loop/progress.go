@@ -1,177 +1,34 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 
-	"github.com/TrebuchetDynamics/gormes-agent/internal/progress"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/progressctl"
 )
 
-func runProgress(root string, args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf(usage)
+// runProgress dispatches to internal/progressctl. The progress logic itself
+// lives there now so cmd/progress and cmd/builder-loop can share it; this
+// shim keeps `builder-loop progress {validate|write}` working for operators
+// who still type the long form.
+func runProgress(deps cliDeps, root string, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("%w\n%s", errParse, subUsage["progress"])
 	}
 
 	switch args[0] {
 	case "validate":
-		return validateProgress(root)
+		format, err := parseFormat(args[1:], "progress validate")
+		if err != nil {
+			return err
+		}
+		return progressctl.Validate(deps.stdout, root, format)
 	case "write":
-		return writeProgress(root)
+		if len(args) != 1 {
+			return fmt.Errorf("%w\n%s", errParse, subUsage["progress"])
+		}
+		return progressctl.Write(deps.stdout, root)
 	default:
-		return fmt.Errorf(usage)
+		return fmt.Errorf("%w\n%s", errParse, subUsage["progress"])
 	}
 }
 
-func validateProgress(root string) error {
-	p, err := loadValidProgress(root)
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(commandStdout, "progress: validated %d phases\n", len(p.Phases))
-	return err
-}
-
-func writeProgress(root string) error {
-	p, err := loadValidProgress(root)
-	if err != nil {
-		return err
-	}
-
-	paths := progressPaths(root)
-	var errs []error
-	if err := rewriteProgressMarker(paths.docsIndex, "docs-full-checklist", progress.RenderDocsChecklist(p)); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: _index.md regenerated")
-	}
-	if err := rewriteProgressMarker(paths.readme, "readme-rollup", progress.RenderReadmeRollup(p)); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: README.md regenerated")
-	}
-	if err := rewriteProgressMarker(paths.contractReadiness, "contract-readiness", progress.RenderContractReadiness(p)); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: contract readiness regenerated")
-	}
-	if err := rewriteProgressMarker(paths.builderLoopHandoff, "builder-loop-handoff", progress.RenderBuilderLoopHandoff(p)); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: builder-loop handoff regenerated")
-	}
-	if err := rewriteProgressMarker(paths.agentQueue, "agent-queue", progress.RenderAgentQueue(p, 10)); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: agent queue regenerated")
-	}
-	if err := rewriteProgressMarker(paths.nextSlices, "next-slices", progress.RenderNextSlices(p, 10)); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: next slices regenerated")
-	}
-	if err := rewriteProgressMarker(paths.blockedSlices, "blocked-slices", progress.RenderBlockedSlices(p)); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: blocked slices regenerated")
-	}
-	if err := rewriteProgressMarker(paths.umbrellaCleanup, "umbrella-cleanup", progress.RenderUmbrellaCleanup(p)); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: umbrella cleanup regenerated")
-	}
-	if err := rewriteProgressMarker(paths.progressSchema, "progress-schema", progress.RenderProgressSchema()); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: progress schema regenerated")
-	}
-	if err := syncProgressFile(paths.progressJSON, paths.siteProgress); err != nil {
-		errs = append(errs, err)
-	} else {
-		fmt.Fprintln(commandStdout, "progress: site progress data refreshed")
-	}
-	return joinProgressErrors(errs)
-}
-
-func loadValidProgress(root string) (*progress.Progress, error) {
-	p, err := progress.Load(progressPaths(root).progressJSON)
-	if err != nil {
-		return nil, err
-	}
-	if err := progress.Validate(p); err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-type progressPathSet struct {
-	progressJSON       string
-	readme             string
-	docsIndex          string
-	contractReadiness  string
-	builderLoopHandoff string
-	agentQueue         string
-	nextSlices         string
-	blockedSlices      string
-	umbrellaCleanup    string
-	progressSchema     string
-	siteProgress       string
-}
-
-func progressPaths(root string) progressPathSet {
-	buildingGormes := filepath.Join(root, "docs", "content", "building-gormes")
-	builderLoopDir := filepath.Join(buildingGormes, "builder-loop")
-	return progressPathSet{
-		progressJSON:       filepath.Join(buildingGormes, "architecture_plan", "progress.json"),
-		readme:             filepath.Join(root, "README.md"),
-		docsIndex:          filepath.Join(buildingGormes, "architecture_plan", "_index.md"),
-		contractReadiness:  filepath.Join(buildingGormes, "contract-readiness.md"),
-		builderLoopHandoff: filepath.Join(builderLoopDir, "builder-loop-handoff.md"),
-		agentQueue:         filepath.Join(builderLoopDir, "agent-queue.md"),
-		nextSlices:         filepath.Join(builderLoopDir, "next-slices.md"),
-		blockedSlices:      filepath.Join(builderLoopDir, "blocked-slices.md"),
-		umbrellaCleanup:    filepath.Join(builderLoopDir, "umbrella-cleanup.md"),
-		progressSchema:     filepath.Join(builderLoopDir, "progress-schema.md"),
-		siteProgress:       filepath.Join(root, "www.gormes.ai", "internal", "site", "data", "progress.json"),
-	}
-}
-
-func rewriteProgressMarker(path, kind, body string) error {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", path, err)
-	}
-	out, err := progress.ReplaceMarker(string(b), kind, body)
-	if err != nil {
-		return fmt.Errorf("%s: %w", path, err)
-	}
-	if err := os.WriteFile(path, []byte(out), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
-	}
-	return nil
-}
-
-func syncProgressFile(src, dst string) error {
-	b, err := os.ReadFile(src)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", src, err)
-	}
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", filepath.Dir(dst), err)
-	}
-	if err := os.WriteFile(dst, b, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", dst, err)
-	}
-	return nil
-}
-
-func joinProgressErrors(errs []error) error {
-	if len(errs) == 0 {
-		return nil
-	}
-	for _, err := range errs {
-		fmt.Fprintln(commandStdout, "progress:", err)
-	}
-	return errors.Join(errs...)
-}

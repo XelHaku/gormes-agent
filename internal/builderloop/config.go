@@ -141,7 +141,7 @@ func ConfigFromEnv(repoRoot string, lookup EnvLookup) (Config, error) {
 		Backend:        "codexu",
 		Mode:           "safe",
 		MaxAgents:      4,
-		MaxPhase:       3,
+		MaxPhase:       4,
 		PriorityBoost:  []string{"2.B.3", "2.B.4", "2.B.10", "2.B.11"},
 		BackendTimeout: 30 * time.Minute,
 

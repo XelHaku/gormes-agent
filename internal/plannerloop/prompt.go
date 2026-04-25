@@ -25,6 +25,20 @@ health block is dropped (the split is a new contract; quarantine resets
 naturally via spec-hash detection).
 `
 
+// runtimeSourceBoundaryClause is appended to every planner prompt as a HARD
+// rule. RunOnce enforces the same boundary after backend execution, but naming
+// it in the prompt prevents wasted generations that implement builder/runtime
+// code instead of refining the canonical plan.
+const runtimeSourceBoundaryClause = `
+RUNTIME SOURCE BOUNDARY (HARD RULE)
+Do not edit repo-root cmd/**/*.go or internal/**/*.go. The planner loop owns
+planning surfaces only: progress.json, generated docs, upstream study docs,
+and www.gormes.ai progress data. If implementation drift requires Go runtime
+changes, add or refine progress.json rows instead, with exact source_refs,
+write_scope, test_commands, ready_when, not_ready_when, and done_signal fields
+for the builder loop to execute.
+`
+
 // quarantinePriorityClause is appended to every planner prompt as a SOFT
 // rule. It instructs the planner to materially change quarantined rows
 // (sharpen, split, or mark for human review) so autoloop's auto-clear path
@@ -235,8 +249,8 @@ Required final report sections:
 6. Recommended next autoloop tasks
 7. Autoloop handoff completeness
 8. Risks and ambiguities
-%s%s%s%s%s%s%s%s%s%s
-`, strings.Join(roots, "\n"), strings.Join(syncLines, "\n"), strings.Join(bundle.ImplementationInventory.Commands, ", "), strings.Join(bundle.ImplementationInventory.InternalPackages, ", "), strings.Join(bundle.ImplementationInventory.BuildingDocs, ", "), landingSite, hugoDocs, auditBlock, bundle.ProgressJSON, bundle.RepoRoot, bundle.ProgressStats.Items, healthPreservationClause, quarantinePriorityClause, quarantineBlock, selfEvaluationClause, reshapeBlock, triggerBlock, topicalBlock, provenanceAwarenessClause, driftStateClause, implInventoryBlock)
+%s%s%s%s%s%s%s%s%s%s%s
+`, strings.Join(roots, "\n"), strings.Join(syncLines, "\n"), strings.Join(bundle.ImplementationInventory.Commands, ", "), strings.Join(bundle.ImplementationInventory.InternalPackages, ", "), strings.Join(bundle.ImplementationInventory.BuildingDocs, ", "), landingSite, hugoDocs, auditBlock, bundle.ProgressJSON, bundle.RepoRoot, bundle.ProgressStats.Items, healthPreservationClause, runtimeSourceBoundaryClause, quarantinePriorityClause, quarantineBlock, selfEvaluationClause, reshapeBlock, triggerBlock, topicalBlock, provenanceAwarenessClause, driftStateClause, implInventoryBlock)
 }
 
 // formatTriggerEvents renders the autoloop signals consumed by this run as

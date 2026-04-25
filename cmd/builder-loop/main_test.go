@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +19,8 @@ import (
 )
 
 func TestRunRejectsUnknownCommand(t *testing.T) {
-	err := run(context.Background(), []string{"unknown"})
+	deps := defaultDeps()
+	err := run(context.Background(), deps, []string{"unknown"})
 	if err == nil {
 		t.Fatal("run() error = nil, want error")
 	}
@@ -94,6 +96,184 @@ func TestWriteDigestOutputRefusesClobber(t *testing.T) {
 	}
 }
 
+func TestClassifyExitCodes(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "parse", err: fmt.Errorf("%w: nope", errParse), want: exitParseError},
+		{name: "verify-failed", err: fmt.Errorf("wrap: %w", builderloop.ErrPostPromotionVerifyFailed), want: exitVerifyFailed},
+		{name: "deadline", err: context.DeadlineExceeded, want: exitBackendTimeout},
+		{name: "canceled", err: context.Canceled, want: exitBackendTimeout},
+		{name: "other", err: errors.New("something else"), want: exitInternal},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyExit(tc.err); got != tc.want {
+				t.Fatalf("classifyExit(%v) = %d, want %d", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseFormatDefaultsToText(t *testing.T) {
+	got, err := parseFormat(nil, "doctor")
+	if err != nil {
+		t.Fatalf("parseFormat(nil) error = %v", err)
+	}
+	if got != "text" {
+		t.Fatalf("parseFormat(nil) = %q, want text", got)
+	}
+}
+
+func TestParseFormatRejectsInvalid(t *testing.T) {
+	if _, err := parseFormat([]string{"--format", "yaml"}, "doctor"); !errors.Is(err, errParse) {
+		t.Fatalf("err = %v, want errParse for yaml", err)
+	}
+	if _, err := parseFormat([]string{"--format"}, "doctor"); !errors.Is(err, errParse) {
+		t.Fatalf("err = %v, want errParse for missing value", err)
+	}
+}
+
+func TestParseFormatAcceptsJSON(t *testing.T) {
+	got, err := parseFormat([]string{"--format", "json"}, "doctor")
+	if err != nil {
+		t.Fatalf("parseFormat(json) error = %v", err)
+	}
+	if got != "json" {
+		t.Fatalf("got = %q, want json", got)
+	}
+}
+
+func TestLatestLedgerEventTimeFindsLatest(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runs.jsonl")
+	body := strings.Join([]string{
+		`{"ts":"2026-04-25T12:00:00Z","event":"run_started"}`,
+		`{"ts":"2026-04-25T12:01:00Z","event":"health_updated"}`,
+		`{"ts":"2026-04-25T12:05:00Z","event":"health_updated"}`,
+		`{"ts":"2026-04-25T12:10:00Z","event":"run_started"}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := latestLedgerEventTime(path, "health_updated")
+	if err != nil {
+		t.Fatalf("latestLedgerEventTime() error = %v", err)
+	}
+	want, _ := time.Parse(time.RFC3339, "2026-04-25T12:05:00Z")
+	if !got.Equal(want) {
+		t.Fatalf("got = %v, want %v", got, want)
+	}
+}
+
+func TestLatestLedgerEventTimeMissingFile(t *testing.T) {
+	_, err := latestLedgerEventTime(filepath.Join(t.TempDir(), "nope.jsonl"), "health_updated")
+	if !os.IsNotExist(err) {
+		t.Fatalf("err = %v, want os.IsNotExist", err)
+	}
+}
+
+func TestStaleWorkerClaimWarningsFindsUnfinishedClaim(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runs.jsonl")
+	now := time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC)
+	if err := builderloop.AppendLedgerEvent(path, builderloop.LedgerEvent{
+		TS:     now.Add(-2 * time.Hour),
+		RunID:  "run-1",
+		Event:  "worker_claimed",
+		Worker: 1,
+		Task:   "5/5.Q/Native TUI bundle independence check",
+		Branch: "builder-loop/run-1/w1/native-tui",
+		Status: "claimed",
+	}); err != nil {
+		t.Fatalf("AppendLedgerEvent() error = %v", err)
+	}
+
+	warnings, err := staleWorkerClaimWarnings(path, now, time.Hour)
+	if err != nil {
+		t.Fatalf("staleWorkerClaimWarnings() error = %v", err)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("warnings = %#v, want one stale claim warning", warnings)
+	}
+	for _, want := range []string{
+		"doctor: warning: builder-loop worker claim stale for 2h0m0s",
+		"run=run-1",
+		"worker=1",
+		"task=5/5.Q/Native TUI bundle independence check",
+		"branch=builder-loop/run-1/w1/native-tui",
+	} {
+		if !strings.Contains(warnings[0], want) {
+			t.Fatalf("warning = %q, want %q", warnings[0], want)
+		}
+	}
+}
+
+func TestStaleWorkerClaimWarningsIgnoresFinishedClaim(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runs.jsonl")
+	now := time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC)
+	claim := builderloop.LedgerEvent{
+		TS:     now.Add(-2 * time.Hour),
+		RunID:  "run-1",
+		Event:  "worker_claimed",
+		Worker: 1,
+		Task:   "task",
+		Branch: "branch",
+		Status: "claimed",
+	}
+	if err := builderloop.AppendLedgerEvent(path, claim); err != nil {
+		t.Fatalf("AppendLedgerEvent(claim) error = %v", err)
+	}
+	claim.TS = now.Add(-90 * time.Minute)
+	claim.Event = "worker_failed"
+	claim.Status = "backend_failed"
+	if err := builderloop.AppendLedgerEvent(path, claim); err != nil {
+		t.Fatalf("AppendLedgerEvent(worker_failed) error = %v", err)
+	}
+
+	warnings, err := staleWorkerClaimWarnings(path, now, time.Hour)
+	if err != nil {
+		t.Fatalf("staleWorkerClaimWarnings() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %#v, want none for finished claim", warnings)
+	}
+}
+
+func TestDriftWarningStaleEvent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runs.jsonl")
+	stale := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{"ts":%q,"event":"health_updated"}`+"\n", stale)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	msg := driftWarning("builder-loop", path, "health_updated", time.Hour)
+	if !strings.Contains(msg, "may be stalled") {
+		t.Fatalf("driftWarning() = %q, want stall warning", msg)
+	}
+}
+
+func TestDriftWarningFreshEvent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runs.jsonl")
+	fresh := time.Now().Add(-30 * time.Second).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{"ts":%q,"event":"health_updated"}`+"\n", fresh)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if msg := driftWarning("builder-loop", path, "health_updated", time.Hour); msg != "" {
+		t.Fatalf("driftWarning() = %q, want no warning", msg)
+	}
+}
+
+func TestDriftWarningMissingLedger(t *testing.T) {
+	if msg := driftWarning("builder-loop", filepath.Join(t.TempDir(), "absent.jsonl"), "health_updated", time.Hour); msg != "" {
+		t.Fatalf("driftWarning() = %q, want empty (no history is not a stall)", msg)
+	}
+}
+
 func TestWriteDigestOutputForceOverwrites(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "digest.txt")
@@ -115,13 +295,10 @@ func TestProgressValidateValidatesCanonicalProgress(t *testing.T) {
 	withTempCwd(t, repoRoot)
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
-	if err := run(context.Background(), []string{"progress", "validate"}); err != nil {
+	if err := run(context.Background(), deps, []string{"progress", "validate"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -136,13 +313,10 @@ func TestProgressWriteRegeneratesDocsAndSiteProgress(t *testing.T) {
 	withTempCwd(t, repoRoot)
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
-	if err := run(context.Background(), []string{"progress", "write"}); err != nil {
+	if err := run(context.Background(), deps, []string{"progress", "write"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -191,7 +365,8 @@ func TestRepoBenchmarkRecordUpdatesBenchmarks(t *testing.T) {
 	}
 	withTempCwd(t, repoRoot)
 
-	if err := run(context.Background(), []string{"repo", "benchmark", "record"}); err != nil {
+	deps := defaultDeps()
+	if err := run(context.Background(), deps, []string{"repo", "benchmark", "record"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -230,7 +405,8 @@ func TestRepoReadmeUpdateUpdatesReadme(t *testing.T) {
 	}
 	withTempCwd(t, repoRoot)
 
-	if err := run(context.Background(), []string{"repo", "readme", "update"}); err != nil {
+	deps := defaultDeps()
+	if err := run(context.Background(), deps, []string{"repo", "readme", "update"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 	raw, err := os.ReadFile(readme)
@@ -280,11 +456,8 @@ func TestRunCommandDryRunPrintsSummary(t *testing.T) {
 	t.Setenv("MAX_PHASE", "12")
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -299,7 +472,7 @@ func TestRunCommandDryRunPrintsSummary(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"run", "--dry-run"}); err != nil {
+	if err := run(context.Background(), deps, []string{"run", "--dry-run"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -311,6 +484,124 @@ func TestRunCommandDryRunPrintsSummary(t *testing.T) {
 		"owner=orchestrator",
 		"size=small",
 		"reason=P0 handoff",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want %q", output, want)
+		}
+	}
+}
+
+func TestRunCommandDryRunExplainsMaxPhaseFilteredQueue(t *testing.T) {
+	repoRoot := t.TempDir()
+	progressPath := filepath.Join(repoRoot, "progress.json")
+	if err := os.WriteFile(progressPath, []byte(`{
+		"phases": {
+			"5": {
+				"subphases": {
+					"5.Q": {
+						"items": [
+							{
+								"item_name": "phase 5 candidate",
+								"status": "planned",
+								"contract": "phase 5 contract",
+								"contract_status": "draft",
+								"slice_size": "small",
+								"execution_owner": "gateway",
+								"ready_when": ["fixture exists"],
+								"write_scope": ["internal/tui/"],
+								"test_commands": ["go test ./internal/tui -count=1"],
+								"done_signal": ["fixture proves behavior"]
+							}
+						]
+					}
+				}
+			}
+		}
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("PROGRESS_JSON", progressPath)
+	t.Setenv("RUN_ROOT", filepath.Join(repoRoot, "runs"))
+	t.Setenv("BACKEND", "opencode")
+	t.Setenv("MODE", "safe")
+	t.Setenv("MAX_AGENTS", "1")
+	t.Setenv("MAX_PHASE", "3")
+
+	var stdout bytes.Buffer
+	deps := defaultDeps()
+	deps.stdout = &stdout
+	withTempCwd(t, repoRoot)
+
+	if err := run(context.Background(), deps, []string{"run", "--dry-run"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"candidates: 0",
+		"selected: 0",
+		"max_phase_filtered: 1",
+		"next_max_phase: 5",
+		"hint: rerun with MAX_PHASE=5 to include the next queued phase",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want %q", output, want)
+		}
+	}
+}
+
+func TestRunCommandDryRunDefaultIncludesPhaseFourQueue(t *testing.T) {
+	repoRoot := t.TempDir()
+	progressPath := filepath.Join(repoRoot, "progress.json")
+	if err := os.WriteFile(progressPath, []byte(`{
+		"phases": {
+			"4": {
+				"subphases": {
+					"4.A": {
+						"items": [
+							{
+								"item_name": "phase 4 candidate",
+								"status": "planned",
+								"contract": "phase 4 contract",
+								"contract_status": "draft",
+								"slice_size": "small",
+								"execution_owner": "provider",
+								"ready_when": ["fixture exists"],
+								"write_scope": ["internal/provider/"],
+								"test_commands": ["go test ./internal/provider -count=1"],
+								"done_signal": ["fixture proves behavior"]
+							}
+						]
+					}
+				}
+			}
+		}
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("PROGRESS_JSON", progressPath)
+	t.Setenv("RUN_ROOT", filepath.Join(repoRoot, "runs"))
+	t.Setenv("BACKEND", "opencode")
+	t.Setenv("MODE", "safe")
+	t.Setenv("MAX_AGENTS", "1")
+	t.Setenv("MAX_PHASE", "")
+
+	var stdout bytes.Buffer
+	deps := defaultDeps()
+	deps.stdout = &stdout
+	withTempCwd(t, repoRoot)
+
+	if err := run(context.Background(), deps, []string{"run", "--dry-run"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"candidates: 1",
+		"selected: 1",
+		"phase 4 candidate",
+		"owner=provider",
+		"size=small",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("stdout = %q, want %q", output, want)
@@ -344,11 +635,8 @@ func TestRunCommandBackendFlagSetsBackend(t *testing.T) {
 	t.Setenv("MAX_PHASE", "12")
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -363,7 +651,7 @@ func TestRunCommandBackendFlagSetsBackend(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"run", "--dry-run", "--backend", "opencode"}); err != nil {
+	if err := run(context.Background(), deps, []string{"run", "--dry-run", "--backend", "opencode"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -408,18 +696,48 @@ func TestParseRunOptions_BackendFlagRejectsUnsupported(t *testing.T) {
 
 func TestRunCommandHelpPrintsUsage(t *testing.T) {
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
-	if err := run(context.Background(), []string{"run", "--help"}); err != nil {
+	if err := run(context.Background(), deps, []string{"run", "--help"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
-	if !strings.Contains(stdout.String(), "usage: builder-loop") {
-		t.Fatalf("stdout = %q, want usage", stdout.String())
+	if !strings.Contains(stdout.String(), "usage: builder-loop run") {
+		t.Fatalf("stdout = %q, want scoped run usage", stdout.String())
+	}
+	// Per-subcommand help should NOT dump the full top-level surface.
+	if strings.Contains(stdout.String(), "service disable legacy-timers") {
+		t.Fatalf("stdout = %q, expected scoped help only", stdout.String())
+	}
+}
+
+func TestSubcommandHelpPrintsScopedUsage(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "digest", args: []string{"digest", "--help"}, want: "usage: builder-loop digest"},
+		{name: "audit", args: []string{"audit", "-h"}, want: "usage: builder-loop audit"},
+		{name: "progress", args: []string{"progress", "--help"}, want: "usage: builder-loop progress"},
+		{name: "progress validate", args: []string{"progress", "validate", "--help"}, want: "usage: builder-loop progress validate"},
+		{name: "service install", args: []string{"service", "install", "--help"}, want: "usage: builder-loop service install"},
+		{name: "service disable legacy-timers", args: []string{"service", "disable", "legacy-timers", "--help"}, want: "usage: builder-loop service disable legacy-timers"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			deps := defaultDeps()
+			deps.stdout = &stdout
+			withTempCwd(t, t.TempDir())
+
+			if err := run(context.Background(), deps, tc.args); err != nil {
+				t.Fatalf("run() error = %v", err)
+			}
+			if !strings.Contains(stdout.String(), tc.want) {
+				t.Fatalf("stdout = %q, want substring %q", stdout.String(), tc.want)
+			}
+		})
 	}
 }
 
@@ -451,11 +769,8 @@ func TestDigestUsesConfiguredRunRoot(t *testing.T) {
 	t.Setenv("AUDIT_DIR", filepath.Join(repoRoot, "audit"))
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -470,7 +785,7 @@ func TestDigestUsesConfiguredRunRoot(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"digest"}); err != nil {
+	if err := run(context.Background(), deps, []string{"digest"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -505,7 +820,8 @@ func TestDigestOutputWritesFile(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"digest", "--output", outputPath}); err != nil {
+	deps := defaultDeps()
+	if err := run(context.Background(), deps, []string{"digest", "--output", outputPath}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -532,11 +848,8 @@ func TestAuditUsesConfiguredRunRoot(t *testing.T) {
 	t.Setenv("AUDIT_DIR", filepath.Join(repoRoot, "audit"))
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -551,7 +864,7 @@ func TestAuditUsesConfiguredRunRoot(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"audit"}); err != nil {
+	if err := run(context.Background(), deps, []string{"audit"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -575,11 +888,8 @@ func TestAuditCreatesReportArtifacts(t *testing.T) {
 	t.Setenv("AUDIT_DIR", auditDir)
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -594,7 +904,7 @@ func TestAuditCreatesReportArtifacts(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"audit"}); err != nil {
+	if err := run(context.Background(), deps, []string{"audit"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -614,11 +924,8 @@ func TestServiceInstallWritesUnitUnderXDGConfigHome(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 	t.Setenv("FORCE", "")
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}, {}}}
-	oldRunner := serviceRunner
-	serviceRunner = runner
-	t.Cleanup(func() {
-		serviceRunner = oldRunner
-	})
+	deps := defaultDeps()
+	deps.runner = runner
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -633,7 +940,7 @@ func TestServiceInstallWritesUnitUnderXDGConfigHome(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"service", "install"}); err != nil {
+	if err := run(context.Background(), deps, []string{"service", "install"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -667,11 +974,8 @@ func TestServiceInstallAuditUsesAuditUnitName(t *testing.T) {
 	xdgConfigHome := filepath.Join(repoRoot, "xdg")
 	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}, {}}}
-	oldRunner := serviceRunner
-	serviceRunner = runner
-	t.Cleanup(func() {
-		serviceRunner = oldRunner
-	})
+	deps := defaultDeps()
+	deps.runner = runner
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -686,7 +990,7 @@ func TestServiceInstallAuditUsesAuditUnitName(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"service", "install-audit"}); err != nil {
+	if err := run(context.Background(), deps, []string{"service", "install-audit"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -719,11 +1023,8 @@ func TestServiceInstallHonorsAutoStartZero(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 	t.Setenv("AUTO_START", "0")
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}}}
-	oldRunner := serviceRunner
-	serviceRunner = runner
-	t.Cleanup(func() {
-		serviceRunner = oldRunner
-	})
+	deps := defaultDeps()
+	deps.runner = runner
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -738,7 +1039,7 @@ func TestServiceInstallHonorsAutoStartZero(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"service", "install"}); err != nil {
+	if err := run(context.Background(), deps, []string{"service", "install"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -756,11 +1057,8 @@ func TestServiceInstallAuditHonorsAutoStartZero(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 	t.Setenv("AUTO_START", "0")
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}}}
-	oldRunner := serviceRunner
-	serviceRunner = runner
-	t.Cleanup(func() {
-		serviceRunner = oldRunner
-	})
+	deps := defaultDeps()
+	deps.runner = runner
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -775,7 +1073,7 @@ func TestServiceInstallAuditHonorsAutoStartZero(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"service", "install-audit"}); err != nil {
+	if err := run(context.Background(), deps, []string{"service", "install-audit"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -789,13 +1087,10 @@ func TestServiceInstallAuditHonorsAutoStartZero(t *testing.T) {
 
 func TestServiceDisableLegacyTimersUsesRunner(t *testing.T) {
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}, {}, {}, {}, {}, {}}}
-	oldRunner := serviceRunner
-	serviceRunner = runner
-	t.Cleanup(func() {
-		serviceRunner = oldRunner
-	})
+	deps := defaultDeps()
+	deps.runner = runner
 
-	if err := run(context.Background(), []string{"service", "disable", "legacy-timers"}); err != nil {
+	if err := run(context.Background(), deps, []string{"service", "disable", "legacy-timers"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -821,11 +1116,8 @@ func TestServiceInstallUsesHomeWhenXDGConfigHomeEmpty(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", home)
 	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}, {}}}
-	oldRunner := serviceRunner
-	serviceRunner = runner
-	t.Cleanup(func() {
-		serviceRunner = oldRunner
-	})
+	deps := defaultDeps()
+	deps.runner = runner
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -840,7 +1132,7 @@ func TestServiceInstallUsesHomeWhenXDGConfigHomeEmpty(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"service", "install"}); err != nil {
+	if err := run(context.Background(), deps, []string{"service", "install"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 
@@ -863,11 +1155,8 @@ func TestDigestIgnoresRunOnlyEnvValidation(t *testing.T) {
 	t.Setenv("MAX_AGENTS", "bad")
 
 	var stdout bytes.Buffer
-	oldStdout := commandStdout
-	commandStdout = &stdout
-	t.Cleanup(func() {
-		commandStdout = oldStdout
-	})
+	deps := defaultDeps()
+	deps.stdout = &stdout
 
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -882,7 +1171,7 @@ func TestDigestIgnoresRunOnlyEnvValidation(t *testing.T) {
 		}
 	})
 
-	if err := run(context.Background(), []string{"digest"}); err != nil {
+	if err := run(context.Background(), deps, []string{"digest"}); err != nil {
 		t.Fatalf("run() error = %v", err)
 	}
 

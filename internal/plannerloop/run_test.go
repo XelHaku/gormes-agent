@@ -3,6 +3,7 @@ package plannerloop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -45,6 +46,25 @@ func TestRunDryRunCollectsContextWithoutBackend(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(summary.RunRoot, "latest_prompt.txt")); err != nil {
 		t.Fatalf("latest_prompt.txt missing after dry-run: %v", err)
+	}
+}
+
+func TestRunOnceRejectsConcurrentRunInSameRunRoot(t *testing.T) {
+	repoRoot := writePlannerFixture(t)
+	cfg := mustConfig(t, repoRoot)
+	lock, err := acquirePlannerRunLock(cfg.RunRoot, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("acquirePlannerRunLock() error = %v", err)
+	}
+	defer lock.release()
+
+	_, err = RunOnce(context.Background(), RunOptions{
+		Config: cfg,
+		Runner: &cmdrunner.FakeRunner{},
+		DryRun: true,
+	})
+	if !errors.Is(err, ErrPlannerRunInProgress) {
+		t.Fatalf("RunOnce() error = %v, want ErrPlannerRunInProgress", err)
 	}
 }
 
@@ -297,6 +317,20 @@ func TestRunOnceReturnsBackendErrorWithOutput(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "backend denied") {
 		t.Fatalf("RunOnce() error = %q, want backend stderr", err)
+	}
+}
+
+func TestPlannerFailureDetailIncludesProcessErrorWithStdout(t *testing.T) {
+	detail := plannerFailureDetail(cmdrunner.Result{
+		Stdout: "Reading additional input from stdin...\n",
+		Err:    errors.New("signal: killed"),
+	})
+
+	if !strings.Contains(detail, "signal: killed") {
+		t.Fatalf("detail = %q, want process error", detail)
+	}
+	if !strings.Contains(detail, "Reading additional input from stdin") {
+		t.Fatalf("detail = %q, want backend stdout", detail)
 	}
 }
 
@@ -564,6 +598,54 @@ func TestRunOnce_AppendsLedgerEventOnValidationReject(t *testing.T) {
 	}
 	if events[0].Detail == "" {
 		t.Fatalf("Detail = empty, want validation error message")
+	}
+}
+
+func TestRunOnce_RejectsRuntimeSourceEdits(t *testing.T) {
+	repoRoot := writePlannerFixture(t)
+	cfg := mustConfig(t, repoRoot)
+	runtimePath := filepath.Join(repoRoot, "internal", "builderloop", "run.go")
+	writeFile(t, runtimePath, "package builderloop\n")
+
+	runner := &mutatingRunner{
+		t: t,
+		inner: &cmdrunner.FakeRunner{
+			Results: []cmdrunner.Result{
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "planner ran ok\n"},
+			},
+		},
+		mutate: func(t *testing.T) {
+			writeFile(t, runtimePath, "package builderloop\n\nfunc offContract() {}\n")
+		},
+	}
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config:         cfg,
+		Runner:         runner,
+		SkipValidation: true,
+	})
+	if err == nil {
+		t.Fatal("RunOnce() error = nil, want runtime source rejection")
+	}
+	if !strings.Contains(err.Error(), "runtime source files") {
+		t.Fatalf("RunOnce() error = %q, want runtime source rejection", err)
+	}
+
+	events := mustReadLedger(t, filepath.Join(cfg.RunRoot, "state", "runs.jsonl"))
+	if len(events) != 1 {
+		t.Fatalf("ledger entries = %d, want 1: %#v", len(events), events)
+	}
+	if events[0].Status != "validation_rejected" {
+		t.Fatalf("Status = %q, want validation_rejected", events[0].Status)
+	}
+	if !strings.Contains(events[0].Detail, "internal/builderloop/run.go") {
+		t.Fatalf("Detail = %q, want runtime path", events[0].Detail)
+	}
+	if len(events[0].Attempts) != 1 || events[0].Attempts[0].Status != "validation_rejected" {
+		t.Fatalf("Attempts = %#v, want one validation_rejected attempt", events[0].Attempts)
 	}
 }
 
