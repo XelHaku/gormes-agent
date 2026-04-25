@@ -41,6 +41,14 @@ type ContextBundle struct {
 	// LLM sees which row state changes prompted this run. Empty when the
 	// run was scheduled (no new events since the last cursor advance).
 	TriggerEvents []plannertriggers.TriggerEvent `json:"trigger_events,omitempty"`
+	// PreviousReshapes correlates rows the planner reshaped within the last
+	// EvaluationWindow with what autoloop did to those rows afterwards. The
+	// L4 self-evaluation surface lets the planner see whether its previous
+	// reshape attempts unstuck the row, are still failing, or haven't been
+	// retried yet. Sourced from Evaluate (evaluation.go); rendered into the
+	// prompt's "Previous Reshape Outcomes" section. Empty when no rows
+	// matching that window were reshaped or when both ledgers are empty.
+	PreviousReshapes []ReshapeOutcome `json:"previous_reshapes,omitempty"`
 }
 
 // QuarantinedRowContext is the planner-side view of one autoloop-quarantined
