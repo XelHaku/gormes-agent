@@ -36,6 +36,18 @@ type SearchLineage struct {
 	Status          string
 }
 
+// SearchLineageStatusUnavailable means the hit matched through a chat key but
+// there was no session-specific metadata row to prove a lineage chain.
+const SearchLineageStatusUnavailable = "unavailable"
+
+// SearchLineage is the lineage evidence attached to one matched session.
+type SearchLineage struct {
+	ParentSessionID string
+	LineageKind     string
+	ChildSessionIDs []string
+	Status          string
+}
+
 // MessageSearchHit is one turn-level result from the session catalog.
 type MessageSearchHit struct {
 	SessionID string
