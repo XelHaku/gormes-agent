@@ -2358,7 +2358,12 @@
               ],
               "done_signal": [
                 "Reasoning echo fixtures prove DeepSeek and Kimi tool-call replays include provider-required reasoning_content without mutating ordinary assistant content."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T06:55:51Z",
+                "last_success": "2026-04-25T06:55:51Z"
+              }
             },
             {
               "name": "Anthropic",
@@ -2547,9 +2552,9 @@
                 "Codex Responses fixtures convert chat input, tool schemas, output items, usage, and tool calls without live credentials."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T06:43:34Z",
-                "last_success": "2026-04-25T06:43:34Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T06:55:51Z",
+                "last_success": "2026-04-25T06:55:51Z"
               }
             },
             {
@@ -2694,7 +2699,12 @@
               ],
               "done_signal": [
                 "Tool-call repair fixtures prove malformed arguments are repaired or rejected before execution using the advertised schema."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T06:55:51Z",
+                "last_success": "2026-04-25T06:55:51Z"
+              }
             }
           ]
         },
@@ -2933,9 +2943,9 @@
                 "Model registry fixtures expose pricing, capability, provider-family, and raw context metadata with explicit unknown states."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T06:39:53Z",
-                "last_success": "2026-04-25T06:39:53Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T06:55:51Z",
+                "last_success": "2026-04-25T06:55:51Z"
               }
             },
             {
@@ -3948,7 +3958,12 @@
               ],
               "done_signal": [
                 "Responses/runs fixtures prove bounded response storage, previous_response_id chaining, event streaming, and orphan cleanup over native session state."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T06:55:51Z",
+                "last_success": "2026-04-25T06:55:51Z"
+              }
             },
             {
               "name": "API server disconnect snapshot persistence",
@@ -4040,9 +4055,9 @@
                 "Proxy-mode fixtures prove URL resolution, session header propagation, safe history filtering, stale-generation handling, and remote-error degradation."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T06:42:42Z",
-                "last_success": "2026-04-25T06:42:42Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T06:55:51Z",
+                "last_success": "2026-04-25T06:55:51Z"
               }
             },
             {
