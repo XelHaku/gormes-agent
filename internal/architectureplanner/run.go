@@ -21,6 +21,11 @@ type RunOptions struct {
 	DryRun         bool
 	SkipValidation bool
 	Now            time.Time
+	// Keywords narrows the planner's row-level context (QuarantinedRows,
+	// future PreviousReshapes) to only rows that mechanically match any of
+	// these substrings. Empty means broad/full-context run. See L6 topical
+	// focus mode in docs/superpowers/specs/2026-04-24-planner-self-healing-design.md.
+	Keywords []string
 }
 
 type RunSummary struct {
@@ -78,6 +83,9 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 	bundle.SyncResults = syncResults
+	if len(opts.Keywords) > 0 {
+		bundle = FilterContextByKeywords(bundle, opts.Keywords)
+	}
 
 	contextPath := filepath.Join(cfg.RunRoot, "context.json")
 	promptPath := filepath.Join(cfg.RunRoot, "latest_prompt.txt")
@@ -89,7 +97,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	if err := writeContext(contextPath, bundle); err != nil {
 		return RunSummary{}, err
 	}
-	prompt := BuildPrompt(bundle)
+	prompt := BuildPrompt(bundle, opts.Keywords)
 	if err := os.WriteFile(promptPath, []byte(prompt), 0o644); err != nil {
 		return RunSummary{}, err
 	}
@@ -144,6 +152,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			Status:      "backend_failed",
 			Detail:      strings.TrimSpace(result.Stderr),
 			BeforeStats: computeStats(beforeDoc),
+			Keywords:    opts.Keywords,
 		})
 		return RunSummary{}, commandError(argv[0], result)
 	}
@@ -172,6 +181,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 					BeforeStats: computeStats(beforeDoc),
 					AfterStats:  computeStats(afterDoc),
 					RowsChanged: diffRows(beforeDoc, afterDoc),
+					Keywords:    opts.Keywords,
 				})
 				return RunSummary{}, fmt.Errorf("planner: regeneration rejected: %w", err)
 			}
@@ -216,6 +226,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		BeforeStats: computeStats(beforeDoc),
 		AfterStats:  computeStats(afterDoc),
 		RowsChanged: diffRows(beforeDoc, afterDoc),
+		Keywords:    opts.Keywords,
 	})
 
 	return summary, nil

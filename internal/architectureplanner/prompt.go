@@ -3,6 +3,7 @@ package architectureplanner
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -45,7 +46,39 @@ Rows in quarantined_rows[] are top priority for repair. For each one:
   quarantine will not auto-clear and autoloop will keep skipping the row.
 `
 
-func BuildPrompt(bundle ContextBundle) string {
+// topicalClauseTemplate is appended to the planner prompt when the run was
+// invoked with positional keyword arguments (L6 topical focus mode). The
+// upstream context (Quarantined Rows, Previous Reshapes, Implementation
+// Inventory) has already been narrowed by FilterContextByKeywords; this
+// clause merely tells the LLM what just happened and what scope to honor.
+const topicalClauseTemplate = `
+TOPICAL FOCUS
+
+This run was invoked with keyword arguments: %s. The context above
+(Quarantined Rows, Previous Reshapes, Implementation Inventory) has been
+narrowed to only rows that mechanically match these keywords.
+
+Focus your refinement work on these areas. You may still adjust adjacent
+rows if a topical row's blocked_by/unblocks dependencies require it, but
+do NOT widen the scope to unrelated phases. If you believe a topical
+keyword needs structural rework that crosses phase boundaries, set
+contract_status="draft" on the affected rows and add a degraded_mode note
+explaining the cross-phase dependency rather than reshaping the whole
+graph.
+`
+
+// formatTopicalClause renders the topical clause with each keyword
+// surrounded by Go-quoted double quotes (so "skills" appears as `"skills"`
+// in the prompt — easier to scan than raw words).
+func formatTopicalClause(keywords []string) string {
+	quoted := make([]string, len(keywords))
+	for i, kw := range keywords {
+		quoted[i] = strconv.Quote(kw)
+	}
+	return fmt.Sprintf(topicalClauseTemplate, "["+strings.Join(quoted, ", ")+"]")
+}
+
+func BuildPrompt(bundle ContextBundle, keywords []string) string {
 	var roots []string
 	for _, root := range bundle.SourceRoots {
 		status := "missing"
@@ -69,6 +102,10 @@ func BuildPrompt(bundle ContextBundle) string {
 	hugoDocs := formatInventorySurface(bundle.ImplementationInventory.HugoDocs)
 	auditBlock := formatAutoloopAudit(bundle.AutoloopAudit)
 	quarantineBlock := formatQuarantinedRows(bundle.QuarantinedRows)
+	topicalBlock := ""
+	if len(keywords) > 0 {
+		topicalBlock = formatTopicalClause(keywords)
+	}
 
 	return fmt.Sprintf(`You are the Gormes Architecture Planner Loop.
 
@@ -136,8 +173,8 @@ Required final report sections:
 6. Recommended next autoloop tasks
 7. Autoloop handoff completeness
 8. Risks and ambiguities
-%s%s%s
-`, strings.Join(roots, "\n"), strings.Join(syncLines, "\n"), strings.Join(bundle.ImplementationInventory.Commands, ", "), strings.Join(bundle.ImplementationInventory.InternalPackages, ", "), strings.Join(bundle.ImplementationInventory.BuildingDocs, ", "), landingSite, hugoDocs, auditBlock, bundle.ProgressJSON, bundle.RepoRoot, bundle.ProgressStats.Items, healthPreservationClause, quarantinePriorityClause, quarantineBlock)
+%s%s%s%s
+`, strings.Join(roots, "\n"), strings.Join(syncLines, "\n"), strings.Join(bundle.ImplementationInventory.Commands, ", "), strings.Join(bundle.ImplementationInventory.InternalPackages, ", "), strings.Join(bundle.ImplementationInventory.BuildingDocs, ", "), landingSite, hugoDocs, auditBlock, bundle.ProgressJSON, bundle.RepoRoot, bundle.ProgressStats.Items, healthPreservationClause, quarantinePriorityClause, quarantineBlock, topicalBlock)
 }
 
 // formatQuarantinedRows renders the planner's call-to-action list for

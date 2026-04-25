@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/architectureplanner"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/autoloop"
@@ -16,7 +17,7 @@ import (
 var commandStdout io.Writer = os.Stdout
 var commandRunner autoloop.Runner = autoloop.ExecRunner{}
 
-const usage = "usage: architecture-planner-loop run [--dry-run] [--codexu|--claudeu] [--mode safe|full|unattended] | status | show-report | doctor | service install [--force]"
+const usage = "usage: architecture-planner-loop run [--dry-run] [--codexu|--claudeu] [--mode safe|full|unattended] [keyword ...] | status | show-report | doctor | service install [--force]"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -49,9 +50,10 @@ func run(args []string) error {
 			return err
 		}
 		summary, err := architectureplanner.RunOnce(context.Background(), architectureplanner.RunOptions{
-			Config: cfg,
-			Runner: commandRunner,
-			DryRun: opts.dryRun,
+			Config:   cfg,
+			Runner:   commandRunner,
+			DryRun:   opts.dryRun,
+			Keywords: opts.keywords,
 		})
 		if err != nil {
 			return err
@@ -93,16 +95,18 @@ func run(args []string) error {
 }
 
 type runOptions struct {
-	dryRun  bool
-	backend string
-	mode    string
-	help    bool
+	dryRun   bool
+	backend  string
+	mode     string
+	help     bool
+	keywords []string
 }
 
 func parseRunOptions(args []string) (runOptions, error) {
 	opts := runOptions{}
 	for i := 0; i < len(args); i++ {
-		switch args[i] {
+		arg := args[i]
+		switch arg {
 		case "--dry-run":
 			opts.dryRun = true
 		case "--codexu":
@@ -118,7 +122,16 @@ func parseRunOptions(args []string) (runOptions, error) {
 		case "--help", "-h":
 			opts.help = true
 		default:
-			return runOptions{}, fmt.Errorf(usage)
+			// Treat as positional keyword argument (L6 topical focus mode).
+			// Multi-word keywords (e.g. "skills tools") get split on
+			// whitespace so a single quoted shell arg yields multiple
+			// keywords. Reject obvious typos for unknown flags.
+			if strings.HasPrefix(arg, "-") {
+				return runOptions{}, fmt.Errorf(usage)
+			}
+			for _, kw := range strings.Fields(arg) {
+				opts.keywords = append(opts.keywords, kw)
+			}
 		}
 	}
 	return opts, nil

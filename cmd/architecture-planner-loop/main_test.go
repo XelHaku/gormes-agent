@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -143,6 +144,31 @@ func TestServiceInstallWritesUnits(t *testing.T) {
 	}
 	if runner.Commands[0].Name != "systemctl" || runner.Commands[0].Args[0] != "--user" || runner.Commands[0].Args[1] != "daemon-reload" {
 		t.Fatalf("Commands[0] = %#v, want systemctl --user daemon-reload", runner.Commands[0])
+	}
+}
+
+func TestParseRunOptions_PositionalKeywords(t *testing.T) {
+	opts, err := parseRunOptions([]string{"--codexu", "honcho", "memory"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.backend != "codexu" {
+		t.Errorf("backend = %q", opts.backend)
+	}
+	want := []string{"honcho", "memory"}
+	if !reflect.DeepEqual(opts.keywords, want) {
+		t.Errorf("keywords = %v, want %v", opts.keywords, want)
+	}
+}
+
+func TestParseRunOptions_QuotedMultiwordKeywordsSplitOnWhitespace(t *testing.T) {
+	opts, err := parseRunOptions([]string{"skills tools"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"skills", "tools"}
+	if !reflect.DeepEqual(opts.keywords, want) {
+		t.Errorf("keywords = %v, want %v", opts.keywords, want)
 	}
 }
 
