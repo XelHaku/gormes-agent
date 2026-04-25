@@ -391,11 +391,16 @@ a:focus-visible,
    a separate section. */
 .pain-block {
   border: 1px solid var(--border);
-  border-left: 4px solid var(--danger);
-  background: rgba(221, 119, 119, 0.08);
+  border-left: 6px solid var(--danger);
+  background: rgba(221, 119, 119, 0.14);
   border-radius: 0;
   padding: 22px 22px 24px;
   margin: 56px 0 32px;
+  /* Inset shadow on the left edge so the red bar reads as a depth
+     stripe, not a flat outline. The 6px stripe + tinted bg + this
+     shadow together turn the block from "spaced text" into "the
+     problem zone." */
+  box-shadow: inset 12px 0 24px -12px rgba(221, 119, 119, 0.35);
 }
 .pain-block p {
   font-weight: 700;
