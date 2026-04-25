@@ -315,14 +315,49 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 
+	// Spec rows that changed in this run feed the verdict-stamping pass
+	// (Phase C Task 11). Computing them once here keeps both the verdict
+	// pass and the ledger entry consistent.
+	rowsChanged := diffRows(beforeDoc, afterDoc)
+
+	// L5 verdict stamping: deterministic post-processing that increments
+	// PlannerVerdict.ReshapeCount on reshaped rows and sets sticky
+	// NeedsHuman when L4 outcomes show persistent failure past the
+	// escalation threshold. Must happen AFTER validateHealthPreservation
+	// passes (so we trust the LLM's regen) and BEFORE the final ledger
+	// append (so verdict_set RowChanges land in the same entry).
+	var verdictChanges []RowChange
+	if afterDoc != nil {
+		verdictChanges = StampVerdicts(afterDoc, rowsChanged, bundle.PreviousReshapes, cfg.EscalationThreshold, now)
+		if len(verdictChanges) > 0 {
+			if err := progress.SaveProgress(cfg.ProgressJSON, afterDoc); err != nil {
+				return RunSummary{}, fmt.Errorf("planner: save verdicts: %w", err)
+			}
+		}
+	}
+
 	runStatus := "ok"
 	if beforeDoc == nil || afterDoc == nil {
 		runStatus = "no_changes"
+	} else if len(verdictChanges) > 0 {
+		// At least one row's PlannerVerdict materially changed. If any of
+		// those changes set NeedsHuman, surface that as the run status so
+		// operators can spot escalations in the ledger at a glance.
+		for _, rc := range verdictChanges {
+			if rc.Detail == "needs_human=true" {
+				runStatus = "needs_human_set"
+				break
+			}
+		}
 	}
 	finalAttempt := 0
 	if len(attempts) > 0 {
 		finalAttempt = attempts[len(attempts)-1].Index
 	}
+
+	combinedRows := append([]RowChange(nil), rowsChanged...)
+	combinedRows = append(combinedRows, verdictChanges...)
+
 	appendPlannerLedger(ledgerPath, LedgerEvent{
 		TS:            now.UTC().Format(time.RFC3339),
 		RunID:         runID,
@@ -333,7 +368,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		Status:        runStatus,
 		BeforeStats:   computeStats(beforeDoc),
 		AfterStats:    computeStats(afterDoc),
-		RowsChanged:   diffRows(beforeDoc, afterDoc),
+		RowsChanged:   combinedRows,
 		Keywords:      opts.Keywords,
 		RetryAttempt:  finalAttempt,
 		Attempts:      attempts,

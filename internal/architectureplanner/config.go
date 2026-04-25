@@ -60,6 +60,12 @@ type Config struct {
 	// Sourced from PLANNER_EVALUATION_WINDOW (Go time.ParseDuration syntax,
 	// e.g. "168h" for seven days); default DefaultEvaluationWindow (7 days).
 	EvaluationWindow time.Duration
+	// EscalationThreshold is the consecutive-reshape count at which a row
+	// whose latest L4 outcome is still_failing is auto-marked NeedsHuman by
+	// StampVerdicts. NeedsHuman is sticky — only a human edit clears it.
+	// Sourced from PLANNER_ESCALATION_THRESHOLD; default
+	// DefaultEscalationThreshold (3). Must be positive.
+	EscalationThreshold int
 }
 
 func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
@@ -88,6 +94,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		MaxRetries:             DefaultMaxRetries,
 		MergeOpenPullRequests:  true,
 		EvaluationWindow:       DefaultEvaluationWindow,
+		EscalationThreshold:    DefaultEscalationThreshold,
 	}
 
 	if value := env["PROGRESS_JSON"]; value != "" {
@@ -168,6 +175,16 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 			return Config{}, fmt.Errorf("PLANNER_EVALUATION_WINDOW must be positive")
 		}
 		cfg.EvaluationWindow = d
+	}
+	if value := env["PLANNER_ESCALATION_THRESHOLD"]; value != "" {
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("PLANNER_ESCALATION_THRESHOLD must be an integer: %w", err)
+		}
+		if n <= 0 {
+			return Config{}, fmt.Errorf("PLANNER_ESCALATION_THRESHOLD must be positive")
+		}
+		cfg.EscalationThreshold = n
 	}
 
 	// TriggersCursorPath derives from the (possibly env-overridden) RunRoot

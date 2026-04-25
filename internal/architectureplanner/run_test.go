@@ -169,7 +169,7 @@ func TestRunOnceMergesOpenPullRequestsBeforeSyncAndPlannerPrompt(t *testing.T) {
 
 	wantPrefix := []autoloop.Command{
 		{Name: "gh", Args: []string{"pr", "list", "--state", "open", "--limit", "100", "--json", "number,title,isDraft,mergeStateStatus,headRefName,url"}, Dir: repoRoot},
-		{Name: "gh", Args: []string{"pr", "merge", "11", "--merge", "--delete-branch"}, Dir: repoRoot},
+		{Name: "gh", Args: []string{"pr", "merge", "11", "--merge", "--delete-branch", "--admin"}, Dir: repoRoot},
 		{Name: "git", Args: []string{"pull", "--ff-only"}, Dir: repoRoot},
 	}
 	if got := runner.Commands[:3]; !reflect.DeepEqual(got, wantPrefix) {
