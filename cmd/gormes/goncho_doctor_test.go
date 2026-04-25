@@ -39,7 +39,7 @@ func TestGonchoDoctorCommand_TextZeroStateReportsOperatorLadder(t *testing.T) {
 		"honcho_context",
 		"Context dry-run",
 		"No stored representation for operator:diagnostic.",
-		"Queue status (observability only; not synchronization)",
+		"Queue status (observability/debugging only; not synchronization; do not wait for empty queue)",
 		"extractor_queue_depth: 0",
 		"representation: total=0 pending=0 in_progress=0 completed=0",
 		"summary: total=0 pending=0 in_progress=0 completed=0",

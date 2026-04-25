@@ -1739,9 +1739,9 @@
             {
               "name": "Goncho queue status read model",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes exposes Honcho-style representation, summary, and dream work-unit queue status as observability, not synchronization",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -1771,7 +1771,7 @@
                 "Only representation, summary, and dream task types count toward Honcho-style queue status.",
                 "Docs and CLI output state that queue status is for observability and debugging, not waiting for completion."
               ],
-              "note": "Honcho docs explicitly warn not to wait for an empty queue. Goncho should expose this as operator evidence alongside existing memory status without making queue drain part of turn correctness.",
+              "note": "TDD landed: Goncho exposes a Honcho-style zero-state queue status read model for representation, summary, and dream work units with completed_work_units, in_progress_work_units, pending_work_units, total_work_units, and optional per-session details. Memory status and Goncho doctor output include extractor queue status alongside Goncho work-unit counts and explicitly frame queue status as observability/debugging evidence, not a synchronization contract or queue-drain wait condition.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",

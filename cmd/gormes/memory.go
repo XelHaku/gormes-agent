@@ -82,7 +82,7 @@ func formatExtractorStatus(status memory.ExtractorStatus) string {
 
 func formatGonchoQueueStatus(status goncho.QueueStatus) string {
 	var b strings.Builder
-	b.WriteString("Goncho queue status (observability only; not synchronization)\n")
+	b.WriteString("Goncho queue status (observability/debugging only; not synchronization; do not wait for empty queue)\n")
 	for _, taskType := range goncho.QueueTaskTypes {
 		counts := status.WorkUnits[taskType]
 		b.WriteString(fmt.Sprintf("%s: total=%d pending=%d in_progress=%d completed=%d\n",
