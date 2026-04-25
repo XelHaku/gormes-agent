@@ -65,9 +65,9 @@ func TestLoad_RealFile(t *testing.T) {
 	if got := p.Phases["2"].DerivedStatus(); got != StatusInProgress {
 		t.Errorf("Phase 2 = %q, want in_progress", got)
 	}
-	// Phase 3 has most memory subphases shipped, 3.E.* planned -> in_progress.
-	if got := p.Phases["3"].DerivedStatus(); got != StatusInProgress {
-		t.Errorf("Phase 3 = %q, want in_progress", got)
+	// Phase 3 memory rows are shipped.
+	if got := p.Phases["3"].DerivedStatus(); got != StatusComplete {
+		t.Errorf("Phase 3 = %q, want complete", got)
 	}
 	// Phase 4 has the Anthropic adapter landed while the rest stays planned.
 	if got := p.Phases["4"].DerivedStatus(); got != StatusInProgress {
@@ -801,8 +801,8 @@ func TestLoad_RealFile_Phase3Ledger(t *testing.T) {
 	}
 
 	sessionSearch := p.Phases["3"].Subphases["3.E.8"]
-	if got := sessionSearch.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 3.E.8 = %q, want in_progress", got)
+	if got := sessionSearch.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 3.E.8 = %q, want complete", got)
 	}
 	e8Items := itemsByName(sessionSearch.Items)
 	lineage := e8Items["parent_session_id lineage for compression splits"]
@@ -1041,7 +1041,7 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 3.E.8 lineage-aware search hits status = %q, want complete", lineageHits.Status)
 	}
 	operatorEvidence := lineageItems["Operator-auditable search evidence"]
-	if operatorEvidence.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.8 operator evidence status = %q, want planned", operatorEvidence.Status)
+	if operatorEvidence.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.8 operator evidence status = %q, want complete", operatorEvidence.Status)
 	}
 }
