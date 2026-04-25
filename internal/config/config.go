@@ -135,6 +135,7 @@ type GonchoCfg struct {
 	PeerCardEnabled              bool   `toml:"peer_card_enabled"`
 	SummaryEnabled               bool   `toml:"summary_enabled"`
 	DreamEnabled                 bool   `toml:"dream_enabled"`
+	DreamIdleTimeoutMinutes      int    `toml:"dream_idle_timeout_minutes"`
 	DeriverWorkers               int    `toml:"deriver_workers"`
 	RepresentationBatchMaxTokens int    `toml:"representation_batch_max_tokens"`
 	DialecticDefaultLevel        string `toml:"dialectic_default_level"`
@@ -153,6 +154,7 @@ func (g GonchoCfg) RuntimeConfig() goncho.Config {
 		PeerCardEnabled:              g.PeerCardEnabled,
 		SummaryEnabled:               g.SummaryEnabled,
 		DreamEnabled:                 g.DreamEnabled,
+		DreamIdleTimeout:             time.Duration(g.DreamIdleTimeoutMinutes) * time.Minute,
 		DeriverWorkers:               g.DeriverWorkers,
 		RepresentationBatchMaxTokens: g.RepresentationBatchMaxTokens,
 		DialecticDefaultLevel:        goncho.DialecticLevel(g.DialecticDefaultLevel),
@@ -312,6 +314,7 @@ func defaults() Config {
 			PeerCardEnabled:              true,
 			SummaryEnabled:               true,
 			DreamEnabled:                 false,
+			DreamIdleTimeoutMinutes:      int(goncho.DefaultDreamIdleTimeout / time.Minute),
 			DeriverWorkers:               goncho.DefaultDeriverWorkers,
 			RepresentationBatchMaxTokens: goncho.DefaultRepresentationBatchMaxTokens,
 			DialecticDefaultLevel:        string(goncho.DialecticLevelLow),
@@ -469,6 +472,13 @@ func loadEnv(cfg *Config) error {
 		}
 		cfg.Goncho.DreamEnabled = parsed
 	}
+	if v := os.Getenv("GORMES_GONCHO_DREAM_IDLE_TIMEOUT_MINUTES"); v != "" {
+		parsed, err := parseEnvInt("GORMES_GONCHO_DREAM_IDLE_TIMEOUT_MINUTES", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.DreamIdleTimeoutMinutes = parsed
+	}
 	if v := os.Getenv("GORMES_GONCHO_DERIVER_WORKERS"); v != "" {
 		parsed, err := parseEnvInt("GORMES_GONCHO_DERIVER_WORKERS", v)
 		if err != nil {
@@ -553,6 +563,7 @@ func validateConfig(cfg *Config) error {
 		{name: "max_message_size", value: cfg.Goncho.MaxMessageSize},
 		{name: "max_file_size", value: cfg.Goncho.MaxFileSize},
 		{name: "get_context_max_tokens", value: cfg.Goncho.GetContextMaxTokens},
+		{name: "dream_idle_timeout_minutes", value: cfg.Goncho.DreamIdleTimeoutMinutes},
 		{name: "deriver_workers", value: cfg.Goncho.DeriverWorkers},
 		{name: "representation_batch_max_tokens", value: cfg.Goncho.RepresentationBatchMaxTokens},
 	} {

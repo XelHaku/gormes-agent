@@ -3,7 +3,7 @@ package memory
 // schemaVersion is the canonical target version for this binary. OpenSqlite
 // migrates any earlier supported version up to this value, and refuses to
 // open DBs with an unknown version (future schemas).
-const schemaVersion = "3h"
+const schemaVersion = "3i"
 
 // schemaV3a is the baseline schema installed on a fresh DB. It matches
 // exactly what Phase 3.A shipped — any change to this string is a schema
@@ -251,4 +251,45 @@ CREATE INDEX IF NOT EXISTS idx_goncho_session_summaries_session
 	ON goncho_session_summaries(workspace_id, session_key);
 
 UPDATE schema_meta SET v = '3h' WHERE k = 'version' AND v = '3g';
+`
+
+// migration3hTo3i adds the first Goncho dream scheduler persistence surface:
+// local auditable dream work intent only, with a partial unique index that
+// permits at most one pending or in-progress dream per observer/observed tuple.
+const migration3hTo3i = `
+CREATE TABLE IF NOT EXISTS goncho_dreams (
+	id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+	workspace_id       TEXT    NOT NULL,
+	observer_peer_id   TEXT    NOT NULL,
+	observed_peer_id   TEXT    NOT NULL,
+	work_unit_key      TEXT    NOT NULL,
+	dream_type         TEXT    NOT NULL DEFAULT 'consolidation',
+	status             TEXT    NOT NULL CHECK(status IN (
+	                        'pending','in_progress','completed','stale','cancelled','rejected'
+	                    )),
+	manual             INTEGER NOT NULL DEFAULT 0 CHECK(manual IN (0,1)),
+	reason             TEXT    NOT NULL,
+	new_conclusions    INTEGER NOT NULL DEFAULT 0 CHECK(new_conclusions >= 0),
+	min_conclusions    INTEGER NOT NULL DEFAULT 50 CHECK(min_conclusions >= 0),
+	last_conclusion_id INTEGER NOT NULL DEFAULT 0,
+	scheduled_for      INTEGER NOT NULL,
+	started_at         INTEGER,
+	completed_at       INTEGER,
+	cancelled_at       INTEGER,
+	stale_at           INTEGER,
+	last_activity_at   INTEGER NOT NULL DEFAULT 0,
+	cooldown_until     INTEGER NOT NULL DEFAULT 0,
+	idle_until         INTEGER NOT NULL DEFAULT 0,
+	created_at         INTEGER NOT NULL,
+	updated_at         INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_goncho_dreams_active_scope
+	ON goncho_dreams(workspace_id, observer_peer_id, observed_peer_id)
+	WHERE status IN ('pending','in_progress');
+CREATE INDEX IF NOT EXISTS idx_goncho_dreams_scope_updated
+	ON goncho_dreams(workspace_id, observer_peer_id, observed_peer_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_goncho_dreams_status
+	ON goncho_dreams(workspace_id, observer_peer_id, status, updated_at DESC);
+
+UPDATE schema_meta SET v = '3i' WHERE k = 'version' AND v = '3h';
 `

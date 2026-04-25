@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/memory"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/session"
@@ -28,6 +29,8 @@ type Service struct {
 	recentLimit    int
 	maxMessageSize int
 	maxFileSize    int
+	dreamEnabled   bool
+	dreamIdle      time.Duration
 	sessions       SessionDirectory
 	log            *slog.Logger
 }
@@ -65,6 +68,8 @@ func NewService(db *sql.DB, cfg Config, log *slog.Logger) *Service {
 		recentLimit:    recentLimit,
 		maxMessageSize: cfg.MaxMessageSize,
 		maxFileSize:    cfg.MaxFileSize,
+		dreamEnabled:   cfg.DreamEnabled,
+		dreamIdle:      cfg.DreamIdleTimeout,
 		sessions:       cfg.SessionDirectory,
 		log:            log,
 	}
@@ -199,6 +204,11 @@ func (s *Service) Conclude(ctx context.Context, params ConcludeParams) (Conclude
 	if err != nil {
 		return ConcludeResult{}, err
 	}
+	if s.dreamEnabled {
+		if _, err := s.cancelPendingDreamsForObserved(ctx, peer, time.Now().Unix(), "new_activity"); err != nil {
+			return ConcludeResult{}, err
+		}
+	}
 
 	return ConcludeResult{
 		WorkspaceID: s.workspaceID,
@@ -272,6 +282,13 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 	query := effectiveContextQuery(params)
 	tokenLimit := effectiveContextTokenLimit(params)
 	unavailable := contextUnavailableEvidence(params, s.observer, peer)
+	if includeDreamStatus(params) {
+		dreamEvidence, err := s.dreamContextUnavailableEvidence(ctx, peer)
+		if err != nil {
+			return ContextResult{}, err
+		}
+		unavailable = append(unavailable, dreamEvidence...)
+	}
 
 	card, err := getPeerCard(ctx, s.db, s.workspaceID, s.observer, peer)
 	if err != nil {
@@ -565,6 +582,10 @@ func deterministicSummaryContent(sessionKey, summaryType string, coveredCount in
 
 func limitToSession(params ContextParams) bool {
 	return params.LimitToSession != nil && *params.LimitToSession
+}
+
+func includeDreamStatus(params ContextParams) bool {
+	return params.IncludeDreamStatus != nil && *params.IncludeDreamStatus
 }
 
 func contextUnavailableEvidence(params ContextParams, defaultObserver, observed string) []ContextUnavailableEvidence {

@@ -85,6 +85,8 @@ type gonchoDoctorConfig struct {
 	Workspace      string `json:"workspace"`
 	ObserverPeer   string `json:"observer_peer"`
 	RecentMessages int    `json:"recent_messages"`
+	DreamEnabled   bool   `json:"dream_enabled"`
+	DreamIdleMins  int    `json:"dream_idle_timeout_minutes"`
 	HermesModel    string `json:"hermes_model"`
 }
 
@@ -126,6 +128,7 @@ type doctorQueueStatus struct {
 	ObservabilityOnly bool                                  `json:"observability_only"`
 	Extractor         extractorQueueSnapshot                `json:"extractor"`
 	WorkUnits         map[string]goncho.QueueWorkUnitStatus `json:"work_units"`
+	Dream             goncho.DreamQueueStatus               `json:"dream"`
 	Message           string                                `json:"message"`
 }
 
@@ -235,11 +238,17 @@ func buildGonchoDoctorReport(ctx context.Context, cfg config.Config, db *sql.DB,
 		return report, 2, nil
 	}
 
+	gonchoCfg := cfg.Goncho.RuntimeConfig()
 	extractor, err := memory.ReadExtractorStatus(ctx, db, 5)
 	if err != nil {
 		return gonchoDoctorReport{}, 2, err
 	}
-	queue, err := goncho.ReadQueueStatus(ctx, db)
+	queue, err := goncho.ReadQueueStatus(ctx, db, goncho.QueueStatusConfig{
+		DreamEnabled:     gonchoCfg.DreamEnabled,
+		WorkspaceID:      gonchoCfg.WorkspaceID,
+		ObserverPeerID:   gonchoCfg.ObserverPeerID,
+		DreamIdleTimeout: gonchoCfg.DreamIdleTimeout,
+	})
 	if err != nil {
 		return gonchoDoctorReport{}, 2, err
 	}
@@ -254,7 +263,8 @@ func buildGonchoDoctorReport(ctx context.Context, cfg config.Config, db *sql.DB,
 	}
 	defer closeSessionDir()
 
-	svc := goncho.NewService(db, goncho.Config{SessionDirectory: sessionDir}, nil)
+	gonchoCfg.SessionDirectory = sessionDir
+	svc := goncho.NewService(db, gonchoCfg, nil)
 	toolStatus := readToolRegistration(svc)
 	contextStatus, err := readContextDryRun(ctx, svc, peer, sessionKey, scope, sources)
 	if err != nil {
@@ -304,6 +314,7 @@ func buildGonchoDoctorReport(ctx context.Context, cfg config.Config, db *sql.DB,
 				SkippedSyncCount: extractor.SkippedSyncCount,
 			},
 			WorkUnits: queue.WorkUnits,
+			Dream:     queue.Dream,
 			Message:   queue.Message,
 		},
 		ConclusionAvailability: conclusions,
@@ -340,9 +351,11 @@ func currentGonchoDoctorConfig(cfg config.Config) gonchoDoctorConfig {
 		ConfigExists:   err == nil,
 		MemoryDBPath:   config.MemoryDBPath(),
 		SessionDBPath:  config.SessionDBPath(),
-		Workspace:      goncho.DefaultWorkspaceID,
-		ObserverPeer:   goncho.DefaultObserverPeerID,
-		RecentMessages: 4,
+		Workspace:      cfg.Goncho.Workspace,
+		ObserverPeer:   cfg.Goncho.ObserverPeer,
+		RecentMessages: cfg.Goncho.RecentMessages,
+		DreamEnabled:   cfg.Goncho.DreamEnabled,
+		DreamIdleMins:  cfg.Goncho.DreamIdleTimeoutMinutes,
 		HermesModel:    cfg.Hermes.Model,
 	}
 }
@@ -378,13 +391,15 @@ func readToolRegistration(svc *goncho.Service) toolRegistrationStatus {
 }
 
 func readContextDryRun(ctx context.Context, svc *goncho.Service, peer, sessionKey, scope string, sources []string) (contextDryRunStatus, error) {
+	includeDreamStatus := true
 	result, err := svc.Context(ctx, goncho.ContextParams{
-		Peer:       peer,
-		Query:      "doctor dry-run",
-		MaxTokens:  400,
-		SessionKey: sessionKey,
-		Scope:      scope,
-		Sources:    sources,
+		Peer:               peer,
+		Query:              "doctor dry-run",
+		MaxTokens:          400,
+		SessionKey:         sessionKey,
+		Scope:              scope,
+		Sources:            sources,
+		IncludeDreamStatus: &includeDreamStatus,
 	})
 	if err != nil {
 		return contextDryRunStatus{}, err
@@ -539,6 +554,17 @@ func collectGonchoDegradedModes(queue goncho.QueueStatus, summaries summaryAvail
 			Reason:     queue.Message,
 		})
 	}
+	if queue.Dream.Status == "dream_disabled" || queue.Dream.Status == "dream_unavailable" {
+		reason := queue.Dream.Status
+		if len(queue.Dream.Evidence) > 0 {
+			reason = queue.Dream.Evidence[0].Reason
+		}
+		out = append(out, degradedMode{
+			Capability: "goncho_dream_scheduler",
+			Severity:   "degraded",
+			Reason:     reason,
+		})
+	}
 	if summaries.Status == "degraded" {
 		out = append(out, degradedMode{
 			Capability: "session_summaries",
@@ -581,7 +607,9 @@ func formatGonchoDoctorReport(report gonchoDoctorReport) string {
 	fmt.Fprintf(&b, "session_db_path: %s\n", report.Config.SessionDBPath)
 	fmt.Fprintf(&b, "workspace: %s\n", report.Config.Workspace)
 	fmt.Fprintf(&b, "observer_peer: %s\n", report.Config.ObserverPeer)
-	fmt.Fprintf(&b, "recent_messages: %d\n\n", report.Config.RecentMessages)
+	fmt.Fprintf(&b, "recent_messages: %d\n", report.Config.RecentMessages)
+	fmt.Fprintf(&b, "dream_enabled: %t\n", report.Config.DreamEnabled)
+	fmt.Fprintf(&b, "dream_idle_timeout_minutes: %d\n\n", report.Config.DreamIdleMins)
 
 	b.WriteString("Schema\n")
 	fmt.Fprintf(&b, "schema_version: %s\n", report.Schema.Version)
@@ -633,6 +661,7 @@ func formatGonchoDoctorReport(report gonchoDoctorReport) string {
 			counts.CompletedWorkUnits,
 		)
 	}
+	b.WriteString(formatDreamQueueEvidence(report.QueueStatus.Dream))
 	fmt.Fprintf(&b, "goncho_queue: %s\n\n", report.QueueStatus.Message)
 
 	b.WriteString("Conclusion availability\n")
