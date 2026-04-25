@@ -60,7 +60,246 @@ type ServiceRestartDelayEvidence struct {
 	Detail   string
 }
 
+const (
+	DefaultServiceRestartPollTimeout  = 10 * time.Second
+	DefaultServiceRestartPollInterval = 500 * time.Millisecond
+)
+
+type ServiceActiveStatus string
+
+const (
+	ServiceActiveStatusActive     ServiceActiveStatus = "active"
+	ServiceActiveStatusInactive   ServiceActiveStatus = "inactive"
+	ServiceActiveStatusActivating ServiceActiveStatus = "activating"
+	ServiceActiveStatusFailed     ServiceActiveStatus = "failed"
+	ServiceActiveStatusUnknown    ServiceActiveStatus = "unknown"
+)
+
+type ServiceRestartPollOutcome string
+
+const (
+	ServiceRestartPollRestarted           ServiceRestartPollOutcome = "restarted"
+	ServiceRestartPollTimeout             ServiceRestartPollOutcome = "restart_timeout"
+	ServiceRestartPollManagerUnavailable  ServiceRestartPollOutcome = "service_manager_unavailable"
+	ServiceRestartPollCrashedAfterRestart ServiceRestartPollOutcome = "crashed_after_restart"
+)
+
+type ServiceRestartPollEvidenceKind string
+
+const (
+	ServiceRestartPollActiveEvidence              ServiceRestartPollEvidenceKind = "service_active"
+	ServiceRestartPollCooldownEvidence            ServiceRestartPollEvidenceKind = "restart_delay_cooldown"
+	ServiceRestartPollTimeoutEvidence             ServiceRestartPollEvidenceKind = "service_restart_timeout"
+	ServiceRestartPollManagerUnavailableEvidence  ServiceRestartPollEvidenceKind = "service_manager_unavailable"
+	ServiceRestartPollCrashedAfterRestartEvidence ServiceRestartPollEvidenceKind = "crashed_after_restart"
+	ServiceRestartPollRetryEvidence               ServiceRestartPollEvidenceKind = "service_restart_retry"
+)
+
+type ServiceActiveStatusCheck struct {
+	Status      ServiceActiveStatus
+	Unavailable bool
+	Raw         string
+	Detail      string
+}
+
+type ServiceActiveStatusRunner interface {
+	ServiceActiveStatus(service string) (ServiceActiveStatusCheck, error)
+}
+
+type ServiceRestartPollClock interface {
+	Now() time.Time
+	Sleep(time.Duration)
+}
+
+type ServiceRestartPollOptions struct {
+	Service      string
+	Runner       ServiceActiveStatusRunner
+	Clock        ServiceRestartPollClock
+	RestartDelay ServiceRestartDelayReport
+	BaseTimeout  time.Duration
+	PollInterval time.Duration
+}
+
+type ServiceRestartPollReport struct {
+	Outcome      ServiceRestartPollOutcome
+	Service      string
+	Timeout      time.Duration
+	PollInterval time.Duration
+	Attempts     int
+	StartedAt    time.Time
+	FinishedAt   time.Time
+	RestartDelay ServiceRestartDelayReport
+	Evidence     []ServiceRestartPollEvidence
+}
+
+type ServiceRestartPollEvidence struct {
+	Kind   ServiceRestartPollEvidenceKind
+	Status ServiceActiveStatus
+	Raw    string
+	Detail string
+}
+
 var systemdDurationTokenRE = regexp.MustCompile(`^([0-9]+(?:\.[0-9]+)?)([A-Za-z]*)$`)
+
+func PollServiceRestartActive(options ServiceRestartPollOptions) ServiceRestartPollReport {
+	clock := options.Clock
+	if clock == nil {
+		clock = realServiceRestartPollClock{}
+	}
+
+	service := strings.TrimSpace(options.Service)
+	if service == "" {
+		service = "service"
+	}
+
+	baseTimeout := options.BaseTimeout
+	if baseTimeout <= 0 {
+		baseTimeout = DefaultServiceRestartPollTimeout
+	}
+	pollInterval := options.PollInterval
+	if pollInterval <= 0 {
+		pollInterval = DefaultServiceRestartPollInterval
+	}
+	timeout := serviceRestartPollTimeout(baseTimeout, options.RestartDelay)
+
+	report := ServiceRestartPollReport{
+		Service:      service,
+		Timeout:      timeout,
+		PollInterval: pollInterval,
+		StartedAt:    clock.Now(),
+		RestartDelay: options.RestartDelay,
+	}
+	if options.RestartDelay.Delay > 0 {
+		report.Evidence = append(report.Evidence, ServiceRestartPollEvidence{
+			Kind: ServiceRestartPollCooldownEvidence,
+			Detail: fmt.Sprintf(
+				"polling service active status for %s to cover restart delay %s plus transition slack %s",
+				timeout, options.RestartDelay.Delay, baseTimeout,
+			),
+		})
+	}
+
+	if options.Runner == nil {
+		return finishServiceRestartPoll(report, clock, ServiceRestartPollManagerUnavailable, ServiceRestartPollEvidence{
+			Kind:   ServiceRestartPollManagerUnavailableEvidence,
+			Detail: "service manager unavailable; no active-status runner was provided",
+		})
+	}
+
+	deadline := report.StartedAt.Add(timeout)
+	for {
+		check, err := options.Runner.ServiceActiveStatus(service)
+		report.Attempts++
+		check.Status = normalizeServiceActiveStatus(check.Status)
+
+		if err != nil {
+			return finishServiceRestartPoll(report, clock, ServiceRestartPollManagerUnavailable, ServiceRestartPollEvidence{
+				Kind:   ServiceRestartPollManagerUnavailableEvidence,
+				Status: check.Status,
+				Raw:    check.Raw,
+				Detail: fmt.Sprintf("service manager unavailable while checking %s: %v", service, err),
+			})
+		}
+		if check.Unavailable {
+			detail := check.Detail
+			if detail == "" {
+				detail = fmt.Sprintf("service manager unavailable while checking %s active status", service)
+			}
+			return finishServiceRestartPoll(report, clock, ServiceRestartPollManagerUnavailable, ServiceRestartPollEvidence{
+				Kind:   ServiceRestartPollManagerUnavailableEvidence,
+				Status: check.Status,
+				Raw:    check.Raw,
+				Detail: detail,
+			})
+		}
+
+		switch check.Status {
+		case ServiceActiveStatusActive:
+			return finishServiceRestartPoll(report, clock, ServiceRestartPollRestarted, ServiceRestartPollEvidence{
+				Kind:   ServiceRestartPollActiveEvidence,
+				Status: check.Status,
+				Raw:    check.Raw,
+				Detail: fmt.Sprintf("service %s reported active after %d poll attempts over %s", service, report.Attempts, clock.Now().Sub(report.StartedAt)),
+			})
+		case ServiceActiveStatusFailed:
+			return finishServiceRestartPoll(report, clock, ServiceRestartPollCrashedAfterRestart,
+				ServiceRestartPollEvidence{
+					Kind:   ServiceRestartPollCrashedAfterRestartEvidence,
+					Status: check.Status,
+					Raw:    check.Raw,
+					Detail: fmt.Sprintf("service %s reported failed after restart; not reporting it as restarted", service),
+				},
+				ServiceRestartPollEvidence{
+					Kind:   ServiceRestartPollRetryEvidence,
+					Status: check.Status,
+					Raw:    check.Raw,
+					Detail: fmt.Sprintf("retry service restart for %s or inspect service logs before declaring recovery", service),
+				},
+			)
+		}
+
+		now := clock.Now()
+		if !now.Before(deadline) {
+			return finishServiceRestartPoll(report, clock, ServiceRestartPollTimeout, ServiceRestartPollEvidence{
+				Kind:   ServiceRestartPollTimeoutEvidence,
+				Status: check.Status,
+				Raw:    check.Raw,
+				Detail: fmt.Sprintf("timed out after %s waiting for %s to report active; last status was %s", timeout, service, check.Status),
+			})
+		}
+
+		sleep := pollInterval
+		if remaining := deadline.Sub(now); remaining < sleep {
+			sleep = remaining
+		}
+		if sleep <= 0 {
+			return finishServiceRestartPoll(report, clock, ServiceRestartPollTimeout, ServiceRestartPollEvidence{
+				Kind:   ServiceRestartPollTimeoutEvidence,
+				Status: check.Status,
+				Raw:    check.Raw,
+				Detail: fmt.Sprintf("timed out after %s waiting for %s to report active; last status was %s", timeout, service, check.Status),
+			})
+		}
+		clock.Sleep(sleep)
+	}
+}
+
+func serviceRestartPollTimeout(baseTimeout time.Duration, restartDelay ServiceRestartDelayReport) time.Duration {
+	timeout := baseTimeout
+	if restartDelay.Delay > 0 {
+		withRestartDelay := restartDelay.Delay + baseTimeout
+		if withRestartDelay > timeout {
+			timeout = withRestartDelay
+		}
+	}
+	return timeout
+}
+
+func normalizeServiceActiveStatus(status ServiceActiveStatus) ServiceActiveStatus {
+	switch status {
+	case ServiceActiveStatusActive, ServiceActiveStatusInactive, ServiceActiveStatusActivating, ServiceActiveStatusFailed:
+		return status
+	default:
+		return ServiceActiveStatusUnknown
+	}
+}
+
+func finishServiceRestartPoll(report ServiceRestartPollReport, clock ServiceRestartPollClock, outcome ServiceRestartPollOutcome, evidence ...ServiceRestartPollEvidence) ServiceRestartPollReport {
+	report.Outcome = outcome
+	report.FinishedAt = clock.Now()
+	report.Evidence = append(report.Evidence, evidence...)
+	return report
+}
+
+type realServiceRestartPollClock struct{}
+
+func (realServiceRestartPollClock) Now() time.Time {
+	return time.Now()
+}
+
+func (realServiceRestartPollClock) Sleep(d time.Duration) {
+	time.Sleep(d)
+}
 
 func ParseServiceRestartDelay(source ServiceRestartDelaySource) ServiceRestartDelayReport {
 	defaultDelay := boundedDefaultDelay(source.DefaultDelay, source.MaxDelay)
