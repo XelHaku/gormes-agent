@@ -86,6 +86,11 @@ const (
 type PlatformEvent struct {
 	Kind PlatformEventKind
 	Text string
+	// Model, when non-empty after trimming whitespace, overrides Config.Model
+	// for this submit event only. The resident kernel configuration is not
+	// mutated, so following turns fall back to Config.Model unless they carry
+	// their own override.
+	Model string
 	// SessionID, when non-empty, overrides k.sessionID for this turn
 	// only. Used by the Phase 2.D cron executor so each cron fire has
 	// an isolated "cron:<job_id>:<unix_ts>" session. A non-cron event

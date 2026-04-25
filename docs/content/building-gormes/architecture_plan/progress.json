@@ -3746,9 +3746,9 @@
             {
               "name": "Per-turn model selection",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Kernel accepts a per-turn model override, sends it on exactly one hermes.ChatRequest, exposes the active model in RenderFrame during that turn, and falls back to the resident config model on the next turn",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -3779,7 +3779,7 @@
                 "RenderFrame.Model reflects the active override while the turn is connecting/streaming and returns to cfg.Model after the turn settles.",
                 "The test stays in internal/kernel with MockClient and does not add provider calls or routing selector changes."
               ],
-              "note": "Status remains planned after a fresh 2026-04-25 audit. Current main has no PlatformEvent.Model field in internal/kernel/frame.go, runTurn is called without a model override, ChatRequest.Model is still k.cfg.Model, and no internal/kernel/model_selection.go exists. This is a single TDD slice: add the event field and focused test first, thread the override through Run -> runTurn -> ChatRequest and emitFrame, and keep the resident cfg.Model unchanged for subsequent turns.",
+              "note": "Complete: TDD added internal/kernel/per_turn_model_test.go and threaded PlatformEvent.Model through Run -> runTurn -> hermes.ChatRequest plus RenderFrame.Model. Blank overrides fall back to Config.Model, the resident config model is not mutated, and the implementation leaves provider routing policy unchanged.",
               "write_scope": [
                 "internal/kernel/frame.go",
                 "internal/kernel/kernel.go",
@@ -3801,6 +3801,11 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5401a008 run_agent.py",
                 "note": "Hermes defines model switching and provider-routing behavior; Gormes must implement a smaller Go kernel per-turn override that consumes the native routing selector without importing Python runtime."
+              },
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T11:14:48Z",
+                "last_success": "2026-04-25T11:14:48Z"
               }
             }
           ]

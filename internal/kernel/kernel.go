@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -96,6 +97,7 @@ type Kernel struct {
 	history     []hermes.Message
 	soul        []SoulEntry
 	sessionID   string
+	activeModel string
 	lastError   string
 	retryStatus RetryStatus
 }
@@ -117,6 +119,7 @@ func New(cfg Config, c hermes.Client, s store.Store, tm telemetry.Telemetry, log
 		render:      make(chan RenderFrame, RenderMailboxCap),
 		events:      make(chan PlatformEvent, PlatformEventMailboxCap),
 		sessionID:   cfg.InitialSessionID,
+		activeModel: cfg.Model,
 		retryStatus: NewRetryStatus(),
 	}
 }
@@ -189,7 +192,7 @@ func (k *Kernel) Run(ctx context.Context) error {
 						k.sessionID = e.SessionID
 						defer func() { k.sessionID = prevSessionID }()
 					}
-					k.runTurn(ctx, e.Text, e.SessionContext, e.CronJobID)
+					k.runTurn(ctx, e.Text, e.SessionContext, e.CronJobID, selectTurnModel(k.cfg.Model, e.Model))
 				}()
 			case PlatformEventCancel:
 				// No active turn; ignore (cancel during a turn is handled
@@ -225,9 +228,10 @@ func (k *Kernel) Run(ctx context.Context) error {
 // goroutine — this is part of the single-owner invariant.
 // cronJobID is non-empty for Phase 2.D cron-fired turns; it is passed through
 // to the store.Command payload and is otherwise opaque to the kernel.
-func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID string) {
+func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID, model string) {
 	prov := newProvenance(k.cfg.Endpoint)
 	turnKey := prov.LocalRunID
+	model = selectTurnModel(k.cfg.Model, model)
 
 	// 1. Admission. Reject locally before any HTTP.
 	if err := k.cfg.Admission.Validate(text); err != nil {
@@ -264,6 +268,7 @@ func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID st
 	k.draft = ""
 	k.lastError = ""
 	k.retryStatus = NewRetryStatus()
+	k.activeModel = model
 	k.phase = PhaseConnecting
 	k.emitFrame("connecting")
 	prov.LogPOSTSent(k.log)
@@ -313,7 +318,7 @@ func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID st
 	}
 
 	request := hermes.ChatRequest{
-		Model:     k.cfg.Model,
+		Model:     model,
 		SessionID: k.sessionID,
 		Stream:    true,
 		Messages:  msgs,
@@ -380,6 +385,7 @@ toolLoop:
 				prov.LogError(k.log)
 				k.phase = PhaseFailed
 				k.lastError = err.Error()
+				k.activeModel = k.cfg.Model
 				k.emitFrame("open stream failed")
 				return
 			}
@@ -444,6 +450,7 @@ toolLoop:
 		if toolIteration > maxIter {
 			k.phase = PhaseFailed
 			k.lastError = fmt.Sprintf("tool iteration limit exceeded (%d)", maxIter)
+			k.activeModel = k.cfg.Model
 			k.emitFrame(k.lastError)
 			return
 		}
@@ -495,6 +502,7 @@ toolLoop:
 		prov.LogError(k.log)
 		k.phase = PhaseFailed
 		k.lastError = fatalErr.Error()
+		k.activeModel = k.cfg.Model
 		k.emitFrame("stream error")
 		return
 	}
@@ -546,6 +554,7 @@ toolLoop:
 
 	prov.LogDone(k.log)
 	k.phase = PhaseIdle
+	k.activeModel = k.cfg.Model
 	k.emitFrame("idle")
 }
 
@@ -751,7 +760,7 @@ func (k *Kernel) emitFrame(status string) {
 		Telemetry:      k.tm.Snapshot(),
 		StatusText:     status,
 		SessionID:      k.sessionID,
-		Model:          k.cfg.Model,
+		Model:          k.displayModel(),
 		ProviderStatus: hermes.ProviderStatusOf(k.client),
 		RetryStatus:    k.retryStatus.snapshot(),
 		LastError:      k.lastError,
@@ -768,6 +777,20 @@ func (k *Kernel) emitFrame(status string) {
 	default:
 		// Should be unreachable after the drain above.
 	}
+}
+
+func (k *Kernel) displayModel() string {
+	if strings.TrimSpace(k.activeModel) != "" {
+		return k.activeModel
+	}
+	return k.cfg.Model
+}
+
+func selectTurnModel(residentModel, override string) string {
+	if model := strings.TrimSpace(override); model != "" {
+		return model
+	}
+	return residentModel
 }
 
 // cronFlag returns 1 when the turn carries a cron_job_id (Phase 2.D),
