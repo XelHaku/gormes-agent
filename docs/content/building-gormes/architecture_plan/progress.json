@@ -6837,9 +6837,9 @@
             {
               "name": "Service RestartSec parser helper",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Service-management helpers parse systemd RestartUSec/RestartSec evidence into a bounded restart delay without invoking live service managers",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -6869,7 +6869,7 @@
                 "Parser fixtures preserve operator-readable evidence for defaulted, malformed, missing, unsupported, and infinite restart-delay cases.",
                 "Tests run without live systemd, Windows service control, root privileges, or network access."
               ],
-              "note": "Split from the still-failing active-polling row. Land the RestartSec parser first so active polling does not mix duration parsing with fake service-runner state machines.",
+              "note": "Complete: TDD added a pure internal/cli RestartUSec/RestartSec parser with fake command-output fixtures for 30s, 100ms, 1min 30s, zero, bounded delays, blank/missing/malformed/infinite values, unsupported managers, and service-manager-unavailable evidence. No live systemctl/sc.exe calls, installer layout policy, gateway restart command semantics, or active polling were changed; the source-backed installer update path remains documented as Gormes' current public path.",
               "write_scope": [
                 "internal/cli/service_restart.go",
                 "internal/cli/service_restart_parse_test.go",
