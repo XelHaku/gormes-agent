@@ -15,6 +15,13 @@ const (
 	dashboardMaxSessionLimit     = 100
 )
 
+const (
+	dashboardPanelBuiltIn           = "built_in"
+	dashboardPanelOptional          = "optional"
+	dashboardPanelOptionalExtension = "optional_extension"
+	dashboardReactViteRuntimeAbsent = "absent"
+)
+
 // DashboardModelProvider is the model-picker provider shape consumed by the
 // dashboard without importing Hermes' React runtime.
 type DashboardModelProvider struct {
@@ -70,8 +77,47 @@ type DashboardSessionInfo struct {
 
 type dashboardPanelStatus struct {
 	State     string   `json:"state"`
+	Category  string   `json:"category,omitempty"`
 	Reason    string   `json:"reason,omitempty"`
 	Endpoints []string `json:"endpoints,omitempty"`
+}
+
+type dashboardExtensionRuntimeStatus struct {
+	State            string                `json:"state"`
+	Reason           string                `json:"reason,omitempty"`
+	ReactViteRuntime string                `json:"react_vite_runtime"`
+	Evidence         []pluginmeta.Evidence `json:"evidence,omitempty"`
+}
+
+type dashboardThemeInventoryStatus struct {
+	State    string                 `json:"state"`
+	Active   string                 `json:"active,omitempty"`
+	Themes   []dashboardThemeStatus `json:"themes"`
+	Evidence []pluginmeta.Evidence  `json:"evidence,omitempty"`
+}
+
+type dashboardThemeStatus struct {
+	Name        string `json:"name"`
+	Label       string `json:"label,omitempty"`
+	Description string `json:"description,omitempty"`
+	Source      string `json:"source,omitempty"`
+	State       string `json:"state"`
+}
+
+type dashboardExtensionStatus struct {
+	Runtime       dashboardExtensionRuntimeStatus `json:"runtime"`
+	Themes        dashboardThemeInventoryStatus   `json:"themes"`
+	UIPlugins     []pluginmeta.PluginStatus       `json:"ui_plugins"`
+	BackendRoutes []pluginmeta.CapabilityStatus   `json:"backend_routes"`
+}
+
+type dashboardPluginInventoryResponse struct {
+	Runtime       dashboardExtensionRuntimeStatus `json:"runtime"`
+	Themes        dashboardThemeInventoryStatus   `json:"themes"`
+	Plugins       []pluginmeta.PluginStatus       `json:"plugins"`
+	Capabilities  []pluginmeta.CapabilityStatus   `json:"capabilities"`
+	BackendRoutes []pluginmeta.CapabilityStatus   `json:"backend_routes"`
+	Evidence      []pluginmeta.Evidence           `json:"evidence,omitempty"`
 }
 
 func (s *Server) handleDashboardStatus(w http.ResponseWriter, r *http.Request) {
@@ -93,22 +139,23 @@ func (s *Server) handleDashboardStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	panels := map[string]dashboardPanelStatus{
-		"chat":          enabledPanel("/v1/chat/completions"),
-		"responses":     enabledPanel("/v1/responses", "/v1/runs", "/v1/runs/{run_id}/events"),
-		"sessions":      enabledPanel("/api/sessions", "/api/sessions/{session_id}"),
-		"models":        enabledPanel("/v1/models", "/api/model/info", "/api/model/options"),
-		"oauth":         enabledPanel("/api/providers/oauth"),
-		"tool_progress": enabledPanel("/v1/runs/{run_id}/events"),
-		"plugins":       disabledPanel(dashboardPluginPanelReason(s.pluginInventory)),
+		"chat":          enabledPanel(dashboardPanelBuiltIn, "/v1/chat/completions"),
+		"responses":     enabledPanel(dashboardPanelBuiltIn, "/v1/responses", "/v1/runs", "/v1/runs/{run_id}/events"),
+		"sessions":      enabledPanel(dashboardPanelBuiltIn, "/api/sessions", "/api/sessions/{session_id}"),
+		"models":        enabledPanel(dashboardPanelBuiltIn, "/v1/models", "/api/model/info", "/api/model/options"),
+		"oauth":         enabledPanel(dashboardPanelOptional, "/api/providers/oauth"),
+		"tool_progress": enabledPanel(dashboardPanelBuiltIn, "/v1/runs/{run_id}/events"),
+		"plugins":       disabledPanel(dashboardPanelOptionalExtension, dashboardPluginPanelReason(s.pluginInventory)),
 	}
 	if s.loop == nil {
-		panels["chat"] = disabledPanel("native turn loop is not configured")
-		panels["responses"] = disabledPanel("native turn loop is not configured")
-		panels["tool_progress"] = disabledPanel("native turn loop is not configured")
+		panels["chat"] = disabledPanel(dashboardPanelBuiltIn, "native turn loop is not configured")
+		panels["responses"] = disabledPanel(dashboardPanelBuiltIn, "native turn loop is not configured")
+		panels["tool_progress"] = disabledPanel(dashboardPanelBuiltIn, "native turn loop is not configured")
 	}
 	if len(s.oauthProviders) == 0 {
-		panels["oauth"] = disabledPanel("no OAuth providers are configured")
+		panels["oauth"] = disabledPanel(dashboardPanelOptional, "no OAuth providers are configured")
 	}
+	extensions := dashboardExtensionsFromInventory(s.pluginInventory)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"active_sessions": activeSessions,
@@ -121,9 +168,10 @@ func (s *Server) handleDashboardStatus(w http.ResponseWriter, r *http.Request) {
 			"state":    "absent",
 			"required": false,
 		},
-		"responses": s.responseHealthStatus(),
-		"runs":      s.runHealthStatus(),
-		"plugins":   clonePluginInventory(s.pluginInventory),
+		"responses":            s.responseHealthStatus(),
+		"runs":                 s.runHealthStatus(),
+		"plugins":              clonePluginInventory(s.pluginInventory),
+		"dashboard_extensions": extensions,
 	})
 }
 
@@ -175,7 +223,7 @@ func (s *Server) handleDashboardPlugins(w http.ResponseWriter, r *http.Request) 
 		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
 		return
 	}
-	writeJSON(w, http.StatusOK, clonePluginInventory(s.pluginInventory).Plugins)
+	writeJSON(w, http.StatusOK, dashboardPluginInventoryFromInventory(s.pluginInventory))
 }
 
 func (s *Server) handleDashboardSessions(w http.ResponseWriter, r *http.Request) {
@@ -256,12 +304,12 @@ func (s *Server) dashboardModelProviders() []DashboardModelProvider {
 	return providers
 }
 
-func enabledPanel(endpoints ...string) dashboardPanelStatus {
-	return dashboardPanelStatus{State: "enabled", Endpoints: append([]string(nil), endpoints...)}
+func enabledPanel(category string, endpoints ...string) dashboardPanelStatus {
+	return dashboardPanelStatus{State: "enabled", Category: category, Endpoints: append([]string(nil), endpoints...)}
 }
 
-func disabledPanel(reason string) dashboardPanelStatus {
-	return dashboardPanelStatus{State: "disabled", Reason: reason}
+func disabledPanel(category, reason string) dashboardPanelStatus {
+	return dashboardPanelStatus{State: "disabled", Category: category, Reason: reason}
 }
 
 func dashboardPluginPanelReason(inventory pluginmeta.Inventory) string {
@@ -269,6 +317,96 @@ func dashboardPluginPanelReason(inventory pluginmeta.Inventory) string {
 		return "plugin manifest metadata is available, but plugin runtime execution is disabled in the native API server"
 	}
 	return "dashboard plugin runtime is not configured in the native API server"
+}
+
+func dashboardExtensionsFromInventory(in pluginmeta.Inventory) dashboardExtensionStatus {
+	inventory := clonePluginInventory(in)
+	return dashboardExtensionStatus{
+		Runtime:       disabledDashboardExtensionRuntime(),
+		Themes:        unavailableDashboardThemes(),
+		UIPlugins:     dashboardUIPlugins(inventory.Plugins),
+		BackendRoutes: dashboardBackendRoutes(inventory.Capabilities),
+	}
+}
+
+func dashboardPluginInventoryFromInventory(in pluginmeta.Inventory) dashboardPluginInventoryResponse {
+	inventory := clonePluginInventory(in)
+	return dashboardPluginInventoryResponse{
+		Runtime:       disabledDashboardExtensionRuntime(),
+		Themes:        unavailableDashboardThemes(),
+		Plugins:       nonNilPluginStatuses(inventory.Plugins),
+		Capabilities:  nonNilCapabilityStatuses(inventory.Capabilities),
+		BackendRoutes: nonNilCapabilityStatuses(dashboardBackendRoutes(inventory.Capabilities)),
+		Evidence:      append([]pluginmeta.Evidence(nil), inventory.Evidence...),
+	}
+}
+
+func disabledDashboardExtensionRuntime() dashboardExtensionRuntimeStatus {
+	return dashboardExtensionRuntimeStatus{
+		State:            pluginmeta.StateDisabled,
+		Reason:           "Hermes React/Vite dashboard extension runtime is absent from the native API server; plugin JavaScript and backend route modules are not imported or executed",
+		ReactViteRuntime: dashboardReactViteRuntimeAbsent,
+		Evidence: []pluginmeta.Evidence{{
+			Code:    pluginmeta.EvidenceExecutionDisabled,
+			Field:   "react_vite_runtime",
+			Message: "Hermes React/Vite dashboard extension runtime is not embedded in Gormes",
+		}},
+	}
+}
+
+func unavailableDashboardThemes() dashboardThemeInventoryStatus {
+	return dashboardThemeInventoryStatus{
+		State:  pluginmeta.StateUnavailable,
+		Themes: []dashboardThemeStatus{},
+		Evidence: []pluginmeta.Evidence{{
+			Code:    pluginmeta.EvidenceThemeRuntimeUnavailable,
+			Field:   "dashboard.theme",
+			Message: "dashboard theme discovery and application are unavailable in the native API server",
+		}},
+	}
+}
+
+func dashboardUIPlugins(plugins []pluginmeta.PluginStatus) []pluginmeta.PluginStatus {
+	out := make([]pluginmeta.PluginStatus, 0, len(plugins))
+	for _, plugin := range plugins {
+		if plugin.Dashboard != nil || hasCapabilityKind(plugin.Capabilities, pluginmeta.CapabilityDashboard) {
+			out = append(out, clonePluginStatus(plugin))
+		}
+	}
+	return nonNilPluginStatuses(out)
+}
+
+func dashboardBackendRoutes(capabilities []pluginmeta.CapabilityStatus) []pluginmeta.CapabilityStatus {
+	out := make([]pluginmeta.CapabilityStatus, 0, len(capabilities))
+	for _, capability := range capabilities {
+		if capability.Kind == pluginmeta.CapabilityBackendRoute {
+			out = append(out, clonePluginCapabilityStatus(capability))
+		}
+	}
+	return nonNilCapabilityStatuses(out)
+}
+
+func hasCapabilityKind(capabilities []pluginmeta.CapabilityStatus, kind pluginmeta.CapabilityKind) bool {
+	for _, capability := range capabilities {
+		if capability.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func nonNilPluginStatuses(in []pluginmeta.PluginStatus) []pluginmeta.PluginStatus {
+	if in == nil {
+		return []pluginmeta.PluginStatus{}
+	}
+	return in
+}
+
+func nonNilCapabilityStatuses(in []pluginmeta.CapabilityStatus) []pluginmeta.CapabilityStatus {
+	if in == nil {
+		return []pluginmeta.CapabilityStatus{}
+	}
+	return in
 }
 
 func parseDashboardInt(raw string, fallback, min, max int) int {

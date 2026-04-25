@@ -10,9 +10,11 @@ const (
 )
 
 const (
-	StateDisabled  = "disabled"
-	StateInvalid   = "invalid"
-	StateMalformed = "malformed"
+	StateDisabled    = "disabled"
+	StateInvalid     = "invalid"
+	StateLoaded      = "loaded"
+	StateMalformed   = "malformed"
+	StateUnavailable = "unavailable"
 )
 
 const (
@@ -23,6 +25,7 @@ const (
 	EvidenceMissingCredential         = "missing_credential"
 	EvidenceMissingRequiredField      = "missing_required_field"
 	EvidenceProjectPluginsDisabled    = "project_plugins_disabled"
+	EvidenceThemeRuntimeUnavailable   = "theme_runtime_unavailable"
 	EvidenceUnsupportedCapabilityKind = "unsupported_capability_kind"
 )
 

@@ -114,17 +114,26 @@ func TestDashboardPluginsEndpointReturnsMetadataOnlyDisabledRows(t *testing.T) {
 		t.Fatalf("status = %d, want 200; body=%s", resp.Code, resp.Body.String())
 	}
 
-	var got []plugins.PluginStatus
+	var got struct {
+		Runtime struct {
+			State            string `json:"state"`
+			ReactViteRuntime string `json:"react_vite_runtime"`
+		} `json:"runtime"`
+		Plugins []plugins.PluginStatus `json:"plugins"`
+	}
 	if err := json.Unmarshal(resp.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode plugins: %v", err)
 	}
-	if len(got) != 1 {
-		t.Fatalf("plugins = %+v, want one disabled metadata row", got)
+	if got.Runtime.State != plugins.StateDisabled || got.Runtime.ReactViteRuntime != "absent" {
+		t.Fatalf("runtime = %+v, want disabled absent runtime", got.Runtime)
 	}
-	if got[0].State != plugins.StateDisabled || got[0].RuntimeCodeExecuted {
-		t.Fatalf("plugin row = %+v, want disabled without runtime execution", got[0])
+	if len(got.Plugins) != 1 {
+		t.Fatalf("plugins = %+v, want one disabled metadata row", got.Plugins)
 	}
-	if got[0].Dashboard == nil || !got[0].Dashboard.Tab.Hidden || len(got[0].Dashboard.Slots) != 3 {
-		t.Fatalf("dashboard manifest row = %+v, want hidden slot metadata", got[0].Dashboard)
+	if got.Plugins[0].State != plugins.StateDisabled || got.Plugins[0].RuntimeCodeExecuted {
+		t.Fatalf("plugin row = %+v, want disabled without runtime execution", got.Plugins[0])
+	}
+	if got.Plugins[0].Dashboard == nil || !got.Plugins[0].Dashboard.Tab.Hidden || len(got.Plugins[0].Dashboard.Slots) != 3 {
+		t.Fatalf("dashboard manifest row = %+v, want hidden slot metadata", got.Plugins[0].Dashboard)
 	}
 }
