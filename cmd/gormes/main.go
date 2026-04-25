@@ -35,7 +35,7 @@ func main() {
 
 	root := newRootCommand()
 	if err := root.Execute(); err != nil {
-		os.Exit(1)
+		os.Exit(exitCodeFromError(err))
 	}
 }
 
@@ -48,7 +48,7 @@ func newRootCommand() *cobra.Command {
 	}
 	root.Flags().Bool("offline", false, "skip startup api_server health check (dev only — turns the TUI into a cosmetic smoke-tester)")
 	root.Flags().String("resume", "", "override persisted session_id for the TUI's default key")
-	root.AddCommand(doctorCmd, versionCmd, telegramCmd, gatewayCmd, sessionCmd, memoryCmd)
+	root.AddCommand(doctorCmd, versionCmd, telegramCmd, gatewayCmd, sessionCmd, memoryCmd, gonchoCmd)
 	return root
 }
 

@@ -2016,9 +2016,9 @@
             {
               "name": "Goncho operator diagnostics contract",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes exposes a Honcho-inspired Goncho doctor path that checks memory topology, queues, config, and degraded modes without requiring operators to inspect raw tables",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -2061,7 +2061,7 @@
                 "Zero-state databases report no data without failing.",
                 "The command reuses existing memory status where possible instead of adding a second status model."
               ],
-              "note": "Honcho CLI docs emphasize fast diagnosis for peers that are not learning, wrong context, and dialectic issues. Goncho needs the same operator ladder so long-running agents can repair the right layer without guessing.",
+              "note": "TDD landed: `gormes goncho doctor` reports config paths, schema/table presence, session catalog state, Honcho-compatible tool registration, context dry-run output, extractor and Goncho queue status, conclusion and summary availability, provider readiness, and visible degraded modes without external Honcho, network services, or hosted LLM calls by default. JSON output is available for autoloop/planner consumption; exit-code fixtures cover 0 healthy/degraded, 1 client/config, 2 runtime/storage, and 3 auth/provider. `gormes memory status` now includes the observability-only Goncho representation/summary/dream zero-state alongside the existing extractor queue.",
               "write_scope": [
                 "cmd/gormes/",
                 "internal/goncho/",

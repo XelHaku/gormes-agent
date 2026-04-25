@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/config"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/goncho"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/memory"
 )
 
@@ -47,9 +48,17 @@ var memoryStatusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		_, err = fmt.Fprint(cmd.OutOrStdout(), formatExtractorStatus(status))
+		queueStatus, err := goncho.ReadQueueStatus(context.Background(), db)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprint(cmd.OutOrStdout(), formatMemoryStatus(status, queueStatus))
 		return err
 	},
+}
+
+func formatMemoryStatus(status memory.ExtractorStatus, queueStatus goncho.QueueStatus) string {
+	return formatExtractorStatus(status) + formatGonchoQueueStatus(queueStatus)
 }
 
 func formatExtractorStatus(status memory.ExtractorStatus) string {
@@ -67,6 +76,25 @@ func formatExtractorStatus(status memory.ExtractorStatus) string {
 	for _, dl := range status.RecentDeadLetters {
 		b.WriteString(fmt.Sprintf("- turn_id=%d session_id=%s chat_id=%s attempts=%d error=%q\n",
 			dl.ID, dl.SessionID, dl.ChatID, dl.Attempts, dl.Error))
+	}
+	return b.String()
+}
+
+func formatGonchoQueueStatus(status goncho.QueueStatus) string {
+	var b strings.Builder
+	b.WriteString("Goncho queue status (observability only; not synchronization)\n")
+	for _, taskType := range goncho.QueueTaskTypes {
+		counts := status.WorkUnits[taskType]
+		b.WriteString(fmt.Sprintf("%s: total=%d pending=%d in_progress=%d completed=%d\n",
+			taskType,
+			counts.TotalWorkUnits,
+			counts.PendingWorkUnits,
+			counts.InProgressWorkUnits,
+			counts.CompletedWorkUnits,
+		))
+	}
+	if status.Degraded {
+		b.WriteString("goncho_queue: unavailable (zero tracked work units)\n")
 	}
 	return b.String()
 }

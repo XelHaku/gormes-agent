@@ -7,6 +7,14 @@ import (
 	"fmt"
 )
 
+var diagnosticTables = []string{
+	"turns",
+	"turns_fts",
+	"goncho_peer_cards",
+	"goncho_conclusions",
+	"goncho_conclusions_fts",
+}
+
 // DeadLetterSummary is the operator-facing shape for one recent turn that
 // exhausted extractor retries and was parked in the dead-letter state.
 type DeadLetterSummary struct {
@@ -42,6 +50,62 @@ type ExtractorStatus struct {
 	ErrorSummary       []DeadLetterErrorSummary
 	RecentDeadLetters  []DeadLetterSummary
 	RecentSkippedSyncs []SkippedSyncSummary
+}
+
+// SchemaStatus is the operator-facing memory schema snapshot used by doctor
+// commands. It intentionally reads the already-open database instead of
+// opening or migrating a second store.
+type SchemaStatus struct {
+	Version        string          `json:"version"`
+	CurrentVersion string          `json:"current_version"`
+	Current        bool            `json:"current"`
+	Tables         map[string]bool `json:"tables"`
+}
+
+// CurrentSchemaVersion returns the schema version this binary expects.
+func CurrentSchemaVersion() string {
+	return schemaVersion
+}
+
+// ReadSchemaStatus reports schema version and key table presence for memory
+// and Goncho diagnostics.
+func ReadSchemaStatus(ctx context.Context, db *sql.DB) (SchemaStatus, error) {
+	if db == nil {
+		return SchemaStatus{}, errors.New("memory: nil db")
+	}
+
+	status := SchemaStatus{
+		CurrentVersion: schemaVersion,
+		Tables:         make(map[string]bool, len(diagnosticTables)),
+	}
+	for _, table := range diagnosticTables {
+		status.Tables[table] = false
+	}
+
+	if err := db.QueryRowContext(ctx, `SELECT v FROM schema_meta WHERE k = 'version'`).Scan(&status.Version); err != nil {
+		return SchemaStatus{}, fmt.Errorf("memory: schema version: %w", err)
+	}
+	status.Current = status.Version == schemaVersion
+
+	rows, err := db.QueryContext(ctx, `SELECT name FROM sqlite_master WHERE type = 'table'`)
+	if err != nil {
+		return SchemaStatus{}, fmt.Errorf("memory: schema tables: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return SchemaStatus{}, fmt.Errorf("memory: scan schema table: %w", err)
+		}
+		if _, ok := status.Tables[name]; ok {
+			status.Tables[name] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return SchemaStatus{}, fmt.Errorf("memory: schema table rows: %w", err)
+	}
+
+	return status, nil
 }
 
 // ReadExtractorStatus summarizes extractor backlog and recent dead letters from

@@ -69,6 +69,36 @@ func TestMemoryStatusCommand_MissingDatabase(t *testing.T) {
 	}
 }
 
+func TestMemoryStatusCommand_PrintsGonchoQueueZeroState(t *testing.T) {
+	seedMemoryStatusDB(t)
+
+	cmd := newRootCommand()
+	var stdout, stderr bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{"memory", "status"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute: %v\nstderr=%s", err, stderr.String())
+	}
+
+	out := stdout.String()
+	for _, want := range []string{
+		"Goncho queue status (observability only; not synchronization)",
+		"representation: total=0 pending=0 in_progress=0 completed=0",
+		"summary: total=0 pending=0 in_progress=0 completed=0",
+		"dream: total=0 pending=0 in_progress=0 completed=0",
+		"goncho_queue: unavailable (zero tracked work units)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout = %q, want substring %q", out, want)
+		}
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
 func seedMemoryStatusDB(t *testing.T) {
 	t.Helper()
 
