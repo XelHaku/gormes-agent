@@ -193,7 +193,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Drain-timeout resume_pending recovery
 - [x] Pairing read-model schema + atomic persistence
 - [x] Pairing approval + rate-limit semantics
-- [ ] Unauthorized DM pairing response contract
+- [x] Unauthorized DM pairing response contract
 - [ ] `gormes gateway status` read-only command
 - [ ] Runtime status JSON + PID/process validation
 - [ ] Token-scoped gateway locks
@@ -357,6 +357,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Context compression
 - [x] ContextEngine interface + status tool contract
 - [x] Compression token-budget trigger + summary sizing
+- [ ] Aux compression headroom for system and tool schemas
 - [ ] Tool-result pruning + protected head/tail summary
 - [ ] Manual compression feedback + context references
 
@@ -398,6 +399,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Provider-side resilience
 - [x] Classified provider-error taxonomy
 - [x] Unsupported temperature retry + Codex flush guard
+- [ ] Generic unsupported-parameter retry + max_tokens guard
 - [x] Jittered reconnect backoff schedule
 - [x] Retry-After header parsing + HTTPError hint
 - [x] Kernel retry honors Retry-After hint
@@ -413,7 +415,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] 61-tool registry port
 - [x] Tool registry inventory + schema parity harness
 - [x] Tool parity manifest refresh for Hermes b35d692f
-- [ ] Discord tool split + platform-scoped toolsets
+- [x] Discord tool split + platform-scoped toolsets
 - [ ] Pure core tools first
 - [ ] Stateful tool migration queue
 
@@ -507,8 +509,10 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] CLI command registry parity + active-turn busy policy
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
-- [ ] Platform toolset config persistence + MCP sentinel
+- [x] Platform toolset config persistence + MCP sentinel
+- [ ] Effective toolset picker dedupes bundled plugin keys
 - [ ] Gateway, platform, webhook, and cron management CLI
+- [ ] Update service restart active polling
 - [ ] Diagnostics, backup, logs, and status CLI
 
 ### 5.P — Docker / Packaging ⏳

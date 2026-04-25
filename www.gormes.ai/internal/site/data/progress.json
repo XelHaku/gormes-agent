@@ -842,6 +842,11 @@
               "done_signal": [
                 "Discord session-source metadata fixtures prove guild, parent-channel, and triggering-message IDs flow into session context without route regressions."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T13:09:35Z",
+                "last_success": "2026-04-25T13:09:35Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:b35d692f gateway/session.py",
@@ -1466,6 +1471,11 @@
               "done_signal": [
                 "Pairing approval fixtures prove code entropy/expiry, pending limits, lockout, per-user rate limiting, and Telegram from_user fallback without adapter sends or agent sessions."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T13:09:35Z",
+                "last_success": "2026-04-25T13:09:35Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T11:39:48Z"
@@ -1478,9 +1488,9 @@
             },
             {
               "name": "Unauthorized DM pairing response contract",
-              "status": "planned",
+              "status": "complete",
               "contract": "Unknown direct-message users receive the configured deny, pair, or ignore response without leaking authorized-session state",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1503,16 +1513,13 @@
               "not_ready_when": [
                 "The slice changes code generation, reads live platform SDKs, or starts agent sessions for unknown direct-message users."
               ],
-              "blocked_by": [
-                "Pairing approval + rate-limit semantics"
-              ],
               "acceptance": [
                 "Configured deny mode sends a deterministic denial without creating a session.",
                 "Configured pair mode sends one bounded pairing prompt and records pending state.",
                 "Configured ignore mode produces no platform reply and no agent run.",
                 "Group/channel unauthorized messages stay silent unless a future platform-specific row explicitly opts into group pairing."
               ],
-              "note": "TDD-ready after pairing approval lands: keep this as a shared gateway policy slice over fake channels and the Go pairing store. Do not edit adapter transports or widen pairing prompts into groups.",
+              "note": "TDD landed: internal/gateway.HandleUnauthorizedDM now freezes the shared unknown-DM policy over fake channels and PairingStore: deny mode sends a deterministic public denial and records allowlist-denied evidence, pair mode emits one bounded approval prompt while pending/rate-limited state stays in pairing.json, ignore mode stays silent, and group/channel unauthorized messages do not reply or start agent sessions.",
               "write_scope": [
                 "internal/gateway/authorization.go",
                 "internal/gateway/unauthorized_dm_test.go",
@@ -1527,6 +1534,11 @@
               "done_signal": [
                 "Unauthorized-DM fixtures prove deny, pair, and ignore modes never start an agent session for unknown users."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T13:38:33Z",
+                "last_success": "2026-04-25T13:38:33Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T11:39:48Z"
@@ -3798,6 +3810,70 @@
               }
             },
             {
+              "name": "Aux compression headroom for system and tool schemas",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Compression feasibility lowers the raw-message threshold below the auxiliary model context window by reserving deterministic system-prompt, tool-schema, flush-instruction, and safety headroom",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Context status reports headroom-clamped compression thresholds instead of allowing the first compression or flush-memory request to overflow the auxiliary model.",
+              "fixture": "internal/hermes/context_compressor_headroom_test.go",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@6e561ffa",
+                "../hermes-agent/tests/run_agent/test_compression_feasibility.py@6e561ffa",
+                "../hermes-agent/agent/model_metadata.py@6e561ffa",
+                "internal/hermes/context_compressor_budget.go",
+                "internal/hermes/context_compressor_budget_test.go",
+                "internal/tools/testdata/upstream_tool_parity_manifest.json"
+              ],
+              "ready_when": [
+                "Compression token-budget trigger + summary sizing is validated on main.",
+                "Provider-enforced context-length resolver is validated on main.",
+                "The test can estimate tool-schema overhead from local descriptors or synthetic ToolDescriptor fixtures without opening a provider connection."
+              ],
+              "not_ready_when": [
+                "The slice mutates message history, calls a summarizer, changes model routing, or subtracts a hard-coded 12000 tokens without accounting for tool descriptors."
+              ],
+              "blocked_by": [
+                "Compression token-budget trigger + summary sizing",
+                "Provider-enforced context-length resolver"
+              ],
+              "unblocks": [
+                "Tool-result pruning + protected head/tail summary",
+                "Manual compression feedback + context references"
+              ],
+              "acceptance": [
+                "When main-model threshold exceeds a 128000-token auxiliary context, the budget helper subtracts estimate_request_tokens_rough-equivalent tool overhead plus 12000 system/flush/safety tokens before setting threshold_tokens.",
+                "With 50 synthetic tool schemas, threshold_tokens is strictly below the auxiliary context and remains above minimumContextCompressorContextLength.",
+                "When overhead would drop below the 64000-token floor, threshold_tokens clamps to the floor and reports headroom_clamped evidence.",
+                "The focused test mirrors Hermes test_auto_lowered_threshold_reserves_headroom_for_tools_and_system and test_headroom_floors_at_minimum_context without provider credentials or kernel history mutation."
+              ],
+              "note": "Hermes f92006ce/6e561ffa changed compression feasibility so auxiliary-context auto-lowering reserves system prompt and tool-schema headroom. Gormes already has the pure budget helper, but it still lacks the request-headroom slice that prevents compression/flush calls from overflowing when many tools are enabled.",
+              "write_scope": [
+                "internal/hermes/",
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestContextCompressorHeadroom -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Headroom fixtures prove tool-schema overhead plus 12000 reserved tokens lower auxiliary-bound thresholds and clamp at the 64000-token floor without provider calls."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:6e561ffa run_agent.py",
+                "note": "Hermes defines the auxiliary compression feasibility fix; Gormes should adapt it to Go-native ContextCompressorBudget/status logic."
+              }
+            },
+            {
               "name": "Tool-result pruning + protected head/tail summary",
               "status": "planned",
               "note": "TDD: freeze old tool-output pruning, protected system/first-turn head messages, recent-tail preservation, and summary prefix compatibility before mutating live message history. Must keep tool-call arguments JSON valid when shrinking per upstream PR #3128d9fc — a pruning pass that truncates an argument string mid-JSON breaks the continuation payload on the next turn, so the head/tail contract has to respect tool-call argument boundaries and never emit partial JSON values."
@@ -3810,8 +3886,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T11:02:16Z",
-            "origin_decision": "Hermes 5401a008 changed ContextCompressor.update_model to recalculate tail and max-summary budgets on model switches. Gormes now has the Go ContextEngine status boundary, provider-cap resolver, and pure compressor budget helper, but the subphase remains upstream-led until tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
+            "last_upstream_check": "2026-04-25T13:39:00Z",
+            "origin_decision": "Hermes 5401a008 changed ContextCompressor.update_model to recalculate tail and max-summary budgets on model switches, and Hermes f92006ce/6e561ffa now reserves system/tool headroom when auxiliary context binds the compression threshold. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and pure compressor budget helper, but the subphase remains upstream-led until auxiliary headroom, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
           }
         },
         "4.C": {
@@ -4340,10 +4416,75 @@
               "done_signal": [
                 "Unsupported-temperature fixtures prove one stripped retry, no retry for unrelated errors, and no temperature in Codex Responses payloads."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T13:09:35Z",
+                "last_success": "2026-04-25T13:09:35Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:b35d692f agent/auxiliary_client.py",
                 "note": "Hermes defines the reactive retry behavior; Gormes should encode it in the provider boundary before more adapters emit optional request parameters."
+              }
+            },
+            {
+              "name": "Generic unsupported-parameter retry + max_tokens guard",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "OpenAI-compatible provider calls detect unsupported request parameters by name and retry max_tokens as max_completion_tokens only when the first payload actually sent max_tokens",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status records parameter-stripped retry evidence for supported reactive retries instead of surfacing opaque 400s or sending max_completion_tokens when no max_tokens was requested.",
+              "fixture": "internal/hermes/unsupported_parameter_retry_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/auxiliary_client.py@6e561ffa",
+                "../hermes-agent/tests/agent/test_unsupported_parameter_retry.py@6e561ffa",
+                "internal/hermes/http_client.go",
+                "internal/hermes/errors.go",
+                "internal/hermes/unsupported_temperature_retry_test.go"
+              ],
+              "ready_when": [
+                "Unsupported temperature retry + Codex flush guard is validated on main.",
+                "Gormes HTTP providers serialize MaxTokens and Temperature through fake HTTP tests without live credentials."
+              ],
+              "not_ready_when": [
+                "The slice deletes arbitrary unsupported parameters silently, retries unrelated 400s, or emits max_completion_tokens when MaxTokens is zero/omitted."
+              ],
+              "blocked_by": [
+                "Unsupported temperature retry + Codex flush guard"
+              ],
+              "unblocks": [
+                "OpenRouter",
+                "Codex OAuth state + stale-token relogin",
+                "Provider rate guard + budget telemetry"
+              ],
+              "acceptance": [
+                "A generic isUnsupportedParameterError-style helper matches temperature, max_tokens, seed, and top_p provider phrasings including unsupported, unknown, unrecognized, invalid, and does-not-support markers.",
+                "The temperature wrapper delegates to the generic helper and existing unsupported-temperature retry/status fixtures remain green.",
+                "When the first request emits max_tokens and receives an unsupported max_tokens error, exactly one retry removes max_tokens, sets max_completion_tokens to the same value, and preserves model, messages, tools, temperature, timeout context, and session headers.",
+                "When MaxTokens is zero/omitted or the provider error is unrelated, the client makes one request and never adds max_completion_tokens with a zero or null value."
+              ],
+              "note": "Hermes 3c1c65e7/6e561ffa generalized the unsupported-temperature detector into a parameter-specific retry helper and hardened max_tokens retry so omitted max_tokens does not create a bogus max_completion_tokens retry. Gormes currently has only the temperature-specific retry slice.",
+              "write_scope": [
+                "internal/hermes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestUnsupportedParameterRetry -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Unsupported-parameter fixtures prove generic detector coverage, preserved temperature retry behavior, max_tokens-to-max_completion_tokens retry, and no retry when MaxTokens is absent."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:6e561ffa agent/auxiliary_client.py",
+                "note": "Hermes defines the reactive parameter retry behavior; Gormes should keep the port in the OpenAI-compatible provider boundary rather than per-provider allowlists."
               }
             },
             {
@@ -4373,7 +4514,12 @@
               "status": "planned",
               "note": "TDD: port `agent/rate_limit_tracker.py` and `agent/nous_rate_guard.py` as deterministic budget/rate decisions that feed Phase 3 insights without sleeping in unit tests."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-25T13:39:00Z",
+            "origin_decision": "Hermes 6e561ffa generalized unsupported-parameter retry and hardened max_tokens retry after the existing Gormes temperature-specific slice landed. Gormes should keep this subphase upstream-led until generic parameter retry, prompt-cache guards, and provider budget telemetry are fixture-backed."
+          }
         }
       }
     },
@@ -4510,9 +4656,9 @@
                 "Tool parity tests prove the embedded manifest reflects Hermes b35d692f Discord, cron, Feishu, and platform-toolset schema drift before handlers port."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T12:56:32Z",
-                "last_success": "2026-04-25T12:56:32Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T13:09:35Z",
+                "last_success": "2026-04-25T13:09:35Z"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -4522,9 +4668,9 @@
             },
             {
               "name": "Discord tool split + platform-scoped toolsets",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes exposes Discord read/participate and Discord admin capabilities as separate descriptors/toolsets with platform-scoped availability",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -4560,7 +4706,7 @@
                 "Dynamic schema fixtures can drop actions based on missing token/intents/allowlist without leaving stale descriptions in the advertised schema.",
                 "Legacy discord_server remains unsupported or aliased only through explicit compatibility evidence, not as an active default tool."
               ],
-              "note": "Hermes b35d692f split Discord server introspection/management into least-privilege toolsets. Port descriptor and toolset scoping before any REST handler logic so Gormes agents do not see admin actions in non-Discord contexts.",
+              "note": "Complete: TDD landed descriptor-only Discord toolset fixtures and implementation. Gormes now exposes split discord and discord_admin descriptors only when the Discord or gateway platform scope explicitly enables those default-off toolsets, drops schemas for missing tokens, missing privileged intents, empty allowlists, or disallowed platforms, filters stale action-specific descriptions and parameters from dynamic schemas, preserves server_actions allowlist config, and keeps legacy discord_server out of active descriptors without porting Discord REST handlers.",
               "write_scope": [
                 "internal/tools/",
                 "internal/config/",
@@ -4573,6 +4719,11 @@
               "done_signal": [
                 "Discord toolset fixtures prove split descriptors, platform scoping, default-off behavior, and dynamic schema dropping without live Discord API calls."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T13:38:33Z",
+                "last_success": "2026-04-25T13:38:33Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:b35d692f tools/discord_tool.py",
@@ -5312,9 +5463,9 @@
             },
             {
               "name": "Platform toolset config persistence + MCP sentinel",
-              "status": "planned",
+              "status": "complete",
               "contract": "CLI setup/tools configuration persists per-platform toolset choices without preserving platform-default supersets, losing MCP server names, or leaking restricted Discord toolsets",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -5347,7 +5498,7 @@
                 "A no_mcp sentinel suppresses MCP servers only for the configured platform and is not exposed as a runtime toolset.",
                 "Restricted toolsets such as discord and discord_admin cannot be saved for non-Discord platforms."
               ],
-              "note": "Hermes b35d692f hardened hermes tools persistence around MCP names, platform defaults, numeric YAML keys, no_mcp, and Discord-only toolsets. Gormes should port these as pure config helpers before the interactive setup UI exists.",
+              "note": "Complete: TDD added internal/cli platform toolset config helpers without command wiring. Fixtures prove platform-default supersets such as hermes-cli/hermes-telegram are stripped while unknown MCP server names survive, YAML-shaped numeric keys/list entries normalize to strings before sorting/persistence, no_mcp suppresses MCP only for its platform without becoming a runtime toolset, and manifest-backed Discord restrictions prevent discord/discord_admin from being saved outside the Discord platform.",
               "write_scope": [
                 "internal/cli/",
                 "internal/config/",
@@ -5361,6 +5512,11 @@
               "done_signal": [
                 "Toolset config fixtures prove platform-default stripping, MCP preservation/no_mcp, numeric normalization, and Discord platform restrictions."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T13:38:33Z",
+                "last_success": "2026-04-25T13:38:33Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:b35d692f hermes_cli/tools_config.py",
@@ -5368,9 +5524,127 @@
               }
             },
             {
+              "name": "Effective toolset picker dedupes bundled plugin keys",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "CLI toolset selection merges built-in toolsets with plugin-provided toolsets without duplicate keys, preserving the built-in label and description when bundled plugins such as Spotify share a key",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "gateway"
+              ],
+              "degraded_mode": "CLI setup status reports duplicate plugin/built-in toolset keys and keeps one effective option instead of presenting duplicate picker rows.",
+              "fixture": "internal/cli/effective_toolsets_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/tools_config.py@6e561ffa",
+                "../hermes-agent/tests/hermes_cli/test_tools_config.py@6e561ffa",
+                "internal/cli/toolset_config.go",
+                "internal/plugins/discovery.go",
+                "internal/plugins/spotify_plugin_test.go",
+                "internal/tools/testdata/upstream_tool_parity_manifest.json"
+              ],
+              "ready_when": [
+                "Plugin SDK is validated on main.",
+                "First-party Spotify plugin fixture is validated on main.",
+                "Platform toolset config persistence + MCP sentinel is validated on main."
+              ],
+              "not_ready_when": [
+                "The slice ports interactive setup UI, executes plugin code, or registers Spotify handlers instead of only producing deterministic effective toolset choices."
+              ],
+              "blocked_by": [
+                "Plugin SDK",
+                "First-party Spotify plugin fixture",
+                "Platform toolset config persistence + MCP sentinel"
+              ],
+              "acceptance": [
+                "The effective picker list starts from manifest/built-in toolsets and appends plugin-provided toolsets only when their key has not already appeared.",
+                "A bundled Spotify plugin that declares toolset=spotify yields exactly one spotify option, with the built-in label/description/source winning over plugin metadata.",
+                "A unique user or project plugin toolset can still appear as a disabled metadata row without executing runtime code.",
+                "Duplicate keys produce deterministic evidence or status and do not appear twice in runtime-visible or persisted platform selections."
+              ],
+              "note": "Hermes ac05daa1/6e561ffa fixed duplicate bundled-plugin toolsets in `hermes tools`. Gormes has plugin metadata and platform toolset persistence, but no row yet freezes the effective picker merge rule that keeps bundled plugins from duplicating built-in choices.",
+              "write_scope": [
+                "internal/cli/",
+                "internal/plugins/",
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli ./internal/plugins ./internal/tools -run 'Test.*Toolset|TestFirstPartySpotify' -count=1",
+                "go test ./internal/cli ./internal/plugins ./internal/tools -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Effective-toolset fixtures prove duplicate bundled plugin keys are collapsed, built-in labels win, unique plugin toolsets survive, and no plugin runtime executes."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:6e561ffa hermes_cli/tools_config.py",
+                "note": "Hermes defines the toolset picker merge behavior; Gormes should express it through Go-native CLI/plugin metadata helpers."
+              }
+            },
+            {
               "name": "Gateway, platform, webhook, and cron management CLI",
               "status": "planned",
               "note": "TDD: port operator management commands after the shared gateway read models land, so status/pairing/platform/cron commands consume the same stores as the runtime."
+            },
+            {
+              "name": "Update service restart active polling",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Update and service-management flows verify restarted gateway services by polling active status with a bounded timeout instead of racing a one-shot post-restart check",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "CLI update/status output reports service restart timeout, retry, missing service manager, or unsupported platform evidence instead of claiming a restarted gateway that immediately crashed.",
+              "fixture": "internal/cli/service_restart_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/main.py@6e561ffa",
+                "internal/cli/",
+                "scripts/install.sh",
+                "scripts/install.ps1",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "ready_when": [
+                "Gateway, platform, webhook, and cron management CLI has established a service-manager seam, or this slice owns a pure helper with a fake service runner and no command wiring.",
+                "Installer source-backed update flow remains documented as Gormes' current public update path."
+              ],
+              "not_ready_when": [
+                "The slice invokes live systemctl/sc.exe in unit tests, changes installer layout policy, or combines restart polling with unrelated setup/auth command ports."
+              ],
+              "blocked_by": [
+                "Gateway, platform, webhook, and cron management CLI"
+              ],
+              "acceptance": [
+                "A pure helper polls service active status every fake 500ms until active or a 10s timeout, with no fixed one-shot sleep.",
+                "Graceful restart exit-75 and hard restart flows share the polling helper and retry only after the first bounded poll fails.",
+                "Fixtures distinguish active-after-delay, timeout, missing service manager, and crashed-after-restart outcomes with operator-readable evidence.",
+                "Tests run without live systemd, Windows service control, root privileges, or network access."
+              ],
+              "note": "Hermes 6e561ffa replaced a fixed sleep(3) post-restart check with bounded `systemctl is-active` polling. Gormes does not need runtime code yet, but the eventual update/service CLI should freeze this as a small fake-runner helper before it touches real service managers.",
+              "write_scope": [
+                "internal/cli/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run TestServiceRestartActivePolling -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Service restart fixtures prove bounded active-status polling, delayed-active success, timeout evidence, retry boundaries, and no live service-manager dependency."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:6e561ffa hermes_cli/main.py",
+                "note": "Hermes defines the restart verification regression; Gormes should adapt only the service-manager helper behavior when its Go CLI update path exists."
+              }
             },
             {
               "name": "Diagnostics, backup, logs, and status CLI",
