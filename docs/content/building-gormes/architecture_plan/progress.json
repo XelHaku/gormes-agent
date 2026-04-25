@@ -4285,9 +4285,9 @@
             {
               "name": "Unsupported temperature retry + Codex flush guard",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Provider calls that actually send temperature retry once without it on unsupported-parameter errors, while Codex Responses fallback never emits temperature",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4326,7 +4326,7 @@
                 "Unrelated 400s and calls that did not send temperature do not trigger the temperature retry path.",
                 "Codex Responses request builders and memory-flush fallback fixtures prove no temperature field is emitted."
               ],
-              "note": "Gormes does not currently serialize temperature on the generic OpenAI-compatible client, but ChatRequest already carries it and Bedrock uses it. Freeze the reactive strip-and-retry behavior before OpenRouter/Codex/native auxiliary paths start forwarding optional sampling fields.",
+              "note": "Complete: TDD landed internal/hermes/unsupported_temperature_retry_test.go. OpenAI-compatible requests now serialize optional max_tokens and temperature when present, retry exactly once without temperature on upstream-matched unsupported-temperature provider errors, preserve the rest of the request body, and record temperature-stripped retry evidence in ProviderStatus. Unrelated 400s and requests that did not send temperature do not retry, while Codex Responses flush-shaped payload fixtures prove temperature is never emitted.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/kernel/",

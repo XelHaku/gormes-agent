@@ -245,6 +245,46 @@ func isContextCode(code string) bool {
 	return false
 }
 
+func isUnsupportedTemperatureError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var httpErr *HTTPError
+	if errors.As(err, &httpErr) {
+		_, combined, code := providerHTTPErrorText(httpErr)
+		return isUnsupportedTemperatureSignal(combined, code)
+	}
+	return isUnsupportedTemperatureSignal(strings.ToLower(err.Error()), "")
+}
+
+var unsupportedTemperaturePatterns = []string{
+	"unsupported parameter",
+	"unsupported_parameter",
+	"not supported",
+	"does not support",
+	"unknown parameter",
+	"unrecognized request argument",
+}
+
+func isUnsupportedTemperatureSignal(combined, code string) bool {
+	combined = strings.ToLower(combined)
+	if !strings.Contains(combined, "temperature") {
+		return false
+	}
+	if isUnsupportedParameterCode(code) {
+		return true
+	}
+	return containsAny(combined, unsupportedTemperaturePatterns)
+}
+
+func isUnsupportedParameterCode(code string) bool {
+	switch strings.ToLower(strings.TrimSpace(code)) {
+	case "unsupported_parameter", "unknown_parameter":
+		return true
+	}
+	return false
+}
+
 func providerHTTPErrorText(err *HTTPError) (message, combined, code string) {
 	body := strings.TrimSpace(err.Body)
 	message = body

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,10 +17,12 @@ const defaultChatCompletionsPath = "/v1/chat/completions"
 const defaultHealthPath = "/health"
 
 type httpClient struct {
-	baseURL  string
-	apiKey   string
-	provider string
-	http     *http.Client
+	baseURL          string
+	apiKey           string
+	provider         string
+	http             *http.Client
+	mu               sync.Mutex
+	temperatureRetry ProviderTemperatureRetryStatus
 }
 
 // NewHTTPClient returns a Client that talks HTTP+SSE to a Hermes-compatible
@@ -49,7 +52,11 @@ func NewHTTPClientWithProvider(baseURL, apiKey, provider string) Client {
 }
 
 func (c *httpClient) ProviderStatus() ProviderStatus {
-	return openAICompatibleProviderStatus(c.provider, c.baseURL)
+	status := openAICompatibleProviderStatus(c.provider, c.baseURL)
+	c.mu.Lock()
+	status.TemperatureRetry = c.temperatureRetry
+	c.mu.Unlock()
+	return status
 }
 
 func (c *httpClient) Health(ctx context.Context) error {
@@ -99,13 +106,54 @@ type orToolDescriptor struct {
 }
 
 type orChatRequest struct {
-	Model    string             `json:"model"`
-	Messages []orMessage        `json:"messages"`
-	Stream   bool               `json:"stream"`
-	Tools    []orToolDescriptor `json:"tools,omitempty"`
+	Model       string             `json:"model"`
+	Messages    []orMessage        `json:"messages"`
+	Stream      bool               `json:"stream"`
+	MaxTokens   int                `json:"max_tokens,omitempty"`
+	Temperature *float64           `json:"temperature,omitempty"`
+	Tools       []orToolDescriptor `json:"tools,omitempty"`
 }
 
 func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, error) {
+	body, descriptors, err := c.buildOpenAICompatibleChatRequestBody(req)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.doChatCompletions(ctx, req, body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		httpErr := newHTTPError(resp.StatusCode, string(raw), resp.Header)
+		if req.Temperature != nil && isUnsupportedTemperatureError(httpErr) {
+			c.recordTemperatureRetry(req.Model, httpErr)
+			retryReq := req
+			retryReq.Temperature = nil
+			retryBody, retryDescriptors, err := c.buildOpenAICompatibleChatRequestBody(retryReq)
+			if err != nil {
+				return nil, err
+			}
+			retryResp, err := c.doChatCompletions(ctx, retryReq, retryBody)
+			if err != nil {
+				return nil, err
+			}
+			if retryResp.StatusCode >= 300 {
+				retryRaw, _ := io.ReadAll(retryResp.Body)
+				_ = retryResp.Body.Close()
+				return nil, newHTTPError(retryResp.StatusCode, string(retryRaw), retryResp.Header)
+			}
+			return newChatStream(retryResp.Body, retryResp.Header.Get("X-Hermes-Session-Id"), retryDescriptors), nil
+		}
+		return nil, httpErr
+	}
+	// The body stays open for streaming; chatStream owns the Close.
+	return newChatStream(resp.Body, resp.Header.Get("X-Hermes-Session-Id"), descriptors), nil
+}
+
+func (c *httpClient) buildOpenAICompatibleChatRequestBody(req ChatRequest) ([]byte, []ToolDescriptor, error) {
 	msgs := makeOpenAICompatibleMessages(req.Messages, c.provider, req.Model, c.baseURL)
 	descriptors := SanitizeToolDescriptors(req.Tools)
 	tools := make([]orToolDescriptor, len(descriptors))
@@ -119,11 +167,21 @@ func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, e
 			}{Name: t.Name, Description: t.Description, Parameters: t.Schema},
 		}
 	}
-	body, err := json.Marshal(orChatRequest{Model: req.Model, Messages: msgs, Stream: true, Tools: tools})
+	body, err := json.Marshal(orChatRequest{
+		Model:       req.Model,
+		Messages:    msgs,
+		Stream:      true,
+		MaxTokens:   req.MaxTokens,
+		Temperature: req.Temperature,
+		Tools:       tools,
+	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	return body, descriptors, nil
+}
 
+func (c *httpClient) doChatCompletions(ctx context.Context, req ChatRequest, body []byte) (*http.Response, error) {
 	// Header-phase budget enforced by Transport.ResponseHeaderTimeout (5s).
 	// The request ctx governs the full response lifetime including body reads —
 	// do NOT cancel it after Do returns or streaming breaks.
@@ -144,13 +202,22 @@ func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, e
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode >= 300 {
-		raw, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		return nil, newHTTPError(resp.StatusCode, string(raw), resp.Header)
+	return resp, nil
+}
+
+func (c *httpClient) recordTemperatureRetry(model string, err *HTTPError) {
+	reason, _, _ := providerHTTPErrorText(err)
+	if reason == "" {
+		reason = err.Body
 	}
-	// The body stays open for streaming; chatStream owns the Close.
-	return newChatStream(resp.Body, resp.Header.Get("X-Hermes-Session-Id"), descriptors), nil
+	c.mu.Lock()
+	c.temperatureRetry = ProviderTemperatureRetryStatus{
+		Attempts: 1,
+		Stripped: true,
+		Model:    model,
+		Reason:   strings.TrimSpace(reason),
+	}
+	c.mu.Unlock()
 }
 
 func makeOpenAICompatibleMessages(messages []Message, provider, model, baseURL string) []orMessage {

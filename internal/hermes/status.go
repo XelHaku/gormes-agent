@@ -17,12 +17,22 @@ type ProviderCapabilities struct {
 	BudgetTelemetry CapabilityStatus
 }
 
+// ProviderTemperatureRetryStatus records the last provider recovery where an
+// unsupported temperature parameter was stripped and retried.
+type ProviderTemperatureRetryStatus struct {
+	Attempts int
+	Stripped bool
+	Model    string
+	Reason   string
+}
+
 // ProviderStatus is the provider-owned status snapshot the kernel can attach
 // to render frames without knowing adapter-specific behavior.
 type ProviderStatus struct {
-	Provider     string
-	Runtime      string
-	Capabilities ProviderCapabilities
+	Provider         string
+	Runtime          string
+	Capabilities     ProviderCapabilities
+	TemperatureRetry ProviderTemperatureRetryStatus
 }
 
 type providerStatusReporter interface {
