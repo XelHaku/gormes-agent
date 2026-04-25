@@ -2054,9 +2054,9 @@
             {
               "name": "Session expiry finalized-flag migration",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway session metadata migrates legacy memory_flushed state into expiry_finalized evidence without adding new hidden memory-flush writes",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -2087,7 +2087,7 @@
                 "New session metadata writes use expiry_finalized and never emit a memory_flushed field.",
                 "Resume/switch-session fixtures prove no memory-flush task is queued or called while reading or rewriting migrated session metadata."
               ],
-              "note": "Split from the failed expiry-finalization row so a worker can land only the data-shape migration first. Hermes removed flush_memories; Gormes should keep Goncho memory extraction explicit and independent from gateway expiry metadata.",
+              "note": "Complete: TDD landed the session metadata data-shape migration only. Legacy raw metadata with memory_flushed=true decodes as expiry_finalized=true with migrated_memory_flushed evidence, rewrites drop the legacy memory_flushed key, new finalized metadata writes only expiry_finalized, and gateway submit/status fixtures report migrated evidence without queuing memory work. Hermes removed flush_memories; Gormes keeps Goncho memory extraction explicit and independent from gateway expiry metadata.",
               "write_scope": [
                 "internal/session/",
                 "internal/gateway/",

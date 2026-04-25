@@ -940,6 +940,16 @@ func (m *Manager) getSessionMetadata(ctx context.Context, sessionID string) (ses
 		m.log.Warn("read session metadata", "session_id", sessionID, "err", err)
 		return session.Metadata{}, false
 	}
+	if ok && meta.MigratedMemoryFlushed {
+		m.writeExpiryFinalizedEvidence(ctx, RuntimeExpiryFinalizedEvidence{
+			SessionID:             meta.SessionID,
+			Source:                meta.Source,
+			ChatID:                meta.ChatID,
+			UserID:                meta.UserID,
+			ExpiryFinalized:       meta.ExpiryFinalized,
+			MigratedMemoryFlushed: meta.MigratedMemoryFlushed,
+		})
+	}
 	return meta, ok
 }
 
@@ -955,6 +965,10 @@ func (m *Manager) clearResumePending(ctx context.Context, sessionID string) {
 
 func (m *Manager) writeNonResumableEvidence(ctx context.Context, evidence RuntimeNonResumableEvidence) {
 	m.writeRuntimeStatus(ctx, RuntimeStatusUpdate{NonResumableEvidence: &evidence})
+}
+
+func (m *Manager) writeExpiryFinalizedEvidence(ctx context.Context, evidence RuntimeExpiryFinalizedEvidence) {
+	m.writeRuntimeStatus(ctx, RuntimeStatusUpdate{ExpiryFinalizedEvidence: &evidence})
 }
 
 func resumePendingNote(reason string) string {

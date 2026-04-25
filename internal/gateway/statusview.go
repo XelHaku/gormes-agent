@@ -57,6 +57,15 @@ func RenderStatusSummary(summary StatusSummary) string {
 		}
 	}
 
+	expiryFinalized := sortedExpiryFinalizedEvidence(summary.Runtime.ExpiryFinalized)
+	if len(expiryFinalized) > 0 {
+		b.WriteString("session_expiry:\n")
+		for _, evidence := range expiryFinalized {
+			b.WriteString(renderExpiryFinalizedEvidence(evidence))
+			b.WriteByte('\n')
+		}
+	}
+
 	degraded := sortedPairingDegradedEvidence(summary.Pairing.Degraded)
 	if len(degraded) > 0 {
 		b.WriteString("degraded:\n")
@@ -109,6 +118,7 @@ func runtimeStatusMissing(runtime RuntimeStatus) bool {
 		runtime.ActiveAgents == 0 &&
 		len(runtime.Platforms) == 0 &&
 		len(runtime.TokenLocks) == 0 &&
+		len(runtime.ExpiryFinalized) == 0 &&
 		runtime.Proxy == (ProxyRuntimeStatus{}) &&
 		runtime.UpdatedAt == ""
 }
@@ -143,6 +153,28 @@ func renderChannelLine(channel StatusChannel, runtime RuntimeStatus, pairing Pai
 		}
 	}
 	fmt.Fprintf(&b, "; pairing=%s pending=%d approved=%d; target=%s", pairingState, pendingCount, approvedCount, target)
+	return b.String()
+}
+
+func renderExpiryFinalizedEvidence(evidence RuntimeExpiryFinalizedEvidence) string {
+	var b strings.Builder
+	b.WriteString("- finalized")
+	if evidence.SessionID != "" {
+		fmt.Fprintf(&b, " session=%s", evidence.SessionID)
+	}
+	if evidence.Source != "" {
+		fmt.Fprintf(&b, " source=%s", evidence.Source)
+	}
+	if evidence.ChatID != "" {
+		fmt.Fprintf(&b, " chat=%s", evidence.ChatID)
+	}
+	if evidence.UserID != "" {
+		fmt.Fprintf(&b, " user=%s", evidence.UserID)
+	}
+	fmt.Fprintf(&b, " expiry_finalized=%t", evidence.ExpiryFinalized)
+	if evidence.MigratedMemoryFlushed {
+		b.WriteString(" migrated_memory_flushed=true")
+	}
 	return b.String()
 }
 
@@ -205,6 +237,24 @@ func sortedApprovedPairingRecords(records []PairingApprovedRecord) []PairingAppr
 			return left.UserID < right.UserID
 		}
 		return left.UserName < right.UserName
+	})
+	return out
+}
+
+func sortedExpiryFinalizedEvidence(records []RuntimeExpiryFinalizedEvidence) []RuntimeExpiryFinalizedEvidence {
+	out := append([]RuntimeExpiryFinalizedEvidence(nil), records...)
+	sort.SliceStable(out, func(i, j int) bool {
+		left, right := out[i], out[j]
+		if left.SessionID != right.SessionID {
+			return left.SessionID < right.SessionID
+		}
+		if left.Source != right.Source {
+			return left.Source < right.Source
+		}
+		if left.ChatID != right.ChatID {
+			return left.ChatID < right.ChatID
+		}
+		return left.UserID < right.UserID
 	})
 	return out
 }

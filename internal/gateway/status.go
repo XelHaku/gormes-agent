@@ -55,6 +55,7 @@ type RuntimeStatus struct {
 	DrainTimeouts     []RuntimeDrainTimeoutEvidence    `json:"drain_timeouts,omitempty"`
 	ResumePending     []RuntimeResumePendingEvidence   `json:"resume_pending,omitempty"`
 	NonResumable      []RuntimeNonResumableEvidence    `json:"non_resumable,omitempty"`
+	ExpiryFinalized   []RuntimeExpiryFinalizedEvidence `json:"expiry_finalized,omitempty"`
 	UpdatedAt         string                           `json:"updated_at"`
 }
 
@@ -132,6 +133,15 @@ type RuntimeNonResumableEvidence struct {
 	At         string `json:"at,omitempty"`
 }
 
+type RuntimeExpiryFinalizedEvidence struct {
+	SessionID             string `json:"session_id,omitempty"`
+	Source                string `json:"source,omitempty"`
+	ChatID                string `json:"chat_id,omitempty"`
+	UserID                string `json:"user_id,omitempty"`
+	ExpiryFinalized       bool   `json:"expiry_finalized"`
+	MigratedMemoryFlushed bool   `json:"migrated_memory_flushed,omitempty"`
+}
+
 // RuntimeStatusUpdate carries a partial update to the shared runtime status.
 type RuntimeStatusUpdate struct {
 	GatewayState GatewayState
@@ -146,10 +156,11 @@ type RuntimeStatusUpdate struct {
 	ProxyURL          string
 	ProxyErrorMessage string
 
-	DrainTimeoutEvidence  *RuntimeDrainTimeoutEvidence
-	ResumePendingEvidence *RuntimeResumePendingEvidence
-	NonResumableEvidence  *RuntimeNonResumableEvidence
-	TokenLockEvidence     *TokenLockEvidence
+	DrainTimeoutEvidence    *RuntimeDrainTimeoutEvidence
+	ResumePendingEvidence   *RuntimeResumePendingEvidence
+	NonResumableEvidence    *RuntimeNonResumableEvidence
+	ExpiryFinalizedEvidence *RuntimeExpiryFinalizedEvidence
+	TokenLockEvidence       *TokenLockEvidence
 }
 
 // RuntimeStatusSnapshot is a read-only view of the runtime status file that
@@ -462,6 +473,10 @@ func (s *RuntimeStatusStore) merge(status *RuntimeStatus, update RuntimeStatusUp
 	if update.NonResumableEvidence != nil {
 		evidence := *update.NonResumableEvidence
 		status.NonResumable = append(status.NonResumable, evidence)
+	}
+	if update.ExpiryFinalizedEvidence != nil {
+		evidence := *update.ExpiryFinalizedEvidence
+		status.ExpiryFinalized = append(status.ExpiryFinalized, evidence)
 	}
 	if update.TokenLockEvidence != nil {
 		evidence := *update.TokenLockEvidence

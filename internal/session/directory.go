@@ -25,18 +25,20 @@ var ErrUserBindingConflict = errors.New("session: chat already bound to differen
 // SessionID remains the resume handle; Source+ChatID identify the transport
 // chat; UserID is the canonical participant identity that can span chats.
 type Metadata struct {
-	SessionID          string `json:"session_id"`
-	Source             string `json:"source,omitempty"`
-	ChatID             string `json:"chat_id,omitempty"`
-	UserID             string `json:"user_id,omitempty"`
-	ParentSessionID    string `json:"parent_session_id,omitempty"`
-	LineageKind        string `json:"lineage_kind"`
-	UpdatedAt          int64  `json:"updated_at"`
-	ResumePending      bool   `json:"resume_pending,omitempty"`
-	ResumeReason       string `json:"resume_reason,omitempty"`
-	ResumeMarkedAt     int64  `json:"resume_marked_at,omitempty"`
-	NonResumableReason string `json:"non_resumable_reason,omitempty"`
-	NonResumableAt     int64  `json:"non_resumable_at,omitempty"`
+	SessionID             string `json:"session_id"`
+	Source                string `json:"source,omitempty"`
+	ChatID                string `json:"chat_id,omitempty"`
+	UserID                string `json:"user_id,omitempty"`
+	ParentSessionID       string `json:"parent_session_id,omitempty"`
+	LineageKind           string `json:"lineage_kind"`
+	UpdatedAt             int64  `json:"updated_at"`
+	ResumePending         bool   `json:"resume_pending,omitempty"`
+	ResumeReason          string `json:"resume_reason,omitempty"`
+	ResumeMarkedAt        int64  `json:"resume_marked_at,omitempty"`
+	NonResumableReason    string `json:"non_resumable_reason,omitempty"`
+	NonResumableAt        int64  `json:"non_resumable_at,omitempty"`
+	ExpiryFinalized       bool   `json:"expiry_finalized,omitempty"`
+	MigratedMemoryFlushed bool   `json:"migrated_memory_flushed,omitempty"`
 }
 
 func normalizeMetadata(meta Metadata) Metadata {
@@ -93,6 +95,12 @@ func mergeMetadata(existing, incoming Metadata) (Metadata, error) {
 	if incoming.NonResumableAt != 0 {
 		out.NonResumableAt = incoming.NonResumableAt
 	}
+	if incoming.ExpiryFinalized {
+		out.ExpiryFinalized = true
+	}
+	if incoming.MigratedMemoryFlushed {
+		out.MigratedMemoryFlushed = true
+	}
 	return finalizeMetadata(out), nil
 }
 
@@ -114,7 +122,25 @@ func decodeMetadata(raw []byte) (Metadata, error) {
 	if err := json.Unmarshal(raw, &meta); err != nil {
 		return Metadata{}, err
 	}
+	applyLegacyMemoryFlushedMigration(raw, &meta)
 	return finalizeMetadata(meta), nil
+}
+
+func applyLegacyMemoryFlushedMigration(raw []byte, meta *Metadata) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return
+	}
+	legacyRaw, ok := fields["memory_flushed"]
+	if !ok {
+		return
+	}
+	var legacyFlushed bool
+	if err := json.Unmarshal(legacyRaw, &legacyFlushed); err != nil || !legacyFlushed {
+		return
+	}
+	meta.MigratedMemoryFlushed = true
+	meta.ExpiryFinalized = true
 }
 
 func (m *BoltMap) PutMetadata(ctx context.Context, meta Metadata) error {
