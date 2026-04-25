@@ -23,6 +23,7 @@ type httpClient struct {
 	http             *http.Client
 	mu               sync.Mutex
 	temperatureRetry ProviderTemperatureRetryStatus
+	parameterRetry   ProviderUnsupportedParameterRetryStatus
 }
 
 // NewHTTPClient returns a Client that talks HTTP+SSE to a Hermes-compatible
@@ -55,6 +56,7 @@ func (c *httpClient) ProviderStatus() ProviderStatus {
 	status := openAICompatibleProviderStatus(c.provider, c.baseURL)
 	c.mu.Lock()
 	status.TemperatureRetry = c.temperatureRetry
+	status.UnsupportedParameterRetry = c.parameterRetry
 	c.mu.Unlock()
 	return status
 }
@@ -128,7 +130,7 @@ func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, e
 		raw, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		httpErr := newHTTPError(resp.StatusCode, string(raw), resp.Header)
-		if req.Temperature != nil && isUnsupportedTemperatureError(httpErr) {
+		if req.Temperature != nil && requestBodyHasParameter(body, "temperature") && isUnsupportedTemperatureError(httpErr) {
 			c.recordTemperatureRetry(req.Model, httpErr)
 			retryReq := req
 			retryReq.Temperature = nil
@@ -146,6 +148,23 @@ func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, e
 				return nil, newHTTPError(retryResp.StatusCode, string(retryRaw), retryResp.Header)
 			}
 			return newChatStream(retryResp.Body, retryResp.Header.Get("X-Hermes-Session-Id"), retryDescriptors), nil
+		}
+		if req.MaxTokens > 0 && requestBodyHasParameter(body, "max_tokens") && isUnsupportedParameterError(httpErr, "max_tokens") {
+			c.recordUnsupportedParameterRetry(req.Model, "max_tokens", "max_completion_tokens", httpErr)
+			retryBody, err := replaceMaxTokensWithMaxCompletionTokens(body, req.MaxTokens)
+			if err != nil {
+				return nil, err
+			}
+			retryResp, err := c.doChatCompletions(ctx, req, retryBody)
+			if err != nil {
+				return nil, err
+			}
+			if retryResp.StatusCode >= 300 {
+				retryRaw, _ := io.ReadAll(retryResp.Body)
+				_ = retryResp.Body.Close()
+				return nil, newHTTPError(retryResp.StatusCode, string(retryRaw), retryResp.Header)
+			}
+			return newChatStream(retryResp.Body, retryResp.Header.Get("X-Hermes-Session-Id"), descriptors), nil
 		}
 		return nil, httpErr
 	}
@@ -181,6 +200,29 @@ func (c *httpClient) buildOpenAICompatibleChatRequestBody(req ChatRequest) ([]by
 	return body, descriptors, nil
 }
 
+func requestBodyHasParameter(body []byte, param string) bool {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return false
+	}
+	_, ok := obj[param]
+	return ok
+}
+
+func replaceMaxTokensWithMaxCompletionTokens(body []byte, maxTokens int) ([]byte, error) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return nil, err
+	}
+	delete(obj, "max_tokens")
+	rawMaxTokens, err := json.Marshal(maxTokens)
+	if err != nil {
+		return nil, err
+	}
+	obj["max_completion_tokens"] = rawMaxTokens
+	return json.Marshal(obj)
+}
+
 func (c *httpClient) doChatCompletions(ctx context.Context, req ChatRequest, body []byte) (*http.Response, error) {
 	// Header-phase budget enforced by Transport.ResponseHeaderTimeout (5s).
 	// The request ctx governs the full response lifetime including body reads —
@@ -206,18 +248,47 @@ func (c *httpClient) doChatCompletions(ctx context.Context, req ChatRequest, bod
 }
 
 func (c *httpClient) recordTemperatureRetry(model string, err *HTTPError) {
-	reason, _, _ := providerHTTPErrorText(err)
-	if reason == "" {
-		reason = err.Body
-	}
+	reason := providerRetryReason(err)
 	c.mu.Lock()
 	c.temperatureRetry = ProviderTemperatureRetryStatus{
 		Attempts: 1,
 		Stripped: true,
 		Model:    model,
-		Reason:   strings.TrimSpace(reason),
+		Reason:   reason,
+	}
+	c.parameterRetry = ProviderUnsupportedParameterRetryStatus{
+		Attempts:  1,
+		Parameter: "temperature",
+		Stripped:  true,
+		Model:     model,
+		Reason:    reason,
 	}
 	c.mu.Unlock()
+}
+
+func (c *httpClient) recordUnsupportedParameterRetry(model, param, replacement string, err *HTTPError) {
+	reason := providerRetryReason(err)
+	c.mu.Lock()
+	c.parameterRetry = ProviderUnsupportedParameterRetryStatus{
+		Attempts:    1,
+		Parameter:   param,
+		Replacement: replacement,
+		Stripped:    true,
+		Model:       model,
+		Reason:      reason,
+	}
+	c.mu.Unlock()
+}
+
+func providerRetryReason(err *HTTPError) string {
+	if err == nil {
+		return ""
+	}
+	reason, _, _ := providerHTTPErrorText(err)
+	if reason == "" {
+		reason = err.Body
+	}
+	return strings.TrimSpace(reason)
 }
 
 func makeOpenAICompatibleMessages(messages []Message, provider, model, baseURL string) []orMessage {

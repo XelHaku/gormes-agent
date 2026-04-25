@@ -4430,9 +4430,9 @@
             {
               "name": "Generic unsupported-parameter retry + max_tokens guard",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "OpenAI-compatible provider calls detect unsupported request parameters by name and retry max_tokens as max_completion_tokens only when the first payload actually sent max_tokens",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4468,7 +4468,7 @@
                 "When the first request emits max_tokens and receives an unsupported max_tokens error, exactly one retry removes max_tokens, sets max_completion_tokens to the same value, and preserves model, messages, tools, temperature, timeout context, and session headers.",
                 "When MaxTokens is zero/omitted or the provider error is unrelated, the client makes one request and never adds max_completion_tokens with a zero or null value."
               ],
-              "note": "Hermes 3c1c65e7/6e561ffa generalized the unsupported-temperature detector into a parameter-specific retry helper and hardened max_tokens retry so omitted max_tokens does not create a bogus max_completion_tokens retry. Gormes currently has only the temperature-specific retry slice.",
+              "note": "Complete: TDD landed internal/hermes/unsupported_parameter_retry_test.go. OpenAI-compatible provider errors now route through a generic unsupported-parameter detector used by the temperature wrapper and covering temperature, max_tokens, seed, and top_p phrasings including unsupported, unknown, unrecognized, invalid, and does-not-support markers. A supported max_tokens recovery retries exactly once only when the original payload emitted max_tokens, rewrites it to max_completion_tokens with the same value, preserves model, messages, tools, temperature, session headers, and caller context, and records UnsupportedParameterRetry evidence in ProviderStatus. Omitted MaxTokens, unrelated max_tokens errors, and unsupported arbitrary parameters do not retry or emit zero/null max_completion_tokens.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
