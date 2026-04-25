@@ -166,25 +166,55 @@ func TestBuildPrompt_PreviousReshapesSectionRendersAllBuckets(t *testing.T) {
 	}
 }
 
-func TestBuildPrompt_ImplInventorySectionRendersDivergenceHints(t *testing.T) {
+func TestBuildPrompt_ProvenanceClauseAlwaysPresent(t *testing.T) {
+	prompt := BuildPrompt(ContextBundle{}, nil)
+	for _, want := range []string{"PROVENANCE AWARENESS", "DRIFT STATE"} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q clause:\n%s", want, prompt)
+		}
+	}
+	if strings.Contains(prompt, "provenance.origin_decision") {
+		t.Fatalf("prompt references non-existent provenance.origin_decision field:\n%s", prompt)
+	}
+	if !strings.Contains(prompt, "provenance.note") {
+		t.Fatalf("prompt should tell planner to use provenance.note:\n%s", prompt)
+	}
+}
+
+func TestBuildPrompt_ImplInventorySectionRendersWhenPresent(t *testing.T) {
 	bundle := ContextBundle{
 		ImplInventory: ImplInventory{
-			GormesOriginalPaths: []string{"cmd/autoloop/main.go", "internal/architectureplanner/run.go"},
-			RecentlyChanged:     []string{"internal/architectureplanner/run.go"},
-			OwnedSubphases:      []string{"5.O"},
+			GormesOriginalPaths: []string{"cmd/autoloop/main.go", "internal/autoloop/run.go"},
+			RecentlyChanged:     []string{"cmd/autoloop/main.go"},
+			OwnedSubphases:      []string{"5.O", "5.P"},
 		},
 	}
-
 	prompt := BuildPrompt(bundle, nil)
-	wants := []string{
-		"Implementation drift inventory:",
-		"Gormes-original paths: cmd/autoloop/main.go, internal/architectureplanner/run.go",
-		"Recently changed Gormes-original paths: internal/architectureplanner/run.go",
-		"Owned subphase candidates: 5.O",
-	}
-	for _, want := range wants {
+	for _, want := range []string{
+		"## Implementation Inventory",
+		"cmd/autoloop/main.go",
+		"5.O",
+	} {
 		if !strings.Contains(prompt, want) {
-			t.Fatalf("BuildPrompt missing %q\nprompt:\n%s", want, prompt)
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
 		}
+	}
+}
+
+func TestBuildPrompt_OmitsImplInventorySectionWhenEmpty(t *testing.T) {
+	prompt := BuildPrompt(ContextBundle{}, nil)
+	if strings.Contains(prompt, "## Implementation Inventory") {
+		t.Fatal("Implementation Inventory section should be omitted when bundle has no inventory")
+	}
+}
+
+func TestBuildPrompt_ImplInventorySectionCapsLongLists(t *testing.T) {
+	paths := make([]string, 0, 42)
+	for i := 0; i < 42; i++ {
+		paths = append(paths, "internal/autoloop/path.go")
+	}
+	prompt := BuildPrompt(ContextBundle{ImplInventory: ImplInventory{GormesOriginalPaths: paths}}, nil)
+	if !strings.Contains(prompt, "... (2 more; see context.json)") {
+		t.Fatalf("prompt should cap long impl inventory lists:\n%s", prompt)
 	}
 }

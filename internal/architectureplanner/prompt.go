@@ -66,6 +66,45 @@ you reshaped in past runs. Use this signal:
   - NO ATTEMPTS YET rows may be legitimately blocked
 `
 
+// provenanceAwarenessClause is appended to every planner prompt as a SOFT
+// rule. It tells the LLM that progress.json rows should declare their
+// origin via the typed `provenance` block, and that fabricating an
+// upstream_ref pointer where none exists is worse than leaving the field
+// empty. The clause is unconditional so the LLM understands the schema
+// even on runs with no Implementation Inventory data section beneath it.
+const provenanceAwarenessClause = `
+PROVENANCE AWARENESS (SOFT RULE)
+
+Every progress.json row SHOULD carry a ` + "`provenance`" + ` block declaring its
+origin_type ("upstream", "gormes", or "hybrid"). When you create or refine
+a row in a Gormes-owned area (see Implementation Inventory section below),
+set provenance.origin_type="gormes" and provenance.note describing why.
+For subphase-level ownership decisions, use drift_state.origin_decision.
+Do NOT fabricate upstream_ref pointers when none exist — leave the field empty.
+`
+
+// driftStateClause is appended to every planner prompt as a SOFT rule. It
+// describes the three Subphase.drift_state.status values (porting,
+// converged, owned) and the one-way ratchet semantics: the planner only
+// promotes forward; humans demote by direct edit when needed.
+const driftStateClause = `
+DRIFT STATE (SOFT RULE)
+
+Subphases progress through three drift states (Subphase.drift_state.status):
+  - "porting"   — upstream leads; refine contracts against upstream code
+  - "converged" — Gormes matches upstream; planner only checks for upstream
+                  changes that warrant new rows
+  - "owned"     — Gormes leads; ignore upstream for this surface; refine
+                  contracts against the Gormes implementation only
+
+Promote subphases to "converged" when all their rows are shipped and
+upstream hasn't changed materially. Promote to "owned" when Gormes has
+shipped functionality with no upstream analog (e.g. autoloop, plannertriggers).
+The Implementation Inventory below lists OwnedSubphases the impl scan
+identified as candidates for owned promotion. This is a one-way ratchet —
+do not demote from owned back to converged or porting.
+`
+
 // topicalClauseTemplate is appended to the planner prompt when the run was
 // invoked with positional keyword arguments (L6 topical focus mode). The
 // upstream context (Quarantined Rows, Previous Reshapes, Implementation
@@ -158,9 +197,6 @@ Current Gormes implementation inventory:
 - landing page: %s
 - Hugo docs: %s
 
-Implementation drift inventory:
-%s
-
 Autoloop audit (last 7 days):
 %s
 
@@ -199,8 +235,8 @@ Required final report sections:
 6. Recommended next autoloop tasks
 7. Autoloop handoff completeness
 8. Risks and ambiguities
-%s%s%s%s%s%s%s
-`, strings.Join(roots, "\n"), strings.Join(syncLines, "\n"), strings.Join(bundle.ImplementationInventory.Commands, ", "), strings.Join(bundle.ImplementationInventory.InternalPackages, ", "), strings.Join(bundle.ImplementationInventory.BuildingDocs, ", "), landingSite, hugoDocs, implInventoryBlock, auditBlock, bundle.ProgressJSON, bundle.RepoRoot, bundle.ProgressStats.Items, healthPreservationClause, quarantinePriorityClause, quarantineBlock, selfEvaluationClause, reshapeBlock, triggerBlock, topicalBlock)
+%s%s%s%s%s%s%s%s%s%s
+`, strings.Join(roots, "\n"), strings.Join(syncLines, "\n"), strings.Join(bundle.ImplementationInventory.Commands, ", "), strings.Join(bundle.ImplementationInventory.InternalPackages, ", "), strings.Join(bundle.ImplementationInventory.BuildingDocs, ", "), landingSite, hugoDocs, auditBlock, bundle.ProgressJSON, bundle.RepoRoot, bundle.ProgressStats.Items, healthPreservationClause, quarantinePriorityClause, quarantineBlock, selfEvaluationClause, reshapeBlock, triggerBlock, topicalBlock, provenanceAwarenessClause, driftStateClause, implInventoryBlock)
 }
 
 // formatTriggerEvents renders the autoloop signals consumed by this run as
@@ -267,29 +303,45 @@ func formatPreviousReshapes(outcomes []ReshapeOutcome) string {
 	return b.String()
 }
 
+// formatImplInventory renders the divergence-aware impl-tree scan output
+// as a markdown section. Returns "" when the inventory is entirely empty
+// so the section is omitted from the prompt — the PROVENANCE AWARENESS /
+// DRIFT STATE clauses still ship unconditionally, telling the LLM what
+// the (absent) section would have meant.
 func formatImplInventory(inv ImplInventory) string {
-	lines := []string{
-		"- Gormes-original paths: none",
-		"- Recently changed Gormes-original paths: none",
-		"- Owned subphase candidates: none",
+	if len(inv.GormesOriginalPaths) == 0 && len(inv.RecentlyChanged) == 0 && len(inv.OwnedSubphases) == 0 {
+		return ""
 	}
+	var b strings.Builder
+	b.WriteString("\n## Implementation Inventory\n\n")
 	if len(inv.GormesOriginalPaths) > 0 {
-		lines[0] = "- Gormes-original paths: " + formatLimitedList(inv.GormesOriginalPaths, 40)
+		b.WriteString("Gormes-original surfaces (no upstream research needed):\n")
+		writeLimitedBullets(&b, inv.GormesOriginalPaths, 40)
+		b.WriteString("\n")
 	}
 	if len(inv.RecentlyChanged) > 0 {
-		lines[1] = "- Recently changed Gormes-original paths: " + formatLimitedList(inv.RecentlyChanged, 40)
+		b.WriteString("Recently changed (last lookback window):\n")
+		writeLimitedBullets(&b, inv.RecentlyChanged, 40)
+		b.WriteString("\n")
 	}
 	if len(inv.OwnedSubphases) > 0 {
-		lines[2] = "- Owned subphase candidates: " + formatLimitedList(inv.OwnedSubphases, 40)
+		b.WriteString("Subphases that ARE entirely Gormes-original (candidates for \"owned\"):\n")
+		writeLimitedBullets(&b, inv.OwnedSubphases, 40)
 	}
-	return strings.Join(lines, "\n")
+	return b.String()
 }
 
-func formatLimitedList(values []string, limit int) string {
+func writeLimitedBullets(b *strings.Builder, values []string, limit int) {
 	if limit <= 0 || len(values) <= limit {
-		return strings.Join(values, ", ")
+		for _, value := range values {
+			fmt.Fprintf(b, "- %s\n", value)
+		}
+		return
 	}
-	return strings.Join(values[:limit], ", ") + fmt.Sprintf(", ... (%d more; see context.json)", len(values)-limit)
+	for _, value := range values[:limit] {
+		fmt.Fprintf(b, "- %s\n", value)
+	}
+	fmt.Fprintf(b, "- ... (%d more; see context.json)\n", len(values)-limit)
 }
 
 // formatQuarantinedRows renders the planner's call-to-action list for
