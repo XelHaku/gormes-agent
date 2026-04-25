@@ -4472,9 +4472,9 @@
             {
               "name": "Aux compression single-prompt threshold reconciliation",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Auxiliary compression budgeting follows Hermes 5006b220 by treating the summarizer request as raw messages plus one small user instruction, not as a system-prompt-plus-tool-schema memory-flush request",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4508,7 +4508,7 @@
                 "A compatibility fixture documents the removed legacy headroom behavior and fails if flush_memories assumptions are reintroduced into compression budgeting.",
                 "Existing provider-cap and compressor-budget tests remain green after the threshold/status expectation update."
               ],
-              "note": "Upstream Hermes first added headroom for flush_memories/tool-schema overflow, then 5006b220 removed flush_memories and restored compression feasibility to aux_context because the summarizer sends one user-role prompt with no tools. Gormes still has the legacy headroom helper; this row makes the required drift explicit before live compression wiring depends on stale thresholds.",
+              "note": "Complete: TDD added internal/hermes/context_compressor_single_prompt_test.go and updated the prior headroom/provider-cap fixtures for Hermes 5006b220 semantics. ContextCompressorBudget now sets auxiliary-bound compression thresholds to aux_context directly, reports threshold_source evidence for single_prompt_aux, provider_cap, main_context, or unavailable, preserves auxiliary_context_source provider_cap evidence, and omits request_headroom_tokens/headroom_clamped from compression-only status. Compatibility fixtures fail if tool-schema plus 12000 flush-memory headroom is reintroduced.",
               "write_scope": [
                 "internal/hermes/context_compressor_budget.go",
                 "internal/hermes/context_compressor_headroom_test.go",
