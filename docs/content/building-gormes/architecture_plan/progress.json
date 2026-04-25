@@ -1413,9 +1413,9 @@
             },
             {
               "name": "Pairing approval + rate-limit semantics",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pairing approval uses Hermes-compatible code generation, expiry, pending limits, failed-approval lockout, per-user rate limits, and Telegram DM from_user fallback without starting agent sessions",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1451,7 +1451,7 @@
                 "Per-user request rate limiting blocks repeat code requests for ten minutes and records visible rate-limit evidence.",
                 "Telegram private-chat events with from_user missing resolve user_id from chat.id; non-DM events with from_user missing do not synthesize a user_id; allowlist-denied users still hit the failed-attempt/lockout evidence path."
               ],
-              "note": "TDD-ready: freeze upstream PairingStore policy over the Go read model, including rate limiting and failed-approval lockout. Keep platform response copy and deny/pair/ignore behavior in the unauthorized-DM row so workers can land this as pure state/policy fixtures.",
+              "note": "TDD landed: internal/gateway.PairingStore now owns Hermes-compatible pairing approval policy over the Go read model: cryptographic 8-character unambiguous codes, one-hour expiry, max three pending codes per platform, ten-minute per-user request rate limits with status evidence, five-failure one-hour platform lockout, valid-code approval that removes pending records, Telegram private-chat missing-from_user fallback through InboundEvent.ChatType, and typed evidence for rate-limited, max-pending, expired, locked-out, allowlist-denied, and unresolved-user attempts without adapter sends or agent sessions.",
               "write_scope": [
                 "internal/gateway/pairing_store.go",
                 "internal/gateway/pairing_approval_test.go",

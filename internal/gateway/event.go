@@ -70,6 +70,7 @@ type InboundEvent struct {
 	Platform string
 	ChatID   string
 	ChatName string
+	ChatType string
 	UserID   string
 	UserName string
 	ThreadID string
@@ -88,6 +89,31 @@ type InboundEvent struct {
 // ChatKey returns the internal/session map key shape for this event.
 func (e InboundEvent) ChatKey() string {
 	return e.Platform + ":" + e.ChatID
+}
+
+// IsDirectMessage reports whether the adapter identified the source as a
+// one-to-one chat. Telegram uses "private" while other adapters generally use
+// "dm" or "direct".
+func (e InboundEvent) IsDirectMessage() bool {
+	switch strings.ToLower(strings.TrimSpace(e.ChatType)) {
+	case "dm", "direct", "private", "private_chat":
+		return true
+	default:
+		return false
+	}
+}
+
+// PairingUserID returns the user identity eligible for pairing policy. Telegram
+// private messages may omit from_user for service-like events; upstream Hermes
+// falls back to chat.id only for private chats and never for groups/channels.
+func (e InboundEvent) PairingUserID() string {
+	if userID := strings.TrimSpace(e.UserID); userID != "" {
+		return userID
+	}
+	if strings.EqualFold(strings.TrimSpace(e.Platform), "telegram") && e.IsDirectMessage() {
+		return strings.TrimSpace(e.ChatID)
+	}
+	return ""
 }
 
 // SubmitText returns the text sent to the kernel for submit events, including

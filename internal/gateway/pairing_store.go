@@ -2,10 +2,12 @@ package gateway
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/big"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,6 +17,18 @@ import (
 )
 
 const pairingStatusKind = "gormes-gateway-pairing"
+
+const (
+	pairingCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	pairingCodeLength   = 8
+
+	pairingCodeTTL          = time.Hour
+	pairingRequestRateLimit = 10 * time.Minute
+	pairingLockoutDuration  = time.Hour
+
+	maxPendingPairingCodesPerPlatform = 3
+	maxPairingApprovalFailures        = 5
+)
 
 // PairingPlatformState is the operator-facing per-platform pairing state.
 type PairingPlatformState string
@@ -32,7 +46,63 @@ const (
 	PairingDegradedCorrupt          PairingDegradedReason = "corrupt"
 	PairingDegradedPermissionDenied PairingDegradedReason = "permission_denied"
 	PairingDegradedReadFailed       PairingDegradedReason = "read_failed"
+	PairingDegradedRateLimited      PairingDegradedReason = "rate_limited"
+	PairingDegradedMaxPending       PairingDegradedReason = "max_pending"
+	PairingDegradedExpired          PairingDegradedReason = "expired"
+	PairingDegradedLockedOut        PairingDegradedReason = "locked_out"
+	PairingDegradedAllowlistDenied  PairingDegradedReason = "allowlist_denied"
+	PairingDegradedUnresolvedUser   PairingDegradedReason = "unresolved_user"
 )
+
+// PairingCodeStatus is the state transition produced by a pairing-code request.
+type PairingCodeStatus string
+
+const (
+	PairingCodeIssued          PairingCodeStatus = "issued"
+	PairingCodeRateLimited     PairingCodeStatus = "rate_limited"
+	PairingCodeMaxPending      PairingCodeStatus = "max_pending"
+	PairingCodeLockedOut       PairingCodeStatus = "locked_out"
+	PairingCodeAllowlistDenied PairingCodeStatus = "allowlist_denied"
+	PairingCodeUnresolvedUser  PairingCodeStatus = "unresolved_user"
+)
+
+// PairingApprovalStatus is the state transition produced by an approval
+// attempt against a code.
+type PairingApprovalStatus string
+
+const (
+	PairingApprovalApproved  PairingApprovalStatus = "approved"
+	PairingApprovalInvalid   PairingApprovalStatus = "invalid"
+	PairingApprovalExpired   PairingApprovalStatus = "expired"
+	PairingApprovalLockedOut PairingApprovalStatus = "locked_out"
+)
+
+// PairingCodeRequest carries the platform-neutral state needed to request a
+// pairing code. It intentionally excludes response-copy and adapter behavior.
+type PairingCodeRequest struct {
+	Platform        string
+	UserID          string
+	UserName        string
+	AllowlistDenied bool
+}
+
+// PairingCodeResult reports whether a code was issued or why policy blocked it.
+type PairingCodeResult struct {
+	Status    PairingCodeStatus
+	Code      string
+	Reason    PairingDegradedReason
+	ExpiresAt time.Time
+	RetryAt   time.Time
+}
+
+// PairingApprovalResult reports whether approval succeeded or why it failed.
+type PairingApprovalResult struct {
+	Status         PairingApprovalStatus
+	Reason         PairingDegradedReason
+	UserID         string
+	UserName       string
+	LockedOutUntil time.Time
+}
 
 // PairingPendingRecord is one pending pairing request in the read model.
 type PairingPendingRecord struct {
@@ -60,11 +130,18 @@ type PairingPlatformStatus struct {
 	ApprovedCount int                  `json:"approved_count"`
 }
 
-// PairingDegradedEvidence records why the read model could not be trusted.
+// PairingDegradedEvidence records read-model degradation and pairing-policy
+// attempts operators need to see in status output.
 type PairingDegradedEvidence struct {
-	Reason  PairingDegradedReason `json:"reason"`
-	Path    string                `json:"path"`
-	Message string                `json:"message"`
+	Reason   PairingDegradedReason `json:"reason"`
+	Path     string                `json:"path"`
+	Message  string                `json:"message"`
+	Platform string                `json:"platform,omitempty"`
+	UserID   string                `json:"user_id,omitempty"`
+	Code     string                `json:"code,omitempty"`
+	At       time.Time             `json:"at,omitempty"`
+	Until    time.Time             `json:"until,omitempty"`
+	Count    int                   `json:"count,omitempty"`
 }
 
 // PairingStatus is the deterministic, operator-facing pairing readout.
@@ -105,6 +182,209 @@ func NewPairingStore(path string) *PairingStore {
 		readFile:  os.ReadFile,
 		writeFile: atomicWritePairingFile,
 	}
+}
+
+// PairingCodeRequestFromInbound extracts the identity used by pairing policy
+// from a gateway event. Telegram private-chat events may fall back to chat.id
+// when from_user is unavailable; group/channel events do not.
+func PairingCodeRequestFromInbound(ev InboundEvent, allowlistDenied bool) PairingCodeRequest {
+	userID := ev.PairingUserID()
+	userName := strings.TrimSpace(ev.UserName)
+	if userName == "" && userID != "" && userID == strings.TrimSpace(ev.ChatID) && ev.IsDirectMessage() {
+		userName = strings.TrimSpace(ev.ChatName)
+	}
+	return PairingCodeRequest{
+		Platform:        ev.Platform,
+		UserID:          userID,
+		UserName:        userName,
+		AllowlistDenied: allowlistDenied,
+	}
+}
+
+// GeneratePairingCode applies the Hermes-compatible pairing-code policy and
+// persists pending state plus operator-visible policy evidence.
+func (s *PairingStore) GeneratePairingCode(ctx context.Context, request PairingCodeRequest) (PairingCodeResult, error) {
+	if s == nil || s.path == "" {
+		return PairingCodeResult{}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return PairingCodeResult{}, err
+	}
+
+	request.Platform = strings.TrimSpace(request.Platform)
+	request.UserID = strings.TrimSpace(request.UserID)
+	request.UserName = strings.TrimSpace(request.UserName)
+	if request.Platform == "" {
+		return PairingCodeResult{}, fmt.Errorf("generate pairing code: platform is required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return PairingCodeResult{}, err
+	}
+	now := s.now().UTC()
+	s.cleanupExpiredPairingCodesLocked(&state, request.Platform, now)
+
+	if request.UserID == "" {
+		s.recordPairingEvidenceLocked(&state, PairingDegradedUnresolvedUser, request.Platform, "", "", "pairing request has no resolvable user identity", time.Time{}, 0, now)
+		state.UpdatedAt = now
+		if err := s.writeStateLocked(ctx, state); err != nil {
+			return PairingCodeResult{}, err
+		}
+		return PairingCodeResult{Status: PairingCodeUnresolvedUser, Reason: PairingDegradedUnresolvedUser}, nil
+	}
+
+	if request.AllowlistDenied {
+		s.recordPairingEvidenceLocked(&state, PairingDegradedAllowlistDenied, request.Platform, request.UserID, "", "pairing request was denied by allowlist policy", time.Time{}, 0, now)
+		state.UpdatedAt = now
+		if err := s.writeStateLocked(ctx, state); err != nil {
+			return PairingCodeResult{}, err
+		}
+		return PairingCodeResult{Status: PairingCodeAllowlistDenied, Reason: PairingDegradedAllowlistDenied}, nil
+	}
+
+	if until, ok := s.activePairingLockoutLocked(&state, request.Platform, now); ok {
+		s.recordPairingEvidenceLocked(&state, PairingDegradedLockedOut, request.Platform, request.UserID, "", "pairing approval failures locked this platform", until, 0, now)
+		state.UpdatedAt = now
+		if err := s.writeStateLocked(ctx, state); err != nil {
+			return PairingCodeResult{}, err
+		}
+		return PairingCodeResult{
+			Status:  PairingCodeLockedOut,
+			Reason:  PairingDegradedLockedOut,
+			RetryAt: until,
+		}, nil
+	}
+
+	if retryAt, ok := s.activePairingRateLimitLocked(&state, request.Platform, request.UserID, now); ok {
+		s.recordPairingEvidenceLocked(&state, PairingDegradedRateLimited, request.Platform, request.UserID, "", "pairing code request was rate limited", retryAt, 0, now)
+		state.UpdatedAt = now
+		if err := s.writeStateLocked(ctx, state); err != nil {
+			return PairingCodeResult{}, err
+		}
+		return PairingCodeResult{
+			Status:  PairingCodeRateLimited,
+			Reason:  PairingDegradedRateLimited,
+			RetryAt: retryAt,
+		}, nil
+	}
+
+	platform := s.ensurePairingPlatformLocked(&state, request.Platform)
+	if len(platform.Pending) >= maxPendingPairingCodesPerPlatform {
+		s.recordPairingEvidenceLocked(&state, PairingDegradedMaxPending, request.Platform, request.UserID, "", "platform has the maximum number of pending pairing codes", time.Time{}, len(platform.Pending), now)
+		state.UpdatedAt = now
+		if err := s.writeStateLocked(ctx, state); err != nil {
+			return PairingCodeResult{}, err
+		}
+		return PairingCodeResult{Status: PairingCodeMaxPending, Reason: PairingDegradedMaxPending}, nil
+	}
+
+	code, err := generatePairingCode()
+	if err != nil {
+		return PairingCodeResult{}, err
+	}
+	for attempts := 0; platform.Pending[code].UserID != "" && attempts < 16; attempts++ {
+		code, err = generatePairingCode()
+		if err != nil {
+			return PairingCodeResult{}, err
+		}
+	}
+	if platform.Pending[code].UserID != "" {
+		return PairingCodeResult{}, errors.New("generate pairing code: exhausted collision retries")
+	}
+
+	platform.Pending[code] = pairingPendingFileRecord{
+		UserID:    request.UserID,
+		UserName:  request.UserName,
+		CreatedAt: now,
+	}
+	state.Platforms[request.Platform] = platform
+	if state.RateLimits == nil {
+		state.RateLimits = map[string]time.Time{}
+	}
+	state.RateLimits[pairingRateLimitKey(request.Platform, request.UserID)] = now
+	state.UpdatedAt = now
+	if err := s.writeStateLocked(ctx, state); err != nil {
+		return PairingCodeResult{}, err
+	}
+	return PairingCodeResult{
+		Status:    PairingCodeIssued,
+		Code:      code,
+		ExpiresAt: now.Add(pairingCodeTTL),
+	}, nil
+}
+
+// ApprovePairingCode approves a pending code or records failed approval
+// evidence. Codes are normalized case-insensitively like upstream Hermes.
+func (s *PairingStore) ApprovePairingCode(ctx context.Context, platformName, code string) (PairingApprovalResult, error) {
+	if s == nil || s.path == "" {
+		return PairingApprovalResult{}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return PairingApprovalResult{}, err
+	}
+	platformName = strings.TrimSpace(platformName)
+	code = strings.ToUpper(strings.TrimSpace(code))
+	if platformName == "" {
+		return PairingApprovalResult{}, fmt.Errorf("approve pairing code: platform is required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	state, err := s.readStateLocked()
+	if err != nil {
+		return PairingApprovalResult{}, err
+	}
+	now := s.now().UTC()
+	expired := s.cleanupExpiredPairingCodesLocked(&state, platformName, now)
+	if _, ok := expired[code]; ok {
+		lockedUntil := s.recordFailedPairingApprovalLocked(&state, platformName, code, now)
+		state.UpdatedAt = now
+		if err := s.writeStateLocked(ctx, state); err != nil {
+			return PairingApprovalResult{}, err
+		}
+		if !lockedUntil.IsZero() {
+			return PairingApprovalResult{Status: PairingApprovalLockedOut, Reason: PairingDegradedLockedOut, LockedOutUntil: lockedUntil}, nil
+		}
+		return PairingApprovalResult{Status: PairingApprovalExpired, Reason: PairingDegradedExpired}, nil
+	}
+
+	platform := s.ensurePairingPlatformLocked(&state, platformName)
+	entry, ok := platform.Pending[code]
+	if !ok {
+		lockedUntil := s.recordFailedPairingApprovalLocked(&state, platformName, code, now)
+		state.UpdatedAt = now
+		if err := s.writeStateLocked(ctx, state); err != nil {
+			return PairingApprovalResult{}, err
+		}
+		if !lockedUntil.IsZero() {
+			return PairingApprovalResult{Status: PairingApprovalLockedOut, Reason: PairingDegradedLockedOut, LockedOutUntil: lockedUntil}, nil
+		}
+		return PairingApprovalResult{Status: PairingApprovalInvalid}, nil
+	}
+
+	delete(platform.Pending, code)
+	if platform.Approved == nil {
+		platform.Approved = map[string]pairingApprovedFileRecord{}
+	}
+	platform.Approved[entry.UserID] = pairingApprovedFileRecord{
+		UserName:   entry.UserName,
+		ApprovedAt: now,
+	}
+	state.Platforms[platformName] = platform
+	state.UpdatedAt = now
+	if err := s.writeStateLocked(ctx, state); err != nil {
+		return PairingApprovalResult{}, err
+	}
+	return PairingApprovalResult{
+		Status:   PairingApprovalApproved,
+		UserID:   entry.UserID,
+		UserName: entry.UserName,
+	}, nil
 }
 
 // RecordPendingPairing persists a caller-supplied pending pairing record.
@@ -215,6 +495,7 @@ func (s *PairingStore) ReadPairingStatus(ctx context.Context) (PairingStatus, er
 }
 
 func (s *PairingStore) statusFromState(state pairingFile) PairingStatus {
+	now := s.now().UTC()
 	status := PairingStatus{
 		Kind:      pairingStatusKind,
 		Version:   1,
@@ -233,15 +514,24 @@ func (s *PairingStore) statusFromState(state pairingFile) PairingStatus {
 		if len(platform.Approved) > 0 {
 			platformState = PairingPlatformStatePaired
 		}
-		status.Platforms = append(status.Platforms, PairingPlatformStatus{
-			Platform:      platformName,
-			State:         platformState,
-			PendingCount:  len(platform.Pending),
-			ApprovedCount: len(platform.Approved),
-		})
 
+		activePendingCount := 0
 		for code, record := range platform.Pending {
-			age := int64(s.now().UTC().Sub(record.CreatedAt.UTC()) / time.Second)
+			createdAt := record.CreatedAt.UTC()
+			if now.Sub(createdAt) > pairingCodeTTL {
+				status.Degraded = append(status.Degraded, PairingDegradedEvidence{
+					Reason:   PairingDegradedExpired,
+					Path:     s.path,
+					Message:  "pairing code expired before approval",
+					Platform: platformName,
+					UserID:   record.UserID,
+					Code:     code,
+					At:       now,
+				})
+				continue
+			}
+			activePendingCount++
+			age := int64(now.Sub(createdAt) / time.Second)
 			if age < 0 {
 				age = 0
 			}
@@ -250,10 +540,16 @@ func (s *PairingStore) statusFromState(state pairingFile) PairingStatus {
 				Code:       code,
 				UserID:     record.UserID,
 				UserName:   record.UserName,
-				CreatedAt:  record.CreatedAt.UTC(),
+				CreatedAt:  createdAt,
 				AgeSeconds: age,
 			})
 		}
+		status.Platforms = append(status.Platforms, PairingPlatformStatus{
+			Platform:      platformName,
+			State:         platformState,
+			PendingCount:  activePendingCount,
+			ApprovedCount: len(platform.Approved),
+		})
 		for userID, record := range platform.Approved {
 			status.Approved = append(status.Approved, PairingApprovedRecord{
 				Platform:   platformName,
@@ -287,7 +583,135 @@ func (s *PairingStore) statusFromState(state pairingFile) PairingStatus {
 		}
 		return left.ApprovedAt.Before(right.ApprovedAt)
 	})
+	for _, evidence := range state.Evidence {
+		status.Degraded = append(status.Degraded, PairingDegradedEvidence{
+			Reason:   evidence.Reason,
+			Path:     s.path,
+			Message:  evidence.Message,
+			Platform: evidence.Platform,
+			UserID:   evidence.UserID,
+			Code:     evidence.Code,
+			At:       evidence.At.UTC(),
+			Until:    evidence.Until.UTC(),
+			Count:    evidence.Count,
+		})
+	}
+	sort.SliceStable(status.Degraded, func(i, j int) bool {
+		left, right := status.Degraded[i], status.Degraded[j]
+		if !left.At.Equal(right.At) {
+			return left.At.Before(right.At)
+		}
+		if left.Reason != right.Reason {
+			return left.Reason < right.Reason
+		}
+		if left.Platform != right.Platform {
+			return left.Platform < right.Platform
+		}
+		if left.UserID != right.UserID {
+			return left.UserID < right.UserID
+		}
+		return left.Code < right.Code
+	})
 	return status
+}
+
+func (s *PairingStore) ensurePairingPlatformLocked(state *pairingFile, platformName string) pairingPlatformFile {
+	if state.Platforms == nil {
+		state.Platforms = map[string]pairingPlatformFile{}
+	}
+	platform := state.Platforms[platformName]
+	if platform.Pending == nil {
+		platform.Pending = map[string]pairingPendingFileRecord{}
+	}
+	if platform.Approved == nil {
+		platform.Approved = map[string]pairingApprovedFileRecord{}
+	}
+	state.Platforms[platformName] = platform
+	return platform
+}
+
+func (s *PairingStore) cleanupExpiredPairingCodesLocked(state *pairingFile, platformName string, now time.Time) map[string]pairingPendingFileRecord {
+	platform := s.ensurePairingPlatformLocked(state, platformName)
+	expired := map[string]pairingPendingFileRecord{}
+	for code, record := range platform.Pending {
+		if now.Sub(record.CreatedAt.UTC()) > pairingCodeTTL {
+			expired[code] = record
+			delete(platform.Pending, code)
+			s.recordPairingEvidenceLocked(state, PairingDegradedExpired, platformName, record.UserID, code, "pairing code expired before approval", time.Time{}, 0, now)
+		}
+	}
+	if len(expired) > 0 {
+		state.Platforms[platformName] = platform
+		state.UpdatedAt = now
+	}
+	return expired
+}
+
+func (s *PairingStore) activePairingRateLimitLocked(state *pairingFile, platformName, userID string, now time.Time) (time.Time, bool) {
+	if state.RateLimits == nil {
+		state.RateLimits = map[string]time.Time{}
+		return time.Time{}, false
+	}
+	key := pairingRateLimitKey(platformName, userID)
+	lastRequest, ok := state.RateLimits[key]
+	if !ok {
+		return time.Time{}, false
+	}
+	retryAt := lastRequest.UTC().Add(pairingRequestRateLimit)
+	if now.Before(retryAt) {
+		return retryAt, true
+	}
+	delete(state.RateLimits, key)
+	return time.Time{}, false
+}
+
+func (s *PairingStore) activePairingLockoutLocked(state *pairingFile, platformName string, now time.Time) (time.Time, bool) {
+	if state.Lockouts == nil {
+		state.Lockouts = map[string]time.Time{}
+		return time.Time{}, false
+	}
+	until, ok := state.Lockouts[platformName]
+	if !ok {
+		return time.Time{}, false
+	}
+	until = until.UTC()
+	if now.Before(until) {
+		return until, true
+	}
+	delete(state.Lockouts, platformName)
+	return time.Time{}, false
+}
+
+func (s *PairingStore) recordFailedPairingApprovalLocked(state *pairingFile, platformName, code string, now time.Time) time.Time {
+	if state.Failures == nil {
+		state.Failures = map[string]int{}
+	}
+	failures := state.Failures[platformName] + 1
+	if failures < maxPairingApprovalFailures {
+		state.Failures[platformName] = failures
+		return time.Time{}
+	}
+	delete(state.Failures, platformName)
+	if state.Lockouts == nil {
+		state.Lockouts = map[string]time.Time{}
+	}
+	until := now.Add(pairingLockoutDuration)
+	state.Lockouts[platformName] = until
+	s.recordPairingEvidenceLocked(state, PairingDegradedLockedOut, platformName, "", code, "platform locked after repeated invalid pairing approvals", until, maxPairingApprovalFailures, now)
+	return until
+}
+
+func (s *PairingStore) recordPairingEvidenceLocked(state *pairingFile, reason PairingDegradedReason, platformName, userID, code, message string, until time.Time, count int, now time.Time) {
+	state.Evidence = append(state.Evidence, pairingEvidenceFileRecord{
+		Reason:   reason,
+		Platform: strings.TrimSpace(platformName),
+		UserID:   strings.TrimSpace(userID),
+		Code:     strings.TrimSpace(code),
+		Message:  message,
+		At:       now.UTC(),
+		Until:    until.UTC(),
+		Count:    count,
+	})
 }
 
 func (s *PairingStore) readStateForStatusLocked() (pairingFile, []PairingDegradedEvidence, error) {
@@ -377,6 +801,15 @@ func decodePairingState(raw []byte) (pairingFile, error) {
 	if state.Platforms == nil {
 		state.Platforms = map[string]pairingPlatformFile{}
 	}
+	if state.RateLimits == nil {
+		state.RateLimits = map[string]time.Time{}
+	}
+	if state.Failures == nil {
+		state.Failures = map[string]int{}
+	}
+	if state.Lockouts == nil {
+		state.Lockouts = map[string]time.Time{}
+	}
 	for name, platform := range state.Platforms {
 		if platform.Pending == nil {
 			platform.Pending = map[string]pairingPendingFileRecord{}
@@ -391,10 +824,13 @@ func decodePairingState(raw []byte) (pairingFile, error) {
 
 func newPairingFile(now time.Time) pairingFile {
 	return pairingFile{
-		Kind:      pairingStatusKind,
-		Version:   1,
-		Platforms: map[string]pairingPlatformFile{},
-		UpdatedAt: now.UTC(),
+		Kind:       pairingStatusKind,
+		Version:    1,
+		Platforms:  map[string]pairingPlatformFile{},
+		RateLimits: map[string]time.Time{},
+		Failures:   map[string]int{},
+		Lockouts:   map[string]time.Time{},
+		UpdatedAt:  now.UTC(),
 	}
 }
 
@@ -448,10 +884,14 @@ func xdgDataHomeForPairing() string {
 }
 
 type pairingFile struct {
-	Kind      string                         `json:"kind"`
-	Version   int                            `json:"version"`
-	Platforms map[string]pairingPlatformFile `json:"platforms"`
-	UpdatedAt time.Time                      `json:"updated_at"`
+	Kind       string                         `json:"kind"`
+	Version    int                            `json:"version"`
+	Platforms  map[string]pairingPlatformFile `json:"platforms"`
+	RateLimits map[string]time.Time           `json:"rate_limits,omitempty"`
+	Failures   map[string]int                 `json:"failures,omitempty"`
+	Lockouts   map[string]time.Time           `json:"lockouts,omitempty"`
+	Evidence   []pairingEvidenceFileRecord    `json:"evidence,omitempty"`
+	UpdatedAt  time.Time                      `json:"updated_at"`
 }
 
 type pairingPlatformFile struct {
@@ -468,4 +908,33 @@ type pairingPendingFileRecord struct {
 type pairingApprovedFileRecord struct {
 	UserName   string    `json:"user_name,omitempty"`
 	ApprovedAt time.Time `json:"approved_at"`
+}
+
+type pairingEvidenceFileRecord struct {
+	Reason   PairingDegradedReason `json:"reason"`
+	Platform string                `json:"platform,omitempty"`
+	UserID   string                `json:"user_id,omitempty"`
+	Code     string                `json:"code,omitempty"`
+	Message  string                `json:"message"`
+	At       time.Time             `json:"at"`
+	Until    time.Time             `json:"until,omitempty"`
+	Count    int                   `json:"count,omitempty"`
+}
+
+func pairingRateLimitKey(platformName, userID string) string {
+	return platformName + ":" + userID
+}
+
+func generatePairingCode() (string, error) {
+	var b strings.Builder
+	b.Grow(pairingCodeLength)
+	max := big.NewInt(int64(len(pairingCodeAlphabet)))
+	for i := 0; i < pairingCodeLength; i++ {
+		n, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", fmt.Errorf("generate pairing code: %w", err)
+		}
+		b.WriteByte(pairingCodeAlphabet[n.Int64()])
+	}
+	return b.String(), nil
 }
