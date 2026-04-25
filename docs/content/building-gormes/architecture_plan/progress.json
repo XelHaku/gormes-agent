@@ -1275,7 +1275,7 @@
             {
               "name": "Honcho-compatible scope/source tool schema",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Honcho-compatible tool schemas expose GONCHO scope and source allowlist controls without renaming public tools",
               "contract_status": "fixture_ready",
               "slice_size": "small",
@@ -1306,7 +1306,7 @@
                 "scope and sources are not required and omitted calls preserve same-chat default behavior.",
                 "The internal implementation package and tables remain named goncho while external tool names remain honcho_*."
               ],
-              "note": "TDD (small, dependency-isolated slice): the Go plumbing is already landed — `internal/goncho/types.go` (SearchParams:48-55 and ContextParams:74-81) advertises `Scope` and `Sources` JSON fields and `internal/goncho/service.go` (Search/Context at :129,:162, fallback at :251) already routes `scope=user` and `sources[]` through the session catalog. The remaining closeout is purely at the tool-registry JSON Schema boundary: the `Schema()` literals returned by `HonchoSearchTool` (`internal/tools/honcho_tools.go:72-74`) and `HonchoContextTool` (`internal/tools/honcho_tools.go:96-98`) still hardcode only `peer`/`query`/`max_tokens`/`session_key` and must add optional `scope` (string, omitempty) and `sources` (array of strings, omitempty). Preserve the external `honcho_search`/`honcho_context` tool names so Honcho compatibility holds. Red→green: extend `internal/tools/honcho_tools_test.go` with a schema-introspection test per tool that asserts (a) `scope` and `sources` appear in `properties`, (b) neither is added to `required`, (c) omitting both still routes same-chat (round-trip through a fake service). Do not touch `internal/goncho/*` — the Go params already accept these fields. Do not advance 3.E.7 past this slice: deny-path fixtures and operator evidence remain separate slices below.",
+              "note": "TDD landed: `honcho_search` and `honcho_context` keep their public Honcho-compatible names while their JSON Schemas now advertise optional `scope` and `sources` controls backed by the existing internal GONCHO params. Schema tests assert both fields are discoverable and not required, and executor round-trips without either field preserve same-chat default behavior. Deny-path fixtures and operator evidence remain separate 3.E.7 slices.",
               "write_scope": [
                 "internal/tools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"

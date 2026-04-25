@@ -27,6 +27,64 @@ func TestHonchoTools_RegisterExpectedNames(t *testing.T) {
 	}
 }
 
+func TestHonchoSearchTool_SchemaExposesOptionalScopeAndSources(t *testing.T) {
+	tool := &HonchoSearchTool{}
+	if got := tool.Name(); got != "honcho_search" {
+		t.Fatalf("Name() = %q, want honcho_search", got)
+	}
+
+	assertScopeAndSourcesSchema(t, tool.Schema(), []string{"peer", "query"})
+}
+
+func TestHonchoContextTool_SchemaExposesOptionalScopeAndSources(t *testing.T) {
+	tool := &HonchoContextTool{}
+	if got := tool.Name(); got != "honcho_context" {
+		t.Fatalf("Name() = %q, want honcho_context", got)
+	}
+
+	assertScopeAndSourcesSchema(t, tool.Schema(), []string{"peer"})
+}
+
+func TestHonchoSearchTool_OmittedScopeSourcesPreservesSameChatDefault(t *testing.T) {
+	reg, svc, cleanup := newTestHonchoRegistry(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	seedScopedConclusions(t, ctx, svc)
+
+	output := executeHonchoTool(t, reg, "honcho_search", json.RawMessage(`{
+		"peer":"telegram:6586915095",
+		"query":"codename",
+		"session_key":"telegram:6586915095"
+	}`))
+	if !strings.Contains(string(output), "same-chat codename orchid") {
+		t.Fatalf("search output missing same-chat result: %s", output)
+	}
+	if strings.Contains(string(output), "other-chat codename orchid") {
+		t.Fatalf("search output leaked other chat result: %s", output)
+	}
+}
+
+func TestHonchoContextTool_OmittedScopeSourcesPreservesSameChatDefault(t *testing.T) {
+	reg, svc, cleanup := newTestHonchoRegistry(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	seedScopedConclusions(t, ctx, svc)
+
+	output := executeHonchoTool(t, reg, "honcho_context", json.RawMessage(`{
+		"peer":"telegram:6586915095",
+		"query":"codename",
+		"session_key":"telegram:6586915095"
+	}`))
+	if !strings.Contains(string(output), "same-chat codename orchid") {
+		t.Fatalf("context output missing same-chat result: %s", output)
+	}
+	if strings.Contains(string(output), "other-chat codename orchid") {
+		t.Fatalf("context output leaked other chat result: %s", output)
+	}
+}
+
 func TestHonchoProfileTool_UsesService(t *testing.T) {
 	reg, svc, cleanup := newTestHonchoRegistry(t)
 	defer cleanup()
@@ -97,6 +155,110 @@ func TestHonchoReasoningTool_ReturnsDeterministicAnswer(t *testing.T) {
 	if !strings.Contains(string(outputs[1].Output), `exact evidence-first reports`) {
 		t.Fatalf("reasoning output missing conclusion: %s", outputs[1].Output)
 	}
+}
+
+func assertScopeAndSourcesSchema(t *testing.T, raw json.RawMessage, wantRequired []string) {
+	t.Helper()
+
+	var schema struct {
+		Properties map[string]struct {
+			Type  string `json:"type"`
+			Items *struct {
+				Type string `json:"type"`
+			} `json:"items,omitempty"`
+		} `json:"properties"`
+		Required []string `json:"required"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("schema unmarshal: %v", err)
+	}
+
+	scope, ok := schema.Properties["scope"]
+	if !ok {
+		t.Fatalf("schema properties missing scope: %s", raw)
+	}
+	if scope.Type != "string" {
+		t.Fatalf("scope type = %q, want string", scope.Type)
+	}
+
+	sources, ok := schema.Properties["sources"]
+	if !ok {
+		t.Fatalf("schema properties missing sources: %s", raw)
+	}
+	if sources.Type != "array" {
+		t.Fatalf("sources type = %q, want array", sources.Type)
+	}
+	if sources.Items == nil || sources.Items.Type != "string" {
+		t.Fatalf("sources items = %+v, want string items", sources.Items)
+	}
+
+	required := make(map[string]bool, len(schema.Required))
+	for _, name := range schema.Required {
+		required[name] = true
+	}
+	for _, name := range []string{"scope", "sources"} {
+		if required[name] {
+			t.Fatalf("%s is required in schema: %s", name, raw)
+		}
+	}
+	if len(schema.Required) != len(wantRequired) {
+		t.Fatalf("required = %v, want %v", schema.Required, wantRequired)
+	}
+	for _, name := range wantRequired {
+		if !required[name] {
+			t.Fatalf("required = %v, missing %s", schema.Required, name)
+		}
+	}
+}
+
+func seedScopedConclusions(t *testing.T, ctx context.Context, svc *goncho.Service) {
+	t.Helper()
+
+	for _, item := range []struct {
+		sessionKey string
+		conclusion string
+	}{
+		{
+			sessionKey: "telegram:6586915095",
+			conclusion: "same-chat codename orchid",
+		},
+		{
+			sessionKey: "discord:channel-9",
+			conclusion: "other-chat codename orchid",
+		},
+	} {
+		if _, err := svc.Conclude(ctx, goncho.ConcludeParams{
+			Peer:       "telegram:6586915095",
+			Conclusion: item.conclusion,
+			SessionKey: item.sessionKey,
+		}); err != nil {
+			t.Fatalf("seed conclusion %q: %v", item.conclusion, err)
+		}
+	}
+}
+
+func executeHonchoTool(t *testing.T, reg *Registry, toolName string, input json.RawMessage) json.RawMessage {
+	t.Helper()
+
+	ch, err := NewInProcessToolExecutor(reg).Execute(context.Background(), ToolRequest{
+		ToolName: toolName,
+		Input:    input,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var outputs []ToolEvent
+	for ev := range ch {
+		outputs = append(outputs, ev)
+	}
+	if len(outputs) != 3 {
+		t.Fatalf("event count = %d, want 3", len(outputs))
+	}
+	if outputs[1].Type != "output" {
+		t.Fatalf("second event = %s, want output", outputs[1].Type)
+	}
+	return outputs[1].Output
 }
 
 func newTestHonchoRegistry(t *testing.T) (*Registry, *goncho.Service, func()) {

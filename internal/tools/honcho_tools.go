@@ -70,7 +70,7 @@ func (*HonchoSearchTool) Description() string {
 	return "Search stored Goncho memory for a peer. Returns raw retrieval results without LLM synthesis."
 }
 func (*HonchoSearchTool) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"max_tokens":{"type":"integer"},"session_key":{"type":"string"}},"required":["peer","query"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"max_tokens":{"type":"integer"},"session_key":{"type":"string"},"scope":{"type":"string"},"sources":{"type":"array","items":{"type":"string"}}},"required":["peer","query"]}`)
 }
 func (*HonchoSearchTool) Timeout() time.Duration { return 5 * time.Second }
 func (t *HonchoSearchTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
@@ -94,7 +94,7 @@ func (*HonchoContextTool) Description() string {
 	return "Build a structured Goncho context block: peer card, representation, conclusions, and recent messages."
 }
 func (*HonchoContextTool) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"max_tokens":{"type":"integer"},"session_key":{"type":"string"}},"required":["peer"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"max_tokens":{"type":"integer"},"session_key":{"type":"string"},"scope":{"type":"string"},"sources":{"type":"array","items":{"type":"string"}}},"required":["peer"]}`)
 }
 func (*HonchoContextTool) Timeout() time.Duration { return 5 * time.Second }
 func (t *HonchoContextTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
