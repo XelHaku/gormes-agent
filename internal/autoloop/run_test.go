@@ -20,7 +20,7 @@ func TestDryRunSelectsCandidatesWithoutRunningBackend(t *testing.T) {
 					"subphases": {
 					"12.A": {
 							"items": [
-								{"item_name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
+								{"name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
 							]
 						}
 					}
@@ -65,7 +65,7 @@ func TestDryRunSkipsCandidatesAboveConfiguredMaxPhase(t *testing.T) {
 					"subphases": {
 					"3.E": {
 							"items": [
-								{"item_name": "phase 3 candidate", "status": "planned", "contract": "phase 3 contract", "contract_status": "draft"}
+								{"name": "phase 3 candidate", "status": "planned", "contract": "phase 3 contract", "contract_status": "draft"}
 							]
 						}
 					}
@@ -74,7 +74,7 @@ func TestDryRunSkipsCandidatesAboveConfiguredMaxPhase(t *testing.T) {
 					"subphases": {
 					"4.A": {
 							"items": [
-								{"item_name": "phase 4 active candidate", "status": "in_progress", "contract": "phase 4 contract"}
+								{"name": "phase 4 active candidate", "status": "in_progress", "contract": "phase 4 contract"}
 							]
 						}
 					}
@@ -115,9 +115,9 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 				"subphases": {
 					"12.A": {
 							"items": [
-								{"item_name": "active candidate", "status": "in_progress", "contract": "active contract"},
-								{"item_name": "planned candidate", "status": "planned", "contract": "planned contract", "contract_status": "draft"},
-								{"item_name": "deferred candidate", "status": "deferred"}
+								{"name": "active candidate", "status": "in_progress", "contract": "active contract"},
+								{"name": "planned candidate", "status": "planned", "contract": "planned contract", "contract_status": "draft"},
+								{"name": "deferred candidate", "status": "deferred"}
 							]
 						}
 				}
@@ -189,12 +189,12 @@ func TestRunOnceLaunchesGitWorkersConcurrently(t *testing.T) {
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "first parallel candidate", "status": "planned", "contract": "first contract", "contract_status": "draft"}
+							{"name": "first parallel candidate", "status": "planned", "contract": "first contract", "contract_status": "draft"}
 						]
 					},
 					"12.B": {
 						"items": [
-							{"item_name": "second parallel candidate", "status": "planned", "contract": "second contract", "contract_status": "draft"}
+							{"name": "second parallel candidate", "status": "planned", "contract": "second contract", "contract_status": "draft"}
 						]
 					}
 				}
@@ -270,7 +270,7 @@ func TestRunOncePassesExecutionMetadataPromptToBackend(t *testing.T) {
 					"12.A": {
 						"items": [
 							{
-								"item_name": "prompted candidate",
+								"name": "prompted candidate",
 								"status": "planned",
 								"priority": "P0",
 								"contract": "Provider-neutral transcript contract",
@@ -406,7 +406,7 @@ func TestRunOnceReturnsBackendRunnerError(t *testing.T) {
 				"subphases": {
 					"12.A": {
 							"items": [
-								{"item_name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
+								{"name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
 							]
 						}
 					}
@@ -440,7 +440,7 @@ func TestRunOnceIncludesBackendStderrInError(t *testing.T) {
 				"subphases": {
 					"12.A": {
 							"items": [
-								{"item_name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
+								{"name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
 							]
 						}
 					}
@@ -477,7 +477,7 @@ func TestRunOnceWritesLedgerEvents(t *testing.T) {
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "ledger candidate", "status": "planned", "contract": "ledger contract", "contract_status": "draft"}
+							{"name": "ledger candidate", "status": "planned", "contract": "ledger contract", "contract_status": "draft"}
 						]
 					}
 				}
@@ -507,7 +507,7 @@ func TestRunOnceWritesLedgerEvents(t *testing.T) {
 	for _, event := range events {
 		got = append(got, event.Event)
 	}
-	want := []string{"run_started", "worker_claimed", "worker_success", "run_completed"}
+	want := []string{"run_started", "worker_claimed", "worker_success", "run_completed", "health_updated"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ledger events = %#v, want %#v", got, want)
 	}
@@ -523,7 +523,7 @@ func TestRunOnceWritesWorkerFailedLedgerEventBeforeReturningBackendError(t *test
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "failing ledger candidate", "status": "planned", "contract": "failing ledger contract", "contract_status": "draft"}
+							{"name": "failing ledger candidate", "status": "planned", "contract": "failing ledger contract", "contract_status": "draft"}
 						]
 					}
 				}
@@ -554,7 +554,7 @@ func TestRunOnceWritesWorkerFailedLedgerEventBeforeReturningBackendError(t *test
 	for _, event := range events {
 		got = append(got, event.Event+":"+event.Status)
 	}
-	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:backend_failed"}
+	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:backend_failed", "health_updated:ok"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ledger events = %#v, want %#v", got, want)
 	}
@@ -569,7 +569,7 @@ func TestRunOnceRefusesDirtyRepositoryBeforeWorkerLaunch(t *testing.T) {
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "dirty preflight", "status": "planned", "contract": "dirty contract", "contract_status": "draft"}
+							{"name": "dirty preflight", "status": "planned", "contract": "dirty contract", "contract_status": "draft"}
 						]
 					}
 				}
@@ -623,7 +623,7 @@ func TestRunOnceFailsWhenWorkerLeavesDirtyWorktree(t *testing.T) {
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "dirty worker", "status": "planned", "contract": "dirty worker contract", "contract_status": "draft"}
+							{"name": "dirty worker", "status": "planned", "contract": "dirty worker contract", "contract_status": "draft"}
 						]
 					}
 				}
@@ -661,7 +661,7 @@ func TestRunOnceFailsWhenWorkerLeavesDirtyWorktree(t *testing.T) {
 	for _, event := range events {
 		got = append(got, event.Event+":"+event.Status)
 	}
-	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:worktree_dirty"}
+	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:worktree_dirty", "health_updated:ok"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ledger events = %#v, want %#v", got, want)
 	}
@@ -677,7 +677,7 @@ func TestRunOnceRunsWorkerInIsolatedGitWorktree(t *testing.T) {
 					"12.A": {
 						"items": [
 							{
-								"item_name": "isolated worker",
+								"name": "isolated worker",
 								"status": "planned",
 								"contract": "isolation contract",
 								"contract_status": "draft",
@@ -753,7 +753,7 @@ func TestRunOnceFailsWhenWorkerCommitsOutsideWriteScope(t *testing.T) {
 					"12.A": {
 						"items": [
 							{
-								"item_name": "scope leaking worker",
+								"name": "scope leaking worker",
 								"status": "planned",
 								"contract": "scope contract",
 								"contract_status": "draft",
@@ -815,7 +815,7 @@ func TestRunOnceFailsWhenWorkerCommitsOutsideWriteScope(t *testing.T) {
 	for _, event := range events {
 		got = append(got, event.Event+":"+event.Status)
 	}
-	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:write_scope_violation"}
+	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:write_scope_violation", "health_updated:ok"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ledger events = %#v, want %#v", got, want)
 	}
@@ -830,7 +830,7 @@ func TestRunOnceFailsWhenWorkerLeavesWorkerBranch(t *testing.T) {
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "branch escaping worker", "status": "planned", "contract": "branch contract", "contract_status": "draft"}
+							{"name": "branch escaping worker", "status": "planned", "contract": "branch contract", "contract_status": "draft"}
 						]
 					}
 				}
@@ -872,7 +872,7 @@ func TestRunOnceFailsWhenWorkerLeavesWorkerBranch(t *testing.T) {
 	for _, event := range events {
 		got = append(got, event.Event+":"+event.Status)
 	}
-	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:branch_changed"}
+	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:branch_changed", "health_updated:ok"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ledger events = %#v, want %#v", got, want)
 	}
@@ -887,7 +887,7 @@ func TestRunOnceFailsWhenWorkerLeavesMergeConflicts(t *testing.T) {
 				"subphases": {
 					"12.A": {
 						"items": [
-							{"item_name": "conflicting worker", "status": "planned", "contract": "conflict contract", "contract_status": "draft"}
+							{"name": "conflicting worker", "status": "planned", "contract": "conflict contract", "contract_status": "draft"}
 						]
 					}
 				}
@@ -927,7 +927,7 @@ func TestRunOnceFailsWhenWorkerLeavesMergeConflicts(t *testing.T) {
 	for _, event := range events {
 		got = append(got, event.Event+":"+event.Status)
 	}
-	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:worktree_unmerged"}
+	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:worktree_unmerged", "health_updated:ok"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ledger events = %#v, want %#v", got, want)
 	}

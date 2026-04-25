@@ -2,6 +2,7 @@ package autoloop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -94,16 +95,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	}
 
 	// flushHealth runs at every return path that might have recorded outcomes.
-	// Errors from Flush are best-effort: we surface them in the ledger but do
-	// not fail the run, since worker outcomes are already promoted at this
-	// point.
-	//
-	// If the live progress.json is in a legacy or test format that the
-	// accumulator cannot resolve (e.g. items keyed by "item_name" instead of
-	// the canonical "name"), Flush would fail with "item not found" for every
-	// row. To avoid noisy ledger churn in that case we probe before flushing
-	// and emit no health event when no recorded row resolves to a real item.
-	flushHealth := func() {
+	// A flush failure is fatal to the run: the operator must see the error so
+	// they can investigate why the on-disk progress.json could not be updated
+	// after worker outcomes were promoted. The failure is also recorded in the
+	// run ledger so post-mortem tooling can correlate it with the run id.
+	flushHealth := func() error {
 		hashOf := func(phaseID, subphaseID, itemName string) string {
 			prog, err := progress.Load(opts.Config.ProgressJSON)
 			if err != nil {
@@ -125,10 +121,6 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			return ""
 		}
 
-		if !accumulatorRowsResolve(acc, opts.Config.ProgressJSON) {
-			return
-		}
-
 		if err := acc.Flush(opts.Config.ProgressJSON, hashOf); err != nil {
 			_ = appendRunLedgerEvent(opts.Config, LedgerEvent{
 				TS:     time.Now().UTC(),
@@ -137,7 +129,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 				Status: "failed",
 				Detail: err.Error(),
 			})
-			return
+			return fmt.Errorf("flush health: %w", err)
 		}
 		_ = appendRunLedgerEvent(opts.Config, LedgerEvent{
 			TS:     time.Now().UTC(),
@@ -145,6 +137,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			Event:  "health_updated",
 			Status: "ok",
 		})
+		return nil
 	}
 
 	// observeOutcome feeds the degrader and emits backend_degraded ledger
@@ -196,8 +189,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			finishErr := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker)
 			recordWorkerOutcome(acc, observeOutcome, degrader.Current(), worker, finishErr)
 			if finishErr != nil {
-				flushHealth()
-				return RunSummary{}, finishErr
+				return RunSummary{}, errors.Join(finishErr, flushHealth())
 			}
 		}
 		if err := appendRunLedgerEvent(opts.Config, LedgerEvent{
@@ -206,10 +198,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			Event:  "run_completed",
 			Status: "completed",
 		}); err != nil {
-			flushHealth()
-			return RunSummary{}, err
+			return RunSummary{}, errors.Join(err, flushHealth())
 		}
-		flushHealth()
+		if err := flushHealth(); err != nil {
+			return summary, err
+		}
 
 		return summary, nil
 	}
@@ -234,8 +227,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			Branch: worker.Branch,
 			Status: "claimed",
 		}); err != nil {
-			flushHealth()
-			return RunSummary{}, err
+			return RunSummary{}, errors.Join(err, flushHealth())
 		}
 
 		if hasGit {
@@ -285,8 +277,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		finishErr := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker)
 		recordWorkerOutcome(acc, observeOutcome, degrader.Current(), worker, finishErr)
 		if finishErr != nil {
-			flushHealth()
-			return RunSummary{}, finishErr
+			return RunSummary{}, errors.Join(finishErr, flushHealth())
 		}
 	}
 	if err := appendRunLedgerEvent(opts.Config, LedgerEvent{
@@ -295,10 +286,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		Event:  "run_completed",
 		Status: "completed",
 	}); err != nil {
-		flushHealth()
-		return RunSummary{}, err
+		return RunSummary{}, errors.Join(err, flushHealth())
 	}
-	flushHealth()
+	if err := flushHealth(); err != nil {
+		return summary, err
+	}
 
 	return summary, nil
 }
@@ -337,36 +329,6 @@ func recordWorkerOutcome(
 		out.IsBackendErrorFlag = true
 	}
 	observe(out)
-}
-
-// accumulatorRowsResolve returns true when at least one row currently held
-// by the accumulator can be resolved against the progress.json on disk. Used
-// to silence health ledger events when running against a legacy/test progress
-// file that uses non-canonical item keys.
-func accumulatorRowsResolve(acc *healthAccumulator, path string) bool {
-	if acc == nil || len(acc.rows) == 0 {
-		return false
-	}
-	prog, err := progress.Load(path)
-	if err != nil {
-		return false
-	}
-	for key := range acc.rows {
-		phase, ok := prog.Phases[key.phaseID]
-		if !ok {
-			continue
-		}
-		sub, ok := phase.Subphases[key.subphaseID]
-		if !ok {
-			continue
-		}
-		for i := range sub.Items {
-			if sub.Items[i].Name == key.itemName {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // mapFinishErrorToCategory classifies a finishWorker error into the closed
