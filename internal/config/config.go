@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TrebuchetDynamics/gormes-agent/internal/goncho"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/pflag"
 )
@@ -33,6 +34,7 @@ type Config struct {
 	Cron       CronCfg       `toml:"cron"`
 	Skills     SkillsCfg     `toml:"skills"`
 	Delegation DelegationCfg `toml:"delegation"`
+	Goncho     GonchoCfg     `toml:"goncho"`
 	// Resume is set only via the --resume CLI flag; intentionally not
 	// a TOML field. Empty means "use whatever internal/session had
 	// persisted for this binary's default key."
@@ -118,6 +120,43 @@ type DelegationCfg struct {
 	RunLogPath            string        `toml:"run_log_path"`
 }
 
+// GonchoCfg configures the in-process Honcho-compatible memory facade.
+type GonchoCfg struct {
+	Enabled                      bool   `toml:"enabled"`
+	Workspace                    string `toml:"workspace"`
+	ObserverPeer                 string `toml:"observer_peer"`
+	RecentMessages               int    `toml:"recent_messages"`
+	MaxMessageSize               int    `toml:"max_message_size"`
+	MaxFileSize                  int    `toml:"max_file_size"`
+	GetContextMaxTokens          int    `toml:"get_context_max_tokens"`
+	ReasoningEnabled             bool   `toml:"reasoning_enabled"`
+	PeerCardEnabled              bool   `toml:"peer_card_enabled"`
+	SummaryEnabled               bool   `toml:"summary_enabled"`
+	DreamEnabled                 bool   `toml:"dream_enabled"`
+	DeriverWorkers               int    `toml:"deriver_workers"`
+	RepresentationBatchMaxTokens int    `toml:"representation_batch_max_tokens"`
+	DialecticDefaultLevel        string `toml:"dialectic_default_level"`
+}
+
+func (g GonchoCfg) RuntimeConfig() goncho.Config {
+	return goncho.Config{
+		Enabled:                      g.Enabled,
+		WorkspaceID:                  g.Workspace,
+		ObserverPeerID:               g.ObserverPeer,
+		RecentMessages:               g.RecentMessages,
+		MaxMessageSize:               g.MaxMessageSize,
+		MaxFileSize:                  g.MaxFileSize,
+		GetContextMaxTokens:          g.GetContextMaxTokens,
+		ReasoningEnabled:             g.ReasoningEnabled,
+		PeerCardEnabled:              g.PeerCardEnabled,
+		SummaryEnabled:               g.SummaryEnabled,
+		DreamEnabled:                 g.DreamEnabled,
+		DeriverWorkers:               g.DeriverWorkers,
+		RepresentationBatchMaxTokens: g.RepresentationBatchMaxTokens,
+		DialecticDefaultLevel:        goncho.DialecticLevel(g.DialecticDefaultLevel),
+	}
+}
+
 func (d *DelegationCfg) UnmarshalTOML(data []byte) error {
 	type rawDelegationCfg struct {
 		Enabled               bool   `toml:"enabled"`
@@ -182,8 +221,13 @@ func Load(args []string) (Config, error) {
 	if err := loadFile(&cfg); err != nil {
 		return cfg, err
 	}
-	loadEnv(&cfg)
+	if err := loadEnv(&cfg); err != nil {
+		return cfg, err
+	}
 	if err := loadFlags(&cfg, args); err != nil {
+		return cfg, err
+	}
+	if err := validateConfig(&cfg); err != nil {
 		return cfg, err
 	}
 	return cfg, nil
@@ -245,6 +289,22 @@ func defaults() Config {
 			DefaultTimeout:        45 * time.Second,
 			RunLogPath:            "",
 		},
+		Goncho: GonchoCfg{
+			Enabled:                      true,
+			Workspace:                    goncho.DefaultWorkspaceID,
+			ObserverPeer:                 goncho.DefaultObserverPeerID,
+			RecentMessages:               goncho.DefaultRecentMessages,
+			MaxMessageSize:               goncho.DefaultMaxMessageSize,
+			MaxFileSize:                  goncho.DefaultMaxFileSize,
+			GetContextMaxTokens:          goncho.DefaultGetContextMaxTokens,
+			ReasoningEnabled:             true,
+			PeerCardEnabled:              true,
+			SummaryEnabled:               true,
+			DreamEnabled:                 false,
+			DeriverWorkers:               goncho.DefaultDeriverWorkers,
+			RepresentationBatchMaxTokens: goncho.DefaultRepresentationBatchMaxTokens,
+			DialecticDefaultLevel:        string(goncho.DialecticLevelLow),
+		},
 	}
 }
 
@@ -289,7 +349,7 @@ func migrateConfig(cfg *Config) error {
 	return nil
 }
 
-func loadEnv(cfg *Config) {
+func loadEnv(cfg *Config) error {
 	if v := os.Getenv("GORMES_ENDPOINT"); v != "" {
 		cfg.Hermes.Endpoint = v
 	}
@@ -316,6 +376,109 @@ func loadEnv(cfg *Config) {
 	if v := os.Getenv("GORMES_SKILLS_ROOT"); v != "" {
 		cfg.Skills.Root = v
 	}
+	if v := os.Getenv("GORMES_GONCHO_ENABLED"); v != "" {
+		parsed, err := parseEnvBool("GORMES_GONCHO_ENABLED", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.Enabled = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_WORKSPACE"); v != "" {
+		cfg.Goncho.Workspace = v
+	}
+	if v := os.Getenv("GORMES_GONCHO_OBSERVER_PEER"); v != "" {
+		cfg.Goncho.ObserverPeer = v
+	}
+	if v := os.Getenv("GORMES_GONCHO_RECENT_MESSAGES"); v != "" {
+		parsed, err := parseEnvInt("GORMES_GONCHO_RECENT_MESSAGES", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.RecentMessages = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_MAX_MESSAGE_SIZE"); v != "" {
+		parsed, err := parseEnvInt("GORMES_GONCHO_MAX_MESSAGE_SIZE", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.MaxMessageSize = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_MAX_FILE_SIZE"); v != "" {
+		parsed, err := parseEnvInt("GORMES_GONCHO_MAX_FILE_SIZE", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.MaxFileSize = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_GET_CONTEXT_MAX_TOKENS"); v != "" {
+		parsed, err := parseEnvInt("GORMES_GONCHO_GET_CONTEXT_MAX_TOKENS", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.GetContextMaxTokens = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_REASONING_ENABLED"); v != "" {
+		parsed, err := parseEnvBool("GORMES_GONCHO_REASONING_ENABLED", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.ReasoningEnabled = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_PEER_CARD_ENABLED"); v != "" {
+		parsed, err := parseEnvBool("GORMES_GONCHO_PEER_CARD_ENABLED", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.PeerCardEnabled = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_SUMMARY_ENABLED"); v != "" {
+		parsed, err := parseEnvBool("GORMES_GONCHO_SUMMARY_ENABLED", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.SummaryEnabled = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_DREAM_ENABLED"); v != "" {
+		parsed, err := parseEnvBool("GORMES_GONCHO_DREAM_ENABLED", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.DreamEnabled = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_DERIVER_WORKERS"); v != "" {
+		parsed, err := parseEnvInt("GORMES_GONCHO_DERIVER_WORKERS", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.DeriverWorkers = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_REPRESENTATION_BATCH_MAX_TOKENS"); v != "" {
+		parsed, err := parseEnvInt("GORMES_GONCHO_REPRESENTATION_BATCH_MAX_TOKENS", v)
+		if err != nil {
+			return err
+		}
+		cfg.Goncho.RepresentationBatchMaxTokens = parsed
+	}
+	if v := os.Getenv("GORMES_GONCHO_DIALECTIC_DEFAULT_LEVEL"); v != "" {
+		cfg.Goncho.DialecticDefaultLevel = v
+	}
+	return nil
+}
+
+func parseEnvBool(name, value string) (bool, error) {
+	parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+	if err != nil {
+		return false, fmt.Errorf("config env %s: %w", name, err)
+	}
+	return parsed, nil
+}
+
+func parseEnvInt(name, value string) (int, error) {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return 0, fmt.Errorf("config env %s: %w", name, err)
+	}
+	return parsed, nil
 }
 
 func loadFlags(cfg *Config, args []string) error {
@@ -338,6 +501,41 @@ func loadFlags(cfg *Config, args []string) error {
 	}
 	if *resume != "" {
 		cfg.Resume = *resume
+	}
+	return nil
+}
+
+func validateConfig(cfg *Config) error {
+	cfg.Goncho.Workspace = strings.TrimSpace(cfg.Goncho.Workspace)
+	cfg.Goncho.ObserverPeer = strings.TrimSpace(cfg.Goncho.ObserverPeer)
+	cfg.Goncho.DialecticDefaultLevel = strings.ToLower(strings.TrimSpace(cfg.Goncho.DialecticDefaultLevel))
+
+	if cfg.Goncho.Workspace == "" {
+		return fmt.Errorf("config: goncho.workspace is required")
+	}
+	if cfg.Goncho.ObserverPeer == "" {
+		return fmt.Errorf("config: goncho.observer_peer is required")
+	}
+	if !goncho.ValidDialecticLevel(cfg.Goncho.DialecticDefaultLevel) {
+		return fmt.Errorf("config: goncho.dialectic_default_level %q is invalid; want one of minimal, low, medium, high, max", cfg.Goncho.DialecticDefaultLevel)
+	}
+	for _, limit := range []struct {
+		name  string
+		value int
+	}{
+		{name: "recent_messages", value: cfg.Goncho.RecentMessages},
+		{name: "max_message_size", value: cfg.Goncho.MaxMessageSize},
+		{name: "max_file_size", value: cfg.Goncho.MaxFileSize},
+		{name: "get_context_max_tokens", value: cfg.Goncho.GetContextMaxTokens},
+		{name: "deriver_workers", value: cfg.Goncho.DeriverWorkers},
+		{name: "representation_batch_max_tokens", value: cfg.Goncho.RepresentationBatchMaxTokens},
+	} {
+		if limit.value < 0 {
+			return fmt.Errorf("config: goncho.%s must be non-negative, got %d", limit.name, limit.value)
+		}
+	}
+	if cfg.Goncho.DeriverWorkers == 0 {
+		return fmt.Errorf("config: goncho.deriver_workers must be at least 1")
 	}
 	return nil
 }
