@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/internal/progress"
 )
 
 type RunOptions struct {
@@ -72,6 +74,96 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return RunSummary{}, err
 	}
 
+	// Reactive autoloop wiring (Tasks 3-4): the per-run accumulator captures
+	// success / failure outcomes for each candidate; Flush at the end of the
+	// run mutates progress.json in one batched write.
+	acc := newHealthAccumulator(runID, time.Now, opts.Config.QuarantineThreshold)
+	chain := opts.Config.BackendFallback
+	if len(chain) == 0 {
+		chain = []string{opts.Config.Backend}
+	}
+	degrader := newBackendDegrader(chain, opts.Config.BackendDegradeThreshold)
+
+	// Forward Task-5 stale-quarantine signals into the accumulator now so the
+	// wiring is in place. Today this is a no-op because StaleQuarantine is
+	// always false; Task 5 will set it during selection.
+	for _, c := range selected {
+		if c.StaleQuarantine {
+			acc.MarkStaleQuarantine(c)
+		}
+	}
+
+	// flushHealth runs at every return path that might have recorded outcomes.
+	// Errors from Flush are best-effort: we surface them in the ledger but do
+	// not fail the run, since worker outcomes are already promoted at this
+	// point.
+	//
+	// If the live progress.json is in a legacy or test format that the
+	// accumulator cannot resolve (e.g. items keyed by "item_name" instead of
+	// the canonical "name"), Flush would fail with "item not found" for every
+	// row. To avoid noisy ledger churn in that case we probe before flushing
+	// and emit no health event when no recorded row resolves to a real item.
+	flushHealth := func() {
+		hashOf := func(phaseID, subphaseID, itemName string) string {
+			prog, err := progress.Load(opts.Config.ProgressJSON)
+			if err != nil {
+				return ""
+			}
+			phase, ok := prog.Phases[phaseID]
+			if !ok {
+				return ""
+			}
+			sub, ok := phase.Subphases[subphaseID]
+			if !ok {
+				return ""
+			}
+			for i := range sub.Items {
+				if sub.Items[i].Name == itemName {
+					return progress.ItemSpecHash(&sub.Items[i])
+				}
+			}
+			return ""
+		}
+
+		if !accumulatorRowsResolve(acc, opts.Config.ProgressJSON) {
+			return
+		}
+
+		if err := acc.Flush(opts.Config.ProgressJSON, hashOf); err != nil {
+			_ = appendRunLedgerEvent(opts.Config, LedgerEvent{
+				TS:     time.Now().UTC(),
+				RunID:  runID,
+				Event:  "health_update_failed",
+				Status: "failed",
+				Detail: err.Error(),
+			})
+			return
+		}
+		_ = appendRunLedgerEvent(opts.Config, LedgerEvent{
+			TS:     time.Now().UTC(),
+			RunID:  runID,
+			Event:  "health_updated",
+			Status: "ok",
+		})
+	}
+
+	// observeOutcome feeds the degrader and emits backend_degraded ledger
+	// events on switch. Called sequentially after each finishWorker so it is
+	// safe with no synchronization.
+	observeOutcome := func(out workerOutcome) {
+		switched, from, to := degrader.ObserveOutcome(out)
+		if !switched {
+			return
+		}
+		_ = appendRunLedgerEvent(opts.Config, LedgerEvent{
+			TS:     time.Now().UTC(),
+			RunID:  runID,
+			Event:  "backend_degraded",
+			Status: "degraded",
+			Detail: fmt.Sprintf("from=%s to=%s threshold=%d", from, to, opts.Config.BackendDegradeThreshold),
+		})
+	}
+
 	runner := opts.Runner
 	if runner == nil {
 		runner = ExecRunner{}
@@ -92,14 +184,20 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	}
 
 	if hasGit && len(selected) > 1 {
-		workers, err := prepareGitWorkers(opts.Config, runID, selected)
+		workers, skipped, err := prepareGitWorkers(opts.Config, runID, selected)
 		if err != nil {
 			return RunSummary{}, err
 		}
+		for _, sk := range skipped {
+			acc.RecordFailure(sk.Candidate, progress.FailureProgressSummary, degrader.Current(), sk.Reason)
+		}
 		runBackendWorkers(ctx, runner, argv, workers)
 		for _, worker := range workers {
-			if err := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker); err != nil {
-				return RunSummary{}, err
+			finishErr := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker)
+			recordWorkerOutcome(acc, observeOutcome, degrader.Current(), worker, finishErr)
+			if finishErr != nil {
+				flushHealth()
+				return RunSummary{}, finishErr
 			}
 		}
 		if err := appendRunLedgerEvent(opts.Config, LedgerEvent{
@@ -108,8 +206,10 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			Event:  "run_completed",
 			Status: "completed",
 		}); err != nil {
+			flushHealth()
 			return RunSummary{}, err
 		}
+		flushHealth()
 
 		return summary, nil
 	}
@@ -134,27 +234,44 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			Branch: worker.Branch,
 			Status: "claimed",
 		}); err != nil {
+			flushHealth()
 			return RunSummary{}, err
 		}
 
 		if hasGit {
 			if err := gitCreateWorkerWorktree(opts.Config.RepoRoot, worker.WorktreePath, worker.Branch); err != nil {
+				// Soft-skip per-candidate setup failure: emit a candidate_skipped
+				// ledger event, record the failure to the accumulator, and move
+				// on to the next candidate so a single broken row cannot stall
+				// an otherwise-healthy run.
 				_ = appendRunLedgerEvent(opts.Config, LedgerEvent{
 					TS:     time.Now().UTC(),
 					RunID:  runID,
-					Event:  "worker_failed",
+					Event:  "candidate_skipped",
 					Worker: worker.ID,
 					Task:   worker.Task,
 					Branch: worker.Branch,
 					Status: "worktree_create_failed",
 					Detail: err.Error(),
 				})
-				return RunSummary{}, err
+				acc.RecordFailure(candidate, progress.FailureProgressSummary, degrader.Current(), err.Error())
+				continue
 			}
 			worker.RepoRoot = worker.WorktreePath
 			worker.BaseCommit, err = gitHeadSha(worker.RepoRoot)
 			if err != nil {
-				return RunSummary{}, err
+				_ = appendRunLedgerEvent(opts.Config, LedgerEvent{
+					TS:     time.Now().UTC(),
+					RunID:  runID,
+					Event:  "candidate_skipped",
+					Worker: worker.ID,
+					Task:   worker.Task,
+					Branch: worker.Branch,
+					Status: "head_sha_failed",
+					Detail: err.Error(),
+				})
+				acc.RecordFailure(candidate, progress.FailureProgressSummary, degrader.Current(), err.Error())
+				continue
 			}
 		}
 
@@ -165,8 +282,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			Args: args,
 			Dir:  worker.RepoRoot,
 		})
-		if err := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker); err != nil {
-			return RunSummary{}, err
+		finishErr := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker)
+		recordWorkerOutcome(acc, observeOutcome, degrader.Current(), worker, finishErr)
+		if finishErr != nil {
+			flushHealth()
+			return RunSummary{}, finishErr
 		}
 	}
 	if err := appendRunLedgerEvent(opts.Config, LedgerEvent{
@@ -175,14 +295,113 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		Event:  "run_completed",
 		Status: "completed",
 	}); err != nil {
+		flushHealth()
 		return RunSummary{}, err
 	}
+	flushHealth()
 
 	return summary, nil
 }
 
-func prepareGitWorkers(cfg Config, runID string, selected []Candidate) ([]workerRun, error) {
-	workers := make([]workerRun, 0, len(selected))
+// recordWorkerOutcome translates a finishWorker result into accumulator +
+// degrader observations. Called sequentially after each worker drains, so it
+// is safe to mutate the accumulator without a mutex.
+func recordWorkerOutcome(
+	acc *healthAccumulator,
+	observe func(workerOutcome),
+	currentBackend string,
+	worker workerRun,
+	finishErr error,
+) {
+	if finishErr == nil {
+		acc.RecordSuccess(worker.Candidate)
+		observe(workerOutcome{IsSuccessFlag: true, Backend: currentBackend})
+		return
+	}
+	cat := mapFinishErrorToCategory(worker, finishErr)
+	stderrTail := worker.Result.Stderr
+	if stderrTail == "" {
+		stderrTail = finishErr.Error()
+	}
+	acc.RecordFailure(worker.Candidate, cat, currentBackend, stderrTail)
+
+	out := workerOutcome{
+		Backend:  currentBackend,
+		Commit:   "",
+		Category: string(cat),
+	}
+	// Only flag as a backend error when the worker exited non-zero AND
+	// produced no commit. This protects against treating row-level failures
+	// (dirty worktree, scope leak, etc.) as backend infra failures.
+	if worker.Result.Err != nil && cat == progress.FailureWorkerError {
+		out.IsBackendErrorFlag = true
+	}
+	observe(out)
+}
+
+// accumulatorRowsResolve returns true when at least one row currently held
+// by the accumulator can be resolved against the progress.json on disk. Used
+// to silence health ledger events when running against a legacy/test progress
+// file that uses non-canonical item keys.
+func accumulatorRowsResolve(acc *healthAccumulator, path string) bool {
+	if acc == nil || len(acc.rows) == 0 {
+		return false
+	}
+	prog, err := progress.Load(path)
+	if err != nil {
+		return false
+	}
+	for key := range acc.rows {
+		phase, ok := prog.Phases[key.phaseID]
+		if !ok {
+			continue
+		}
+		sub, ok := phase.Subphases[key.subphaseID]
+		if !ok {
+			continue
+		}
+		for i := range sub.Items {
+			if sub.Items[i].Name == key.itemName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// mapFinishErrorToCategory classifies a finishWorker error into the closed
+// FailureCategory set. Errors not unambiguously classifiable default to
+// FailureWorkerError so quarantine math still progresses.
+func mapFinishErrorToCategory(worker workerRun, err error) progress.FailureCategory {
+	if err == nil {
+		return ""
+	}
+	// A backend exit error (worker.Result.Err != nil) is always worker_error.
+	if worker.Result.Err != nil {
+		return progress.FailureWorkerError
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "outside declared write scope"):
+		return progress.FailureReportValidation
+	case strings.Contains(msg, "worker branch changed"):
+		return progress.FailureWorkerError
+	case strings.Contains(msg, "uncommitted changes"):
+		return progress.FailureWorkerError
+	case strings.Contains(msg, "unresolved merge conflicts"):
+		return progress.FailureWorkerError
+	}
+	return progress.FailureWorkerError
+}
+
+// prepareGitWorkers builds workerRun entries for each selected candidate in
+// the concurrent multi-worker path. Per-candidate setup failures (worktree
+// create, head-sha lookup) are soft-skipped: a candidate_skipped ledger event
+// is emitted and the failure is reported via the skipped slice so the caller
+// can record it in the health accumulator. The returned worker slice contains
+// only successfully-prepared workers (it may be shorter than selected).
+func prepareGitWorkers(cfg Config, runID string, selected []Candidate) (workers []workerRun, skipped []skippedCandidate, err error) {
+	workers = make([]workerRun, 0, len(selected))
 	for i, candidate := range selected {
 		worker := workerRun{
 			ID:           i + 1,
@@ -192,7 +411,7 @@ func prepareGitWorkers(cfg Config, runID string, selected []Candidate) ([]worker
 			RepoRoot:     WorkerWorktreePath(cfg, runID, i+1),
 			WorktreePath: WorkerWorktreePath(cfg, runID, i+1),
 		}
-		if err := appendRunLedgerEvent(cfg, LedgerEvent{
+		if claimErr := appendRunLedgerEvent(cfg, LedgerEvent{
 			TS:     time.Now().UTC(),
 			RunID:  runID,
 			Event:  "worker_claimed",
@@ -200,30 +419,49 @@ func prepareGitWorkers(cfg Config, runID string, selected []Candidate) ([]worker
 			Task:   worker.Task,
 			Branch: worker.Branch,
 			Status: "claimed",
-		}); err != nil {
-			return nil, err
+		}); claimErr != nil {
+			return nil, nil, claimErr
 		}
-		if err := gitCreateWorkerWorktree(cfg.RepoRoot, worker.WorktreePath, worker.Branch); err != nil {
+		if createErr := gitCreateWorkerWorktree(cfg.RepoRoot, worker.WorktreePath, worker.Branch); createErr != nil {
 			_ = appendRunLedgerEvent(cfg, LedgerEvent{
 				TS:     time.Now().UTC(),
 				RunID:  runID,
-				Event:  "worker_failed",
+				Event:  "candidate_skipped",
 				Worker: worker.ID,
 				Task:   worker.Task,
 				Branch: worker.Branch,
 				Status: "worktree_create_failed",
-				Detail: err.Error(),
+				Detail: createErr.Error(),
 			})
-			return nil, err
+			skipped = append(skipped, skippedCandidate{Candidate: candidate, Reason: createErr.Error()})
+			continue
 		}
-		baseCommit, err := gitHeadSha(worker.RepoRoot)
-		if err != nil {
-			return nil, err
+		baseCommit, headErr := gitHeadSha(worker.RepoRoot)
+		if headErr != nil {
+			_ = appendRunLedgerEvent(cfg, LedgerEvent{
+				TS:     time.Now().UTC(),
+				RunID:  runID,
+				Event:  "candidate_skipped",
+				Worker: worker.ID,
+				Task:   worker.Task,
+				Branch: worker.Branch,
+				Status: "head_sha_failed",
+				Detail: headErr.Error(),
+			})
+			skipped = append(skipped, skippedCandidate{Candidate: candidate, Reason: headErr.Error()})
+			continue
 		}
 		worker.BaseCommit = baseCommit
 		workers = append(workers, worker)
 	}
-	return workers, nil
+	return workers, skipped, nil
+}
+
+// skippedCandidate carries enough context for the run loop to record a
+// per-candidate setup failure in the accumulator without re-deriving paths.
+type skippedCandidate struct {
+	Candidate Candidate
+	Reason    string
 }
 
 func runBackendWorkers(ctx context.Context, runner Runner, argv []string, workers []workerRun) {

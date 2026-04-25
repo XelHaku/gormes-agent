@@ -40,6 +40,11 @@ type Candidate struct {
 	TestCommands   []string
 	DoneSignal     []string
 	Note           string
+	// StaleQuarantine is set by Task 5's selection logic when the row's
+	// existing Quarantine.SpecHash no longer matches the current ItemSpecHash
+	// (planner reshape detected). The run loop forwards this to the health
+	// accumulator so Flush clears the stale block atomically with run health.
+	StaleQuarantine bool
 }
 
 func (candidate Candidate) SelectionReason() string {
