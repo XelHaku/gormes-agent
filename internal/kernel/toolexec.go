@@ -108,6 +108,10 @@ func (k *Kernel) executeToolCallsInterruptible(runCtx context.Context, calls []h
 				} else {
 					k.addSoul("tool error: " + res.Result.Name)
 				}
+			default:
+				if res.Status != "" {
+					k.addSoul("tool status: " + res.Result.Name + ": " + res.Status)
+				}
 			}
 		}
 	}
@@ -155,6 +159,32 @@ func (k *Kernel) executeOneToolCall(ctx context.Context, index int, call hermes.
 	case <-ctx.Done():
 		return cancelled()
 	default:
+	}
+
+	if k.cfg.ToolSafety != nil {
+		decision := k.cfg.ToolSafety.DecideToolCall(call)
+		if !decision.Allow {
+			status := decision.Status
+			if status == "" {
+				status = "blocked"
+			}
+			payload := decision.Content
+			if len(payload) == 0 {
+				payload = json.RawMessage(fmt.Sprintf(`{"status":%q}`, status))
+			}
+			err := decision.Err
+			if err == nil {
+				err = errors.New(status)
+			}
+			result := toolResult{ID: call.ID, Name: call.Name, Content: string(payload)}
+			return indexedToolResult{
+				Index:  index,
+				Result: result,
+				Status: status,
+				Err:    err,
+				Audit:  buildAudit(status, payload, err),
+			}
+		}
 	}
 
 	executeContextEngineTool := func() indexedToolResult {

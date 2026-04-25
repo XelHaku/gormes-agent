@@ -48,9 +48,10 @@ func newRootCommand() *cobra.Command {
 }
 
 type rootRuntime struct {
-	runTUI           func(*cobra.Command, []string) error
-	runOneshot       func(*cobra.Command, oneshotInvocation) error
-	newOneshotClient oneshotClientFactory
+	runTUI                 func(*cobra.Command, []string) error
+	runOneshot             func(*cobra.Command, oneshotInvocation) error
+	newOneshotClient       oneshotClientFactory
+	configureOneshotKernel oneshotKernelConfigurer
 }
 
 type oneshotInvocation struct {
@@ -68,8 +69,9 @@ func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
 	}
 	if runtime.runOneshot == nil {
 		newClient := runtime.newOneshotClient
+		configureKernel := runtime.configureOneshotKernel
 		runtime.runOneshot = func(cmd *cobra.Command, invocation oneshotInvocation) error {
-			return runResolvedOneshotWithClient(cmd, invocation, newClient)
+			return runResolvedOneshotWithClient(cmd, invocation, newClient, configureKernel)
 		}
 	}
 	resetGonchoDoctorFlags()
@@ -127,6 +129,7 @@ func resolveOneshotInvocation(cmd *cobra.Command) (oneshotInvocation, error) {
 }
 
 type oneshotClientFactory func(context.Context, config.Config, oneshotInvocation) (hermes.Client, error)
+type oneshotKernelConfigurer func(*kernel.Config)
 
 func newOneshotHTTPClient(_ context.Context, cfg config.Config, invocation oneshotInvocation) (hermes.Client, error) {
 	return hermes.NewHTTPClientWithProvider(cfg.Hermes.Endpoint, cfg.Hermes.APIKey, invocation.Inference.Provider), nil
@@ -136,7 +139,7 @@ func runResolvedOneshot(cmd *cobra.Command, invocation oneshotInvocation) error 
 	return runResolvedOneshotWithClient(cmd, invocation, newOneshotHTTPClient)
 }
 
-func runResolvedOneshotWithClient(cmd *cobra.Command, invocation oneshotInvocation, newClient oneshotClientFactory) error {
+func runResolvedOneshotWithClient(cmd *cobra.Command, invocation oneshotInvocation, newClient oneshotClientFactory, configureKernel ...oneshotKernelConfigurer) error {
 	if newClient == nil {
 		newClient = newOneshotHTTPClient
 	}
@@ -157,11 +160,23 @@ func runResolvedOneshotWithClient(cmd *cobra.Command, invocation oneshotInvocati
 		return newExitCodeError(1, fmt.Errorf("gormes -z: provider setup failed: %w", errors.New("nil hermes client")))
 	}
 
-	k := kernel.New(kernel.Config{
-		Model:     model,
-		Endpoint:  cfg.Hermes.Endpoint,
-		Admission: kernel.Admission{MaxBytes: cfg.Input.MaxBytes, MaxLines: cfg.Input.MaxLines},
-	}, client, store.NewNoop(), telemetry.New(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	toolSafety, err := kernel.NewOneshotToolSafetyPolicy(kernel.OneshotToolSafetyOptions{
+		TrustClass: kernel.TrustClassOperator,
+	})
+	if err != nil {
+		return newExitCodeError(1, fmt.Errorf("gormes -z: safety policy setup failed: %w", err))
+	}
+	kernelCfg := kernel.Config{
+		Model:      model,
+		Endpoint:   cfg.Hermes.Endpoint,
+		Admission:  kernel.Admission{MaxBytes: cfg.Input.MaxBytes, MaxLines: cfg.Input.MaxLines},
+		ToolAudit:  audit.NewJSONLWriter(config.ToolAuditLogPath()),
+		ToolSafety: toolSafety,
+	}
+	if len(configureKernel) > 0 && configureKernel[0] != nil {
+		configureKernel[0](&kernelCfg)
+	}
+	k := kernel.New(kernelCfg, client, store.NewNoop(), telemetry.New(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	runDone := make(chan error, 1)
 	go func() {

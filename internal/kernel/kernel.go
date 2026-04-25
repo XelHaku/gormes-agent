@@ -58,6 +58,9 @@ type Config struct {
 	SkillUsage SkillUsageRecorder
 	// ToolAudit records append-only JSONL tool execution events when non-nil.
 	ToolAudit audit.Recorder
+	// ToolSafety can deterministically deny interactive or approval-gated tool
+	// calls before registry lookup/execution.
+	ToolSafety ToolSafetyPolicy
 	// ContextEngine owns context-window status, context-engine tools, and the
 	// explicit compression boundary. The kernel may update usage and dispatch
 	// engine tools, but it must not call Compress as an implicit side effect.
