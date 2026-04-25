@@ -19,17 +19,37 @@ var (
 // via Script / ScriptRunEvents; each OpenStream / OpenRunEvents call dequeues
 // the next scripted sequence and returns a Stream / RunEventStream backed by it.
 type MockClient struct {
-	mu          sync.Mutex
-	streams     []*MockStream
-	runStreams  []*MockRunEventStream
-	healthErr   error
-	requests    []ChatRequest
+	mu         sync.Mutex
+	streams    []*MockStream
+	runStreams []*MockRunEventStream
+	healthErr  error
+	requests   []ChatRequest
+	status     ProviderStatus
 }
 
 func NewMockClient() *MockClient { return &MockClient{} }
 
 // SetHealth makes Health return err for the life of this MockClient.
 func (m *MockClient) SetHealth(err error) { m.healthErr = err }
+
+// SetProviderStatus overrides the default mock provider status for kernel
+// tests that assert degraded provider capability rows.
+func (m *MockClient) SetProviderStatus(status ProviderStatus) { m.status = status }
+
+func (m *MockClient) ProviderStatus() ProviderStatus {
+	if m.status.Provider != "" || m.status.Runtime != "" {
+		return normalizeProviderStatus(m.status)
+	}
+	return ProviderStatus{
+		Provider: "mock",
+		Runtime:  "test_harness",
+		Capabilities: ProviderCapabilities{
+			PromptCache:     unavailableCapability("mock provider status not configured"),
+			RateGuard:       unavailableCapability("mock provider status not configured"),
+			BudgetTelemetry: unavailableCapability("mock provider status not configured"),
+		},
+	}
+}
 
 // Script queues a Stream emitting the given Events for the next OpenStream call.
 // sessionID is what Stream.SessionID() returns.

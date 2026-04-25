@@ -3072,9 +3072,9 @@
           "items": [
             {
               "name": "Provider-side resilience",
-              "status": "in_progress",
+              "status": "complete",
               "contract": "Provider resilience umbrella over retry, cache, rate, and budget behavior",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "large",
               "execution_owner": "provider",
               "trust_class": [
@@ -3105,7 +3105,7 @@
                 "Kernel retry policy reports schedule and provider hint decisions.",
                 "Unavailable cache/rate/budget capability is visible before routing relies on it."
               ],
-              "note": "Umbrella tracker for 4.H closeout. Already shipped: structured provider-error taxonomy in `internal/hermes/errors.go`, Retry-After header/body parsing on `HTTPError`, and `internal/kernel/retry.go` 1s/2s/4s/8s/16s +/-20% reconnect budget with provider Retry-After hints preferred and capped during open-stream retries. Remaining work is owned by the sibling slices below — `Prompt-cache capability guard` and `Provider rate guard + budget telemetry`.",
+              "note": "Complete: TDD landed the 4.H umbrella status contract without porting the sibling slices monolithically. `internal/hermes.ProviderStatusOf` now exposes prompt-cache, rate-guard, and budget-telemetry capability rows for OpenAI-compatible, Anthropic, mock, and unknown providers; OpenAI-compatible request fixtures prove unsupported `cache_control` metadata is stripped with a visible disabled path, while Anthropic reports cache-control support. `internal/kernel.RenderFrame` now carries provider status plus retry status, including the 1s/2s/4s/8s/16s schedule, max Retry-After cap, attempts used, provider hint vs scheduled-backoff decision, and retryable provider-error class/kind. Rate-guard and budget-telemetry implementations remain planned in their sibling slices, but their unavailable state is visible before routing can rely on them. Verified with `go test ./internal/hermes ./internal/kernel -count=1`.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/kernel/",
