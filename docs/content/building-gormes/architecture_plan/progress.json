@@ -1336,6 +1336,11 @@
               "done_signal": [
                 "Pairing store fixtures prove atomic persistence, deterministic readout, corrupt-state degradation, and per-platform pending/approved separation without code generation or adapter UX."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T12:27:15Z",
+                "last_success": "2026-04-25T12:27:15Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T11:39:48Z"
@@ -3073,6 +3078,11 @@
               "done_signal": [
                 "Dream scheduler fixtures prove threshold, cooldown, idle, dedupe, manual scheduling, cancellation, and doctor/status degraded evidence without LLM execution."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T12:27:15Z",
+                "last_success": "2026-04-25T12:27:15Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "honcho:e659b6b docs/v3/documentation/features/advanced/dreaming.mdx",
