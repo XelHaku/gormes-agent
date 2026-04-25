@@ -17,6 +17,7 @@ type anthropicStream struct {
 	pending     []Event
 	inputTokens int
 	toolCalls   map[int]*anthropicPendingToolCall
+	tools       []ToolDescriptor
 }
 
 type anthropicPendingToolCall struct {
@@ -70,11 +71,12 @@ type anthropicErrorPayload struct {
 	} `json:"error"`
 }
 
-func newAnthropicStream(body io.ReadCloser) *anthropicStream {
+func newAnthropicStream(body io.ReadCloser, tools []ToolDescriptor) *anthropicStream {
 	return &anthropicStream{
 		body:      body,
 		sse:       newSSEReader(body),
 		toolCalls: make(map[int]*anthropicPendingToolCall),
+		tools:     SanitizeToolDescriptors(tools),
 	}
 }
 
@@ -105,7 +107,7 @@ func (s *anthropicStream) Recv(ctx context.Context) (Event, error) {
 		frame, err := s.sse.Next(ctx)
 		if err != nil {
 			if err == io.EOF && len(s.toolCalls) > 0 {
-				return s.flushToolCallsOnEOF(), nil
+				return s.flushToolCallsOnEOF()
 			}
 			return Event{}, err
 		}
@@ -162,8 +164,12 @@ func (s *anthropicStream) Recv(ctx context.Context) (Event, error) {
 				Raw:          raw,
 			}
 			if done.FinishReason == "tool_calls" && len(s.toolCalls) > 0 {
-				done.ToolCalls = flushAnthropicToolCalls(s.toolCalls)
+				toolCalls, err := RepairToolCalls(flushAnthropicToolCalls(s.toolCalls), s.tools)
 				s.toolCalls = make(map[int]*anthropicPendingToolCall)
+				if err != nil {
+					return Event{}, err
+				}
+				done.ToolCalls = toolCalls
 			}
 			return done, nil
 		case "error":
@@ -180,15 +186,19 @@ func (s *anthropicStream) Recv(ctx context.Context) (Event, error) {
 	}
 }
 
-func (s *anthropicStream) flushToolCallsOnEOF() Event {
+func (s *anthropicStream) flushToolCallsOnEOF() (Event, error) {
+	toolCalls, err := RepairToolCalls(flushAnthropicToolCalls(s.toolCalls), s.tools)
+	s.toolCalls = make(map[int]*anthropicPendingToolCall)
+	if err != nil {
+		return Event{}, err
+	}
 	ev := Event{
 		Kind:         EventDone,
 		FinishReason: "tool_calls",
 		TokensIn:     s.inputTokens,
-		ToolCalls:    flushAnthropicToolCalls(s.toolCalls),
+		ToolCalls:    toolCalls,
 	}
-	s.toolCalls = make(map[int]*anthropicPendingToolCall)
-	return ev
+	return ev, nil
 }
 
 func anthropicFrameType(frame *sseFrame) string {

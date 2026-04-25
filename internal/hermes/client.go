@@ -63,7 +63,7 @@ func (d ToolDescriptor) MarshalJSON() ([]byte, error) {
 		Name        string          `json:"name"`
 		Description string          `json:"description"`
 		Parameters  json.RawMessage `json:"parameters"`
-	}{Name: d.Name, Description: d.Description, Parameters: d.Schema}
+	}{Name: d.Name, Description: d.Description, Parameters: sanitizeToolSchema(d.Schema)}
 	wrap := struct {
 		Type     string `json:"type"`
 		Function any    `json:"function"`

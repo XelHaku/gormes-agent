@@ -23,6 +23,7 @@ type chatStream struct {
 	// Pending tool-call accumulator, keyed by upstream index field.
 	// Populated across partial tool_calls deltas; flushed on finish_reason=="tool_calls".
 	pendingCalls map[int]*pendingToolCall
+	tools        []ToolDescriptor
 }
 
 type pendingToolCall struct {
@@ -31,12 +32,13 @@ type pendingToolCall struct {
 	arguments strings.Builder
 }
 
-func newChatStream(body io.ReadCloser, sessionID string) *chatStream {
+func newChatStream(body io.ReadCloser, sessionID string, tools []ToolDescriptor) *chatStream {
 	return &chatStream{
 		body:         body,
 		sse:          newSSEReader(body),
 		sessionID:    sessionID,
 		pendingCalls: make(map[int]*pendingToolCall),
+		tools:        SanitizeToolDescriptors(tools),
 	}
 }
 
@@ -108,7 +110,7 @@ func (s *chatStream) Recv(ctx context.Context) (Event, error) {
 		f, err := s.sse.Next(ctx)
 		if err != nil {
 			if err == io.EOF && len(s.pendingCalls) > 0 {
-				return s.flushPendingCallsOnEOF(), nil
+				return s.flushPendingCallsOnEOF()
 			}
 			return Event{}, err
 		}
@@ -159,8 +161,12 @@ func (s *chatStream) Recv(ctx context.Context) (Event, error) {
 				ev.TokensOut = chunk.Usage.CompletionTokens
 			}
 			if c.FinishReason == "tool_calls" && len(s.pendingCalls) > 0 {
-				ev.ToolCalls = flushPending(s.pendingCalls)
+				toolCalls, err := RepairToolCalls(flushPending(s.pendingCalls), s.tools)
 				s.pendingCalls = make(map[int]*pendingToolCall) // reset for possible reuse
+				if err != nil {
+					return Event{}, err
+				}
+				ev.ToolCalls = toolCalls
 			}
 			events = append(events, ev)
 		}
@@ -175,14 +181,18 @@ func (s *chatStream) Recv(ctx context.Context) (Event, error) {
 	}
 }
 
-func (s *chatStream) flushPendingCallsOnEOF() Event {
+func (s *chatStream) flushPendingCallsOnEOF() (Event, error) {
+	toolCalls, err := RepairToolCalls(flushPending(s.pendingCalls), s.tools)
+	s.pendingCalls = make(map[int]*pendingToolCall)
+	if err != nil {
+		return Event{}, err
+	}
 	ev := Event{
 		Kind:         EventDone,
 		FinishReason: "tool_calls",
-		ToolCalls:    flushPending(s.pendingCalls),
+		ToolCalls:    toolCalls,
 	}
-	s.pendingCalls = make(map[int]*pendingToolCall)
-	return ev
+	return ev, nil
 }
 
 // flushPending converts the accumulator map into a sorted, finalised ToolCall slice.

@@ -3,6 +3,7 @@ package hermes
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,6 +38,11 @@ func TestStream_ToolCallDeltasAccumulate(t *testing.T) {
 	s, err := c.OpenStream(context.Background(), ChatRequest{
 		Model:    "x",
 		Messages: []Message{{Role: "user", Content: "echo hi"}},
+		Tools: []ToolDescriptor{{
+			Name:        "echo",
+			Description: "echo text",
+			Schema:      json.RawMessage(`{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}`),
+		}},
 	})
 	if err != nil {
 		t.Fatal(err)

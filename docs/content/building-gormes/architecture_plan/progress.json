@@ -2645,7 +2645,7 @@
             },
             {
               "name": "Tool-call argument repair + schema sanitizer",
-              "status": "planned",
+              "status": "complete",
               "contract": "Provider tool-call arguments are repaired or rejected against available tool schemas before execution",
               "contract_status": "fixture_ready",
               "slice_size": "small",
@@ -2678,7 +2678,7 @@
                 "Impossible repairs return a provider/tool-call error before execution.",
                 "Repair decisions use the current advertised tool schema so disabled or unavailable tools cannot be hallucinated into execution."
               ],
-              "note": "Hermes added focused regression tests for tool-call argument repair and schema sanitization. Port this as a shared provider boundary so Codex, OpenRouter, Bedrock, and child-agent trust classes do not each implement their own repair rules.",
+              "note": "Complete: TDD added `internal/hermes/tool_call_argument_repair_test.go` and a shared provider-boundary repair/sanitizer. OpenAI-compatible and Anthropic streams now repair deterministic malformed JSON arguments against the advertised descriptor schema, reject impossible repairs, missing required fields, and unadvertised tools before EventDone reaches execution, and provider request mappers sanitize hostile schema shapes while preserving already-safe schemas. Verified with `go test ./internal/hermes ./internal/tools -count=1`.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/tools/",

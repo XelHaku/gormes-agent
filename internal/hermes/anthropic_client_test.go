@@ -196,6 +196,11 @@ func TestAnthropicStream_AccumulatesToolUseDeltasAndMapsStopReason(t *testing.T)
 		Model:     "claude-sonnet-4-5-20250929",
 		MaxTokens: 256,
 		Messages:  []Message{{Role: "user", Content: "weather in Monterrey"}},
+		Tools: []ToolDescriptor{{
+			Name:        "get_weather",
+			Description: "Returns current weather.",
+			Schema:      json.RawMessage(`{"type":"object","properties":{"location":{"type":"string"}},"required":["location"]}`),
+		}},
 	})
 	if err != nil {
 		t.Fatalf("OpenStream() error = %v", err)

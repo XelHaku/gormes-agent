@@ -235,8 +235,9 @@ func appendBedrockCachePoint(blocks []bedrockContentBlock, cache *CacheControl) 
 }
 
 func convertBedrockTools(tools []ToolDescriptor) ([]bedrockTool, error) {
-	out := make([]bedrockTool, 0, len(tools))
-	for _, tool := range tools {
+	descriptors := SanitizeToolDescriptors(tools)
+	out := make([]bedrockTool, 0, len(descriptors))
+	for _, tool := range descriptors {
 		schema := tool.Schema
 		if len(schema) == 0 {
 			schema = json.RawMessage(`{"type":"object","properties":{}}`)

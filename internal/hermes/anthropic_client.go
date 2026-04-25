@@ -80,6 +80,8 @@ func (c *anthropicClient) ProviderStatus() ProviderStatus {
 }
 
 func (c *anthropicClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, error) {
+	descriptors := SanitizeToolDescriptors(req.Tools)
+	req.Tools = descriptors
 	payload, err := buildAnthropicRequest(req)
 	if err != nil {
 		return nil, err
@@ -106,7 +108,7 @@ func (c *anthropicClient) OpenStream(ctx context.Context, req ChatRequest) (Stre
 		_ = resp.Body.Close()
 		return nil, newHTTPError(resp.StatusCode, string(raw), resp.Header)
 	}
-	return newAnthropicStream(resp.Body), nil
+	return newAnthropicStream(resp.Body, descriptors), nil
 }
 
 func (c *anthropicClient) OpenRunEvents(context.Context, string) (RunEventStream, error) {
@@ -149,7 +151,7 @@ func buildAnthropicRequest(req ChatRequest) (anthropicRequest, error) {
 		return anthropicRequest{}, err
 	}
 	tools := make([]anthropicTool, 0, len(req.Tools))
-	for _, tool := range req.Tools {
+	for _, tool := range SanitizeToolDescriptors(req.Tools) {
 		tools = append(tools, anthropicTool{
 			Name:        tool.Name,
 			Description: tool.Description,
