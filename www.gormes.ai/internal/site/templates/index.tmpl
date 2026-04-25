@@ -3,7 +3,7 @@
   <div class="hero-inner">
     <div class="hero-content">
       <p class="kicker">{{.HeroKicker}}</p>
-      <h1 class="hero-title">{{.HeroHeadline}}</h1>
+      <h1 class="hero-title"><span class="hero-prompt" aria-hidden="true">$</span>{{.HeroHeadline}}</h1>
       <div class="hero-subhead">
         {{range .HeroLines}}<p>{{.}}</p>{{end}}
       </div>

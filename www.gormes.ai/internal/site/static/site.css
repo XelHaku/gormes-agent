@@ -150,6 +150,29 @@ a:focus-visible,
 
 .hero {
   border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+/* Faint right-side grid overlay — identity texture without noise.
+   24px squares at 0.018 alpha, masked to fade in only on the right
+   half. On viewports narrower than the page max-width (880) the
+   mask still keeps the left text region clean. */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(238, 236, 229, 0.018) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(238, 236, 229, 0.018) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-mask-image: linear-gradient(to right, transparent 55%, black 100%);
+          mask-image: linear-gradient(to right, transparent 55%, black 100%);
+}
+.hero-inner {
+  position: relative;
+  z-index: 1;
 }
 /* Spacing rhythm: hero is the largest beat (96px top, 72px bottom);
    subsequent sections breathe at 72px (between-section register);
@@ -173,17 +196,40 @@ a:focus-visible,
   font-variation-settings: "opsz" 144, "SOFT" 18;
   color: var(--text);
 }
+/* Terminal-prompt signature: mono "$" in accent color before the
+   serif headline. Smaller than the headline so it reads as a
+   prompt prefix, not a peer character. Tiny right margin gives
+   the headline its own measure. */
+.hero-prompt {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.55em;
+  color: var(--accent);
+  margin-right: 0.32em;
+  letter-spacing: 0;
+  vertical-align: 0.18em;
+}
 .hero-subhead {
   margin: 0 0 16px;
   max-width: 560px;
 }
+/* Three-tier descent: identity line in full text-color, the
+   "operations problem" line a step muted, the "no virtualenvs"
+   factual closer dimmer still. Eye picks up the order without
+   thinking about it. */
 .hero-subhead p {
   font-size: 17px;
-  color: var(--muted-strong);
   margin: 0 0 8px;
   line-height: 1.48;
   overflow-wrap: break-word;
 }
+.hero-subhead p:nth-child(1) {
+  color: var(--text);
+  font-weight: 500;
+}
+.hero-subhead p:nth-child(2) { color: var(--muted-strong); }
+.hero-subhead p:nth-child(3) { color: var(--muted); }
 /* "Early-stage." stamp reads as positioning identity (mono caps,
    accent color); the caveat body underneath stays muted. Two-line
    stack so the stamp lands as a label, not a sentence opener. */
@@ -211,9 +257,12 @@ a:focus-visible,
   color: var(--muted-strong);
 }
 .hero-ctas {
+  /* Extra breathing room above so the CTAs anchor the section
+     instead of feeling attached to the note above. */
+  margin-top: 12px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
@@ -240,8 +289,13 @@ a:focus-visible,
   background: var(--accent);
   color: var(--accent-ink);
   font-size: 14px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.10em;
   padding: 16px 32px;
+  /* 1px inner highlight + 1px inner shadow gives the button a
+     subtle embossed depth without the SaaS-y drop shadow. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }
 .btn-primary:hover {
   background: var(--accent-hover);
@@ -251,9 +305,10 @@ a:focus-visible,
   background: transparent;
   color: var(--label);
   border-color: transparent;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  padding: 10px 4px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  padding: 10px 2px;
+  font-weight: 600;
 }
 .btn-secondary:hover {
   color: var(--accent);

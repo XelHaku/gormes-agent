@@ -19,6 +19,10 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		"OPEN SOURCE · MIT LICENSE",
 		"UNDER CONSTRUCTION",
 		"One Go Binary. No Python. No Drift.",
+		// Terminal-prompt signature: mono "$" in accent color before
+		// the serif headline. aria-hidden so screen readers don't
+		// announce "dollar sign".
+		`<span class="hero-prompt" aria-hidden="true">$</span>`,
 		"Gormes is a Go-native runtime for AI agents.",
 		"Built to solve the operations problem",
 		"One static binary. No virtualenvs. No dependency hell.",

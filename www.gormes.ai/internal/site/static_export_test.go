@@ -22,6 +22,7 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 	text := string(indexBody)
 	wants := []string{
 		"One Go Binary. No Python. No Drift.",
+		`<span class="hero-prompt" aria-hidden="true">$</span>`,
 		"Gormes is a Go-native runtime for AI agents.",
 		"Built to solve the operations problem",
 		"One static binary. No virtualenvs. No dependency hell.",
