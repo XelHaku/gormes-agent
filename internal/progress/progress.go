@@ -107,6 +107,11 @@ type Item struct {
 	// preserve it verbatim across writes (see
 	// docs/superpowers/specs/2026-04-24-planner-self-healing-design.md).
 	PlannerVerdict *PlannerVerdict `json:"planner_verdict,omitempty"`
+	// Provenance is per-row source-of-truth metadata owned by the planner.
+	// Autoloop preserves it via typed-struct round-trip. The planner sets
+	// origin_type="gormes" for rows with no upstream analog (see Phase D of
+	// docs/superpowers/plans/2026-04-25-planner-divergence-awareness.md).
+	Provenance *Provenance `json:"provenance,omitempty"`
 }
 
 type Subphase struct {
@@ -115,6 +120,10 @@ type Subphase struct {
 	// Exactly one of Items or Status is set. Enforced by Validate.
 	Items  []Item `json:"items,omitempty"`
 	Status Status `json:"status,omitempty"`
+	// DriftState is subphase-level convergence state owned by the planner.
+	// Autoloop preserves it via typed-struct round-trip (see Phase D of
+	// docs/superpowers/plans/2026-04-25-planner-divergence-awareness.md).
+	DriftState *DriftState `json:"drift_state,omitempty"`
 }
 
 type Phase struct {

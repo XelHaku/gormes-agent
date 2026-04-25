@@ -73,6 +73,25 @@ type PlannerVerdict struct {
 	LastOutcome  string `json:"last_outcome,omitempty"`  // "unstuck" | "still_failing" | "no_attempts_yet"
 }
 
+// Provenance is per-row source-of-truth metadata. Owned by the planner;
+// autoloop preserves it via typed-struct round-trip. The planner sets
+// origin_type="gormes" for rows that have no upstream analog.
+type Provenance struct {
+	OriginType  string `json:"origin_type"`            // "upstream" | "gormes" | "hybrid"
+	UpstreamRef string `json:"upstream_ref,omitempty"` // e.g. "hermes:gateway/api_server.py@abc123"
+	OwnedSince  string `json:"owned_since,omitempty"`  // RFC3339 when origin_type became "gormes"
+	Note        string `json:"note,omitempty"`
+}
+
+// DriftState is subphase-level convergence state. Owned by the planner.
+// Status is a one-way ratchet: porting -> converged -> owned. Humans can
+// demote by direct edit when the upstream relationship changes.
+type DriftState struct {
+	Status            string `json:"status"`                        // "porting" | "converged" | "owned"
+	LastUpstreamCheck string `json:"last_upstream_check,omitempty"` // RFC3339
+	OriginDecision    string `json:"origin_decision,omitempty"`     // human-readable rationale
+}
+
 // ItemSpecHash returns a stable SHA-256 hex digest of the row's spec fields
 // used for quarantine auto-clear detection. Excludes Name, Status, Health,
 // and other run-state metadata so a quarantine survives cosmetic edits but

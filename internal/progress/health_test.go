@@ -282,3 +282,66 @@ func TestItem_PlannerVerdictOmitemptyByDefault(t *testing.T) {
 		t.Fatalf("Item with no verdict should not emit planner_verdict key, got %s", data)
 	}
 }
+
+func TestProvenance_RoundTrip(t *testing.T) {
+	p := &Provenance{
+		OriginType:  "gormes",
+		UpstreamRef: "",
+		OwnedSince:  "2026-04-25T00:00:00Z",
+		Note:        "autoloop is Gormes-original",
+	}
+	data, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var got Provenance
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.OriginType != "gormes" || got.OwnedSince != "2026-04-25T00:00:00Z" {
+		t.Fatalf("round-trip mismatch: %+v", got)
+	}
+}
+
+func TestProvenance_OmitemptyKeepsZeroFieldsOut(t *testing.T) {
+	p := &Provenance{OriginType: "upstream"}
+	data, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(data) != `{"origin_type":"upstream"}` {
+		t.Fatalf("expected origin_type only, got %s", data)
+	}
+}
+
+func TestDriftState_RoundTrip(t *testing.T) {
+	d := &DriftState{
+		Status:            "owned",
+		LastUpstreamCheck: "2026-04-24T12:00:00Z",
+		OriginDecision:    "Gormes invented L2 trigger ledger; no upstream analog",
+	}
+	data, _ := json.Marshal(d)
+	var got DriftState
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Status != "owned" {
+		t.Fatalf("Status = %q, want owned", got.Status)
+	}
+}
+
+func TestItem_ProvenanceOmitemptyByDefault(t *testing.T) {
+	item := &Item{Name: "x", Status: StatusPlanned}
+	data, _ := json.Marshal(item)
+	if strings.Contains(string(data), "provenance") {
+		t.Fatalf("Item with no provenance should not emit key, got %s", data)
+	}
+}
+
+func TestSubphase_DriftStateOmitemptyByDefault(t *testing.T) {
+	sub := Subphase{Name: "S"}
+	data, _ := json.Marshal(sub)
+	if strings.Contains(string(data), "drift_state") {
+		t.Fatalf("Subphase with no drift_state should not emit key, got %s", data)
+	}
+}

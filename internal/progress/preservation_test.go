@@ -182,3 +182,75 @@ func TestSymmetricPreservation_BothBlocksRoundTrip(t *testing.T) {
 		t.Fatal("PlannerVerdict.NeedsHuman flipped across round-trip")
 	}
 }
+
+// TestSymmetricPreservation_FourBlocksRoundTrip verifies that all four typed
+// blocks (Health, PlannerVerdict, Provenance, DriftState) survive both writers:
+// planner-side SaveProgress AND autoloop-side ApplyHealthUpdates.
+func TestSymmetricPreservation_FourBlocksRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "progress.json")
+	body := `{
+  "version": "1",
+  "phases": {
+    "1": {
+      "name": "P",
+      "subphases": {
+        "1.A": {
+          "name": "S",
+          "drift_state": {"status": "owned", "origin_decision": "test"},
+          "items": [
+            {"name": "row-1", "status": "planned", "contract": "do x",
+             "health": {"attempt_count": 1},
+             "planner_verdict": {"reshape_count": 2, "last_outcome": "still_failing"},
+             "provenance": {"origin_type": "gormes", "owned_since": "2026-04-25T00:00:00Z"}}
+          ]
+        }
+      }
+    }
+  }
+}
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Round-trip via SaveProgress (planner side) — all 4 blocks survive.
+	prog, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if err := SaveProgress(path, prog); err != nil {
+		t.Fatalf("SaveProgress: %v", err)
+	}
+	prog2, _ := Load(path)
+	row := &prog2.Phases["1"].Subphases["1.A"].Items[0]
+	if row.Health == nil || row.PlannerVerdict == nil || row.Provenance == nil {
+		t.Fatal("one of the row-level typed blocks went missing")
+	}
+	sub2 := prog2.Phases["1"].Subphases["1.A"]
+	if sub2.DriftState == nil {
+		t.Fatal("DriftState went missing on round-trip")
+	}
+
+	// Round-trip via ApplyHealthUpdates (autoloop side) — all 4 blocks survive.
+	if err := ApplyHealthUpdates(path, []HealthUpdate{{
+		PhaseID: "1", SubphaseID: "1.A", ItemName: "row-1",
+		Mutate: func(h *RowHealth) {
+			h.AttemptCount = 5
+		},
+	}}); err != nil {
+		t.Fatalf("ApplyHealthUpdates: %v", err)
+	}
+	prog3, _ := Load(path)
+	row3 := &prog3.Phases["1"].Subphases["1.A"].Items[0]
+	if row3.PlannerVerdict == nil || row3.PlannerVerdict.ReshapeCount != 2 {
+		t.Fatal("PlannerVerdict erased by autoloop write")
+	}
+	if row3.Provenance == nil || row3.Provenance.OriginType != "gormes" {
+		t.Fatal("Provenance erased by autoloop write")
+	}
+	sub3 := prog3.Phases["1"].Subphases["1.A"]
+	if sub3.DriftState == nil || sub3.DriftState.Status != "owned" {
+		t.Fatal("DriftState erased by autoloop write")
+	}
+}
