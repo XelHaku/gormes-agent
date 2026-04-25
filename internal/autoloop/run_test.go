@@ -666,6 +666,9 @@ func TestRunOnceWritesWorkerFailedLedgerEventBeforeReturningBackendError(t *test
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ledger events = %#v, want %#v", got, want)
 	}
+	if detail := events[2].Detail; !strings.Contains(detail, "backend failed") || !strings.Contains(detail, "backend stderr") {
+		t.Fatalf("backend failure detail = %q, want error and stderr", detail)
+	}
 }
 
 func TestRunOnceRefusesDirtyRepositoryBeforeWorkerLaunch(t *testing.T) {

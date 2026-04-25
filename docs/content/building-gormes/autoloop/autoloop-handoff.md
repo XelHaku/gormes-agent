@@ -39,8 +39,10 @@ at a time. Do not maintain a parallel queue outside this docs tree.
 - MAX_AGENTS is a safety cap: if fewer metadata-ready rows are available, run fewer workers instead of selecting filler or random work.
 - Each worker runs in an isolated git worktree under RUN_ROOT/worktrees and promotion rejects committed paths outside the selected row's write_scope.
 - When git worktrees are available and MAX_AGENTS is greater than 1, cmd/autoloop launches selected workers concurrently, then validates and promotes each branch through the same ledgered safety gates.
+- When PRE_PROMOTION_VERIFY_COMMANDS is configured, cmd/autoloop verifies the worker branch before cherry-picking, repairs failures on that worker branch, and keeps main untouched until the gate passes.
 - After all promotions, cmd/autoloop runs the mandatory post-promotion full-suite gate before emitting run_completed or health_updated.
 - On post-promotion gate failure, cmd/autoloop starts one backend repair attempt by default, requires the checkout to be clean, reruns the suite, and records final health only if the gate passes.
+- Backend worker failures preserve captured stderr/stdout detail in the ledger so repair and planner loops can diagnose the real failure instead of only seeing backend_failed.
 - Prefer contract rows with write_scope, test_commands, and done_signal.
 - Inject selected progress metadata into the worker prompt instead of asking workers to rescan the whole roadmap.
 <!-- PROGRESS:END -->

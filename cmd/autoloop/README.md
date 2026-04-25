@@ -66,6 +66,15 @@ Useful environment variables:
   full-suite gate. Separate shell commands with `;;` or newlines. Defaults to
   `go test ./... -count=1`, `www.gormes.ai` Go tests, progress validation,
   autoloop dry-run, and the site Playwright e2e suite.
+- `PRE_PROMOTION_VERIFY_COMMANDS`: optional worker-branch gate that runs inside
+  the worker worktree before the worker commit is cherry-picked to the control
+  checkout. Separate commands with `;;` or newlines. A failing gate keeps main
+  untouched.
+- `PRE_PROMOTION_REPAIR`: enable or disable the automatic repair backend after
+  a failed pre-promotion gate. Defaults to enabled when pre-promotion verify
+  commands are configured.
+- `PRE_PROMOTION_REPAIR_ATTEMPTS`: number of worker-branch repair attempts
+  before the worker is recorded as failed. Defaults to `1`.
 - `POST_PROMOTION_REPAIR`: enable or disable the automatic repair backend after
   a failed post-promotion gate. Defaults to enabled.
 - `POST_PROMOTION_REPAIR_ATTEMPTS`: number of repair attempts before the run is
@@ -103,13 +112,18 @@ clean-worktree preflight. The flow per worker is:
 5. Diff the worker commit against its base commit and reject any changed path
    outside the selected row's `write_scope`
    (`worker_failed:write_scope_violation`).
-6. From the clean control checkout, call `PromoteWorker`: `git push origin
+6. When `PRE_PROMOTION_VERIFY_COMMANDS` is configured, run every verify command
+   inside the worker worktree before promotion. A failure emits
+   `worker_failed:pre_promotion_verify_failed`; the repair backend gets the
+   full captured failure detail, commits any repair on the worker branch, and
+   the gate reruns before main is touched.
+7. From the clean control checkout, call `PromoteWorker`: `git push origin
    <branch>`, create a review PR with `gh pr create --fill --head <branch>`,
    then land the worker commit locally with `git cherry-pick -Xtheirs
    <commit>`. If push or `gh` fails, autoloop still attempts the same local
    cherry-pick fallback. Clean successful/no-change worktrees are removed;
    failed worktrees stay in `$RUN_ROOT/worktrees/` for inspection.
-7. After all worker promotions land, run the mandatory post-promotion full-suite
+8. After all worker promotions land, run the mandatory post-promotion full-suite
    gate before emitting `run_completed` or `health_updated`. A gate failure
    emits `post_promotion_verify_failed`, starts one repair backend by default,
    requires the repair to leave the checkout clean, reruns the full suite, and

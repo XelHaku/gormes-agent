@@ -983,6 +983,7 @@ func finishWorker(ctx context.Context, cfg Config, runner Runner, backendName st
 			Task:   worker.Task,
 			Branch: worker.Branch,
 			Status: "backend_failed",
+			Detail: truncateLedgerDetail(commandFailureDetail(worker.Result)),
 		}); err != nil {
 			return err
 		}
