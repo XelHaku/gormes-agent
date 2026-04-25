@@ -584,6 +584,63 @@ func TestRunOnceFailsWhenWorkerLeavesDirtyWorktree(t *testing.T) {
 	}
 }
 
+func TestRunOnceFailsWhenWorkerLeavesWorkerBranch(t *testing.T) {
+	repoRoot := t.TempDir()
+	initCleanRepo(t, repoRoot)
+	progressPath := writeProgressJSON(t, `{
+		"phases": {
+			"12": {
+				"subphases": {
+					"12.A": {
+						"items": [
+							{"item_name": "branch escaping worker", "status": "planned", "contract": "branch contract", "contract_status": "draft"}
+						]
+					}
+				}
+			}
+		}
+	}`)
+	runRoot := t.TempDir()
+	runner := runnerFunc(func(_ context.Context, command Command) Result {
+		if command.Name == "opencode" {
+			return ExecRunner{}.Run(context.Background(), Command{
+				Name: "git",
+				Args: []string{"switch", "master"},
+				Dir:  repoRoot,
+			})
+		}
+		return Result{Err: ErrUnexpectedCommand}
+	})
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:     repoRoot,
+			ProgressJSON: progressPath,
+			RunRoot:      runRoot,
+			Backend:      "opencode",
+			Mode:         "safe",
+			MaxAgents:    1,
+		},
+		Runner: runner,
+	})
+	if err == nil {
+		t.Fatal("RunOnce() error = nil, want branch changed error")
+	}
+	if !strings.Contains(err.Error(), "worker branch changed") {
+		t.Fatalf("RunOnce() error = %q, want branch changed context", err)
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	var got []string
+	for _, event := range events {
+		got = append(got, event.Event+":"+event.Status)
+	}
+	want := []string{"run_started:started", "worker_claimed:claimed", "worker_failed:branch_changed"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ledger events = %#v, want %#v", got, want)
+	}
+}
+
 func TestRunOnceFailsWhenWorkerLeavesMergeConflicts(t *testing.T) {
 	repoRoot := t.TempDir()
 	initConflictingRepo(t, repoRoot)

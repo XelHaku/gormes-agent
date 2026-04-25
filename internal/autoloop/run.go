@@ -143,6 +143,24 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			}
 			return RunSummary{}, backendRunError(argv[0], result)
 		}
+		if hasGit {
+			if err := ensureCurrentBranch(opts.Config.RepoRoot, workerBranch); err != nil {
+				if ledgerErr := appendRunLedgerEvent(opts.Config, LedgerEvent{
+					TS:     time.Now().UTC(),
+					RunID:  runID,
+					Event:  "worker_failed",
+					Worker: workerID,
+					Task:   task,
+					Branch: workerBranch,
+					Status: "branch_changed",
+					Detail: err.Error(),
+				}); ledgerErr != nil {
+					return RunSummary{}, ledgerErr
+				}
+				restoreBranchIfClean(opts.Config.RepoRoot, baseBranch)
+				return RunSummary{}, err
+			}
+		}
 		if err := ensureNoMergeConflicts(opts.Config.RepoRoot); err != nil {
 			if ledgerErr := appendRunLedgerEvent(opts.Config, LedgerEvent{
 				TS:     time.Now().UTC(),
@@ -348,6 +366,20 @@ func ensureWorktreeClean(repoRoot string) error {
 		return fmt.Errorf("repository has uncommitted changes:\n%s", dirty)
 	}
 
+	return nil
+}
+
+func ensureCurrentBranch(repoRoot string, expected string) error {
+	if expected == "" {
+		return nil
+	}
+	current, err := gitCurrentBranch(repoRoot)
+	if err != nil {
+		return err
+	}
+	if current != expected {
+		return fmt.Errorf("worker branch changed: current %s, want %s", current, expected)
+	}
 	return nil
 }
 
