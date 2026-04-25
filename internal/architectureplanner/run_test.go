@@ -846,3 +846,348 @@ func writeFile(t *testing.T, path, content string) {
 		t.Fatalf("WriteFile(%s) error = %v", path, err)
 	}
 }
+
+// perAttemptRunner is a test runner that wires distinct per-backend-call
+// behaviors. Each backend invocation (codexu/claudeu) increments a counter
+// and dispatches to the corresponding entry in attemptMutators. Used to
+// simulate the L3 retry-with-feedback loop where attempt 1 drops health,
+// attempt 2 (or 3) restores it. Captures every prompt sent so tests can
+// assert the retry feedback is appended on subsequent calls. Non-backend
+// commands fall through to the wrapped FakeRunner unchanged.
+type perAttemptRunner struct {
+	inner            *autoloop.FakeRunner
+	attemptMutators  []func(t *testing.T)
+	t                *testing.T
+	backendCallCount int
+	prompts          []string
+}
+
+func (r *perAttemptRunner) Run(ctx context.Context, command autoloop.Command) autoloop.Result {
+	res := r.inner.Run(ctx, command)
+	if command.Name == "codexu" || command.Name == "claudeu" {
+		// Capture the prompt (last arg) so tests can verify the retry
+		// feedback is appended to subsequent attempts.
+		if len(command.Args) > 0 {
+			r.prompts = append(r.prompts, command.Args[len(command.Args)-1])
+		}
+		idx := r.backendCallCount
+		r.backendCallCount++
+		if idx < len(r.attemptMutators) && r.attemptMutators[idx] != nil {
+			r.attemptMutators[idx](r.t)
+		}
+	}
+	return res
+}
+
+func TestRunOnce_RetryRecoversAfterFirstAttemptDropsHealth(t *testing.T) {
+	repoRoot := writePlannerFixture(t)
+	cfg := mustConfig(t, repoRoot)
+	cfg.MaxRetries = 2 // explicit; default is 2 anyway
+	progressPath := cfg.ProgressJSON
+
+	// Seed a Health block on Gateway task so a drop has something to
+	// detect.
+	withHealth := `{
+  "phases": {
+    "2": {
+      "name": "Gateway",
+      "subphases": {
+        "2.A": {
+          "items": [
+            {"name": "Gateway task", "status": "planned", "health": {"attempt_count": 3, "consecutive_failures": 1}},
+            {"name": "Goncho task", "status": "in_progress"}
+          ]
+        }
+      }
+    }
+  }
+}`
+	writeFile(t, progressPath, withHealth)
+
+	withoutHealth := `{
+  "phases": {
+    "2": {
+      "name": "Gateway",
+      "subphases": {
+        "2.A": {
+          "items": [
+            {"name": "Gateway task", "status": "planned"},
+            {"name": "Goncho task", "status": "in_progress"}
+          ]
+        }
+      }
+    }
+  }
+}`
+
+	// Attempt 0 drops the health block (rejection); attempt 1 restores it
+	// (acceptance). Expect status="ok" and 2 attempts in the ledger.
+	runner := &perAttemptRunner{
+		t: t,
+		inner: &autoloop.FakeRunner{
+			Results: []autoloop.Result{
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "planner attempt 0\n"},
+				{Stdout: "planner attempt 1\n"},
+			},
+		},
+		attemptMutators: []func(t *testing.T){
+			func(t *testing.T) { writeFile(t, progressPath, withoutHealth) },
+			func(t *testing.T) { writeFile(t, progressPath, withHealth) },
+		},
+	}
+
+	if _, err := RunOnce(context.Background(), RunOptions{
+		Config:         cfg,
+		Runner:         runner,
+		SkipValidation: true,
+	}); err != nil {
+		t.Fatalf("RunOnce() error = %v, want recovery on retry", err)
+	}
+
+	if got := runner.backendCallCount; got != 2 {
+		t.Fatalf("backendCallCount = %d, want 2 (initial + 1 retry)", got)
+	}
+	if len(runner.prompts) != 2 {
+		t.Fatalf("len(prompts) = %d, want 2", len(runner.prompts))
+	}
+	if !strings.Contains(runner.prompts[1], "HEALTH BLOCK PRESERVATION") {
+		t.Fatalf("retry prompt missing HARD RULE reference:\n%s", runner.prompts[1])
+	}
+	if !strings.Contains(runner.prompts[1], "2/2.A/Gateway task") {
+		t.Fatalf("retry prompt missing dropped row name:\n%s", runner.prompts[1])
+	}
+
+	events := mustReadLedger(t, filepath.Join(cfg.RunRoot, "state", "runs.jsonl"))
+	if len(events) != 1 {
+		t.Fatalf("ledger entries = %d, want 1", len(events))
+	}
+	ev := events[0]
+	if ev.Status != "ok" {
+		t.Fatalf("Status = %q, want ok (recovered after retry)", ev.Status)
+	}
+	if len(ev.Attempts) != 2 {
+		t.Fatalf("Attempts length = %d, want 2: %#v", len(ev.Attempts), ev.Attempts)
+	}
+	if ev.Attempts[0].Status != "validation_rejected" {
+		t.Fatalf("Attempts[0].Status = %q, want validation_rejected", ev.Attempts[0].Status)
+	}
+	if len(ev.Attempts[0].DroppedRows) != 1 || ev.Attempts[0].DroppedRows[0] != "2/2.A/Gateway task" {
+		t.Fatalf("Attempts[0].DroppedRows = %#v, want [2/2.A/Gateway task]", ev.Attempts[0].DroppedRows)
+	}
+	if ev.Attempts[1].Status != "ok" {
+		t.Fatalf("Attempts[1].Status = %q, want ok", ev.Attempts[1].Status)
+	}
+	if ev.RetryAttempt != 1 {
+		t.Fatalf("RetryAttempt = %d, want 1 (final attempt index)", ev.RetryAttempt)
+	}
+}
+
+func TestRunOnce_RetryExhaustionStillRejectsWithFullForensics(t *testing.T) {
+	repoRoot := writePlannerFixture(t)
+	cfg := mustConfig(t, repoRoot)
+	cfg.MaxRetries = 2 // up to 3 total backend invocations
+	progressPath := cfg.ProgressJSON
+
+	withHealth := `{
+  "phases": {
+    "2": {
+      "name": "Gateway",
+      "subphases": {
+        "2.A": {
+          "items": [
+            {"name": "Gateway task", "status": "planned", "health": {"attempt_count": 3, "consecutive_failures": 1}},
+            {"name": "Goncho task", "status": "in_progress"}
+          ]
+        }
+      }
+    }
+  }
+}`
+	writeFile(t, progressPath, withHealth)
+
+	withoutHealth := `{
+  "phases": {
+    "2": {
+      "name": "Gateway",
+      "subphases": {
+        "2.A": {
+          "items": [
+            {"name": "Gateway task", "status": "planned"},
+            {"name": "Goncho task", "status": "in_progress"}
+          ]
+        }
+      }
+    }
+  }
+}`
+
+	dropper := func(t *testing.T) { writeFile(t, progressPath, withoutHealth) }
+	// Seed health back before each LLM attempt so beforeDoc remains stable
+	// across the run; in real life the LLM stomps the file each run, so we
+	// emulate by re-seeding before the next attempt's mutator drops it.
+	runner := &perAttemptRunner{
+		t: t,
+		inner: &autoloop.FakeRunner{
+			Results: []autoloop.Result{
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "attempt 0\n"},
+				{Stdout: "attempt 1\n"},
+				{Stdout: "attempt 2\n"},
+			},
+		},
+		attemptMutators: []func(t *testing.T){dropper, dropper, dropper},
+	}
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config:         cfg,
+		Runner:         runner,
+		SkipValidation: true,
+	})
+	if err == nil {
+		t.Fatal("RunOnce() error = nil, want regeneration rejected after retry exhaustion")
+	}
+	if !strings.Contains(err.Error(), "regeneration rejected") {
+		t.Fatalf("RunOnce() error = %q, want regeneration rejected", err)
+	}
+	if got, want := runner.backendCallCount, 3; got != want {
+		t.Fatalf("backendCallCount = %d, want %d (1 initial + 2 retries)", got, want)
+	}
+
+	events := mustReadLedger(t, filepath.Join(cfg.RunRoot, "state", "runs.jsonl"))
+	if len(events) != 1 {
+		t.Fatalf("ledger entries = %d, want 1", len(events))
+	}
+	ev := events[0]
+	if ev.Status != "validation_rejected" {
+		t.Fatalf("Status = %q, want validation_rejected", ev.Status)
+	}
+	if len(ev.Attempts) != 3 {
+		t.Fatalf("Attempts length = %d, want 3 (initial + 2 retries)", len(ev.Attempts))
+	}
+	for i, a := range ev.Attempts {
+		if a.Index != i {
+			t.Fatalf("Attempts[%d].Index = %d, want %d", i, a.Index, i)
+		}
+		if a.Status != "validation_rejected" {
+			t.Fatalf("Attempts[%d].Status = %q, want validation_rejected", i, a.Status)
+		}
+	}
+	if ev.RetryAttempt != 2 {
+		t.Fatalf("RetryAttempt = %d, want 2 (final attempt index)", ev.RetryAttempt)
+	}
+}
+
+func TestRunOnce_BackendFailureDoesNotRetry(t *testing.T) {
+	repoRoot := writePlannerFixture(t)
+	cfg := mustConfig(t, repoRoot)
+	cfg.MaxRetries = 5 // even with retries available, backend errors short-circuit
+
+	wantErr := os.ErrPermission
+	runner := &perAttemptRunner{
+		t: t,
+		inner: &autoloop.FakeRunner{
+			Results: []autoloop.Result{
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Err: wantErr, Stderr: "backend denied\n"},
+			},
+		},
+	}
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config:         cfg,
+		Runner:         runner,
+		SkipValidation: true,
+	})
+	if err == nil {
+		t.Fatal("RunOnce() error = nil, want backend failure")
+	}
+	if !strings.Contains(err.Error(), "backend denied") {
+		t.Fatalf("RunOnce() error = %q, want backend stderr", err)
+	}
+	if got := runner.backendCallCount; got != 1 {
+		t.Fatalf("backendCallCount = %d, want 1 (backend failures must NOT retry)", got)
+	}
+
+	events := mustReadLedger(t, filepath.Join(cfg.RunRoot, "state", "runs.jsonl"))
+	if len(events) != 1 {
+		t.Fatalf("ledger entries = %d, want 1", len(events))
+	}
+	if events[0].Status != "backend_failed" {
+		t.Fatalf("Status = %q, want backend_failed", events[0].Status)
+	}
+	if len(events[0].Attempts) != 1 || events[0].Attempts[0].Status != "backend_failed" {
+		t.Fatalf("Attempts = %#v, want one entry with backend_failed", events[0].Attempts)
+	}
+}
+
+func TestRunOnce_MaxRetriesZeroSkipsRetryLoop(t *testing.T) {
+	repoRoot := writePlannerFixture(t)
+	cfg := mustConfig(t, repoRoot)
+	cfg.MaxRetries = 0 // disable retries — pre-L3 behavior
+	progressPath := cfg.ProgressJSON
+
+	writeFile(t, progressPath, `{
+  "phases": {
+    "2": {
+      "name": "Gateway",
+      "subphases": {
+        "2.A": {
+          "items": [
+            {"name": "Gateway task", "status": "planned", "health": {"attempt_count": 3}},
+            {"name": "Goncho task", "status": "in_progress"}
+          ]
+        }
+      }
+    }
+  }
+}`)
+
+	runner := &perAttemptRunner{
+		t: t,
+		inner: &autoloop.FakeRunner{
+			Results: []autoloop.Result{
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "Already up to date.\n"},
+				{Stdout: "attempt 0\n"},
+			},
+		},
+		attemptMutators: []func(t *testing.T){
+			func(t *testing.T) {
+				writeFile(t, progressPath, `{
+  "phases": {
+    "2": {
+      "name": "Gateway",
+      "subphases": {
+        "2.A": {
+          "items": [
+            {"name": "Gateway task", "status": "planned"},
+            {"name": "Goncho task", "status": "in_progress"}
+          ]
+        }
+      }
+    }
+  }
+}`)
+			},
+		},
+	}
+
+	if _, err := RunOnce(context.Background(), RunOptions{
+		Config:         cfg,
+		Runner:         runner,
+		SkipValidation: true,
+	}); err == nil {
+		t.Fatal("RunOnce() error = nil, want validation rejection without retry")
+	}
+	if got := runner.backendCallCount; got != 1 {
+		t.Fatalf("backendCallCount = %d, want 1 (MaxRetries=0 disables retries)", got)
+	}
+}
