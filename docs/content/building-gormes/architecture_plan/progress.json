@@ -1321,9 +1321,9 @@
             {
               "name": "Honcho host integration compatibility fixtures",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "GONCHO preserves host-facing Honcho session, peer, and tool semantics needed by current OpenCode and SillyTavern integrations",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -1331,16 +1331,12 @@
                 "system"
               ],
               "degraded_mode": "Doctor and memory status explain which Honcho-compatible host mappings are unsupported instead of silently accepting incompatible config.",
-              "fixture": "internal/goncho host integration mapping fixtures",
+              "fixture": "internal/goncho/host_integration_test.go",
               "source_refs": [
                 "../honcho/docs/v3/guides/integrations/opencode.mdx",
                 "../honcho/docs/v3/guides/integrations/sillytavern.mdx",
                 "../honcho/docs/v3/guides/integrations/hermes.mdx",
                 "docs/content/building-gormes/architecture_plan/phase-3-memory.md"
-              ],
-              "blocked_by": [
-                "Honcho-compatible scope/source tool schema",
-                "Interrupted-turn memory sync suppression"
               ],
               "ready_when": [
                 "Public honcho_* schemas expose scope/source controls and interrupted turns cannot persist partial memory observations."
@@ -1353,7 +1349,7 @@
                 "Host-scoped config keys do not mutate another host's settings.",
                 "GONCHO keeps internal names while generated tool schemas and docs preserve honcho_* external compatibility."
               ],
-              "note": "Honcho upstream added OpenCode and SillyTavern integration docs in e659b6b. Gormes should not adopt their Node/Bun plugins, but the internal GONCHO contract must remain compatible with the shared Honcho concepts they depend on: workspace, peer, session strategy, host-scoped config, context-only/tool-only/hybrid recall, and durable conclusion/search tools.",
+              "note": "TDD landed: internal/goncho host integration fixtures now map Hermes/OpenCode/SillyTavern-style workspace, peer, session strategy, recall mode, and Honcho-compatible external tool naming semantics without adding a cloud Honcho client or renaming the internal Goncho service. Fixtures cover per-directory, per-repo, per-session, chat-instance, and global session keys, context/tools/hybrid recall behavior including context-only and tool-only aliases, host-scoped config patch isolation, and fail-closed diagnostics for unsupported host mappings.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",
