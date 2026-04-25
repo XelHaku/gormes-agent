@@ -37,12 +37,12 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 34/74 subphases shipped · 16 in progress · 24 planned
+**Overall:** 35/74 subphases shipped · 15 in progress · 24 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 14/20 subphases |
+| Phase 2 — The Gateway | 🔨 | 15/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
@@ -98,13 +98,13 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] gormes gateway multi-channel entrypoint
 - [x] Discord
 
-### 2.B.3 — Slack on Shared Chassis 🔨
+### 2.B.3 — Slack on Shared Chassis ✅
 
 - [x] Slack Socket Mode adapter
 - [x] Thread routing + coalesced reply flow
 - [x] Slack CommandRegistry parser wiring
 - [x] Slack gateway.Channel adapter shim
-- [ ] Slack config + cmd/gormes gateway registration
+- [x] Slack config + cmd/gormes gateway registration
 
 ### 2.B.4 — WhatsApp Adapter ✅
 
@@ -195,10 +195,11 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Pairing approval + rate-limit semantics
 - [x] Unauthorized DM pairing response contract
 - [x] `gormes gateway status` read-only command
-- [ ] Runtime status JSON + PID/process validation
-- [ ] Token-scoped gateway locks
+- [x] Runtime status JSON + PID/process validation
+- [x] Token-scoped gateway locks
 - [ ] Gateway /restart command + takeover markers
-- [ ] Session expiry finalization without memory flush
+- [ ] Session expiry finalized-flag migration
+- [ ] Session expiry hook cleanup retry evidence
 - [x] Channel lifecycle writers into status model
 
 ### 2.F.4 — Home Channel + Operator Surfaces ⏳
@@ -347,6 +348,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Google Code Assist
 - [ ] Codex
 - [x] Codex Responses pure conversion harness
+- [ ] Codex Responses assistant content role types
 - [ ] Codex OAuth state + stale-token relogin
 - [x] Codex stream repair + tool-call leak sanitizer
 - [ ] Cross-provider reasoning-tag sanitization
@@ -361,7 +363,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Aux compression headroom for system and tool schemas
 - [x] Aux compression provider-aware context cap
 - [ ] Tool-result pruning + protected head/tail summary
-- [ ] Aux compression single-prompt threshold reconciliation
+- [x] Aux compression single-prompt threshold reconciliation
 - [ ] Manual compression feedback + context references
 
 ### 4.C — Native Prompt Builder ⏳
@@ -401,12 +403,13 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Provider-side resilience
 - [x] Classified provider-error taxonomy
-- [x] Unsupported temperature retry + Codex flush guard
-- [ ] Codex Responses temperature guard after flush removal
+- [x] Unsupported temperature retry + Codex no-temperature guard
+- [x] Codex Responses temperature guard after flush removal
 - [x] Generic unsupported-parameter retry + max_tokens guard
 - [x] Jittered reconnect backoff schedule
 - [x] Retry-After header parsing + HTTPError hint
 - [x] Kernel retry honors Retry-After hint
+- [ ] Streaming interrupt retry suppression
 - [ ] Prompt-cache capability guard
 - [ ] Provider rate guard + budget telemetry
 
@@ -515,12 +518,14 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] CLI command registry parity + active-turn busy policy
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
-- [ ] Top-level oneshot flag and model/provider resolver
-- [ ] Oneshot stdout-only kernel execution
+- [x] Top-level oneshot flag and model/provider resolver
+- [ ] Oneshot final-output writer boundary
+- [ ] Oneshot noninteractive safety and clarify policy
 - [x] Platform toolset config persistence + MCP sentinel
 - [x] Effective toolset picker dedupes bundled plugin keys
 - [ ] Gateway, platform, webhook, and cron management CLI
-- [ ] Update service restart active polling
+- [ ] Service RestartSec parser helper
+- [ ] Service restart active-status poller
 - [ ] Diagnostics, backup, logs, and status CLI
 
 ### 5.P — Docker / Packaging ⏳

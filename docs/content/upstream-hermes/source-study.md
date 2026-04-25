@@ -199,8 +199,8 @@ Recent upstream sync delta (2026-04-25): upstream commit `b35d692f` adds five
 planner-relevant contracts:
 
 - auxiliary LLM calls retry once without `temperature` when a provider rejects
-  that parameter, while Codex Responses memory-flush fallback strips
-  temperature before sending;
+  that parameter, while Codex Responses keeps the no-temperature transport
+  rule independent of the now-deleted memory-flush path;
 - cron jobs gained `context_from` so one scheduled job can inject bounded
   output from previous jobs without blocking on same-tick runs;
 - Discord session sources now preserve `guild_id`, `parent_chat_id`, and
@@ -216,8 +216,8 @@ Gormes tracks these as small rows: 4.H unsupported-temperature retry, 5.N
 installer policy.
 
 Latest upstream sync delta (2026-04-25): commits `6e561ffa`, `97d54f0e`,
-`af22421e`, `cf2fabc4`, and `d635e2df` add planner-relevant contracts already
-tracked in progress.json:
+`af22421e`, `cf2fabc4`, `d635e2df`, `7c17accb`, and `648b8991` add
+planner-relevant contracts tracked in progress.json:
 
 - update/service restart verification now polls active status instead of doing
   a one-shot sleep check;
@@ -226,7 +226,11 @@ tracked in progress.json:
 - dashboard page-scoped plugin slots should be preserved as metadata/API
   contracts without importing the upstream React runtime;
 - auxiliary compression feasibility must pass provider identity into context
-  length resolution so Codex uses the provider cap before headroom math.
+  length resolution so Codex uses the provider cap before headroom math;
+- stream retries must check cancellation before opening a fresh connection, so
+  `/stop` cannot be negated by a retry loop;
+- Codex Responses assistant replay messages must serialize text parts as
+  `output_text`, while user messages keep `input_text`.
 
 Gormes tracks these as small rows in 5.O service restart polling, 5.A terminal
 notification throttling, 5.I dashboard slot inventory, and 4.B provider-aware

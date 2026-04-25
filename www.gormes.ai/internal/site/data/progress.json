@@ -570,9 +570,9 @@
             },
             {
               "name": "Slack config + cmd/gormes gateway registration",
-              "status": "planned",
+              "status": "complete",
               "contract": "Slack config and cmd/gormes gateway registration use the shared gateway.Manager lifecycle after the Slack Channel shim is fixture-locked",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -603,7 +603,7 @@
                 "Doctor/status output distinguishes Slack disabled, missing-token, startup-failed, and running states.",
                 "Unit tests use fake Slack clients and do not contact Slack."
               ],
-              "note": "TDD: add Slack config loading, doctor coverage, and cmd/gormes gateway registration only after the Channel shim is green; current evidence shows only Telegram and Discord are registered there.",
+              "note": "Complete: TDD landed Slack config loading, cmd/gormes shared Manager registration, and status/doctor degraded reporting for disabled, missing-token, startup-failed, and running Slack states. Gateway registration fixtures use fake channels and prove Telegram/Discord-only runs do not require Slack credentials.",
               "write_scope": [
                 "cmd/gormes/",
                 "internal/config/",
@@ -619,10 +619,15 @@
               "done_signal": [
                 "Gateway registration tests prove Slack can be enabled through config and status/doctor output without requiring live Slack credentials."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T15:16:17Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "gormes",
@@ -1845,9 +1850,9 @@
             {
               "name": "Runtime status JSON + PID/process validation",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway runtime status validates PID/start-time identity and stale-process cleanup before callers trust gateway_state.json as the live lifecycle read model",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1882,7 +1887,7 @@
                 "Stale state cleanup preserves last_error evidence while refusing to mark channels running.",
                 "The status renderer can display the validation result without starting or stopping any service."
               ],
-              "note": "TDD: port only the runtime-status/PID identity contract after the read-only status command lands, so stale-process handling does not collide with CLI rendering or token lock work.",
+              "note": "Complete: TDD landed RuntimeStatusStore PID identity records with start_time, generation, command, and argv fields in gateway_state.json plus the sibling gateway.pid record. Fake process-table fixtures prove missing state, missing PID file, stale PID, PID reuse, stopped process, permission-denied lookup, and live matching process classification; stale cleanup returns stopped channel state without dropping exit/error evidence, and `gormes gateway status` renders runtime_validation evidence from the read-only status path.",
               "write_scope": [
                 "internal/gateway/status.go",
                 "internal/gateway/status_test.go",
@@ -1898,10 +1903,15 @@
               "done_signal": [
                 "PID validation fixtures prove gateway_state.json cannot report a stale, stopped, or pid-reused process as running."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T15:16:17Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1912,9 +1922,9 @@
             {
               "name": "Token-scoped gateway locks",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway credential locks are scoped by platform and credential hash so multiple profiles cannot run the same token while unrelated tokens remain independent",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1947,7 +1957,7 @@
                 "Stale stopped-process locks are cleared only after PID/start-time validation proves the owner is gone.",
                 "Release-on-shutdown removes only the current process lock and reports release failures without masking the gateway exit reason."
               ],
-              "note": "TDD: keep token-scoped locks behind PID validation so stale-lock cleanup cannot guess from PID files alone.",
+              "note": "Complete: TDD landed internal/gateway/token_lock_test.go plus XDG state-root config coverage. Token-scoped locks now use platform plus full SHA-256 credential hashes in filenames and runtime evidence, reject live same-token owners through fake PID/start-time validation, allow different tokens/platforms independently, clear stopped-process stale locks without deleting unrelated locks, report credential-hash mismatches without overwriting the file, and preserve gateway exit reasons while recording lock-release-failed evidence.",
               "write_scope": [
                 "internal/gateway/",
                 "internal/config/",
@@ -1961,10 +1971,15 @@
               "done_signal": [
                 "Token-lock fixtures prove same-token exclusion, different-token independence, stale cleanup, and safe release without exposing raw credential material."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T17:16:18Z",
+                "last_success": "2026-04-25T17:16:18Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T15:16:17Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -2037,10 +2052,10 @@
               }
             },
             {
-              "name": "Session expiry finalization without memory flush",
+              "name": "Session expiry finalized-flag migration",
               "priority": "P2",
               "status": "planned",
-              "contract": "Gateway session expiry finalizes hooks, cleanup, and cache eviction once per expired session without launching a model-driven memory flush agent",
+              "contract": "Gateway session metadata migrates legacy memory_flushed state into expiry_finalized evidence without adding new hidden memory-flush writes",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -2048,47 +2063,104 @@
                 "gateway",
                 "system"
               ],
-              "degraded_mode": "Gateway status reports expiry_finalize_pending, expiry_finalize_failed, expiry_finalize_gave_up, and legacy memory_flushed migration evidence instead of retrying hidden memory writes forever.",
-              "fixture": "internal/gateway/session_expiry_finalize_test.go",
+              "degraded_mode": "Gateway status reports migrated legacy memory_flushed evidence separately from current expiry_finalized state so operators can tell old session records from new finalization writes.",
+              "fixture": "internal/session/expiry_finalized_migration_test.go",
               "source_refs": [
-                "../hermes-agent/gateway/run.py@5006b220",
-                "../hermes-agent/gateway/session.py@5006b220",
-                "../hermes-agent/tests/gateway/test_session_boundary_hooks.py@5006b220",
-                "../hermes-agent/tests/gateway/test_resume_command.py@5006b220",
+                "../hermes-agent/gateway/run.py@648b8991",
+                "../hermes-agent/gateway/session.py@648b8991",
+                "../hermes-agent/tests/gateway/test_resume_command.py@648b8991",
+                "internal/session/directory.go",
+                "internal/gateway/manager.go"
+              ],
+              "ready_when": [
+                "Session metadata load/save can be exercised with temp directories and fake clocks without starting Telegram, Discord, Slack, or a live gateway manager.",
+                "This slice owns only metadata migration and write-shape evidence; hook execution and retry policy live in the dependent expiry hook row."
+              ],
+              "not_ready_when": [
+                "The slice calls Goncho/Honcho extractors, launches a model-driven memory flush, edits pairing/restart behavior, or implements idle scanning."
+              ],
+              "unblocks": [
+                "Session expiry hook cleanup retry evidence"
+              ],
+              "acceptance": [
+                "A legacy session record with memory_flushed=true loads as expiry_finalized=true and records migrated_memory_flushed evidence.",
+                "New session metadata writes use expiry_finalized and never emit a memory_flushed field.",
+                "Resume/switch-session fixtures prove no memory-flush task is queued or called while reading or rewriting migrated session metadata."
+              ],
+              "note": "Split from the failed expiry-finalization row so a worker can land only the data-shape migration first. Hermes removed flush_memories; Gormes should keep Goncho memory extraction explicit and independent from gateway expiry metadata.",
+              "write_scope": [
+                "internal/session/",
+                "internal/gateway/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/session -run TestExpiryFinalizedMigration -count=1",
+                "go test ./internal/session ./internal/gateway -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Session metadata fixtures prove legacy memory_flushed records migrate to expiry_finalized and new writes contain no hidden memory-flush fields."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:648b8991 gateway/session.py",
+                "note": "Hermes defines finalization-only session expiry after flush removal; Gormes adapts only the persisted metadata boundary in this slice."
+              }
+            },
+            {
+              "name": "Session expiry hook cleanup retry evidence",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Gateway expiry finalization invokes hook and cached-agent cleanup exactly once per expired session, with bounded retry/give-up evidence and no memory flush task",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Gateway status reports expiry_finalize_pending, expiry_finalize_failed, and expiry_finalize_gave_up with attempt counts instead of retrying hidden cleanup work forever.",
+              "fixture": "internal/gateway/session_expiry_hooks_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/run.py@648b8991",
+                "../hermes-agent/tests/gateway/test_session_boundary_hooks.py@648b8991",
+                "../hermes-agent/tests/gateway/test_resume_command.py@648b8991",
                 "internal/gateway/manager.go",
                 "internal/session/directory.go"
               ],
               "ready_when": [
-                "Gateway session metadata can persist one-shot finalization evidence and a fake expiry scanner can run without live channel transports.",
-                "The slice owns only expiry finalization state and hook/cleanup evidence; scheduled reset policy and live idle scanning can remain future rows."
+                "Session expiry finalized-flag migration is validated on main.",
+                "A fake expiry scanner and fake cleanup hooks can run against temp session metadata without live channel transports."
               ],
               "not_ready_when": [
-                "The slice adds a model-driven memory flush, calls Goncho/Honcho extractors, changes pairing/restart status, or starts real Telegram/Discord/Slack adapters in tests."
+                "The slice changes session key generation, pairing/restart status, live adapter startup, or Goncho/Honcho memory extraction behavior."
+              ],
+              "blocked_by": [
+                "Session expiry finalized-flag migration"
               ],
               "acceptance": [
-                "A legacy session record with memory_flushed=true migrates to expiry_finalized=true when read, but new writes use only expiry_finalized.",
                 "Expired-session fixtures invoke finalize hooks and cached-agent cleanup exactly once, then persist expiry_finalized evidence across reload.",
-                "Transient finalize failures retry up to three fake-clock attempts and then mark gave-up evidence so the gateway does not spin forever.",
-                "Resume/switch-session fixtures prove no memory flush task is started before switching sessions."
+                "Transient finalize failures retry for three fake-clock attempts and then mark gave-up evidence so the gateway cannot spin forever.",
+                "Resume/switch-session fixtures prove no memory flush task or Goncho/Honcho extractor is started before switching sessions."
               ],
-              "note": "Hermes 5006b220 removed flush_memories from CLI exit, compression, gateway reset, resume, and expiry paths. Gormes should preserve session-boundary cleanup and hook semantics but keep memory extraction in explicit Goncho/Phase 3 paths, not a hidden expiry-time LLM turn.",
+              "note": "Second half of the expiry split. Keep hook cleanup retry policy separate from metadata migration so autoloop workers can land one fake-clock fixture set at a time.",
               "write_scope": [
                 "internal/gateway/",
                 "internal/session/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/gateway -run TestSessionExpiryFinalize -count=1",
+                "go test ./internal/gateway -run TestSessionExpiryHooks -count=1",
                 "go test ./internal/session ./internal/gateway -count=1",
                 "go run ./cmd/autoloop progress validate"
               ],
               "done_signal": [
-                "Expiry-finalization fixtures prove legacy migration, one-shot hook/cleanup persistence, retry/give-up evidence, and zero memory-flush task launches."
+                "Expiry hook fixtures prove one-shot cleanup, bounded retry/give-up evidence, persisted finalization state, and zero memory-flush task launches."
               ],
               "provenance": {
                 "origin_type": "hybrid",
-                "upstream_ref": "hermes:5006b220 gateway/run.py",
-                "note": "Hermes now defines session expiry as finalization-only; Gormes adapts the behavior to Go session metadata and explicit Goncho memory boundaries."
+                "upstream_ref": "hermes:648b8991 gateway/run.py",
+                "note": "Hermes defines session expiry as finalization-only; Gormes keeps cleanup evidence in Go gateway/session metadata while preserving explicit Goncho memory boundaries."
               }
             },
             {
@@ -3981,6 +4053,7 @@
               ],
               "unblocks": [
                 "Codex Responses pure conversion harness",
+                "Codex Responses assistant content role types",
                 "Codex OAuth state + stale-token relogin",
                 "Codex stream repair + tool-call leak sanitizer"
               ],
@@ -4011,6 +4084,7 @@
                 "The slice performs OAuth/device login, imports ~/.codex/auth.json, or opens a live Responses request."
               ],
               "unblocks": [
+                "Codex Responses assistant content role types",
                 "Codex stream repair + tool-call leak sanitizer",
                 "Codex OAuth state + stale-token relogin"
               ],
@@ -4034,6 +4108,62 @@
                 "attempt_count": 2,
                 "last_attempt": "2026-04-25T06:55:51Z",
                 "last_success": "2026-04-25T06:55:51Z"
+              }
+            },
+            {
+              "name": "Codex Responses assistant content role types",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Codex Responses payload conversion emits role-correct text content parts: input_text for user messages and output_text for assistant replay messages",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Codex provider status reports codex_responses_role_content_unavailable if assistant list-content replay would still send input_text to the Responses API.",
+              "fixture": "internal/hermes/codex_responses_role_content_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/codex_responses_adapter.py@648b8991",
+                "../hermes-agent/tests/run_agent/test_provider_parity.py@648b8991",
+                "internal/hermes/codex_responses_adapter.go",
+                "internal/hermes/codex_responses_adapter_test.go"
+              ],
+              "ready_when": [
+                "Codex Responses pure conversion harness is validated on main.",
+                "The slice can use pure payload-conversion fixtures and does not require Codex OAuth, live Responses requests, or ChatGPT backend credentials."
+              ],
+              "not_ready_when": [
+                "The slice changes Codex OAuth, live streaming repair, tool-call argument repair, or generic OpenAI chat-completions content mapping."
+              ],
+              "unblocks": [
+                "Codex OAuth state + stale-token relogin"
+              ],
+              "acceptance": [
+                "User Message.ContentParts with text/text-like parts serialize as input_text and keep image parts as input_image.",
+                "Assistant Message.ContentParts with text, input_text, or output_text parts serialize as output_text and never input_text.",
+                "A user -> assistant -> user round-trip fixture proves the preflight/payload builder preserves role-correct content part types before tool-call replay.",
+                "Existing temperature, stream-repair, and tool-call conversion fixtures remain green without live Codex credentials."
+              ],
+              "note": "Hermes 648b8991 fixed a Responses API rejection where assistant message list content was replayed with input_text. Gormes has the pure converter but still emits input_text for every text part, so add a narrow fixture before auth/live Codex work.",
+              "write_scope": [
+                "internal/hermes/codex_responses_adapter.go",
+                "internal/hermes/codex_responses_adapter_test.go",
+                "internal/hermes/codex_responses_role_content_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestBuildCodexResponsesPayload|TestCodexResponsesRoleContent' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Codex Responses role-content fixtures prove assistant list-content replay uses output_text while user list-content remains input_text."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:648b8991 agent/codex_responses_adapter.py",
+                "note": "Hermes defines the Responses role-specific content part fix; Gormes ports it in the pure provider-conversion boundary."
               }
             },
             {
@@ -4063,7 +4193,8 @@
               "blocked_by": [
                 "Token vault",
                 "Multi-account auth",
-                "Codex Responses pure conversion harness"
+                "Codex Responses pure conversion harness",
+                "Codex Responses assistant content role types"
               ],
               "acceptance": [
                 "Codex tokens persist under Gormes home with provider/account metadata.",
@@ -4081,7 +4212,11 @@
               ],
               "done_signal": [
                 "Fake-auth fixtures prove Codex OAuth state is Gormes-owned and stale refresh failures require relogin."
-              ]
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T17:16:35Z"
+              }
             },
             {
               "name": "Codex stream repair + tool-call leak sanitizer",
@@ -4190,7 +4325,12 @@
                 "last_success": "2026-04-25T06:55:51Z"
               }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-25T17:16:35Z",
+            "origin_decision": "Hermes 648b8991 fixed Codex Responses assistant list-content replay to use output_text instead of input_text. Gormes has pure Responses conversion and stream repair, but the role-specific content-part fixture is not landed yet, so this provider subphase remains upstream-led until that small row and Codex auth/live state rows are validated."
+          }
         },
         "4.B": {
           "name": "Context Engine + Compression",
@@ -4472,9 +4612,9 @@
             {
               "name": "Aux compression single-prompt threshold reconciliation",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Auxiliary compression budgeting follows Hermes 5006b220 by treating the summarizer request as raw messages plus one small user instruction, not as a system-prompt-plus-tool-schema memory-flush request",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4508,7 +4648,7 @@
                 "A compatibility fixture documents the removed legacy headroom behavior and fails if flush_memories assumptions are reintroduced into compression budgeting.",
                 "Existing provider-cap and compressor-budget tests remain green after the threshold/status expectation update."
               ],
-              "note": "Upstream Hermes first added headroom for flush_memories/tool-schema overflow, then 5006b220 removed flush_memories and restored compression feasibility to aux_context because the summarizer sends one user-role prompt with no tools. Gormes still has the legacy headroom helper; this row makes the required drift explicit before live compression wiring depends on stale thresholds.",
+              "note": "Complete: TDD added internal/hermes/context_compressor_single_prompt_test.go and updated the prior headroom/provider-cap fixtures for Hermes 5006b220 semantics. ContextCompressorBudget now sets auxiliary-bound compression thresholds to aux_context directly, reports threshold_source evidence for single_prompt_aux, provider_cap, main_context, or unavailable, preserves auxiliary_context_source provider_cap evidence, and omits request_headroom_tokens/headroom_clamped from compression-only status. Compatibility fixtures fail if tool-schema plus 12000 flush-memory headroom is reintroduced.",
               "write_scope": [
                 "internal/hermes/context_compressor_budget.go",
                 "internal/hermes/context_compressor_headroom_test.go",
@@ -4524,6 +4664,11 @@
               "done_signal": [
                 "Single-prompt compression fixtures prove auxiliary-bound thresholds use aux_context directly, preserve provider-cap evidence, and no longer reserve tool-schema or flush-memory headroom."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5006b220 run_agent.py",
@@ -5011,10 +5156,10 @@
               ]
             },
             {
-              "name": "Unsupported temperature retry + Codex flush guard",
+              "name": "Unsupported temperature retry + Codex no-temperature guard",
               "priority": "P1",
               "status": "complete",
-              "contract": "Provider calls that actually send temperature retry once without it on unsupported-parameter errors, while Codex Responses fallback never emits temperature",
+              "contract": "Provider calls that actually send temperature retry once without it on unsupported-parameter errors, while Codex Responses payload conversion never emits temperature",
               "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -5027,7 +5172,6 @@
                 "../hermes-agent/agent/auxiliary_client.py@b35d692f",
                 "../hermes-agent/tests/agent/test_unsupported_temperature_retry.py@b35d692f",
                 "../hermes-agent/run_agent.py@b35d692f",
-                "../hermes-agent/tests/run_agent/test_flush_memories_codex.py@b35d692f",
                 "internal/hermes/client.go",
                 "internal/hermes/http_client.go",
                 "internal/hermes/codex_responses_adapter.go"
@@ -5052,9 +5196,9 @@
                 "Unsupported-temperature detector matches OpenAI/Codex, Copilot, OpenRouter, Anthropic-compatible, and gateway-style phrasings from the Hermes b35d692f tests.",
                 "When the first request includes temperature and fails with an unsupported-temperature error, exactly one retry removes only temperature and preserves model, max tokens, tools, messages, and timeout context.",
                 "Unrelated 400s and calls that did not send temperature do not trigger the temperature retry path.",
-                "Codex Responses request builders and memory-flush fallback fixtures prove no temperature field is emitted."
+                "Codex Responses request builders prove no temperature field is emitted."
               ],
-              "note": "Complete: TDD landed internal/hermes/unsupported_temperature_retry_test.go. OpenAI-compatible requests now serialize optional max_tokens and temperature when present, retry exactly once without temperature on upstream-matched unsupported-temperature provider errors, preserve the rest of the request body, and record temperature-stripped retry evidence in ProviderStatus. Unrelated 400s and requests that did not send temperature do not retry, while Codex Responses flush-shaped payload fixtures prove temperature is never emitted.",
+              "note": "Complete: TDD landed internal/hermes/unsupported_temperature_retry_test.go. OpenAI-compatible requests now serialize optional max_tokens and temperature when present, retry exactly once without temperature on upstream-matched unsupported-temperature provider errors, preserve the rest of the request body, and record temperature-stripped retry evidence in ProviderStatus. Unrelated 400s and requests that did not send temperature do not retry, while Codex Responses payload fixtures prove the transport mapping never emits temperature.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/kernel/",
@@ -5082,26 +5226,27 @@
             {
               "name": "Codex Responses temperature guard after flush removal",
               "priority": "P2",
-              "status": "planned",
-              "contract": "Codex Responses payload conversion keeps omitting temperature while removing obsolete flush_memories fixture names, source references, and docs language after Hermes 5006b220 deleted memory flush",
-              "contract_status": "draft",
+              "status": "complete",
+              "contract": "Codex Responses payload conversion keeps omitting temperature while removing obsolete memory-flush fixture names, source references, and docs language after Hermes deleted the memory-flush path",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
                 "system"
               ],
-              "degraded_mode": "Provider status and docs explain no-temperature behavior as a Codex Responses transport rule, not as a memory-flush fallback path.",
+              "degraded_mode": "Provider status and docs explain no-temperature behavior as a Codex Responses transport rule independent of session-boundary memory behavior.",
               "fixture": "internal/hermes/codex_responses_temperature_test.go",
               "source_refs": [
                 "../hermes-agent/run_agent.py@5006b220",
                 "../hermes-agent/tests/agent/test_unsupported_temperature_retry.py@5006b220",
                 "../hermes-agent/hermes_cli/config.py@5006b220",
                 "internal/hermes/unsupported_temperature_retry_test.go",
+                "internal/hermes/codex_responses_temperature_test.go",
                 "internal/hermes/codex_responses_adapter.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "ready_when": [
-                "Unsupported temperature retry + Codex flush guard and Generic unsupported-parameter retry + max_tokens guard are validated on main.",
+                "Unsupported temperature retry + Codex no-temperature guard and Generic unsupported-parameter retry + max_tokens guard are validated on main.",
                 "The change can be proven by renaming/splitting fake payload fixtures; no live Codex, OAuth, or memory provider is required."
               ],
               "not_ready_when": [
@@ -5112,11 +5257,11 @@
               ],
               "acceptance": [
                 "Codex Responses request-builder fixtures still prove temperature is never emitted even when ChatRequest.Temperature is set.",
-                "Test names, progress source_refs, and generated docs no longer cite deleted upstream tests/run_agent/test_flush_memories_codex.py as a current donor.",
-                "Unsupported-temperature retry fixtures still cover the Hermes 5006b220 auxiliary task names without auxiliary.flush_memories.",
+                "Test names, progress source_refs, and generated docs no longer cite the deleted upstream Codex memory-flush test as a current donor.",
+                "Unsupported-temperature retry fixtures still cover the Hermes 5006b220 auxiliary task names without the deleted memory-flush auxiliary task.",
                 "Progress validation and internal/hermes tests pass without changing runtime retry semantics."
               ],
-              "note": "Hermes 5006b220 deleted flush_memories and its tests. Gormes still needs the Codex Responses no-temperature rule, but the planner should stop teaching workers that this behavior belongs to a memory-flush fallback.",
+              "note": "Complete: TDD split the Codex Responses no-temperature fixture into internal/hermes/codex_responses_temperature_test.go and renamed the planner boundary around a transport-level request mapping rule. The unsupported-temperature retry fixtures now retain the Hermes auxiliary task table for compression, session_search, vision, and web_extract while excluding the deleted memory-flush auxiliary task, and progress source references no longer list the deleted Codex memory-flush donor test.",
               "write_scope": [
                 "internal/hermes/unsupported_temperature_retry_test.go",
                 "internal/hermes/codex_responses_adapter_test.go",
@@ -5129,8 +5274,13 @@
                 "go run ./cmd/autoloop progress validate"
               ],
               "done_signal": [
-                "Codex Responses temperature fixtures and generated progress docs explain the no-temperature rule without any flush_memories donor references."
+                "Codex Responses temperature fixtures and generated progress docs explain the no-temperature rule without memory-flush donor references."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5006b220 run_agent.py",
@@ -5158,14 +5308,14 @@
                 "internal/hermes/unsupported_temperature_retry_test.go"
               ],
               "ready_when": [
-                "Unsupported temperature retry + Codex flush guard is validated on main.",
+                "Unsupported temperature retry + Codex no-temperature guard is validated on main.",
                 "Gormes HTTP providers serialize MaxTokens and Temperature through fake HTTP tests without live credentials."
               ],
               "not_ready_when": [
                 "The slice deletes arbitrary unsupported parameters silently, retries unrelated 400s, or emits max_completion_tokens when MaxTokens is zero/omitted."
               ],
               "blocked_by": [
-                "Unsupported temperature retry + Codex flush guard"
+                "Unsupported temperature retry + Codex no-temperature guard"
               ],
               "unblocks": [
                 "OpenRouter",
@@ -5220,6 +5370,61 @@
               "note": "Complete: TDD added `RetryBudget.NextDelayFor` so open-stream retry consumes the existing retry budget while preferring a provider `RetryAfter` hint when present, capping it at 16s, and falling back to the jittered schedule when absent. `internal/kernel/retry_test.go` covers capped hint behavior, fallback behavior, and a fast end-to-end retry through the kernel."
             },
             {
+              "name": "Streaming interrupt retry suppression",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Kernel stream cancellation and /stop-style events abort retry loops before any fresh provider stream is opened",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Render/status frames report interrupted retry suppression instead of reconnecting after the operator has cancelled a running turn.",
+              "fixture": "internal/kernel/stream_interrupt_retry_test.go",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@7c17accb",
+                "../hermes-agent/tests/run_agent/test_stream_interrupt_retry.py@7c17accb",
+                "internal/kernel/kernel.go",
+                "internal/kernel/retry.go",
+                "internal/kernel/reset_test.go"
+              ],
+              "ready_when": [
+                "Jittered reconnect backoff schedule and Kernel retry honors Retry-After hint are validated on main.",
+                "A fake hermes.Client can make the first stream attempt return a retryable error while the test submits PlatformEventCancel or cancels the parent context."
+              ],
+              "not_ready_when": [
+                "The slice changes provider error classification, retry timing constants, tool execution cancellation, or gateway command policy instead of only proving retry suppression after cancellation."
+              ],
+              "acceptance": [
+                "If PlatformEventCancel arrives during a stream attempt that then returns a retryable error, the kernel enters cancellation/finalization and does not call OpenStream again.",
+                "If the parent context is cancelled before reconnect backoff completes, Wait returns immediately and no retry attempt is opened.",
+                "A no-cancel control fixture still retries normally after a transient stream error so the fix does not disable Route-B recovery.",
+                "Interrupted turns continue to skip memory sync instead of persisting partial assistant content."
+              ],
+              "note": "Hermes 7c17accb fixed a bug where /stop closed the current stream but the retry loop opened a fresh connection. Gormes already routes retry through context cancellation, but needs a narrow regression fixture so future kernel changes cannot reintroduce a post-cancel reconnect.",
+              "write_scope": [
+                "internal/kernel/stream_interrupt_retry_test.go",
+                "internal/kernel/kernel.go",
+                "internal/kernel/retry.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/kernel -run 'TestKernel_StreamInterruptSuppressesRetry|TestRetryBudget_WaitRespectsContextCancel' -count=1",
+                "go test ./internal/kernel -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Kernel interrupt retry fixtures prove cancel-before-retry, context-cancel-during-backoff, no-cancel retry recovery, and interrupted memory-sync suppression."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:7c17accb run_agent.py",
+                "note": "Hermes exposes the retry-after-stop regression; Gormes should lock the same behavior at the Go kernel retry boundary."
+              }
+            },
+            {
               "name": "Prompt-cache capability guard",
               "status": "planned",
               "note": "TDD: port `agent/prompt_caching.py` model/provider capability checks so cache-control metadata is attached only when the selected provider supports it."
@@ -5232,8 +5437,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T13:39:00Z",
-            "origin_decision": "Hermes 6e561ffa generalized unsupported-parameter retry and hardened max_tokens retry after the existing Gormes temperature-specific slice landed. Gormes should keep this subphase upstream-led until generic parameter retry, prompt-cache guards, and provider budget telemetry are fixture-backed."
+            "last_upstream_check": "2026-04-25T17:16:35Z",
+            "origin_decision": "Hermes 7c17accb added a streaming retry interrupt guard after the generic unsupported-parameter work. Gormes has retry/backoff and provider-hint behavior, but this subphase remains upstream-led until the cancel-before-retry fixture, prompt-cache guards, and provider budget telemetry are fixture-backed."
           }
         }
       }
@@ -6316,9 +6521,9 @@
             {
               "name": "Top-level oneshot flag and model/provider resolver",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes accepts a top-level `-z/--oneshot` prompt plus `--model`, `--provider`, GORMES_INFERENCE_MODEL, and GORMES_INFERENCE_PROVIDER overrides with Hermes-compatible ambiguity errors before any agent execution starts",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -6342,7 +6547,7 @@
                 "The slice opens the TUI, starts the kernel, sends provider requests, changes config file schema broadly, or implements stdout capture and tool approval behavior in the same change."
               ],
               "unblocks": [
-                "Oneshot stdout-only kernel execution"
+                "Oneshot final-output writer boundary"
               ],
               "acceptance": [
                 "`gormes -z 'hi' --model fixture-model` parses without invoking runTUI or api_server health checks.",
@@ -6365,6 +6570,11 @@
               "done_signal": [
                 "Oneshot flag fixtures prove top-level parsing, provider-without-model exit 2, env fallback, and no TUI/gateway startup during resolution."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5006b220 hermes_cli/oneshot.py",
@@ -6372,10 +6582,10 @@
               }
             },
             {
-              "name": "Oneshot stdout-only kernel execution",
+              "name": "Oneshot final-output writer boundary",
               "priority": "P2",
               "status": "planned",
-              "contract": "One-shot mode runs exactly one native Gormes turn, auto-resolves noninteractive prompts safely, and writes only the final assistant content to stdout",
+              "contract": "One-shot mode runs one native Gormes kernel turn over a fake provider and writes only final assistant content plus one trailing newline to stdout",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -6383,51 +6593,111 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "CLI output reports provider/client setup failures on stderr with nonzero exit codes while never mixing banners, TUI frames, tool previews, or session IDs into stdout.",
-              "fixture": "cmd/gormes/oneshot_execution_test.go",
+              "degraded_mode": "CLI output reports provider/client setup failures on stderr with nonzero exit codes while banners, render frames, tool previews, logs, and session IDs never enter stdout.",
+              "fixture": "cmd/gormes/oneshot_output_test.go",
               "source_refs": [
-                "../hermes-agent/hermes_cli/oneshot.py@5006b220",
-                "../hermes-agent/hermes_cli/main.py@5006b220",
+                "../hermes-agent/hermes_cli/oneshot.py@648b8991",
+                "../hermes-agent/hermes_cli/main.py@648b8991",
                 "cmd/gormes/main.go",
                 "internal/kernel/kernel.go",
-                "internal/cli/toolset_config.go",
-                "internal/tools/"
+                "internal/hermes/client.go"
               ],
               "ready_when": [
                 "Top-level oneshot flag and model/provider resolver is validated on main.",
                 "A fake hermes.Client can stream one assistant final response through the existing kernel without live provider credentials."
               ],
               "not_ready_when": [
-                "The slice implements interactive TUI behavior, starts gateway transports, changes tool registry defaults, or auto-approves dangerous commands without an explicit audit/status fixture."
+                "The slice implements interactive TUI behavior, starts gateway transports, changes tool registry defaults, or decides noninteractive dangerous-command approval policy."
               ],
-              "blocked_by": [
-                "Top-level oneshot flag and model/provider resolver"
+              "unblocks": [
+                "Oneshot noninteractive safety and clarify policy"
               ],
               "acceptance": [
-                "A fake-client oneshot command prints only the final assistant content plus one trailing newline to stdout.",
-                "Status frames, tool-progress frames, banners, session IDs, and logs are suppressed from stdout and either dropped or routed to stderr according to fixture expectations.",
-                "Clarify-style unavailable prompts return a deterministic noninteractive assumption response instead of hanging.",
-                "Dangerous-command and hook auto-approval behavior is explicit in audit/status evidence and defaults to the existing Gormes safety policy when no bypass flag exists."
+                "A fake-client `gormes -z 'hi' --model fixture-model` command prints exactly the final assistant content plus one trailing newline to stdout.",
+                "Status frames, tool-progress frames, banners, session IDs, and logs are absent from stdout and either suppressed or routed to stderr under explicit fixtures.",
+                "Provider/client setup failures return nonzero exit status with operator-readable stderr and empty stdout.",
+                "The command starts no TUI, gateway transport, api_server bridge, or live provider request in the focused fixture."
               ],
-              "note": "Keep execution separate from flag parsing. Hermes bypasses cli.py and redirects stdout/stderr around AIAgent; Gormes should express the same public behavior over the native kernel with fake-client fixtures before live provider use.",
+              "note": "Split from the failed broad oneshot row so the first worker owns only output capture and one fake kernel turn. Safety/clarify behavior follows in the dependent row.",
               "write_scope": [
-                "cmd/gormes/",
+                "cmd/gormes/main.go",
+                "cmd/gormes/oneshot_output_test.go",
                 "internal/kernel/",
-                "internal/cli/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./cmd/gormes -run TestOneshotExecution -count=1",
-                "go test ./cmd/gormes ./internal/kernel ./internal/cli -count=1",
+                "go test ./cmd/gormes -run TestOneshotFinalOutput -count=1",
+                "go test ./cmd/gormes ./internal/kernel -count=1",
                 "go run ./cmd/autoloop progress validate"
               ],
               "done_signal": [
-                "Oneshot execution fixtures prove stdout contains only final content, fake-client execution uses one native kernel turn, and noninteractive prompts cannot hang."
+                "Oneshot output fixtures prove one fake kernel turn, stdout-only final content, stderr-only setup failures, and no TUI/gateway/provider startup."
               ],
               "provenance": {
                 "origin_type": "hybrid",
-                "upstream_ref": "hermes:5006b220 hermes_cli/oneshot.py",
-                "note": "Hermes defines stdout-only one-shot behavior; Gormes owns the native kernel execution and safety/audit adaptation."
+                "upstream_ref": "hermes:648b8991 hermes_cli/oneshot.py",
+                "note": "Hermes defines stdout-only one-shot behavior; Gormes owns the native kernel/output-capture adaptation."
+              }
+            },
+            {
+              "name": "Oneshot noninteractive safety and clarify policy",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "One-shot mode resolves clarify-style prompts and dangerous-command/hook approvals deterministically without hanging or silently widening Gormes safety defaults",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "One-shot status/audit evidence reports noninteractive assumption, clarify_unavailable, dangerous_command_blocked, or explicit approval-bypass state instead of waiting for TUI input.",
+              "fixture": "cmd/gormes/oneshot_safety_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/oneshot.py@648b8991",
+                "../hermes-agent/run_agent.py@648b8991",
+                "cmd/gormes/main.go",
+                "internal/cli/toolset_config.go",
+                "internal/tools/",
+                "internal/kernel/kernel.go"
+              ],
+              "ready_when": [
+                "Oneshot final-output writer boundary is validated on main.",
+                "Dangerous-command and clarify fixtures can use fake tools/providers without interactive stdin or live credentials."
+              ],
+              "not_ready_when": [
+                "The slice changes stdout capture, starts gateway transports, enables broad auto-approval by default, or rewrites the shared tool registry."
+              ],
+              "blocked_by": [
+                "Oneshot final-output writer boundary"
+              ],
+              "acceptance": [
+                "Clarify-style unavailable prompts return a deterministic noninteractive assumption or clarify_unavailable error instead of reading stdin.",
+                "Dangerous-command and hook approval behavior is explicit in audit/status evidence and defaults to the existing Gormes safety policy when no bypass flag exists.",
+                "Any bypass flag or future approval mode is fixture-locked as operator-local only and is never enabled for gateway or child-agent trust classes.",
+                "The existing final-output fixtures remain green so safety evidence does not leak into stdout."
+              ],
+              "note": "Second half of oneshot execution. Keep policy decisions out of the stdout boundary slice so workers do not mix CLI output plumbing with tool-safety semantics.",
+              "write_scope": [
+                "cmd/gormes/main.go",
+                "cmd/gormes/oneshot_safety_test.go",
+                "internal/cli/",
+                "internal/tools/",
+                "internal/kernel/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes -run TestOneshotSafety -count=1",
+                "go test ./cmd/gormes ./internal/cli ./internal/tools ./internal/kernel -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Oneshot safety fixtures prove clarify/noninteractive behavior, dangerous-command audit evidence, trust-class boundaries, and no stdout contamination."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:648b8991 hermes_cli/oneshot.py",
+                "note": "Hermes defines one-shot noninteractive execution; Gormes keeps safety policy explicit in Go CLI/tool fixtures."
               }
             },
             {
@@ -6565,10 +6835,10 @@
               "note": "TDD: port operator management commands after the shared gateway read models land, so status/pairing/platform/cron commands consume the same stores as the runtime."
             },
             {
-              "name": "Update service restart active polling",
+              "name": "Service RestartSec parser helper",
               "priority": "P2",
               "status": "planned",
-              "contract": "Update and service-management flows verify restarted gateway services by polling active status for at least RestartSec plus slack instead of racing the systemd cooldown window",
+              "contract": "Service-management helpers parse systemd RestartUSec/RestartSec evidence into a bounded restart delay without invoking live service managers",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -6576,50 +6846,104 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "CLI update/status output reports service restart timeout, retry, missing service manager, or unsupported platform evidence instead of claiming a restarted gateway that immediately crashed.",
-              "fixture": "internal/cli/service_restart_test.go",
+              "degraded_mode": "CLI service status reports restart_delay_defaulted, restart_delay_malformed, restart_delay_infinite, or service_manager_unavailable evidence instead of hiding parser failures.",
+              "fixture": "internal/cli/service_restart_parse_test.go",
               "source_refs": [
-                "../hermes-agent/hermes_cli/main.py@5006b220",
+                "../hermes-agent/hermes_cli/main.py@648b8991",
                 "internal/cli/",
                 "scripts/install.sh",
-                "scripts/install.ps1",
-                "docs/content/building-gormes/architecture_plan/progress.json"
+                "scripts/install.ps1"
               ],
               "ready_when": [
-                "This slice owns a pure service-manager helper with a fake runner and no command wiring; later Gateway/platform/webhook/cron CLI rows can consume it.",
+                "This slice owns only a pure parser/helper with fake command output fixtures; no command wiring or real service control is needed.",
                 "Installer source-backed update flow remains documented as Gormes' current public update path."
               ],
               "not_ready_when": [
-                "The slice invokes live systemctl/sc.exe in unit tests, changes installer layout policy, edits gateway restart command semantics, or combines restart polling with unrelated setup/auth command ports."
+                "The slice invokes live systemctl/sc.exe, changes installer layout policy, edits gateway restart command semantics, or implements active polling."
+              ],
+              "unblocks": [
+                "Service restart active-status poller"
               ],
               "acceptance": [
-                "A pure helper parses RestartUSec values such as 30s, 100ms, 1min 30s, infinity, blank, and malformed output into a bounded restart delay or default.",
-                "After graceful exit-75, the active-status poll timeout is max(10s, parsed_restart_sec+10s), and fake 500ms polling continues through the cooldown window.",
-                "Hard restart flows can reuse the same helper with the original 10s timeout when no RestartSec evidence exists.",
-                "Fixtures distinguish active-after-delay, active-after-RestartSec, timeout, missing service manager, malformed RestartUSec, and crashed-after-restart outcomes with operator-readable evidence.",
+                "A pure helper parses RestartUSec/RestartSec values such as 30s, 100ms, 1min 30s, infinity, blank, zero, and malformed output into a bounded restart delay or documented default.",
+                "Parser fixtures preserve operator-readable evidence for defaulted, malformed, missing, unsupported, and infinite restart-delay cases.",
                 "Tests run without live systemd, Windows service control, root privileges, or network access."
               ],
-              "note": "Hermes 6e561ffa replaced a fixed sleep(3) post-restart check with bounded `systemctl is-active` polling, then 5006b220 extended the timeout past systemd RestartSec so update does not give up during the cooldown. Gormes can freeze this as a pure fake-runner helper now, before command wiring touches real service managers.",
+              "note": "Split from the still-failing active-polling row. Land the RestartSec parser first so active polling does not mix duration parsing with fake service-runner state machines.",
               "write_scope": [
-                "internal/cli/",
+                "internal/cli/service_restart.go",
+                "internal/cli/service_restart_parse_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/cli -run 'TestServiceRestart(ActivePolling|RestartSec)' -count=1",
+                "go test ./internal/cli -run TestServiceRestartParser -count=1",
                 "go test ./internal/cli -count=1",
                 "go run ./cmd/autoloop progress validate"
               ],
               "done_signal": [
-                "Service restart fixtures prove RestartSec parsing, cooldown-aware active-status polling, delayed-active success, timeout evidence, retry boundaries, and no live service-manager dependency."
+                "RestartSec parser fixtures prove bounded duration parsing, default/malformed evidence, and no live service-manager dependency."
               ],
-              "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-25T16:23:17Z"
-              },
               "provenance": {
                 "origin_type": "hybrid",
-                "upstream_ref": "hermes:5006b220 hermes_cli/main.py",
-                "note": "Hermes defines the RestartSec-aware restart verification regression; Gormes should adapt only the service-manager helper behavior before its Go CLI update path exists."
+                "upstream_ref": "hermes:648b8991 hermes_cli/main.py",
+                "note": "Hermes defines RestartSec-aware restart verification; Gormes first freezes the pure parser/helper boundary."
+              }
+            },
+            {
+              "name": "Service restart active-status poller",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Update and service-management flows poll fake active status through the RestartSec cooldown window before reporting restarted, timeout, or crashed evidence",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "CLI update/status output reports service restart timeout, retry, missing service manager, or crashed-after-restart evidence instead of claiming a restarted gateway that immediately failed.",
+              "fixture": "internal/cli/service_restart_poll_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/main.py@648b8991",
+                "internal/cli/service_restart.go",
+                "internal/cli/service_restart_parse_test.go",
+                "scripts/install.sh",
+                "scripts/install.ps1"
+              ],
+              "ready_when": [
+                "Service RestartSec parser helper is validated on main.",
+                "The poller can run with a fake runner, fake clock, and no command wiring; later Gateway/platform/webhook/cron CLI rows can consume it."
+              ],
+              "not_ready_when": [
+                "The slice invokes live systemctl/sc.exe in unit tests, changes installer layout policy, edits gateway restart command semantics, or combines restart polling with setup/auth command ports."
+              ],
+              "blocked_by": [
+                "Service RestartSec parser helper"
+              ],
+              "acceptance": [
+                "After graceful exit-75, the active-status poll timeout is max(10s, parsed_restart_sec+10s), and fake 500ms polling continues through the cooldown window.",
+                "Hard restart flows can reuse the same helper with the original 10s timeout when no RestartSec evidence exists.",
+                "Fixtures distinguish active-after-delay, active-after-RestartSec, timeout, missing service manager, malformed RestartUSec fallback, and crashed-after-restart outcomes with operator-readable evidence.",
+                "Tests run without live systemd, Windows service control, root privileges, or network access."
+              ],
+              "note": "Second half of the restart-polling split. Keep the fake-runner polling state machine independent from parser and installer policy work.",
+              "write_scope": [
+                "internal/cli/service_restart.go",
+                "internal/cli/service_restart_poll_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run TestServiceRestartPoller -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Service restart poller fixtures prove cooldown-aware active polling, timeout/crash evidence, hard-restart fallback, and no live service-manager dependency."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:648b8991 hermes_cli/main.py",
+                "note": "Hermes defines the RestartSec-aware active polling regression; Gormes adapts it as fake-runner CLI helper behavior."
               }
             },
             {

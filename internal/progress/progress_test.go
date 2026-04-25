@@ -252,8 +252,8 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 	}
 
 	slack := p.Phases["2"].Subphases["2.B.3"]
-	if got := slack.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.B.3 = %q, want in_progress", got)
+	if got := slack.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.B.3 = %q, want complete", got)
 	}
 	slackItems := itemStatusByName(slack.Items)
 	for name, want := range map[string]Status{
@@ -261,7 +261,7 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 		"Thread routing + coalesced reply flow":          StatusComplete,
 		"Slack CommandRegistry parser wiring":            StatusComplete,
 		"Slack gateway.Channel adapter shim":             StatusComplete,
-		"Slack config + cmd/gormes gateway registration": StatusPlanned,
+		"Slack config + cmd/gormes gateway registration": StatusComplete,
 	} {
 		if got := slackItems[name]; got != want {
 			t.Errorf("Phase 2.B.3 item %q = %q, want %q", name, got, want)
@@ -274,6 +274,13 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 	}
 	if !strings.Contains(parser.Note, "gateway.ParseInboundText") || !strings.Contains(parser.Note, "GatewayHelpLines") {
 		t.Fatalf("Slack parser note = %q, want shared parser/help evidence", parser.Note)
+	}
+	slackConfig := slackContracts["Slack config + cmd/gormes gateway registration"]
+	if slackConfig.ContractStatus != ContractStatusValidated {
+		t.Fatalf("Slack config contract status = %q, want validated", slackConfig.ContractStatus)
+	}
+	if !strings.Contains(slackConfig.Note, "shared Manager registration") || !strings.Contains(slackConfig.Note, "missing-token") {
+		t.Fatalf("Slack config note = %q, want shared manager/degraded status evidence", slackConfig.Note)
 	}
 
 	skills := p.Phases["2"].Subphases["2.G"]
@@ -743,19 +750,28 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.F.3 gateway status readout contract/acceptance = %q / %v, want command/configured-channels detail", statusReadout.Contract, statusReadout.Acceptance)
 	}
 	statusJSON := lifecycleItems["Runtime status JSON + PID/process validation"]
-	if statusJSON.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 runtime status JSON status = %q, want planned", statusJSON.Status)
+	if statusJSON.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 runtime status JSON status = %q, want complete", statusJSON.Status)
+	}
+	if statusJSON.ContractStatus != ContractStatusValidated {
+		t.Fatalf("Phase 2.F.3 runtime status JSON contract status = %q, want validated", statusJSON.ContractStatus)
+	}
+	if !strings.Contains(statusJSON.Note, "RuntimeStatusStore") ||
+		!strings.Contains(statusJSON.Note, "PID identity") ||
+		!strings.Contains(statusJSON.Note, "runtime_validation") {
+		t.Fatalf("Phase 2.F.3 runtime status JSON note = %q, want PID/runtime_validation evidence", statusJSON.Note)
 	}
 	tokenLocks := lifecycleItems["Token-scoped gateway locks"]
-	if tokenLocks.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 token-scoped locks status = %q, want planned", tokenLocks.Status)
+	if tokenLocks.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 token-scoped locks status = %q, want complete", tokenLocks.Status)
 	}
-	if tokenLocks.ContractStatus != ContractStatusDraft {
-		t.Fatalf("Phase 2.F.3 token-scoped locks contract status = %q, want draft", tokenLocks.ContractStatus)
+	if tokenLocks.ContractStatus != ContractStatusValidated {
+		t.Fatalf("Phase 2.F.3 token-scoped locks contract status = %q, want validated", tokenLocks.ContractStatus)
 	}
 	if !strings.Contains(tokenLocks.Contract, "credential hash") ||
-		!containsString(tokenLocks.SourceRefs, "../hermes-agent/gateway/status.py@d635e2df") {
-		t.Fatalf("Phase 2.F.3 token-scoped locks contract/source_refs = %q / %v, want credential-hash upstream status detail", tokenLocks.Contract, tokenLocks.SourceRefs)
+		!containsString(tokenLocks.SourceRefs, "../hermes-agent/gateway/status.py@d635e2df") ||
+		!strings.Contains(tokenLocks.Note, "Token-scoped locks") {
+		t.Fatalf("Phase 2.F.3 token-scoped locks contract/source_refs/note = %q / %v / %q, want credential-hash upstream status detail", tokenLocks.Contract, tokenLocks.SourceRefs, tokenLocks.Note)
 	}
 	restartMarkers := lifecycleItems["Gateway /restart command + takeover markers"]
 	if restartMarkers.Status != StatusPlanned {

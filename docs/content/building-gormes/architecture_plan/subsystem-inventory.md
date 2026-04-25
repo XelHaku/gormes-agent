@@ -117,7 +117,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Copilot ACP client | `agent/copilot_acp_client.py` | 4.A | ⏳ planned |
 | Auxiliary client (multi-provider: Anthropic, Codex, OpenRouter, xAI) | `agent/auxiliary_client.py` (`AnthropicAuxiliaryClient`, `AsyncAnthropicAuxiliaryClient`, `CodexAuxiliaryClient`, `AsyncCodexAuxiliaryClient`) + `tools/xai_http.py` | 4.A | ⏳ planned |
 | Auxiliary chat completion shims (ACP / Anthropic / Codex / Gemini) | `agent/*_adapter.py` internal `_*ChatShim`, `_*ChatCompletions`, `_*CompletionsAdapter`, `_*StreamChunk` classes | 4.A | ⏳ planned |
-| Codex Responses conversion | `agent/codex_responses_adapter.py`, `tests/run_agent/test_run_agent_codex_responses.py` | 4.A | ⏳ planned — fixture-only Responses request/response conversion should land before Codex OAuth, live routing, stream repair, or ChatGPT backend calls |
+| Codex Responses conversion | `agent/codex_responses_adapter.py`, `tests/run_agent/test_run_agent_codex_responses.py`, `tests/run_agent/test_provider_parity.py` | 4.A | 🔨 partial — pure Responses request/response conversion and stream repair are landed; Hermes `648b8991` adds the remaining assistant `output_text` role-content fixture before Codex OAuth, live routing, or ChatGPT backend calls |
 | Billing + cost + usage types | `agent/*` — `BillingRoute`, `CanonicalUsage`, `CostResult` classes | 4.E / 4.H | ⏳ planned |
 | Provider failover | `agent/*` — `FailoverReason` enum + routing logic | 4.H | ⏳ planned |
 | Model metadata types | `agent/model_metadata.py` — `ModelCapabilities`, `ModelInfo` classes | 4.D | ⏳ planned |
@@ -136,7 +136,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Credential files | `tools/credential_files.py` | 4.G | ⏳ planned |
 | Anthropic OAuth/keychain discovery | `tests/agent/test_anthropic_keychain.py`, `hermes_cli/auth.py` | 4.G | ⏳ planned — credential discovery should report OAuth, keychain, stale, and missing-key states through the Gormes token vault once that seam exists |
 | Rate limit tracker | `agent/rate_limit_tracker.py` + `nous_rate_guard.py` | 4.H | ⏳ planned |
-| Retry utils | `agent/retry_utils.py` | 4.H | ✅ shipped for retry timing — `internal/kernel/retry.go` applies 1s/2s/4s/8s/16s reconnect backoff with +/-20% jitter, `HTTPError.RetryAfter` parses header/body hints, and the kernel prefers capped provider hints over the schedule. Remaining Phase 4.H resilience work is prompt-cache capability guards plus provider rate/budget telemetry, not core retry timing |
+| Retry utils | `agent/retry_utils.py`, `tests/run_agent/test_stream_interrupt_retry.py` | 4.H | 🔨 partial — `internal/kernel/retry.go` applies 1s/2s/4s/8s/16s reconnect backoff with +/-20% jitter, `HTTPError.RetryAfter` parses header/body hints, and the kernel prefers capped provider hints over the schedule. Hermes `7c17accb` adds a cancel-before-retry regression that still needs a Go kernel fixture before prompt-cache capability guards and provider rate/budget telemetry |
 | Prompt caching | `agent/prompt_caching.py` | 4.H | ⏳ planned |
 | Subdirectory hints | `agent/subdirectory_hints.py` | 4.B | ⏳ planned |
 | Skill commands / utils | `agent/skill_commands.py`, `agent/skill_utils.py`, `agent/skill_preprocessing.py` | 4.C / 5.F | ⏳ planned — upstream now has preprocessing and skill-backed slash-command behavior; Gormes should reuse the Phase 2.G active/inactive skill store instead of adding a second skill substrate |
@@ -219,7 +219,7 @@ The upstream `hermes_cli/` has 49 Python files. Grouped by capability:
 
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
-| CLI entry + setup + uninstall | `hermes_cli/{main,setup,uninstall,env_loader,commands,callbacks,completion,oneshot}.py` | 5.O | ⏳ planned — include upstream busy-command guards, top-level `-z/--oneshot` parser/execution slices, and RestartSec-aware update polling so `/compress`, one-shot calls, and service restarts produce deterministic operator-visible behavior |
+| CLI entry + setup + uninstall | `hermes_cli/{main,setup,uninstall,env_loader,commands,callbacks,completion,oneshot}.py` | 5.O | 🔨 partial — busy-command guards, platform toolset persistence helpers, and top-level `-z/--oneshot` parser/resolver are validated; remaining rows split final-output capture, noninteractive one-shot safety, RestartSec parser helper, and active-status poller before broader setup/auth command ports |
 | Auth commands (base) | `hermes_cli/{auth,auth_commands}.py` | 5.O | ⏳ planned |
 | Provider-specific auth | `hermes_cli/{copilot_auth,dingtalk_auth}.py` + (`hermes_cli/nous_subscription.py` for Nous) | 5.O | ⏳ planned |
 | Backup / dump / debug | `hermes_cli/{backup,dump,debug,logs,doctor,status}.py` | 5.O | ⏳ planned |
