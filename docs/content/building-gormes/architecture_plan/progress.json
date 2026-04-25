@@ -5204,9 +5204,9 @@
             {
               "name": "Dashboard page-scoped plugin slot inventory",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Dashboard plugin metadata preserves Hermes page-scoped slot names with colons and exposes them through the native disabled plugin inventory without claiming React/Vite runtime support",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -5241,7 +5241,7 @@
                 "The fixture documents the Hermes known page-scoped slot catalogue as metadata only, without adding an allowlist that would reject future slot names.",
                 "Empty or unknown slot names remain inert metadata and do not create executable backend routes."
               ],
-              "note": "Hermes af22421e/cf2fabc4 added page-scoped dashboard slots such as sessions:top and chat:bottom. Gormes already treats dashboard slots as metadata while the native React/Vite runtime is absent, but needs a focused fixture so colons are not mangled and public status stays honest.",
+              "note": "Complete: TDD landed focused page-scoped dashboard slot fixtures. Synthetic dashboard/manifest.json metadata now proves colon-bearing Hermes page-scoped slot names round-trip unchanged through internal/plugins LoadDir and /api/dashboard/plugins while runtime.react_vite_runtime remains absent. Empty and future slot names stay inert metadata and do not create executable backend route rows.",
               "write_scope": [
                 "internal/plugins/",
                 "internal/apiserver/",
@@ -5259,6 +5259,11 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:af22421e web/src/plugins/slots.ts",
                 "note": "Hermes defines the page-scoped slot catalogue; Gormes should preserve it as Go-native metadata until it owns a dashboard slot runtime."
+              },
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T14:55:15Z",
+                "last_success": "2026-04-25T14:55:15Z"
               }
             },
             {
