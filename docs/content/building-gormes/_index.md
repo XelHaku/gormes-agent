@@ -66,6 +66,10 @@ instructions elsewhere. `autoloop` should consume the same source of truth that
 contributors read: progress rows for machine selection, generated pages for
 operator review, and row metadata for worker prompts.
 
+Worker execution is isolated: `cmd/autoloop` creates a git worktree under
+`RUN_ROOT/worktrees` for each selected row, runs the backend there, and rejects
+committed paths outside that row's `write_scope` before promotion.
+
 ## Contributor path
 
 Use the planning docs in this order:

@@ -63,20 +63,31 @@ Useful environment variables:
 
 ## Worker isolation and promotion
 
-Each selected worker runs on its own branch named
+Each selected worker runs in its own git worktree under
+`$RUN_ROOT/worktrees/<run-id>/w<worker>` on a branch named
 `autoloop/<run-id>/w<worker>/<slug>` cut from the autoloop base branch. The
+backend command runs with that worktree as its working directory, so worker
+edits cannot dirty the control checkout while autoloop is monitoring them. The
 flow per worker is:
 
 1. Pre-flight: refuse to launch if the repo has unmerged paths or uncommitted
    changes (emits `run_failed:worktree_unmerged` / `run_failed:worktree_dirty`).
-2. Switch to a fresh worker branch and record its base commit.
+2. Create a fresh worker branch in an isolated worktree and record its base
+   commit.
 3. Run the backend with the worker prompt (which tells the agent the branch
-   name).
-4. Verify no merge conflicts and require the worker branch to be clean. Dirty
-   output emits `worker_failed:worktree_dirty` and the run stops for inspection.
-5. Restore the autoloop base branch and call `PromoteWorker`:
+   name and allowed write scope).
+4. Verify no merge conflicts, require the worker worktree to stay on its
+   assigned branch, and require it to be clean. Dirty output emits
+   `worker_failed:worktree_dirty` and the run stops for inspection without
+   dirtying the base checkout.
+5. Diff the worker commit against its base commit and reject any changed path
+   outside the selected row's `write_scope`
+   (`worker_failed:write_scope_violation`).
+6. From the clean control checkout, call `PromoteWorker`:
    `git push origin <branch>` then `gh pr create --fill --head <branch>`,
    falling back to `git cherry-pick -Xtheirs <commit>` if push or `gh` fails.
+   Clean successful/no-change worktrees are removed; failed worktrees stay in
+   `$RUN_ROOT/worktrees/` for inspection.
 
 Each promotion attempt emits a `worker_promoted` or `worker_promotion_failed`
 ledger event so the audit's `productivity` metric reflects work that actually

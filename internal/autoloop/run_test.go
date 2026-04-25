@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDryRunSelectsCandidatesWithoutRunningBackend(t *testing.T) {
@@ -548,8 +549,8 @@ func TestRunOnceFailsWhenWorkerLeavesDirtyWorktree(t *testing.T) {
 		}
 	}`)
 	runRoot := t.TempDir()
-	runner := runnerFunc(func(context.Context, Command) Result {
-		if err := os.WriteFile(filepath.Join(repoRoot, "worker-dirty.go"), []byte("package dirty\n"), 0o644); err != nil {
+	runner := runnerFunc(func(_ context.Context, command Command) Result {
+		if err := os.WriteFile(filepath.Join(command.Dir, "worker-dirty.go"), []byte("package dirty\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		return Result{}
@@ -584,6 +585,82 @@ func TestRunOnceFailsWhenWorkerLeavesDirtyWorktree(t *testing.T) {
 	}
 }
 
+func TestRunOnceRunsWorkerInIsolatedGitWorktree(t *testing.T) {
+	repoRoot := t.TempDir()
+	initCleanRepo(t, repoRoot)
+	progressPath := writeProgressJSON(t, `{
+		"phases": {
+			"12": {
+				"subphases": {
+					"12.A": {
+						"items": [
+							{
+								"item_name": "isolated worker",
+								"status": "planned",
+								"contract": "isolation contract",
+								"contract_status": "draft",
+								"write_scope": ["internal/channels/whatsapp/"]
+							}
+						]
+					}
+				}
+			}
+		}
+	}`)
+	runRoot := t.TempDir()
+	var workerDir string
+	runner := runnerFunc(func(_ context.Context, command Command) Result {
+		workerDir = command.Dir
+		if workerDir == repoRoot {
+			return Result{}
+		}
+		outsidePath := filepath.Join(workerDir, "www.gormes.ai", "internal", "site", "content.go")
+		if err := os.MkdirAll(filepath.Dir(outsidePath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(outsidePath, []byte("package site\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return Result{}
+	})
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:     repoRoot,
+			ProgressJSON: progressPath,
+			RunRoot:      runRoot,
+			Backend:      "opencode",
+			Mode:         "safe",
+			MaxAgents:    1,
+			MaxPhase:     12,
+		},
+		Runner: runner,
+		Now:    time.Date(2026, 4, 25, 1, 40, 0, 0, time.UTC),
+	})
+	if err == nil {
+		t.Fatal("RunOnce() error = nil, want dirty worker worktree error")
+	}
+	if workerDir == "" {
+		t.Fatal("worker command was not captured")
+	}
+	if workerDir == repoRoot {
+		t.Fatalf("worker command Dir = repo root %q, want isolated worktree", repoRoot)
+	}
+	wantDir := filepath.Join(runRoot, "worktrees", "20260425T014000Z", "w1")
+	if workerDir != wantDir {
+		t.Fatalf("worker command Dir = %q, want %q", workerDir, wantDir)
+	}
+	if !strings.Contains(err.Error(), "uncommitted changes") {
+		t.Fatalf("RunOnce() error = %q, want dirty worktree context", err)
+	}
+	if status := gitStatusPorcelain(t, repoRoot); status != "" {
+		t.Fatalf("base repo status = %q, want clean", status)
+	}
+	if current := mustGitCurrentBranch(t, repoRoot); current != "master" {
+		t.Fatalf("base repo branch = %q, want master", current)
+	}
+}
+
 func TestRunOnceFailsWhenWorkerCommitsOutsideWriteScope(t *testing.T) {
 	repoRoot := t.TempDir()
 	initCleanRepo(t, repoRoot)
@@ -610,15 +687,15 @@ func TestRunOnceFailsWhenWorkerCommitsOutsideWriteScope(t *testing.T) {
 	runner := runnerFunc(func(_ context.Context, command Command) Result {
 		switch command.Name {
 		case "opencode":
-			outsidePath := filepath.Join(repoRoot, "outside", "scope.txt")
+			outsidePath := filepath.Join(command.Dir, "outside", "scope.txt")
 			if err := os.MkdirAll(filepath.Dir(outsidePath), 0o755); err != nil {
 				t.Fatal(err)
 			}
 			if err := os.WriteFile(outsidePath, []byte("scope leak\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			runGitCommand(t, repoRoot, "add", "outside/scope.txt")
-			runGitCommand(t, repoRoot, "commit", "-m", "scope leak")
+			runGitCommand(t, command.Dir, "add", "outside/scope.txt")
+			runGitCommand(t, command.Dir, "commit", "-m", "scope leak")
 			return Result{}
 		case "git", "gh":
 			return Result{}
@@ -683,8 +760,8 @@ func TestRunOnceFailsWhenWorkerLeavesWorkerBranch(t *testing.T) {
 		if command.Name == "opencode" {
 			return ExecRunner{}.Run(context.Background(), Command{
 				Name: "git",
-				Args: []string{"switch", "master"},
-				Dir:  repoRoot,
+				Args: []string{"switch", "-c", "escaped-worker"},
+				Dir:  command.Dir,
 			})
 		}
 		return Result{Err: ErrUnexpectedCommand}
@@ -736,8 +813,8 @@ func TestRunOnceFailsWhenWorkerLeavesMergeConflicts(t *testing.T) {
 		}
 	}`)
 	runRoot := t.TempDir()
-	runner := runnerFunc(func(context.Context, Command) Result {
-		cmd := exec.Command("git", "-C", repoRoot, "merge", "worker-branch")
+	runner := runnerFunc(func(_ context.Context, command Command) Result {
+		cmd := exec.Command("git", "-C", command.Dir, "merge", "worker-branch")
 		output, err := cmd.CombinedOutput()
 		if err == nil {
 			t.Fatalf("git merge unexpectedly succeeded:\n%s", output)
@@ -825,6 +902,16 @@ func mustGitCurrentBranch(t *testing.T, repoRoot string) string {
 	out, err := exec.Command("git", "-C", repoRoot, "branch", "--show-current").Output()
 	if err != nil {
 		t.Fatalf("git branch --show-current failed: %v", err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func gitStatusPorcelain(t *testing.T, repoRoot string) string {
+	t.Helper()
+
+	out, err := exec.Command("git", "-C", repoRoot, "status", "--porcelain").Output()
+	if err != nil {
+		t.Fatalf("git status --porcelain failed: %v", err)
 	}
 	return strings.TrimSpace(string(out))
 }

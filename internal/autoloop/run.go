@@ -84,8 +84,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		task := candidateTaskName(candidate)
 		var workerBranch string
 		var workerBaseCommit string
+		workerRepoRoot := opts.Config.RepoRoot
+		var workerWorktreePath string
 		if hasGit {
 			workerBranch = WorkerBranchName(runID, workerID, candidate)
+			workerWorktreePath = WorkerWorktreePath(opts.Config, runID, workerID)
 		}
 		if err := appendRunLedgerEvent(opts.Config, LedgerEvent{
 			TS:     time.Now().UTC(),
@@ -100,7 +103,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		}
 
 		if hasGit {
-			if err := gitCreateWorkerBranch(opts.Config.RepoRoot, workerBranch); err != nil {
+			if err := gitCreateWorkerWorktree(opts.Config.RepoRoot, workerWorktreePath, workerBranch); err != nil {
 				_ = appendRunLedgerEvent(opts.Config, LedgerEvent{
 					TS:     time.Now().UTC(),
 					RunID:  runID,
@@ -108,12 +111,13 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 					Worker: workerID,
 					Task:   task,
 					Branch: workerBranch,
-					Status: "branch_create_failed",
+					Status: "worktree_create_failed",
 					Detail: err.Error(),
 				})
 				return RunSummary{}, err
 			}
-			workerBaseCommit, err = gitHeadSha(opts.Config.RepoRoot)
+			workerRepoRoot = workerWorktreePath
+			workerBaseCommit, err = gitHeadSha(workerRepoRoot)
 			if err != nil {
 				return RunSummary{}, err
 			}
@@ -124,7 +128,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		result := runner.Run(ctx, Command{
 			Name: argv[0],
 			Args: args,
-			Dir:  opts.Config.RepoRoot,
+			Dir:  workerRepoRoot,
 		})
 		if result.Err != nil {
 			if err := appendRunLedgerEvent(opts.Config, LedgerEvent{
@@ -138,13 +142,10 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			}); err != nil {
 				return RunSummary{}, err
 			}
-			if hasGit {
-				restoreBranchIfClean(opts.Config.RepoRoot, baseBranch)
-			}
 			return RunSummary{}, backendRunError(argv[0], result)
 		}
 		if hasGit {
-			if err := ensureCurrentBranch(opts.Config.RepoRoot, workerBranch); err != nil {
+			if err := ensureCurrentBranch(workerRepoRoot, workerBranch); err != nil {
 				if ledgerErr := appendRunLedgerEvent(opts.Config, LedgerEvent{
 					TS:     time.Now().UTC(),
 					RunID:  runID,
@@ -157,11 +158,10 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 				}); ledgerErr != nil {
 					return RunSummary{}, ledgerErr
 				}
-				restoreBranchIfClean(opts.Config.RepoRoot, baseBranch)
 				return RunSummary{}, err
 			}
 		}
-		if err := ensureNoMergeConflicts(opts.Config.RepoRoot); err != nil {
+		if err := ensureNoMergeConflicts(workerRepoRoot); err != nil {
 			if ledgerErr := appendRunLedgerEvent(opts.Config, LedgerEvent{
 				TS:     time.Now().UTC(),
 				RunID:  runID,
@@ -174,12 +174,9 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			}); ledgerErr != nil {
 				return RunSummary{}, ledgerErr
 			}
-			if hasGit {
-				restoreBranchIfClean(opts.Config.RepoRoot, baseBranch)
-			}
 			return RunSummary{}, err
 		}
-		if err := ensureWorktreeClean(opts.Config.RepoRoot); err != nil {
+		if err := ensureWorktreeClean(workerRepoRoot); err != nil {
 			if ledgerErr := appendRunLedgerEvent(opts.Config, LedgerEvent{
 				TS:     time.Now().UTC(),
 				RunID:  runID,
@@ -196,12 +193,12 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		}
 		var commitSha string
 		if hasGit {
-			commitSha, err = gitHeadSha(opts.Config.RepoRoot)
+			commitSha, err = gitHeadSha(workerRepoRoot)
 			if err != nil {
 				return RunSummary{}, err
 			}
 			if commitSha != workerBaseCommit {
-				if err := ensureChangedPathsWithinWriteScope(opts.Config.RepoRoot, workerBaseCommit, commitSha, candidate); err != nil {
+				if err := ensureChangedPathsWithinWriteScope(workerRepoRoot, workerBaseCommit, commitSha, candidate); err != nil {
 					if ledgerErr := appendRunLedgerEvent(opts.Config, LedgerEvent{
 						TS:     time.Now().UTC(),
 						RunID:  runID,
@@ -215,15 +212,15 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 					}); ledgerErr != nil {
 						return RunSummary{}, ledgerErr
 					}
-					restoreBranchIfClean(opts.Config.RepoRoot, baseBranch)
 					return RunSummary{}, err
 				}
-				if err := gitRestoreBranch(opts.Config.RepoRoot, baseBranch); err != nil {
+				if err := ensureCurrentBranch(opts.Config.RepoRoot, baseBranch); err != nil {
 					return RunSummary{}, err
 				}
 				if err := promoteWorkerCommit(ctx, opts.Config, runner, runID, workerID, task, workerBranch, commitSha); err != nil {
 					return RunSummary{}, err
 				}
+				removeCleanWorkerWorktree(opts.Config.RepoRoot, workerWorktreePath)
 			} else {
 				commitSha = ""
 				if err := appendRunLedgerEvent(opts.Config, LedgerEvent{
@@ -237,9 +234,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 				}); err != nil {
 					return RunSummary{}, err
 				}
-				if err := gitRestoreBranch(opts.Config.RepoRoot, baseBranch); err != nil {
-					return RunSummary{}, err
-				}
+				removeCleanWorkerWorktree(opts.Config.RepoRoot, workerWorktreePath)
 			}
 		}
 
@@ -338,6 +333,10 @@ func promoteWorkerCommit(ctx context.Context, cfg Config, runner Runner, runID s
 		Commit: commitSha,
 		Status: "promoted",
 	})
+}
+
+func removeCleanWorkerWorktree(repoRoot, worktreePath string) {
+	_ = gitRemoveWorkerWorktree(repoRoot, worktreePath)
 }
 
 func ensureNoMergeConflicts(repoRoot string) error {

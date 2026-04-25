@@ -1,6 +1,9 @@
 package autoloop
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestWorkerBranchNameIncludesRunWorkerAndSlug(t *testing.T) {
 	got := WorkerBranchName("20260101T000000Z", 3, Candidate{
@@ -24,6 +27,18 @@ func TestWorkerBranchNameTruncatesLongSlug(t *testing.T) {
 
 	if len(got) > len("autoloop/run/w1/")+60 {
 		t.Fatalf("WorkerBranchName() = %q, want slug truncated to <=60 chars", got)
+	}
+}
+
+func TestWorkerWorktreePathUsesRunRoot(t *testing.T) {
+	got := WorkerWorktreePath(Config{
+		RepoRoot: "/repo",
+		RunRoot:  "/repo/.codex/orchestrator",
+	}, "20260425T014000Z", 2)
+	want := filepath.Join("/repo", ".codex", "orchestrator", "worktrees", "20260425T014000Z", "w2")
+
+	if got != want {
+		t.Fatalf("WorkerWorktreePath() = %q, want %q", got, want)
 	}
 }
 

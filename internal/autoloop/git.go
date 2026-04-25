@@ -29,30 +29,29 @@ func gitCurrentBranch(repoRoot string) (string, error) {
 	return branch, nil
 }
 
-func gitCreateWorkerBranch(repoRoot, branch string) error {
-	cmd := exec.Command("git", "-C", repoRoot, "switch", "-c", branch)
+func gitCreateWorkerWorktree(repoRoot, worktreePath, branch string) error {
+	if worktreePath == "" {
+		return fmt.Errorf("worker worktree path is required")
+	}
+	if err := os.MkdirAll(filepath.Dir(worktreePath), 0o755); err != nil {
+		return fmt.Errorf("create worker worktree parent: %w", err)
+	}
+	cmd := exec.Command("git", "-C", repoRoot, "worktree", "add", "-b", branch, worktreePath)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git switch -c %s: %w: %s", branch, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("git worktree add -b %s %s: %w: %s", branch, worktreePath, err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
 
-func gitRestoreBranch(repoRoot, branch string) error {
-	if branch == "" {
+func gitRemoveWorkerWorktree(repoRoot, worktreePath string) error {
+	if worktreePath == "" {
 		return nil
 	}
-	cmd := exec.Command("git", "-C", repoRoot, "switch", branch)
+	cmd := exec.Command("git", "-C", repoRoot, "worktree", "remove", worktreePath)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git switch %s: %w: %s", branch, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("git worktree remove %s: %w: %s", worktreePath, err, strings.TrimSpace(string(out)))
 	}
 	return nil
-}
-
-func restoreBranchIfClean(repoRoot string, branch string) {
-	if ensureWorktreeClean(repoRoot) != nil {
-		return
-	}
-	_ = gitRestoreBranch(repoRoot, branch)
 }
 
 func gitHeadSha(repoRoot string) (string, error) {
