@@ -108,6 +108,7 @@ func runtimeStatusMissing(runtime RuntimeStatus) bool {
 		runtime.ExitReason == "" &&
 		runtime.ActiveAgents == 0 &&
 		len(runtime.Platforms) == 0 &&
+		len(runtime.TokenLocks) == 0 &&
 		runtime.Proxy == (ProxyRuntimeStatus{}) &&
 		runtime.UpdatedAt == ""
 }

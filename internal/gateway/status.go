@@ -51,6 +51,7 @@ type RuntimeStatus struct {
 	ActiveAgents      int                              `json:"active_agents"`
 	Platforms         map[string]PlatformRuntimeStatus `json:"platforms"`
 	Proxy             ProxyRuntimeStatus               `json:"proxy"`
+	TokenLocks        []TokenLockEvidence              `json:"token_locks,omitempty"`
 	DrainTimeouts     []RuntimeDrainTimeoutEvidence    `json:"drain_timeouts,omitempty"`
 	ResumePending     []RuntimeResumePendingEvidence   `json:"resume_pending,omitempty"`
 	NonResumable      []RuntimeNonResumableEvidence    `json:"non_resumable,omitempty"`
@@ -148,6 +149,7 @@ type RuntimeStatusUpdate struct {
 	DrainTimeoutEvidence  *RuntimeDrainTimeoutEvidence
 	ResumePendingEvidence *RuntimeResumePendingEvidence
 	NonResumableEvidence  *RuntimeNonResumableEvidence
+	TokenLockEvidence     *TokenLockEvidence
 }
 
 // RuntimeStatusSnapshot is a read-only view of the runtime status file that
@@ -460,6 +462,10 @@ func (s *RuntimeStatusStore) merge(status *RuntimeStatus, update RuntimeStatusUp
 	if update.NonResumableEvidence != nil {
 		evidence := *update.NonResumableEvidence
 		status.NonResumable = append(status.NonResumable, evidence)
+	}
+	if update.TokenLockEvidence != nil {
+		evidence := *update.TokenLockEvidence
+		status.TokenLocks = append(status.TokenLocks, evidence)
 	}
 	if update.Platform == "" {
 		return

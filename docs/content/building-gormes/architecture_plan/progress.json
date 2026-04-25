@@ -1922,9 +1922,9 @@
             {
               "name": "Token-scoped gateway locks",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway credential locks are scoped by platform and credential hash so multiple profiles cannot run the same token while unrelated tokens remain independent",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1957,7 +1957,7 @@
                 "Stale stopped-process locks are cleared only after PID/start-time validation proves the owner is gone.",
                 "Release-on-shutdown removes only the current process lock and reports release failures without masking the gateway exit reason."
               ],
-              "note": "TDD: keep token-scoped locks behind PID validation so stale-lock cleanup cannot guess from PID files alone.",
+              "note": "Complete: TDD landed internal/gateway/token_lock_test.go plus XDG state-root config coverage. Token-scoped locks now use platform plus full SHA-256 credential hashes in filenames and runtime evidence, reject live same-token owners through fake PID/start-time validation, allow different tokens/platforms independently, clear stopped-process stale locks without deleting unrelated locks, report credential-hash mismatches without overwriting the file, and preserve gateway exit reasons while recording lock-release-failed evidence.",
               "write_scope": [
                 "internal/gateway/",
                 "internal/config/",
@@ -1971,6 +1971,11 @@
               "done_signal": [
                 "Token-lock fixtures prove same-token exclusion, different-token independence, stale cleanup, and safe release without exposing raw credential material."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:09:26Z",
+                "last_success": "2026-04-25T17:09:26Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T15:16:17Z",

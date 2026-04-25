@@ -503,6 +503,26 @@ func TestGatewayRuntimeStatusPath_HonorsXDG(t *testing.T) {
 	}
 }
 
+func TestGatewayLockDir_HonorsXDGStateHome(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", "/tmp/gormes-test-state")
+	got := GatewayLockDir()
+	want := "/tmp/gormes-test-state/gormes/gateway-locks"
+	if got != want {
+		t.Errorf("GatewayLockDir() = %q, want %q", got, want)
+	}
+}
+
+func TestGatewayLockDir_DefaultsToHomeLocalState(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", "")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	got := GatewayLockDir()
+	want := filepath.Join(home, ".local", "state", "gormes", "gateway-locks")
+	if got != want {
+		t.Errorf("GatewayLockDir() default = %q, want %q", got, want)
+	}
+}
+
 func TestBootPath_DefaultsToHomeLocalShare(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "")
 	home := t.TempDir()

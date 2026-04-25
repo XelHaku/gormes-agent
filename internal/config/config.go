@@ -754,6 +754,14 @@ func xdgDataHome() string {
 	return filepath.Join(home, ".local", "share")
 }
 
+func xdgStateHome() string {
+	if v := os.Getenv("XDG_STATE_HOME"); v != "" {
+		return v
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".local", "state")
+}
+
 // ConfigPath returns the Gormes TOML config file path resolved from XDG rules.
 func ConfigPath() string {
 	return filepath.Join(xdgConfigHome(), "gormes", "config.toml")
@@ -817,6 +825,13 @@ func HooksRoot() string {
 // path for live gateway lifecycle status.
 func GatewayRuntimeStatusPath() string {
 	return filepath.Join(xdgDataHome(), "gormes", "gateway_state.json")
+}
+
+// GatewayLockDir returns the machine-local directory for token-scoped gateway
+// credential locks. It uses XDG state because these locks describe live process
+// ownership rather than durable user data.
+func GatewayLockDir() string {
+	return filepath.Join(xdgStateHome(), "gormes", "gateway-locks")
 }
 
 // BootPath returns the BOOT.md path used by the built-in gateway startup hook.
