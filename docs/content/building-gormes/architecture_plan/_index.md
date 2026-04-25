@@ -357,7 +357,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Context compression
 - [x] ContextEngine interface + status tool contract
 - [x] Compression token-budget trigger + summary sizing
-- [ ] Aux compression headroom for system and tool schemas
+- [x] Aux compression headroom for system and tool schemas
+- [ ] Aux compression provider-aware context cap
 - [ ] Tool-result pruning + protected head/tail summary
 - [ ] Manual compression feedback + context references
 
@@ -399,7 +400,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Provider-side resilience
 - [x] Classified provider-error taxonomy
 - [x] Unsupported temperature retry + Codex flush guard
-- [ ] Generic unsupported-parameter retry + max_tokens guard
+- [x] Generic unsupported-parameter retry + max_tokens guard
 - [x] Jittered reconnect backoff schedule
 - [x] Retry-After header parsing + HTTPError hint
 - [x] Kernel retry honors Retry-After hint
@@ -418,6 +419,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Discord tool split + platform-scoped toolsets
 - [ ] Pure core tools first
 - [ ] Stateful tool migration queue
+- [ ] Terminal process watch notification throttle contract
 
 ### 5.B — Sandboxing Backends ⏳
 
@@ -466,6 +468,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Plugin SDK
 - [x] Dashboard theme/plugin extension status contract
+- [ ] Dashboard page-scoped plugin slot inventory
 - [ ] Third-party extensions
 - [x] First-party Spotify plugin fixture
 
@@ -510,7 +513,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
 - [x] Platform toolset config persistence + MCP sentinel
-- [ ] Effective toolset picker dedupes bundled plugin keys
+- [x] Effective toolset picker dedupes bundled plugin keys
 - [ ] Gateway, platform, webhook, and cron management CLI
 - [ ] Update service restart active polling
 - [ ] Diagnostics, backup, logs, and status CLI

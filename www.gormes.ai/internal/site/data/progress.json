@@ -3163,9 +3163,9 @@
             }
           ],
           "drift_state": {
-            "status": "porting",
-            "last_upstream_check": "2026-04-25T11:44:44Z",
-            "origin_decision": "Core Goncho/Honcho parity rows are validated, but Honcho's dreaming scheduler semantics are now tracked as a remaining small Go-native Goncho row before this subphase can be converged."
+            "status": "converged",
+            "last_upstream_check": "2026-04-25T14:29:29Z",
+            "origin_decision": "Honcho e659b6b remains the latest synchronized memory donor, and all Goncho/Honcho parity rows are validated on main including the Go-native dream scheduler intent contract. Keep the internal implementation named Goncho while preserving honcho_* public tool compatibility; future Honcho drift should become new small rows rather than keeping this subphase porting."
           }
         }
       }
@@ -3812,9 +3812,9 @@
             {
               "name": "Aux compression headroom for system and tool schemas",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Compression feasibility lowers the raw-message threshold below the auxiliary model context window by reserving deterministic system-prompt, tool-schema, flush-instruction, and safety headroom",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -3839,10 +3839,6 @@
               "not_ready_when": [
                 "The slice mutates message history, calls a summarizer, changes model routing, or subtracts a hard-coded 12000 tokens without accounting for tool descriptors."
               ],
-              "blocked_by": [
-                "Compression token-budget trigger + summary sizing",
-                "Provider-enforced context-length resolver"
-              ],
               "unblocks": [
                 "Tool-result pruning + protected head/tail summary",
                 "Manual compression feedback + context references"
@@ -3853,7 +3849,7 @@
                 "When overhead would drop below the 64000-token floor, threshold_tokens clamps to the floor and reports headroom_clamped evidence.",
                 "The focused test mirrors Hermes test_auto_lowered_threshold_reserves_headroom_for_tools_and_system and test_headroom_floors_at_minimum_context without provider credentials or kernel history mutation."
               ],
-              "note": "Hermes f92006ce/6e561ffa changed compression feasibility so auxiliary-context auto-lowering reserves system prompt and tool-schema headroom. Gormes already has the pure budget helper, but it still lacks the request-headroom slice that prevents compression/flush calls from overflowing when many tools are enabled.",
+              "note": "Complete: internal/hermes/context_compressor_headroom_test.go covers the auxiliary-bound threshold path with synthetic tool descriptors and the minimum-floor path. ContextCompressorBudget now estimates provider-visible tool descriptor overhead, reserves that plus 12000 fixed system/flush/safety tokens, lowers threshold_tokens below the auxiliary context when needed, and reports headroom_clamped evidence without provider calls or history mutation.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/tools/",
@@ -3867,10 +3863,78 @@
               "done_signal": [
                 "Headroom fixtures prove tool-schema overhead plus 12000 reserved tokens lower auxiliary-bound thresholds and clamp at the 64000-token floor without provider calls."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T14:12:37Z",
+                "last_success": "2026-04-25T14:12:37Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:6e561ffa run_agent.py",
                 "note": "Hermes defines the auxiliary compression feasibility fix; Gormes should adapt it to Go-native ContextCompressorBudget/status logic."
+              }
+            },
+            {
+              "name": "Aux compression provider-aware context cap",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Auxiliary compression feasibility resolves the auxiliary model context window with the active provider identity before applying headroom and threshold budgets",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Context status reports provider-cap source, raw-model fallback, or missing auxiliary context evidence instead of budgeting compression against the wrong raw OpenAI-compatible window.",
+              "fixture": "internal/hermes/context_compressor_provider_cap_test.go",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@d635e2df",
+                "../hermes-agent/tests/run_agent/test_compression_feasibility.py@d635e2df",
+                "../hermes-agent/agent/model_metadata.py@d635e2df",
+                "internal/hermes/model_context_resolver.go",
+                "internal/hermes/context_compressor_budget.go",
+                "internal/hermes/context_compressor_headroom_test.go"
+              ],
+              "ready_when": [
+                "Provider-enforced context-length resolver is validated on main.",
+                "Aux compression headroom for system and tool schemas is validated on main.",
+                "The slice can use fake ModelContextResolver inputs for openai-codex gpt-5.5 raw 1050000 tokens vs provider cap 272000 tokens without live provider calls."
+              ],
+              "not_ready_when": [
+                "The slice calls a summarizer, mutates message history, opens a network provider, or only repeats generic context resolver tests without proving the auxiliary compression feasibility path forwards provider identity."
+              ],
+              "blocked_by": [
+                "Provider-enforced context-length resolver",
+                "Aux compression headroom for system and tool schemas"
+              ],
+              "unblocks": [
+                "Tool-result pruning + protected head/tail summary",
+                "Manual compression feedback + context references"
+              ],
+              "acceptance": [
+                "A fake auxiliary feasibility check for provider=openai-codex model=gpt-5.5 raw_context=1050000 resolves auxiliary_context_length=272000 with source=provider_cap before threshold/headroom math runs.",
+                "The same model with provider=openai or an empty provider does not borrow the openai-codex cap and reports raw-model fallback or unavailable evidence according to the resolver fixture.",
+                "ContextCompressorBudget receives the provider-resolved AuxiliaryContextLength and lowers threshold_tokens below 272000 after tool-schema plus 12000 fixed headroom.",
+                "Status evidence exposes the context source or lookup error so operators can distinguish provider-cap budgeting from models.dev fallback."
+              ],
+              "note": "Hermes d635e2df fixed compression feasibility by passing self.provider into get_model_context_length; without that provider identity Codex OAuth can budget against the raw 1050000 OpenAI window instead of the 272000 provider cap. Gormes already has provider-cap resolution and headroom math, but needs a focused auxiliary-compression fixture proving those two pieces are connected before live compression wiring lands.",
+              "write_scope": [
+                "internal/hermes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestContextCompressorProviderCap -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Provider-cap compression fixtures prove the auxiliary feasibility path forwards provider identity, uses the 272000 Codex cap, and reports fallback/source evidence without live provider calls."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:d635e2df run_agent.py",
+                "note": "Hermes defines the provider-forwarding regression; Gormes should adapt it to the Go ContextCompressorBudget and ModelContextResolver boundary."
               }
             },
             {
@@ -3886,8 +3950,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T13:39:00Z",
-            "origin_decision": "Hermes 5401a008 changed ContextCompressor.update_model to recalculate tail and max-summary budgets on model switches, and Hermes f92006ce/6e561ffa now reserves system/tool headroom when auxiliary context binds the compression threshold. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and pure compressor budget helper, but the subphase remains upstream-led until auxiliary headroom, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
+            "last_upstream_check": "2026-04-25T14:29:29Z",
+            "origin_decision": "Hermes 5401a008 changed ContextCompressor.update_model budgets, f92006ce/6e561ffa added system/tool headroom when auxiliary context binds compression, and d635e2df now passes provider identity into the auxiliary context-length resolver so Codex OAuth uses its 272000 cap. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and pure compressor budget helper, but the subphase remains upstream-led until provider-aware auxiliary feasibility, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
           }
         },
         "4.C": {
@@ -4430,9 +4494,9 @@
             {
               "name": "Generic unsupported-parameter retry + max_tokens guard",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "OpenAI-compatible provider calls detect unsupported request parameters by name and retry max_tokens as max_completion_tokens only when the first payload actually sent max_tokens",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4468,7 +4532,7 @@
                 "When the first request emits max_tokens and receives an unsupported max_tokens error, exactly one retry removes max_tokens, sets max_completion_tokens to the same value, and preserves model, messages, tools, temperature, timeout context, and session headers.",
                 "When MaxTokens is zero/omitted or the provider error is unrelated, the client makes one request and never adds max_completion_tokens with a zero or null value."
               ],
-              "note": "Hermes 3c1c65e7/6e561ffa generalized the unsupported-temperature detector into a parameter-specific retry helper and hardened max_tokens retry so omitted max_tokens does not create a bogus max_completion_tokens retry. Gormes currently has only the temperature-specific retry slice.",
+              "note": "Complete: TDD landed internal/hermes/unsupported_parameter_retry_test.go. OpenAI-compatible provider errors now route through a generic unsupported-parameter detector used by the temperature wrapper and covering temperature, max_tokens, seed, and top_p phrasings including unsupported, unknown, unrecognized, invalid, and does-not-support markers. A supported max_tokens recovery retries exactly once only when the original payload emitted max_tokens, rewrites it to max_completion_tokens with the same value, preserves model, messages, tools, temperature, session headers, and caller context, and records UnsupportedParameterRetry evidence in ProviderStatus. Omitted MaxTokens, unrelated max_tokens errors, and unsupported arbitrary parameters do not retry or emit zero/null max_completion_tokens.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -4481,6 +4545,11 @@
               "done_signal": [
                 "Unsupported-parameter fixtures prove generic detector coverage, preserved temperature retry behavior, max_tokens-to-max_completion_tokens retry, and no retry when MaxTokens is absent."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T14:12:37Z",
+                "last_success": "2026-04-25T14:12:37Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:6e561ffa agent/auxiliary_client.py",
@@ -4739,8 +4808,75 @@
               "name": "Stateful tool migration queue",
               "status": "planned",
               "note": "TDD: group file/session/checkpoint/process tools by shared state contracts and prove XDG/path isolation plus rollback semantics before exposing write-capable tools to the native agent loop."
+            },
+            {
+              "name": "Terminal process watch notification throttle contract",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Terminal/process tools rate-limit watch-pattern notifications, suppress matches after process exit, and make notify_on_complete mutually exclusive with watch_patterns before any live process runner is exposed",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Tool status reports watch-pattern disabled, promoted-to-notify-on-complete, or global overflow evidence instead of flooding operators with duplicate delayed process notifications.",
+              "fixture": "internal/tools/process_notifications_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/process_registry.py@97d54f0e",
+                "../hermes-agent/tools/terminal_tool.py@97d54f0e",
+                "../hermes-agent/tests/tools/test_watch_patterns.py@97d54f0e",
+                "internal/tools/registry.go",
+                "internal/cli/pty_bridge.go"
+              ],
+              "ready_when": [
+                "Tool registry inventory + schema parity harness is validated on main.",
+                "The first slice owns a pure fake-clock notification policy under internal/tools and does not need to spawn a real shell or wire the terminal tool handler."
+              ],
+              "not_ready_when": [
+                "The slice opens a PTY, starts real subprocesses, ports the whole process_registry, or combines notification throttling with file/checkpoint/session tool migration."
+              ],
+              "blocked_by": [
+                "Tool registry inventory + schema parity harness"
+              ],
+              "unblocks": [
+                "Stateful tool migration queue",
+                "Dangerous-command detector + blocked-result schema",
+                "PTY bridge protocol adapter"
+              ],
+              "acceptance": [
+                "notify_on_complete=true with background=true drops watch_patterns and returns operator-readable evidence; non-background calls and watch-only calls keep their requested behavior.",
+                "A running fake session emits at most one watch_match per 15 seconds; suppressed matches in the same window count as one strike.",
+                "After three consecutive strike windows the session disables watch_patterns, promotes to notify_on_complete semantics, and emits one watch_disabled summary.",
+                "Matches arriving after session.exited are ignored, and a global fake-registry breaker suppresses more than 15 watch events in 10 seconds across sessions with trip/release summary evidence."
+              ],
+              "note": "Hermes 97d54f0e hardened terminal watch-pattern notifications after agents combined notify_on_complete with noisy watch_patterns and flooded delayed completion queues. Gormes does not yet have a live terminal/process tool, so keep this as a pure policy fixture before the stateful process tool port starts.",
+              "write_scope": [
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run TestProcessNotification -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Process-notification fixtures prove mutual exclusion, per-session 1/15s throttling, three-strike promotion, suppress-after-exit, and global overflow trip/release behavior without spawning processes."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:97d54f0e tools/process_registry.py",
+                "note": "Hermes defines the watch-pattern flood-control behavior; Gormes should port it as Go-native process-tool policy before exposing a terminal runner."
+              }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-25T14:29:29Z",
+            "origin_decision": "Hermes still leads terminal/process tool behavior. The 97d54f0e watch-pattern flood-control fix must become a small Go-native policy fixture before Gormes ports the live process runner or broad stateful tool migration queue."
+          }
         },
         "5.B": {
           "name": "Sandboxing Backends",
@@ -5061,6 +5197,66 @@
               }
             },
             {
+              "name": "Dashboard page-scoped plugin slot inventory",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Dashboard plugin metadata preserves Hermes page-scoped slot names with colons and exposes them through the native disabled plugin inventory without claiming React/Vite runtime support",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Dashboard plugin status reports page-scoped slots as inert metadata while the native React/Vite slot runtime remains disabled or unavailable.",
+              "fixture": "internal/plugins/page_scoped_slots_test.go",
+              "source_refs": [
+                "../hermes-agent/web/src/plugins/slots.ts@af22421e",
+                "../hermes-agent/tests/hermes_cli/test_web_server.py@af22421e",
+                "../hermes-agent/plugins/example-dashboard/dashboard/manifest.json@af22421e",
+                "../hermes-agent/website/docs/user-guide/features/extending-the-dashboard.md@cf2fabc4",
+                "internal/plugins/loader.go",
+                "internal/apiserver/dashboard.go",
+                "internal/apiserver/plugin_status_test.go"
+              ],
+              "ready_when": [
+                "Plugin SDK and dashboard extension status contracts are validated on main.",
+                "The slice can use synthetic dashboard/manifest.json fixtures and the native /api/dashboard/plugins handler without embedding upstream React/Vite assets."
+              ],
+              "not_ready_when": [
+                "The slice imports Hermes web/src pages, executes plugin JavaScript, registers a real PluginSlot renderer, or claims page-scoped slot runtime support before the dashboard runtime exists."
+              ],
+              "blocked_by": [
+                "Plugin SDK",
+                "Dashboard theme/plugin extension status contract"
+              ],
+              "acceptance": [
+                "A dashboard manifest declaring sessions:top, analytics:bottom, logs:top, skills:bottom, config:top, env:bottom, docs:top, cron:bottom, and chat:top round-trips with colons unchanged through internal/plugins LoadDir.",
+                "/api/dashboard/plugins returns those slot names exactly in the disabled metadata row and keeps runtime.react_vite_runtime=absent.",
+                "The fixture documents the Hermes known page-scoped slot catalogue as metadata only, without adding an allowlist that would reject future slot names.",
+                "Empty or unknown slot names remain inert metadata and do not create executable backend routes."
+              ],
+              "note": "Hermes af22421e/cf2fabc4 added page-scoped dashboard slots such as sessions:top and chat:bottom. Gormes already treats dashboard slots as metadata while the native React/Vite runtime is absent, but needs a focused fixture so colons are not mangled and public status stays honest.",
+              "write_scope": [
+                "internal/plugins/",
+                "internal/apiserver/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/plugins ./internal/apiserver -run 'Test.*PageScopedSlot|TestDashboardPluginsEndpoint' -count=1",
+                "go test ./internal/plugins ./internal/apiserver -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Page-scoped slot fixtures prove colon-bearing Hermes slot names round-trip through plugin manifests and disabled dashboard inventory without enabling a React/Vite runtime."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:af22421e web/src/plugins/slots.ts",
+                "note": "Hermes defines the page-scoped slot catalogue; Gormes should preserve it as Go-native metadata until it owns a dashboard slot runtime."
+              }
+            },
+            {
               "name": "Third-party extensions",
               "status": "planned",
               "note": "TDD: add extension install/enable/disable flows only after the SDK contract is stable, with fixture plugins proving failure containment and no implicit runtime code execution."
@@ -5120,8 +5316,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T09:23:21Z",
-            "origin_decision": "Hermes still leads plugin and dashboard-extension contracts. Gormes should port manifest/status boundaries first and keep Go runtime independent from Hermes React/Vite assets."
+            "last_upstream_check": "2026-04-25T14:29:29Z",
+            "origin_decision": "Hermes still leads plugin and dashboard-extension contracts. af22421e/cf2fabc4 added page-scoped built-in page slots that Gormes should preserve as inert metadata first, while keeping the Go runtime independent from Hermes React/Vite assets until a native slot runtime is deliberately designed."
           }
         },
         "5.J": {
@@ -5526,9 +5722,9 @@
             {
               "name": "Effective toolset picker dedupes bundled plugin keys",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "CLI toolset selection merges built-in toolsets with plugin-provided toolsets without duplicate keys, preserving the built-in label and description when bundled plugins such as Spotify share a key",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -5564,7 +5760,7 @@
                 "A unique user or project plugin toolset can still appear as a disabled metadata row without executing runtime code.",
                 "Duplicate keys produce deterministic evidence or status and do not appear twice in runtime-visible or persisted platform selections."
               ],
-              "note": "Hermes ac05daa1/6e561ffa fixed duplicate bundled-plugin toolsets in `hermes tools`. Gormes has plugin metadata and platform toolset persistence, but no row yet freezes the effective picker merge rule that keeps bundled plugins from duplicating built-in choices.",
+              "note": "Complete: TDD added a pure effective toolset picker helper and fixture. Built-in picker rows come from the upstream parity manifest, plugin-declared toolsets append only for unseen keys, bundled Spotify duplicates collapse with built-in label/description/source preserved, unique plugin toolsets remain disabled metadata rows, and duplicate evidence is reported without executing plugin runtime code.",
               "write_scope": [
                 "internal/cli/",
                 "internal/plugins/",
@@ -5579,6 +5775,11 @@
               "done_signal": [
                 "Effective-toolset fixtures prove duplicate bundled plugin keys are collapsed, built-in labels win, unique plugin toolsets survive, and no plugin runtime executes."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T14:12:37Z",
+                "last_success": "2026-04-25T14:12:37Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:6e561ffa hermes_cli/tools_config.py",
