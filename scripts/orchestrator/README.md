@@ -40,11 +40,11 @@ unchanged across backends; each backend only translates argv.
 
 | Backend | Binary | CLI flag | Notes |
 |---|---|---|---|
-| `codexu` (default) | `codexu` | `--codexu` | Native codex-cli non-interactive mode. |
-| `claudeu` | `claudeu` shim (PATH) | `--claudeu` | Shim translates codexu-style argv to `claude --print`. |
-| `opencode` | `opencode` | `--opencode` | Uses `opencode run --no-interactive`; shape approximate. |
+| `codexu` (default) | `codexu` | `--backend codexu` | Native codex-cli non-interactive mode. |
+| `claudeu` | `claudeu` shim (PATH) | `--backend claudeu` | Shim translates codexu-style argv to `claude --print`. |
+| `opencode` | `opencode` | `--backend opencode` | Uses `opencode run --no-interactive`; shape approximate (builder-loop only). |
 
-Switch via env (`BACKEND=claudeu $0`) or flag (`$0 --claudeu`). CLI flag wins.
+Switch via env (`BACKEND=claudeu $0`) or flag (`$0 --backend claudeu`). CLI flag wins.
 
 ## Companion scheduling
 
