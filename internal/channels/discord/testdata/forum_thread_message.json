@@ -1,0 +1,12 @@
+{
+  "id": "msg-201",
+  "channel_id": "thread-200",
+  "guild_id": "guild-1",
+  "content": "follow up from the forum post",
+  "type": 0,
+  "author": {
+    "id": "user-2",
+    "username": "alice",
+    "global_name": "Alice"
+  }
+}

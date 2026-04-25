@@ -8,7 +8,7 @@ The site is built in Go and serves the public homepage at `/` plus embedded stat
 
 ## Layout
 
-- `cmd/www-gormes` - HTTP entrypoint.
+- `cmd/www-gormes` - HTTP and static-export entrypoint.
 - `internal/site/content.go` - landing-page copy and link data.
 - `internal/site/data/progress.json` - embedded roadmap copy of `../docs/content/building-gormes/architecture_plan/progress.json`.
 - `internal/site/server.go` - route wiring and template execution.
@@ -31,6 +31,12 @@ go run ./cmd/www-gormes -listen :8080
 ```
 
 `make run` uses the same command.
+
+Export the static site with the same command:
+
+```bash
+go run ./cmd/www-gormes export --out dist
+```
 
 ## Verification
 

@@ -21,6 +21,8 @@ const (
 	EventReset
 	// EventStart is the help or welcome command.
 	EventStart
+	// EventThreadLifecycle carries normalized thread open/close/archive state.
+	EventThreadLifecycle
 )
 
 // String returns the stable log/test representation of an EventKind.
@@ -34,9 +36,32 @@ func (k EventKind) String() string {
 		return "reset"
 	case EventStart:
 		return "start"
+	case EventThreadLifecycle:
+		return "thread_lifecycle"
 	default:
 		return "unknown"
 	}
+}
+
+// ThreadLifecycleState is the platform-neutral lifecycle state for a threaded
+// conversation surface such as a Discord thread or forum post.
+type ThreadLifecycleState string
+
+const (
+	ThreadLifecycleOpen     ThreadLifecycleState = "open"
+	ThreadLifecycleClosed   ThreadLifecycleState = "closed"
+	ThreadLifecycleArchived ThreadLifecycleState = "archived"
+)
+
+// ThreadLifecycleEvent carries normalized thread metadata alongside the
+// channel-neutral InboundEvent envelope.
+type ThreadLifecycleEvent struct {
+	ID       string
+	ParentID string
+	Name     string
+	State    ThreadLifecycleState
+	Archived bool
+	Locked   bool
 }
 
 // InboundEvent is the platform-neutral form every channel emits into the
@@ -51,6 +76,8 @@ type InboundEvent struct {
 	MsgID    string
 	Kind     EventKind
 	Text     string
+
+	ThreadLifecycle *ThreadLifecycleEvent
 
 	// Attachments carries platform-normalized inbound media references. The
 	// shared gateway keeps this as metadata; adapters own platform-specific

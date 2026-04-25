@@ -65,8 +65,8 @@ Required behavior:
 8. Do not mark implementation complete without concrete repository evidence.
 
 After edits, run:
-- go run ./cmd/progress-gen -write
-- go run ./cmd/progress-gen -validate
+- go run ./cmd/autoloop progress write
+- go run ./cmd/autoloop progress validate
 - go test ./internal/progress -count=1
 - go test ./docs -count=1
 

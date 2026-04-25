@@ -108,6 +108,7 @@ func runGateway(cmd *cobra.Command, _ []string) error {
 		CoalesceMs:     coalesceMs,
 		SessionMap:     smap,
 		Hooks:          hooks,
+		RuntimeStatus:  gateway.NewRuntimeStatusStore(config.GatewayRuntimeStatusPath()),
 	}, k, slog.Default())
 
 	if cfg.Telegram.BotToken != "" {

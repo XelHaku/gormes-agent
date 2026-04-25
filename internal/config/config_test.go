@@ -264,6 +264,15 @@ func TestHooksRoot_HonorsXDG(t *testing.T) {
 	}
 }
 
+func TestGatewayRuntimeStatusPath_HonorsXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/tmp/gormes-test-status")
+	got := GatewayRuntimeStatusPath()
+	want := "/tmp/gormes-test-status/gormes/gateway_state.json"
+	if got != want {
+		t.Errorf("GatewayRuntimeStatusPath() = %q, want %q", got, want)
+	}
+}
+
 func TestBootPath_DefaultsToHomeLocalShare(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "")
 	home := t.TempDir()

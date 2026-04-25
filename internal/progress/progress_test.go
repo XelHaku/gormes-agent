@@ -336,11 +336,11 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	}
 	whatsAppItems := itemsByName(whatsApp.Items)
 	decision := whatsAppItems["Bridge-vs-native runtime decision"]
-	if decision.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.4 decision status = %q, want planned", decision.Status)
+	if decision.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.4 decision status = %q, want complete", decision.Status)
 	}
-	if !strings.Contains(decision.Note, "gateway/platforms/whatsapp.py") || !strings.Contains(decision.Note, "bridge-first") {
-		t.Fatalf("Phase 2.B.4 decision note = %q, want upstream-whatsapp/bridge-first detail", decision.Note)
+	if !strings.Contains(decision.Note, "gateway/platforms/whatsapp.py") || !strings.Contains(decision.Note, "DecideRuntime") || !strings.Contains(decision.Note, "native-first") {
+		t.Fatalf("Phase 2.B.4 decision note = %q, want upstream-whatsapp/DecideRuntime/native-first detail", decision.Note)
 	}
 	inbound := whatsAppItems["Inbound normalization + command passthrough"]
 	if inbound.Status != StatusComplete {
@@ -361,8 +361,8 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if weChat.Priority != "P1" {
 		t.Fatalf("Phase 2.B.10 priority = %q, want P1", weChat.Priority)
 	}
-	if got := weChat.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.B.10 = %q, want in_progress", got)
+	if got := weChat.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.B.10 = %q, want complete", got)
 	}
 	weChatItems := itemsByName(weChat.Items)
 	weComWeiXin := weChatItems["WeCom + WeiXin shared-chassis bot seam"]
@@ -373,8 +373,11 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.B.10 WeCom + WeiXin shared-chassis bot seam note = %q, want WeCom/WeiXin detail", weComWeiXin.Note)
 	}
 	weComTransport := weChatItems["WeCom + WeiXin transport/bootstrap layer"]
-	if weComTransport.Status != StatusPlanned {
-		t.Fatalf("Phase 2.B.10 WeCom + WeiXin transport/bootstrap status = %q, want planned", weComTransport.Status)
+	if weComTransport.Status != StatusComplete {
+		t.Fatalf("Phase 2.B.10 WeCom + WeiXin transport/bootstrap status = %q, want complete", weComTransport.Status)
+	}
+	if !strings.Contains(weComTransport.Note, "runtime.go") || !strings.Contains(weComTransport.Note, "context-token") {
+		t.Fatalf("Phase 2.B.10 WeCom + WeiXin transport/bootstrap note = %q, want runtime/context-token detail", weComTransport.Note)
 	}
 
 	signal := p.Phases["7"].Subphases["7.A"]
@@ -492,6 +495,15 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	}
 	if !strings.Contains(drain.Note, "TDD") {
 		t.Fatalf("Phase 2.F.3 drain note = %q, want TDD guidance", drain.Note)
+	}
+	startupCleanup := lifecycleItems["Adapter startup failure cleanup contract"]
+	if startupCleanup.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 startup cleanup status = %q, want complete", startupCleanup.Status)
+	}
+	if !strings.Contains(startupCleanup.Note, "Manager.Run") ||
+		!strings.Contains(startupCleanup.Note, "Disconnect") ||
+		!strings.Contains(startupCleanup.Note, "Discord") {
+		t.Fatalf("Phase 2.F.3 startup cleanup note = %q, want Manager.Run/Disconnect/Discord detail", startupCleanup.Note)
 	}
 	operator := p.Phases["2"].Subphases["2.F.4"]
 	if operator.Priority != "P3" {
@@ -689,8 +701,11 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.F.3 restart markers note = %q, want restart/takeover-marker detail", restartMarkers.Note)
 	}
 	lifecycleWriters := lifecycleItems["Channel lifecycle writers into status model"]
-	if lifecycleWriters.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 lifecycle writers status = %q, want planned", lifecycleWriters.Status)
+	if lifecycleWriters.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 lifecycle writers status = %q, want complete", lifecycleWriters.Status)
+	}
+	if !strings.Contains(lifecycleWriters.Note, "RuntimeStatusStore") || !strings.Contains(lifecycleWriters.Note, "gateway_state.json") {
+		t.Fatalf("Phase 2.F.3 lifecycle writers note = %q, want runtime status store evidence", lifecycleWriters.Note)
 	}
 
 	if got := operator.DerivedStatus(); got != StatusPlanned {

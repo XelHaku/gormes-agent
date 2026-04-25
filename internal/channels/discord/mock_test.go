@@ -16,6 +16,7 @@ type mockSession struct {
 	reactionsAdded  []mockReaction
 	reactionsRemove []mockReaction
 	nextMsgID       int
+	openErr         error
 	sendErr         error
 	editErr         error
 	reactionErr     error
@@ -32,8 +33,9 @@ func newMockSession() *mockSession {
 func (m *mockSession) Open() error {
 	m.mu.Lock()
 	m.opened = true
+	err := m.openErr
 	m.mu.Unlock()
-	return nil
+	return err
 }
 
 func (m *mockSession) Close() error {
@@ -101,6 +103,45 @@ func (m *mockSession) deliver(msg *discordgo.MessageCreate) bool {
 	return false
 }
 
+func (m *mockSession) deliverThreadCreate(thread *discordgo.ThreadCreate) bool {
+	m.mu.Lock()
+	handlers := append([]interface{}{}, m.handlers...)
+	m.mu.Unlock()
+	for _, h := range handlers {
+		if fn, ok := h.(func(*discordgo.Session, *discordgo.ThreadCreate)); ok {
+			fn(nil, thread)
+			return true
+		}
+	}
+	return false
+}
+
+func (m *mockSession) deliverThreadUpdate(thread *discordgo.ThreadUpdate) bool {
+	m.mu.Lock()
+	handlers := append([]interface{}{}, m.handlers...)
+	m.mu.Unlock()
+	for _, h := range handlers {
+		if fn, ok := h.(func(*discordgo.Session, *discordgo.ThreadUpdate)); ok {
+			fn(nil, thread)
+			return true
+		}
+	}
+	return false
+}
+
+func (m *mockSession) deliverThreadDelete(thread *discordgo.ThreadDelete) bool {
+	m.mu.Lock()
+	handlers := append([]interface{}{}, m.handlers...)
+	m.mu.Unlock()
+	for _, h := range handlers {
+		if fn, ok := h.(func(*discordgo.Session, *discordgo.ThreadDelete)); ok {
+			fn(nil, thread)
+			return true
+		}
+	}
+	return false
+}
+
 func (m *mockSession) sentSnapshot() []mockSent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -123,6 +164,12 @@ func (m *mockSession) reactionsAddedSnapshot() []mockReaction {
 	out := make([]mockReaction, len(m.reactionsAdded))
 	copy(out, m.reactionsAdded)
 	return out
+}
+
+func (m *mockSession) closedSnapshot() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.closed
 }
 
 func nextID(n *int) string {

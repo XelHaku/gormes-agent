@@ -108,13 +108,18 @@ func (b *Bot) Send(ctx context.Context, chatID, text string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("wecom: no route for chat %q", chatID)
 	}
-	if meta.requestID != "" {
-		msgID, err := b.client.SendReply(ctx, meta.requestID, text)
+	decision := DecideOutbound(OutboundContext{
+		ChatID:    chatID,
+		ChatType:  meta.chatType,
+		RequestID: meta.requestID,
+	})
+	if decision.Primary == OutboundModeReply {
+		msgID, err := b.client.SendReply(ctx, decision.RequestID, text)
 		if err == nil {
 			return msgID, nil
 		}
 	}
-	return b.client.SendPush(ctx, chatID, meta.chatType, text)
+	return b.client.SendPush(ctx, decision.ChatID, decision.ChatType, text)
 }
 
 func (b *Bot) toInboundEvent(msg InboundMessage) (gateway.InboundEvent, bool) {

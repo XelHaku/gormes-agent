@@ -33,6 +33,20 @@ Run the selected work through the configured backend:
 go run ./cmd/autoloop run
 ```
 
+Validate or regenerate the progress control plane:
+
+```sh
+go run ./cmd/autoloop progress validate
+go run ./cmd/autoloop progress write
+```
+
+Record repository maintenance metadata:
+
+```sh
+go run ./cmd/autoloop repo benchmark record
+go run ./cmd/autoloop repo readme update
+```
+
 Useful environment variables:
 
 - `PROGRESS_JSON`: override the canonical progress file path.

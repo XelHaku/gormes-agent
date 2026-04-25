@@ -14,7 +14,7 @@ import (
 var commandStdout io.Writer = os.Stdout
 var serviceRunner autoloop.Runner = autoloop.ExecRunner{}
 
-const usage = "usage: autoloop run [--dry-run] | audit | digest | service install | service install-audit | service disable legacy-timers"
+const usage = "usage: autoloop run [--dry-run] | progress validate | progress write | repo benchmark record | repo readme update | audit | digest | service install | service install-audit | service disable legacy-timers"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -48,6 +48,10 @@ func run(args []string) error {
 			return err
 		}
 		return runAutoloop(cfg, runOpts.dryRun)
+	case len(args) >= 1 && args[0] == "progress":
+		return runProgress(root, args[1:])
+	case len(args) >= 1 && args[0] == "repo":
+		return runRepo(root, args[1:])
 	case len(args) >= 1 && args[0] == "digest":
 		outputPath, err := digestOutputPath(args[1:])
 		if err != nil {
@@ -263,7 +267,7 @@ func dashIfEmpty(value string) string {
 
 func autoloopEnv() map[string]string {
 	env := map[string]string{}
-	for _, key := range []string{"PROGRESS_JSON", "RUN_ROOT", "BACKEND", "MODE", "MAX_AGENTS", "MAX_PHASE"} {
+	for _, key := range []string{"PROGRESS_JSON", "RUN_ROOT", "BACKEND", "MODE", "MAX_AGENTS", "MAX_PHASE", "PRIORITY_BOOST"} {
 		env[key] = os.Getenv(key)
 	}
 

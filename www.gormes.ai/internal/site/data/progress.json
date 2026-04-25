@@ -311,8 +311,8 @@
           "items": [
             {
               "name": "Bridge-vs-native runtime decision",
-              "status": "planned",
-              "note": "TDD: port the runtime-selection seam from upstream `gateway/platforms/whatsapp.py` into a Go contract that freezes bridge-first vs native-first startup, session-path ownership, and bot/self-chat policy before transport wiring. Current tree only lands `internal/channels/whatsapp.NormalizeInbound`."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/whatsapp.DecideRuntime ports the upstream `gateway/platforms/whatsapp.py` runtime-selection seam into a Go contract that freezes bridge-first versus native-first startup, Gormes state-root/session-path ownership, bridge command/log shape, and bot versus self-chat echo/prefix policy before transport wiring."
             },
             {
               "name": "Inbound normalization + command passthrough",
@@ -364,8 +364,8 @@
           "items": [
             {
               "name": "Discord forum channel ingress + thread lifecycle",
-              "status": "planned",
-              "note": "TDD: port upstream PR #e5333e79 (forum channel support) as an additive seam on top of the already-shipped 2.B.2 Discord adapter. Freeze forum-channel detection, canonical thread IDs derived from forum posts, and open/close/archive lifecycle normalization into gateway events with fixture-backed tests before widening outbound routing. Do not change the baseline 2.B.2 Discord contract or shared chassis tests."
+              "status": "complete",
+              "note": "TDD landed: Discord forum channel type detection, parent-forum chat IDs with canonical thread IDs for forum post ingress, and open/closed/archived thread lifecycle normalization now emit fixture-backed gateway events without changing the shipped 2.B.2 send contract or shared chassis behavior."
             },
             {
               "name": "Discord forum media + polish parity",
@@ -466,11 +466,11 @@
           "name": "OS-AI Spine: Concurrent-Tool Cancellation",
           "priority": "P1",
           "items": [
-            {
-              "name": "Interrupt propagation to concurrent-tool workers",
-              "status": "planned",
-              "note": "TDD: port upstream PR #11907 (interrupt propagation to concurrent-tool workers) as a kernel-side cancellation contract that covers parallel tool_calls fan-out, sidecar sandbox jobs, and delegated subagent children. Freeze the seam with fixture-backed concurrent-tool tests that prove one interrupt cancels every in-flight worker and returns a single coherent cancel envelope before parallel-tool execution or 2.F.5 mid-run steering land on top."
-            }
+              {
+                "name": "Interrupt propagation to concurrent-tool workers",
+                "status": "complete",
+                "note": "TDD landed: executeToolCalls now fans tool_calls out through a shared cancellable context while the kernel continues servicing cancel/reset/submit events, returns the coherent {\"error\":\"tool execution cancelled\"} envelope for cancelled workers, and stops the turn without a follow-up model call. Fixture tests cover one interrupt cancelling every in-flight worker, execute_code sidecar cancellation, delegated subagent child cancellation, and LocalCodeSandbox interrupted status."
+              }
           ]
         },
         "2.F.1": {
@@ -521,13 +521,13 @@
             },
             {
               "name": "Adapter startup failure cleanup contract",
-              "status": "planned",
-              "note": "TDD: mirror upstream GatewayRunner._safe_adapter_disconnect by proving partially-started channel resources are closed when Connect/Run startup returns false or errors, and that cleanup errors are logged without masking the original startup failure."
+              "status": "complete",
+              "note": "TDD landed: gateway Manager.Run now treats channel startup Run errors as startup failures, defensively calls Disconnect on partially-started adapters, logs cleanup errors without masking the original failure, and Discord startup-open failures close their session through that contract."
             },
             {
               "name": "Active-turn follow-up queue + late-arrival drain policy",
-              "status": "planned",
-              "note": "TDD: decide and freeze Gormes's active-turn follow-up semantics before adding richer interrupt/queue behavior; upstream BasePlatformAdapter now keeps the active-session guard live across pending drains and spawns a late-arrival drain task so follow-ups cannot duplicate agent runs or disappear during cleanup."
+              "status": "complete",
+              "note": "TDD landed: the shared gateway manager now queues ordinary EventSubmit follow-ups behind the active turn, preserves original terminal-frame routing, drains queued follow-ups only after terminal frames, and keeps the active-turn guard pinned while draining so late arrivals queue behind the drained turn instead of duplicating kernel submits. Tests cover cross-channel route preservation and late-arrival FIFO behavior."
             },
             {
               "name": "Drain-timeout resume_pending recovery",
@@ -566,8 +566,8 @@
             },
             {
               "name": "Channel lifecycle writers into status model",
-              "status": "planned",
-              "note": "TDD: thread live channel lifecycle updates into the shared pairing/status surface and prove read-model coherence before adapter-specific pairing UX widens."
+              "status": "complete",
+              "note": "TDD landed: internal/gateway.RuntimeStatusStore persists gateway_state.json atomically, gateway.Manager writes gateway/channel lifecycle states into that shared model, and focused tests prove read-model coherence for start, stop, and startup-failure paths before pairing UX widens."
             }
           ]
         },
@@ -708,8 +708,8 @@
             },
             {
               "name": "WeCom + WeiXin transport/bootstrap layer",
-              "status": "planned",
-              "note": "TDD: freeze callback/webhook bootstrap, credential validation, and outbound push/reply lifecycle seams before binding real WeCom or WeiXin transports."
+              "status": "complete",
+              "note": "TDD landed: internal/channels/wecom/runtime.go and internal/channels/weixin/runtime.go now freeze WeCom WebSocket/callback bootstrap, credential validation, WeCom reply-vs-active-push decisions, and Weixin long-poll/context-token lifecycle seams before any real transport binding."
             }
           ]
         }

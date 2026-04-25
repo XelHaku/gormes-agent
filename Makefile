@@ -5,7 +5,6 @@ BINARY_PATH := bin/gormes
 
 build: validate-progress $(BINARY_PATH)
 	@$(call record-benchmark)
-	@$(call record-progress)
 	$(MAKE) -s generate-progress
 	@$(call update-readme)
 
@@ -14,25 +13,20 @@ $(BINARY_PATH):
 
 validate-progress:
 	@echo "Validating progress.json..."
-	@go run ./cmd/progress-gen -validate
+	@go run ./cmd/autoloop progress validate
 
 generate-progress:
 	@echo "Regenerating progress-driven markdown..."
-	@go run ./cmd/progress-gen -write
+	@go run ./cmd/autoloop progress write
 
 define record-benchmark
 	@echo "Recording benchmark..."
-	@go run ./cmd/repoctl benchmark record
+	@go run ./cmd/autoloop repo benchmark record
 endef
 
 define update-readme
 	@echo "Updating README.md..."
-	@go run ./cmd/repoctl readme update
-endef
-
-define record-progress
-	@echo "Updating progress..."
-	@go run ./cmd/repoctl progress sync
+	@go run ./cmd/autoloop repo readme update
 endef
 
 update-readme:

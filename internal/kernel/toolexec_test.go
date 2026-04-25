@@ -3,6 +3,7 @@ package kernel
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -102,4 +103,81 @@ func TestExecuteToolCalls_CancelBetweenCalls(t *testing.T) {
 			t.Errorf("res[%d] content = %q, want to mention cancelled", i, res[i].Content)
 		}
 	}
+}
+
+func TestExecuteToolCalls_ContextCancelCancelsEveryConcurrentWorker(t *testing.T) {
+	reg := tools.NewRegistry()
+	started := make(chan string, 3)
+	cancelled := make(chan string, 3)
+
+	for _, name := range []string{"alpha", "bravo", "charlie"} {
+		name := name
+		reg.MustRegister(&tools.MockTool{
+			NameStr:  name,
+			TimeoutD: 5 * time.Second,
+			ExecuteFn: func(ctx context.Context, _ json.RawMessage) (json.RawMessage, error) {
+				started <- name
+				<-ctx.Done()
+				cancelled <- name
+				return nil, ctx.Err()
+			},
+		})
+	}
+	k := newKernelWithRegistry(t, reg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan []toolResult, 1)
+	go func() {
+		done <- k.executeToolCalls(ctx, []hermes.ToolCall{
+			{ID: "call_alpha", Name: "alpha", Arguments: json.RawMessage(`{}`)},
+			{ID: "call_bravo", Name: "bravo", Arguments: json.RawMessage(`{}`)},
+			{ID: "call_charlie", Name: "charlie", Arguments: json.RawMessage(`{}`)},
+		})
+	}()
+
+	requireNames(t, started, []string{"alpha", "bravo", "charlie"}, 500*time.Millisecond)
+	cancel()
+	requireNames(t, cancelled, []string{"alpha", "bravo", "charlie"}, time.Second)
+
+	select {
+	case results := <-done:
+		if len(results) != 3 {
+			t.Fatalf("result count = %d, want 3", len(results))
+		}
+		for i, result := range results {
+			if !strings.Contains(result.Content, "tool execution cancelled") {
+				t.Fatalf("results[%d].Content = %q, want coherent cancellation envelope", i, result.Content)
+			}
+		}
+	case <-time.After(time.Second):
+		t.Fatal("executeToolCalls did not return within 1s after context cancellation")
+	}
+}
+
+func requireNames(t *testing.T, ch <-chan string, want []string, timeout time.Duration) {
+	t.Helper()
+
+	deadline := time.After(timeout)
+	remaining := make(map[string]struct{}, len(want))
+	for _, name := range want {
+		remaining[name] = struct{}{}
+	}
+
+	for len(remaining) > 0 {
+		select {
+		case name := <-ch:
+			delete(remaining, name)
+		case <-deadline:
+			t.Fatalf("timeout waiting for names %v", sortedKeys(remaining))
+		}
+	}
+}
+
+func sortedKeys(m map[string]struct{}) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }

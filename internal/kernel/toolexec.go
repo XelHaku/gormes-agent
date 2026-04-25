@@ -20,96 +20,229 @@ type toolResult struct {
 	Content string // JSON string — errors are JSON-encoded {"error":"..."}
 }
 
-// executeToolCalls runs each tool call sequentially with per-call timeout
-// and panic recovery. Honours runCtx cancellation between calls. Returns
-// results in the same order as calls.
+type toolBatchOutcome struct {
+	Results   []toolResult
+	Cancelled bool
+}
+
+type indexedToolResult struct {
+	Index  int
+	Result toolResult
+	Status string
+	Err    error
+	Audit  *audit.Record
+}
+
+var errToolExecutionCancelled = errors.New("tool execution cancelled")
+
+const toolExecutionCancelledContent = `{"error":"tool execution cancelled"}`
+
+// executeToolCalls runs tool calls with per-call timeout and panic recovery.
+// It preserves result order for the model-facing transcript. Existing unit
+// tests call this wrapper directly; runTurn uses executeToolCallsInterruptible
+// so a PlatformEventCancel can stop the active tool batch.
 func (k *Kernel) executeToolCalls(runCtx context.Context, calls []hermes.ToolCall) []toolResult {
+	return k.executeToolCallsInterruptible(runCtx, calls).Results
+}
+
+// executeToolCallsInterruptible fans a tool-call batch out to worker goroutines
+// that share one cancellation context. The kernel goroutine stays in this
+// function while workers run, so it can keep servicing k.events and propagate a
+// single interrupt to every in-flight worker before returning one coherent
+// cancellation envelope per call.
+func (k *Kernel) executeToolCallsInterruptible(runCtx context.Context, calls []hermes.ToolCall) toolBatchOutcome {
 	results := make([]toolResult, len(calls))
+	auditRecords := make([]*audit.Record, len(calls))
+	if len(calls) == 0 {
+		return toolBatchOutcome{Results: results}
+	}
+
+	execCtx, cancelAll := context.WithCancel(runCtx)
+	defer cancelAll()
+
+	resultCh := make(chan indexedToolResult, len(calls))
 	for i, call := range calls {
-		start := time.Now()
-		recordAudit := func(status string, result json.RawMessage, err error) {
-			if k.cfg.ToolAudit == nil {
-				return
-			}
-			rec := audit.Record{
-				Timestamp:       time.Now().UTC(),
-				Source:          "kernel",
-				SessionID:       k.sessionID,
-				Tool:            call.Name,
-				Args:            append(json.RawMessage(nil), call.Arguments...),
-				DurationMs:      time.Since(start).Milliseconds(),
-				Status:          status,
-				ResultSizeBytes: len(result),
-			}
-			if err != nil {
-				rec.Error = err.Error()
-			}
-			if auditErr := k.cfg.ToolAudit.Record(rec); auditErr != nil && k.log != nil {
-				k.log.Warn("kernel: append tool audit failed", "tool", call.Name, "err", auditErr)
-			}
-		}
-
-		select {
-		case <-runCtx.Done():
-			results[i] = toolResult{
-				ID: call.ID, Name: call.Name,
-				Content: `{"error":"cancelled before execution"}`,
-			}
-			recordAudit("cancelled", nil, errors.New("cancelled before execution"))
-			continue
-		default:
-		}
-
-		if k.cfg.Tools == nil {
-			results[i] = toolResult{
-				ID: call.ID, Name: call.Name,
-				Content: `{"error":"no tool registry configured"}`,
-			}
-			recordAudit("failed", nil, errors.New("no tool registry configured"))
-			continue
-		}
-
-		tool, ok := k.cfg.Tools.Get(call.Name)
-		if !ok {
-			results[i] = toolResult{
-				ID: call.ID, Name: call.Name,
-				Content: fmt.Sprintf(`{"error":"unknown tool: %q"}`, call.Name),
-			}
-			k.addSoul("tool unknown: " + call.Name)
-			recordAudit("failed", nil, fmt.Errorf("unknown tool: %q", call.Name))
-			continue
-		}
-
-		timeout := tool.Timeout()
-		if timeout <= 0 {
-			timeout = k.cfg.MaxToolDuration
-		}
-		if timeout <= 0 {
-			timeout = 30 * time.Second
-		}
-
-		callCtx, cancel := context.WithTimeout(runCtx, timeout)
-
 		k.addSoul("tool: " + call.Name)
 		k.emitFrame("executing tool: " + call.Name)
-
-		payload, err := safeExecute(callCtx, tool, call.Arguments)
-		cancel()
-
-		if err != nil {
-			results[i] = toolResult{
-				ID: call.ID, Name: call.Name,
-				Content: fmt.Sprintf(`{"error":%q}`, err.Error()),
-			}
-			k.addSoul("tool error: " + call.Name + ": " + err.Error())
-			recordAudit("failed", nil, err)
-			continue
-		}
-		results[i] = toolResult{ID: call.ID, Name: call.Name, Content: string(payload)}
-		k.addSoul("tool done: " + call.Name)
-		recordAudit("completed", payload, nil)
+		go func(index int, toolCall hermes.ToolCall, sessionID string) {
+			resultCh <- k.executeOneToolCall(execCtx, index, toolCall, sessionID)
+		}(i, call, k.sessionID)
 	}
-	return results
+
+	cancelled := false
+	runDone := runCtx.Done()
+	remaining := len(calls)
+	for remaining > 0 {
+		select {
+		case <-runDone:
+			cancelled = true
+			cancelAll()
+			runDone = nil
+		case e := <-k.events:
+			switch e.Kind {
+			case PlatformEventCancel, PlatformEventQuit:
+				cancelled = true
+				cancelAll()
+				k.phase = PhaseCancelling
+				k.emitFrame("cancelling tools")
+			case PlatformEventSubmit:
+				k.lastError = ErrTurnInFlight.Error()
+				k.emitFrame("still processing previous turn")
+			case PlatformEventResetSession:
+				if e.ack != nil {
+					e.ack <- ErrResetDuringTurn
+				}
+			}
+		case res := <-resultCh:
+			remaining--
+			results[res.Index] = res.Result
+			auditRecords[res.Index] = res.Audit
+			switch res.Status {
+			case "completed":
+				k.addSoul("tool done: " + res.Result.Name)
+			case "cancelled":
+				k.addSoul("tool cancelled: " + res.Result.Name)
+			case "failed":
+				if res.Err != nil {
+					k.addSoul("tool error: " + res.Result.Name + ": " + res.Err.Error())
+				} else {
+					k.addSoul("tool error: " + res.Result.Name)
+				}
+			}
+		}
+	}
+
+	for _, rec := range auditRecords {
+		k.recordToolAudit(rec)
+	}
+
+	return toolBatchOutcome{Results: results, Cancelled: cancelled}
+}
+
+func (k *Kernel) executeOneToolCall(ctx context.Context, index int, call hermes.ToolCall, sessionID string) indexedToolResult {
+	start := time.Now()
+	buildAudit := func(status string, result json.RawMessage, err error) *audit.Record {
+		if k.cfg.ToolAudit == nil {
+			return nil
+		}
+		rec := audit.Record{
+			Timestamp:       time.Now().UTC(),
+			Source:          "kernel",
+			SessionID:       sessionID,
+			Tool:            call.Name,
+			Args:            append(json.RawMessage(nil), call.Arguments...),
+			DurationMs:      time.Since(start).Milliseconds(),
+			Status:          status,
+			ResultSizeBytes: len(result),
+		}
+		if err != nil {
+			rec.Error = err.Error()
+		}
+		return &rec
+	}
+
+	cancelled := func() indexedToolResult {
+		return indexedToolResult{
+			Index:  index,
+			Result: cancelledToolResult(call),
+			Status: "cancelled",
+			Err:    errToolExecutionCancelled,
+			Audit:  buildAudit("cancelled", nil, errToolExecutionCancelled),
+		}
+	}
+
+	select {
+	case <-ctx.Done():
+		return cancelled()
+	default:
+	}
+
+	if k.cfg.Tools == nil {
+		err := errors.New("no tool registry configured")
+		result := toolResult{
+			ID: call.ID, Name: call.Name,
+			Content: `{"error":"no tool registry configured"}`,
+		}
+		return indexedToolResult{
+			Index:  index,
+			Result: result,
+			Status: "failed",
+			Err:    err,
+			Audit:  buildAudit("failed", nil, err),
+		}
+	}
+
+	tool, ok := k.cfg.Tools.Get(call.Name)
+	if !ok {
+		err := fmt.Errorf("unknown tool: %q", call.Name)
+		result := toolResult{
+			ID: call.ID, Name: call.Name,
+			Content: fmt.Sprintf(`{"error":"unknown tool: %q"}`, call.Name),
+		}
+		return indexedToolResult{
+			Index:  index,
+			Result: result,
+			Status: "failed",
+			Err:    err,
+			Audit:  buildAudit("failed", nil, err),
+		}
+	}
+
+	timeout := tool.Timeout()
+	if timeout <= 0 {
+		timeout = k.cfg.MaxToolDuration
+	}
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	payload, err := safeExecute(callCtx, tool, call.Arguments)
+	callErr := callCtx.Err()
+	cancel()
+
+	if errors.Is(callErr, context.Canceled) || errors.Is(err, context.Canceled) {
+		return cancelled()
+	}
+
+	if err == nil && errors.Is(callErr, context.DeadlineExceeded) {
+		err = callErr
+	}
+
+	if err != nil {
+		result := toolResult{
+			ID: call.ID, Name: call.Name,
+			Content: fmt.Sprintf(`{"error":%q}`, err.Error()),
+		}
+		return indexedToolResult{
+			Index:  index,
+			Result: result,
+			Status: "failed",
+			Err:    err,
+			Audit:  buildAudit("failed", nil, err),
+		}
+	}
+
+	result := toolResult{ID: call.ID, Name: call.Name, Content: string(payload)}
+	return indexedToolResult{
+		Index:  index,
+		Result: result,
+		Status: "completed",
+		Audit:  buildAudit("completed", payload, nil),
+	}
+}
+
+func cancelledToolResult(call hermes.ToolCall) toolResult {
+	return toolResult{ID: call.ID, Name: call.Name, Content: toolExecutionCancelledContent}
+}
+
+func (k *Kernel) recordToolAudit(rec *audit.Record) {
+	if rec == nil || k.cfg.ToolAudit == nil {
+		return
+	}
+	if auditErr := k.cfg.ToolAudit.Record(*rec); auditErr != nil && k.log != nil {
+		k.log.Warn("kernel: append tool audit failed", "tool", rec.Tool, "err", auditErr)
+	}
 }
 
 // safeExecute wraps Tool.Execute with panic recovery so a misbehaving tool

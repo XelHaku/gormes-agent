@@ -223,6 +223,10 @@ func (s *LocalCodeSandbox) Execute(ctx context.Context, req CodeExecutionRequest
 	case runCtx.Err() == context.DeadlineExceeded:
 		result.Status = "timeout"
 		result.Error = fmt.Sprintf("execution timed out after %s", req.Timeout)
+	case runCtx.Err() == context.Canceled:
+		result.Status = "interrupted"
+		result.ExitCode = 130
+		result.Error = "execution interrupted"
 	case runErr != nil:
 		result.Status = "error"
 		result.ExitCode = exitCode(runErr)

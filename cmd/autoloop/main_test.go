@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -19,6 +21,10 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	}
 	for _, want := range []string{
 		"usage: autoloop",
+		"progress validate",
+		"progress write",
+		"repo benchmark record",
+		"repo readme update",
 		"audit",
 		"service install",
 		"service install-audit",
@@ -27,6 +33,139 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("run() error = %q, want %q", err, want)
 		}
+	}
+}
+
+func TestProgressValidateValidatesCanonicalProgress(t *testing.T) {
+	repoRoot := t.TempDir()
+	writeMinimalProgressRepo(t, repoRoot)
+	withTempCwd(t, repoRoot)
+
+	var stdout bytes.Buffer
+	oldStdout := commandStdout
+	commandStdout = &stdout
+	t.Cleanup(func() {
+		commandStdout = oldStdout
+	})
+
+	if err := run([]string{"progress", "validate"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	if !strings.Contains(stdout.String(), "progress: validated 1 phases") {
+		t.Fatalf("stdout = %q, want validation summary", stdout.String())
+	}
+}
+
+func TestProgressWriteRegeneratesDocsAndSiteProgress(t *testing.T) {
+	repoRoot := t.TempDir()
+	writeMinimalProgressRepo(t, repoRoot)
+	withTempCwd(t, repoRoot)
+
+	var stdout bytes.Buffer
+	oldStdout := commandStdout
+	commandStdout = &stdout
+	t.Cleanup(func() {
+		commandStdout = oldStdout
+	})
+
+	if err := run([]string{"progress", "write"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	indexRaw, err := os.ReadFile(filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "_index.md"))
+	if err != nil {
+		t.Fatalf("ReadFile(_index.md) error = %v", err)
+	}
+	if !strings.Contains(string(indexRaw), "Phase 1 — Test Phase") || !strings.Contains(string(indexRaw), "- [x] First shipped item") {
+		t.Fatalf("_index.md was not regenerated with progress content:\n%s", indexRaw)
+	}
+
+	siteRaw, err := os.ReadFile(filepath.Join(repoRoot, "www.gormes.ai", "internal", "site", "data", "progress.json"))
+	if err != nil {
+		t.Fatalf("ReadFile(site progress) error = %v", err)
+	}
+	sourceRaw, err := os.ReadFile(filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"))
+	if err != nil {
+		t.Fatalf("ReadFile(source progress) error = %v", err)
+	}
+	if string(siteRaw) != string(sourceRaw) {
+		t.Fatalf("site progress mirror mismatch")
+	}
+	if !strings.Contains(stdout.String(), "progress: _index.md regenerated") {
+		t.Fatalf("stdout = %q, want generation summary", stdout.String())
+	}
+}
+
+func TestRepoBenchmarkRecordUpdatesBenchmarks(t *testing.T) {
+	repoRoot := t.TempDir()
+	runGit(t, repoRoot, "init")
+	if err := os.WriteFile(filepath.Join(repoRoot, "README.md"), []byte("test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, repoRoot, "add", "README.md")
+	runGit(t, repoRoot, "-c", "user.email=test@example.com", "-c", "user.name=Test User", "commit", "-m", "initial")
+
+	bin := filepath.Join(repoRoot, "bin", "gormes")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, make([]byte, 1024*1024), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoRoot, "benchmarks.json"), []byte(`{"binary":{"name":"gormes"},"history":[]}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	withTempCwd(t, repoRoot)
+
+	if err := run([]string{"repo", "benchmark", "record"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	var got struct {
+		Binary struct {
+			Name      string `json:"name"`
+			SizeMB    string `json:"size_mb"`
+			SizeBytes int64  `json:"size_bytes"`
+			Commit    string `json:"commit"`
+		} `json:"binary"`
+		History []map[string]any `json:"history"`
+	}
+	raw, err := os.ReadFile(filepath.Join(repoRoot, "benchmarks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Binary.Name != "gormes" || got.Binary.SizeMB != "1.0" || got.Binary.SizeBytes != 1024*1024 || got.Binary.Commit == "" {
+		t.Fatalf("binary = %+v", got.Binary)
+	}
+	if len(got.History) != 1 {
+		t.Fatalf("history = %+v", got.History)
+	}
+}
+
+func TestRepoReadmeUpdateUpdatesReadme(t *testing.T) {
+	repoRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(repoRoot, "benchmarks.json"), []byte(`{"binary":{"size_mb":"16.2"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	readme := filepath.Join(repoRoot, "README.md")
+	if err := os.WriteFile(readme, []byte("Binary size: ~99.9 MB\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	withTempCwd(t, repoRoot)
+
+	if err := run([]string{"repo", "readme", "update"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+	raw, err := os.ReadFile(readme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "~16.2 MB") {
+		t.Fatalf("README not updated:\n%s", raw)
 	}
 }
 
@@ -624,5 +763,89 @@ func TestDigestIgnoresRunOnlyEnvValidation(t *testing.T) {
 
 	if !strings.Contains(stdout.String(), "runs: 1") {
 		t.Fatalf("stdout = %q, want digest from configured RUN_ROOT", stdout.String())
+	}
+}
+
+func writeMinimalProgressRepo(t *testing.T, root string) {
+	t.Helper()
+
+	progressPath := filepath.Join(root, "docs", "content", "building-gormes", "architecture_plan", "progress.json")
+	progressJSON := `{
+  "meta": {
+    "version": "2.0",
+    "last_updated": "2026-04-24"
+  },
+  "phases": {
+    "1": {
+      "name": "Phase 1 — Test Phase",
+      "deliverable": "Test deliverable",
+      "subphases": {
+        "1.A": {
+          "name": "Test Subphase",
+          "items": [
+            {"name": "First shipped item", "status": "complete"}
+          ]
+        }
+      }
+    }
+  }
+}
+`
+	if err := os.MkdirAll(filepath.Dir(progressPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(progressPath, []byte(progressJSON), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	markers := map[string]string{
+		"README.md": "readme-rollup",
+		"docs/content/building-gormes/architecture_plan/_index.md": "docs-full-checklist",
+		"docs/content/building-gormes/contract-readiness.md":       "contract-readiness",
+		"docs/content/building-gormes/autoloop-handoff.md":         "autoloop-handoff",
+		"docs/content/building-gormes/agent-queue.md":              "agent-queue",
+		"docs/content/building-gormes/next-slices.md":              "next-slices",
+		"docs/content/building-gormes/blocked-slices.md":           "blocked-slices",
+		"docs/content/building-gormes/umbrella-cleanup.md":         "umbrella-cleanup",
+		"docs/content/building-gormes/progress-schema.md":          "progress-schema",
+	}
+	for rel, kind := range markers {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		body := "before\n<!-- PROGRESS:START kind=" + kind + " -->\nstale\n<!-- PROGRESS:END -->\nafter\n"
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(root, "www.gormes.ai", "internal", "site", "data"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runGit(t *testing.T, dir string, args ...string) []byte {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return out
+}
+
+func withTempCwd(t *testing.T, dir string) {
+	t.Helper()
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldwd); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -16,6 +16,8 @@ import (
 var startGreeting = gatewayHelpText()
 
 const shutdownNotice = "Gateway is shutting down — send /stop to cancel the active turn or try again shortly."
+const followUpQueueFullNotice = "Busy — follow-up queue is full; try again after the current turn."
+const followUpQueueCap = kernel.PlatformEventMailboxCap
 
 // ManagerConfig drives the shared gateway manager.
 type ManagerConfig struct {
@@ -24,6 +26,7 @@ type ManagerConfig struct {
 	CoalesceMs     int
 	SessionMap     session.Map
 	Hooks          *Hooks
+	RuntimeStatus  RuntimeStatusWriter
 }
 
 type kernelSubmitter interface {
@@ -46,8 +49,14 @@ type Manager struct {
 	turnChatID   string
 	turnMsgID    string
 	shuttingDown bool
+	followUps    []InboundEvent
 
 	renderChan <-chan kernel.RenderFrame
+}
+
+type channelRunFailure struct {
+	channel Channel
+	err     error
 }
 
 type hookedPlaceholderEditor struct {
@@ -166,6 +175,12 @@ func (m *Manager) Shutdown(ctx context.Context) error {
 	m.shuttingDown = true
 	m.turnMu.Unlock()
 
+	activeAgents := m.activeAgentCount()
+	m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+		GatewayState: GatewayStateDraining,
+		ActiveAgents: &activeAgents,
+	})
+
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -193,37 +208,100 @@ func (m *Manager) Run(ctx context.Context) error {
 	}
 	m.mu.Unlock()
 
+	m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{GatewayState: GatewayStateStarting})
+
 	inbox := make(chan InboundEvent, len(channels)*4)
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	failures := make(chan channelRunFailure, len(channels))
 
 	var wg sync.WaitGroup
 	for _, ch := range channels {
+		m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+			Platform:      ch.Name(),
+			PlatformState: PlatformStateStarting,
+		})
 		wg.Add(1)
 		go func(c Channel) {
 			defer wg.Done()
-			if err := c.Run(ctx, inbox); err != nil && !errors.Is(err, context.Canceled) {
-				m.fireHook(ctx, HookEvent{
+			m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+				Platform:      c.Name(),
+				PlatformState: PlatformStateRunning,
+			})
+			if err := c.Run(runCtx, inbox); err != nil && !errors.Is(err, context.Canceled) {
+				m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+					Platform:      c.Name(),
+					PlatformState: PlatformStateFailed,
+					ErrorMessage:  err.Error(),
+				})
+				m.fireHook(runCtx, HookEvent{
 					Point:    HookOnError,
 					Platform: c.Name(),
 					Err:      err,
 				})
 				m.log.Warn("channel exited with error", "channel", c.Name(), "err", err)
+				failures <- channelRunFailure{channel: c, err: err}
+				return
 			}
+			m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+				Platform:      c.Name(),
+				PlatformState: PlatformStateStopped,
+			})
 		}(ch)
 	}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		m.runOutbound(ctx)
+		m.runOutbound(runCtx)
 	}()
 
+	m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{GatewayState: GatewayStateRunning})
+
+	activeChannels := len(channels)
+	var firstFailure error
 	for {
 		select {
 		case <-ctx.Done():
+			cancel()
 			wg.Wait()
+			zero := 0
+			m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+				GatewayState: GatewayStateStopped,
+				ActiveAgents: &zero,
+			})
 			return nil
+		case failure := <-failures:
+			m.safeChannelDisconnect(ctx, failure.channel)
+			if firstFailure == nil {
+				firstFailure = failure.err
+			}
+			activeChannels--
+			if activeChannels <= 0 {
+				cancel()
+				wg.Wait()
+				reason := ""
+				if firstFailure != nil {
+					reason = firstFailure.Error()
+				}
+				zero := 0
+				m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+					GatewayState: GatewayStateStartupFailed,
+					ExitReason:   reason,
+					ActiveAgents: &zero,
+				})
+				return firstFailure
+			}
 		case ev := <-inbox:
-			m.handleInbound(ctx, ev)
+			m.handleInbound(runCtx, ev)
+		}
+	}
+}
+
+func (m *Manager) safeChannelDisconnect(ctx context.Context, ch Channel) {
+	if disconnecter, ok := ch.(DisconnectCapable); ok {
+		if err := disconnecter.Disconnect(ctx); err != nil {
+			m.log.Debug("defensive channel disconnect after failed startup raised", "channel", ch.Name(), "err", err)
 		}
 	}
 }
@@ -333,27 +411,16 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) {
 		if m.kernel == nil {
 			return
 		}
-		sessionID, err := resolveSessionID(ctx, m.cfg.SessionMap, ev.ChatKey())
-		if err != nil {
-			m.log.Warn("load session mapping", "key", ev.ChatKey(), "err", err)
-		}
-		sessionContext := BuildSessionContextPrompt(SessionContext{
-			Source:             sessionSourceFromInbound(ev),
-			SessionKey:         ev.ChatKey(),
-			SessionID:          sessionID,
-			ConnectedPlatforms: m.connectedPlatforms(),
-		})
-		m.pinTurn(ev.Platform, ev.ChatID, ev.MsgID)
-		if err := m.kernel.Submit(kernel.PlatformEvent{
-			Kind:           kernel.PlatformEventSubmit,
-			Text:           ev.SubmitText(),
-			SessionID:      sessionID,
-			SessionContext: sessionContext,
-		}); err != nil {
-			m.clearTurn()
-			_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Busy — try again in a second.")
+		queued, full := m.queueFollowUpIfActive(ev)
+		if queued {
 			return
 		}
+		if full {
+			_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, followUpQueueFullNotice)
+			return
+		}
+		m.pinTurn(ev.Platform, ev.ChatID, ev.MsgID)
+		m.submitPinned(ctx, ch, ev)
 	case EventUnknown:
 		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "unknown command")
 	}
@@ -377,7 +444,7 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 	if !ok {
 		m.sendFinalNoStream(ctx, ch, f, chatID)
 		if f.Phase == kernel.PhaseIdle || f.Phase == kernel.PhaseFailed || f.Phase == kernel.PhaseCancelling {
-			m.clearTurn()
+			m.drainNextFollowUp(ctx)
 		}
 		return
 	}
@@ -392,7 +459,7 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 		} else {
 			_, _ = m.sendWithHooks(ctx, ch, chatID, m.formatFinal(platform, f))
 		}
-		m.clearTurn()
+		m.drainNextFollowUp(ctx)
 	case kernel.PhaseFailed, kernel.PhaseCancelling:
 		text := m.formatError(platform, f)
 		if *co != nil {
@@ -403,7 +470,7 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 		} else {
 			_, _ = m.sendWithHooks(ctx, ch, chatID, text)
 		}
-		m.clearTurn()
+		m.drainNextFollowUp(ctx)
 	case kernel.PhaseConnecting, kernel.PhaseStreaming, kernel.PhaseReconnecting, kernel.PhaseFinalizing:
 		if *co == nil {
 			cCtx, cancel := context.WithCancel(ctx)
@@ -471,6 +538,15 @@ func (m *Manager) fireHook(ctx context.Context, ev HookEvent) {
 	m.cfg.Hooks.Fire(ctx, ev)
 }
 
+func (m *Manager) writeRuntimeStatus(ctx context.Context, update RuntimeStatusUpdate) {
+	if m.cfg.RuntimeStatus == nil {
+		return
+	}
+	if err := m.cfg.RuntimeStatus.UpdateRuntimeStatus(ctx, update); err != nil && !errors.Is(err, context.Canceled) {
+		m.log.Debug("write gateway runtime status", "err", err)
+	}
+}
+
 func (m *Manager) allowed(ev InboundEvent) bool {
 	want, ok := m.cfg.AllowedChats[ev.Platform]
 	if !ok || want == "" {
@@ -515,13 +591,22 @@ func (m *Manager) clearTurn() {
 func (m *Manager) hasActiveTurn() bool {
 	m.turnMu.Lock()
 	defer m.turnMu.Unlock()
-	return m.turnPlatform != "" || m.turnChatID != "" || m.turnMsgID != ""
+	return m.hasActiveTurnLocked()
 }
 
 func (m *Manager) isShuttingDown() bool {
 	m.turnMu.Lock()
 	defer m.turnMu.Unlock()
 	return m.shuttingDown
+}
+
+func (m *Manager) activeAgentCount() int {
+	m.turnMu.Lock()
+	defer m.turnMu.Unlock()
+	if m.turnPlatform == "" {
+		return 0
+	}
+	return 1
 }
 
 func (m *Manager) formatStream(platform string, f kernel.RenderFrame) string {
@@ -560,4 +645,82 @@ func (m *Manager) persistSession(ctx context.Context, f kernel.RenderFrame) {
 	if err := m.cfg.SessionMap.Put(ctx, key, f.SessionID); err != nil {
 		m.log.Warn("persist session_id", "key", key, "session_id", f.SessionID, "err", err)
 	}
+}
+
+func (m *Manager) hasActiveTurnLocked() bool {
+	return m.turnPlatform != "" || m.turnChatID != "" || m.turnMsgID != "" || len(m.followUps) > 0
+}
+
+func (m *Manager) queueFollowUpIfActive(ev InboundEvent) (queued bool, full bool) {
+	m.turnMu.Lock()
+	defer m.turnMu.Unlock()
+	if !m.hasActiveTurnLocked() {
+		return false, false
+	}
+	if len(m.followUps) >= followUpQueueCap {
+		return false, true
+	}
+	m.followUps = append(m.followUps, ev)
+	return true, false
+}
+
+func (m *Manager) drainNextFollowUp(ctx context.Context) {
+	for {
+		next, ok := m.popNextFollowUpAsActive()
+		if !ok {
+			return
+		}
+		ch := m.lookupChannel(next.Platform)
+		if ch == nil {
+			m.log.Warn("queued follow-up for unknown channel", "platform", next.Platform)
+			m.clearTurn()
+			continue
+		}
+		if m.submitPinned(ctx, ch, next) {
+			return
+		}
+	}
+}
+
+func (m *Manager) popNextFollowUpAsActive() (InboundEvent, bool) {
+	m.turnMu.Lock()
+	defer m.turnMu.Unlock()
+	if len(m.followUps) == 0 {
+		m.turnPlatform = ""
+		m.turnChatID = ""
+		m.turnMsgID = ""
+		return InboundEvent{}, false
+	}
+	next := m.followUps[0]
+	copy(m.followUps, m.followUps[1:])
+	m.followUps[len(m.followUps)-1] = InboundEvent{}
+	m.followUps = m.followUps[:len(m.followUps)-1]
+	m.turnPlatform = next.Platform
+	m.turnChatID = next.ChatID
+	m.turnMsgID = next.MsgID
+	return next, true
+}
+
+func (m *Manager) submitPinned(ctx context.Context, ch Channel, ev InboundEvent) bool {
+	sessionID, err := resolveSessionID(ctx, m.cfg.SessionMap, ev.ChatKey())
+	if err != nil {
+		m.log.Warn("load session mapping", "key", ev.ChatKey(), "err", err)
+	}
+	sessionContext := BuildSessionContextPrompt(SessionContext{
+		Source:             sessionSourceFromInbound(ev),
+		SessionKey:         ev.ChatKey(),
+		SessionID:          sessionID,
+		ConnectedPlatforms: m.connectedPlatforms(),
+	})
+	if err := m.kernel.Submit(kernel.PlatformEvent{
+		Kind:           kernel.PlatformEventSubmit,
+		Text:           ev.SubmitText(),
+		SessionID:      sessionID,
+		SessionContext: sessionContext,
+	}); err != nil {
+		m.clearTurn()
+		_, _ = m.sendWithHooks(ctx, ch, ev.ChatID, "Busy — try again in a second.")
+		return false
+	}
+	return true
 }

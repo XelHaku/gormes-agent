@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestMakefileUsesRepoctl(t *testing.T) {
+func TestMakefileUsesAutoloopRepoHelpers(t *testing.T) {
 	raw, err := os.ReadFile("../../Makefile")
 	if err != nil {
 		t.Fatal(err)
@@ -17,6 +17,8 @@ func TestMakefileUsesRepoctl(t *testing.T) {
 		"bash scripts/record-benchmark.sh",
 		"bash scripts/record-progress.sh",
 		"bash scripts/update-readme.sh",
+		"go run ./cmd/repoctl",
+		"go run ./cmd/progress-gen",
 	} {
 		if strings.Contains(makefile, forbidden) {
 			t.Fatalf("Makefile still calls %q", forbidden)
@@ -24,9 +26,9 @@ func TestMakefileUsesRepoctl(t *testing.T) {
 	}
 
 	for _, required := range []string{
-		"go run ./cmd/repoctl benchmark record",
-		"go run ./cmd/repoctl progress sync",
-		"go run ./cmd/repoctl readme update",
+		"go run ./cmd/autoloop repo benchmark record",
+		"go run ./cmd/autoloop progress write",
+		"go run ./cmd/autoloop repo readme update",
 	} {
 		if !strings.Contains(makefile, required) {
 			t.Fatalf("Makefile missing %q", required)

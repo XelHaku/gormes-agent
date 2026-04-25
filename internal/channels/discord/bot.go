@@ -29,10 +29,20 @@ type Bot struct {
 
 	reactionsMu sync.Mutex
 	reactions   map[string]bool
+
+	threadsMu sync.RWMutex
+	threads   map[string]discordThread
+}
+
+type discordThread struct {
+	id       string
+	parentID string
+	name     string
 }
 
 var (
 	_ gateway.Channel            = (*Bot)(nil)
+	_ gateway.DisconnectCapable  = (*Bot)(nil)
 	_ gateway.MessageEditor      = (*Bot)(nil)
 	_ gateway.PlaceholderCapable = (*Bot)(nil)
 	_ gateway.ReactionCapable    = (*Bot)(nil)
@@ -47,12 +57,57 @@ func New(cfg Config, session discordSession, log *slog.Logger) *Bot {
 		session:   session,
 		log:       log,
 		reactions: map[string]bool{},
+		threads:   map[string]discordThread{},
 	}
 }
 
 func (b *Bot) Name() string { return "discord" }
 
+func isForumChannel(ch *discordgo.Channel) bool {
+	return ch != nil && ch.Type == discordgo.ChannelTypeGuildForum
+}
+
 func (b *Bot) Run(ctx context.Context, inbox chan<- gateway.InboundEvent) error {
+	b.session.AddHandler(func(_ *discordgo.Session, t *discordgo.ThreadCreate) {
+		if t == nil {
+			return
+		}
+		ev, ok := b.toThreadLifecycleEvent(t.Channel)
+		if !ok {
+			return
+		}
+		select {
+		case inbox <- ev:
+		case <-ctx.Done():
+		}
+	})
+	b.session.AddHandler(func(_ *discordgo.Session, t *discordgo.ThreadUpdate) {
+		if t == nil {
+			return
+		}
+		ev, ok := b.toThreadLifecycleEvent(t.Channel)
+		if !ok {
+			return
+		}
+		select {
+		case inbox <- ev:
+		case <-ctx.Done():
+		}
+	})
+	b.session.AddHandler(func(_ *discordgo.Session, t *discordgo.ThreadDelete) {
+		if t == nil {
+			return
+		}
+		ev, ok := b.toThreadLifecycleEvent(t.Channel)
+		if !ok {
+			return
+		}
+		ev.ThreadLifecycle.State = gateway.ThreadLifecycleClosed
+		select {
+		case inbox <- ev:
+		case <-ctx.Done():
+		}
+	})
 	b.session.AddHandler(func(_ *discordgo.Session, m *discordgo.MessageCreate) {
 		if m == nil || m.Message == nil {
 			return
@@ -73,8 +128,12 @@ func (b *Bot) Run(ctx context.Context, inbox chan<- gateway.InboundEvent) error 
 		return fmt.Errorf("discord: open session: %w", err)
 	}
 	<-ctx.Done()
-	_ = b.session.Close()
+	_ = b.Disconnect(ctx)
 	return nil
+}
+
+func (b *Bot) Disconnect(context.Context) error {
+	return b.session.Close()
 }
 
 func (b *Bot) toInboundEvent(m *discordgo.Message) (gateway.InboundEvent, bool) {
@@ -85,13 +144,88 @@ func (b *Bot) toInboundEvent(m *discordgo.Message) (gateway.InboundEvent, bool) 
 	if m.Author != nil {
 		userID = m.Author.ID
 	}
+	chatID := m.ChannelID
+	threadID := ""
+	chatName := ""
+	if thread, ok := b.threadForMessageChannel(m.ChannelID); ok {
+		chatID = thread.parentID
+		threadID = thread.id
+		chatName = thread.name
+	}
 	return gateway.InboundEvent{
 		Platform: "discord",
-		ChatID:   m.ChannelID,
+		ChatID:   chatID,
+		ChatName: chatName,
 		UserID:   userID,
+		ThreadID: threadID,
 		MsgID:    m.ID,
 		Kind:     kind,
 		Text:     body,
+	}, true
+}
+
+func (b *Bot) rememberThread(ch *discordgo.Channel) {
+	if ch == nil || !ch.IsThread() || strings.TrimSpace(ch.ID) == "" {
+		return
+	}
+	parentID := strings.TrimSpace(ch.ParentID)
+	if parentID == "" {
+		return
+	}
+	b.threadsMu.Lock()
+	defer b.threadsMu.Unlock()
+	b.threads[ch.ID] = discordThread{
+		id:       strings.TrimSpace(ch.ID),
+		parentID: parentID,
+		name:     strings.TrimSpace(ch.Name),
+	}
+}
+
+func (b *Bot) threadForMessageChannel(channelID string) (discordThread, bool) {
+	b.threadsMu.RLock()
+	defer b.threadsMu.RUnlock()
+	thread, ok := b.threads[strings.TrimSpace(channelID)]
+	return thread, ok
+}
+
+func (b *Bot) toThreadLifecycleEvent(ch *discordgo.Channel) (gateway.InboundEvent, bool) {
+	if ch == nil || !ch.IsThread() || strings.TrimSpace(ch.ID) == "" || strings.TrimSpace(ch.ParentID) == "" {
+		return gateway.InboundEvent{}, false
+	}
+	b.rememberThread(ch)
+
+	archived := false
+	locked := false
+	if ch.ThreadMetadata != nil {
+		archived = ch.ThreadMetadata.Archived
+		locked = ch.ThreadMetadata.Locked
+	}
+
+	state := gateway.ThreadLifecycleOpen
+	switch {
+	case locked:
+		state = gateway.ThreadLifecycleClosed
+	case archived:
+		state = gateway.ThreadLifecycleArchived
+	}
+
+	threadID := strings.TrimSpace(ch.ID)
+	parentID := strings.TrimSpace(ch.ParentID)
+	name := strings.TrimSpace(ch.Name)
+	return gateway.InboundEvent{
+		Platform: "discord",
+		ChatID:   parentID,
+		ChatName: name,
+		ThreadID: threadID,
+		Kind:     gateway.EventThreadLifecycle,
+		ThreadLifecycle: &gateway.ThreadLifecycleEvent{
+			ID:       threadID,
+			ParentID: parentID,
+			Name:     name,
+			State:    state,
+			Archived: archived,
+			Locked:   locked,
+		},
 	}, true
 }
 

@@ -79,6 +79,27 @@ func TestLocalCodeSandbox_TimesOut(t *testing.T) {
 	}
 }
 
+func TestLocalCodeSandbox_ContextCancelReturnsInterrupted(t *testing.T) {
+	sandbox := NewLocalCodeSandbox()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result, err := sandbox.Execute(ctx, CodeExecutionRequest{
+		Language: "sh",
+		Code:     `sleep 5`,
+		Timeout:  5 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if result.Status != "interrupted" {
+		t.Fatalf("status = %q, want interrupted", result.Status)
+	}
+	if result.Error == "" || !strings.Contains(result.Error, "interrupted") {
+		t.Fatalf("error = %q, want interrupted detail", result.Error)
+	}
+}
+
 func TestLocalCodeSandbox_BlocksFilesystemAccess(t *testing.T) {
 	sandbox := NewLocalCodeSandbox()
 

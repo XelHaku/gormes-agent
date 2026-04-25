@@ -37,12 +37,12 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 28/72 subphases shipped · 11 in progress · 33 planned
+**Overall:** 29/72 subphases shipped · 10 in progress · 33 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 11/19 subphases |
+| Phase 2 — The Gateway | 🔨 | 12/19 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 11/13 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
@@ -105,7 +105,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ### 2.B.4 — WhatsApp Adapter 🔨
 
-- [ ] Bridge-vs-native runtime decision
+- [x] Bridge-vs-native runtime decision
 - [x] Inbound normalization + command passthrough
 - [ ] Pairing, reconnect, and send contract
 
@@ -116,14 +116,14 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 
-### 2.B.10 — WeChat Adapter 🔨
+### 2.B.10 — WeChat Adapter ✅
 
 - [x] WeCom + WeiXin shared-chassis bot seam
-- [ ] WeCom + WeiXin transport/bootstrap layer
+- [x] WeCom + WeiXin transport/bootstrap layer
 
-### 2.B.11 — Discord Forum Channels ⏳
+### 2.B.11 — Discord Forum Channels 🔨
 
-- [ ] Discord forum channel ingress + thread lifecycle
+- [x] Discord forum channel ingress + thread lifecycle
 - [ ] Discord forum media + polish parity
 
 ### 2.C — Thin Mapping Persistence ✅
@@ -152,9 +152,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Tool-call audit in typed child results
 - [x] Real child Hermes stream loop
 
-### 2.E.2 — OS-AI Spine: Concurrent-Tool Cancellation ⏳
+### 2.E.2 — OS-AI Spine: Concurrent-Tool Cancellation ✅
 
-- [ ] Interrupt propagation to concurrent-tool workers
+- [x] Interrupt propagation to concurrent-tool workers
 
 ### 2.F.1 — Slash Command Registry + Gateway Dispatch ✅
 
@@ -170,7 +170,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 2.F.3 — Restart / Pairing / Status 🔨
 
 - [x] Graceful restart drain + managed shutdown
-- [ ] Adapter startup failure cleanup contract
+- [x] Adapter startup failure cleanup contract
 - [ ] Active-turn follow-up queue + late-arrival drain policy
 - [ ] Drain-timeout resume_pending recovery
 - [ ] Pairing read-model schema + atomic persistence

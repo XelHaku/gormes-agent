@@ -1,0 +1,13 @@
+{
+  "id": "forum-100",
+  "guild_id": "guild-1",
+  "name": "support",
+  "topic": "Support intake instructions",
+  "type": 15,
+  "available_tags": [
+    {
+      "id": "tag-1",
+      "name": "bug"
+    }
+  ]
+}

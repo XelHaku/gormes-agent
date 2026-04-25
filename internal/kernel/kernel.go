@@ -417,8 +417,13 @@ toolLoop:
 		}
 
 		runCtx, cancelRun := context.WithCancel(ctx)
-		results := k.executeToolCalls(runCtx, finalDelta.ToolCalls)
+		toolOutcome := k.executeToolCallsInterruptible(runCtx, finalDelta.ToolCalls)
 		cancelRun()
+		if toolOutcome.Cancelled {
+			cancelled = true
+			break toolLoop
+		}
+		results := toolOutcome.Results
 
 		// Append the assistant's tool-requesting message plus one tool-result
 		// message per call. The draft so far is captured in the assistant

@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TrebuchetDynamics/gormes-agent/internal/gateway"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/kernel"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/session"
 )
@@ -108,13 +109,13 @@ func (b *Bot) handleEvent(ctx context.Context, e Event) {
 
 	threadTS := b.replyThreadTS(e)
 	text := strings.TrimSpace(e.Text)
-	switch {
-	case text == "/start":
-		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
-			"Gormes is online. Send a message to start a turn. Commands: /stop /new")
-	case text == "/stop":
+	kind, body := gateway.ParseInboundText(text)
+	switch kind {
+	case gateway.EventStart:
+		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, slackHelpText())
+	case gateway.EventCancel:
 		_ = b.kernel.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventCancel})
-	case text == "/new":
+	case gateway.EventReset:
 		if b.hasTurnInFlight() {
 			_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS,
 				"Cannot reset during active turn - send /stop first.")
@@ -136,21 +137,28 @@ func (b *Bot) handleEvent(ctx context.Context, e Event) {
 			return
 		}
 		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "Session reset. Next message starts fresh.")
-	case strings.HasPrefix(text, "/"):
+	case gateway.EventUnknown:
 		_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "unknown command")
-	case text == "":
-		return
-	default:
+	case gateway.EventSubmit:
+		if body == "" {
+			return
+		}
 		ticket := b.reserveTurn(e.ChannelID, threadTS)
 		if ticket == 0 {
 			_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "Busy - try again in a second.")
 			return
 		}
-		if err := b.kernel.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventSubmit, Text: text}); err != nil {
+		if err := b.kernel.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventSubmit, Text: body}); err != nil {
 			b.cancelReservedTurn(ticket)
 			_, _ = b.client.PostMessage(ctx, e.ChannelID, threadTS, "Busy - try again in a second.")
 		}
+	default:
+		return
 	}
+}
+
+func slackHelpText() string {
+	return "Gormes is online. Available commands:\n" + strings.Join(gateway.GatewayHelpLines(), "\n")
 }
 
 func (b *Bot) runOutbound(ctx context.Context, wg *sync.WaitGroup, ready chan<- struct{}) {

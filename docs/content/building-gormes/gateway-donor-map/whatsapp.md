@@ -9,7 +9,7 @@ WhatsApp is partially ported for Phase 2.B.4, but PicoClaw actually offers two d
 
 ## Status
 
-Gormes does not yet ship a runnable WhatsApp adapter. The current Go surface is a transport-neutral `internal/channels/whatsapp.NormalizeInbound` contract that normalizes direct/group peer IDs and passes generic slash commands through `gateway.ParseInboundText`; runtime selection, pairing, reconnect, and outbound send lifecycle are still planned. The upstream Hermes docs currently describe a built-in Baileys bridge flow, while PicoClaw supports:
+Gormes does not yet ship a runnable WhatsApp adapter. The current Go surface has a transport-neutral `internal/channels/whatsapp.NormalizeInbound` contract that normalizes direct/group peer IDs and passes generic slash commands through `gateway.ParseInboundText`, plus `internal/channels/whatsapp.DecideRuntime` for bridge-vs-native startup selection, session-path ownership, and bot/self-chat policy. Pairing, reconnect, and outbound send lifecycle are still planned. The upstream Hermes docs currently describe a built-in Baileys bridge flow, while PicoClaw supports:
 
 Evidence level:
 

@@ -412,6 +412,12 @@ func HooksRoot() string {
 	return filepath.Join(xdgDataHome(), "gormes", "hooks")
 }
 
+// GatewayRuntimeStatusPath returns the shared gateway_state.json read-model
+// path for live gateway lifecycle status.
+func GatewayRuntimeStatusPath() string {
+	return filepath.Join(xdgDataHome(), "gormes", "gateway_state.json")
+}
+
 // BootPath returns the BOOT.md path used by the built-in gateway startup hook.
 func BootPath() string {
 	return filepath.Join(xdgDataHome(), "gormes", "BOOT.md")

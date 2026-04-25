@@ -327,8 +327,8 @@ Required tasks:
 6) When PHASE_SKIP_SUBPHASES is set, don't promote docs for those subphases to
    the top of pages / landing / README — keep them listed as "deferred".
 7) Run validation commands:
-   - go run ./cmd/progress-gen -write
-   - go run ./cmd/progress-gen -validate
+   - go run ./cmd/autoloop progress write
+   - go run ./cmd/autoloop progress validate
    - go test ./internal/progress -count=1
    - go test ./docs -count=1
 
@@ -405,14 +405,14 @@ run_validation() {
   : > "$VALIDATION_LOG"
 
   log "Validation log: $VALIDATION_LOG"
-  log "Validation command: go run ./cmd/progress-gen -write"
-  log "Validation command: go run ./cmd/progress-gen -validate"
+  log "Validation command: go run ./cmd/autoloop progress write"
+  log "Validation command: go run ./cmd/autoloop progress validate"
   log "Validation command: go test ./internal/progress -count=1"
   log "Validation command: go test ./docs -count=1"
   (
     cd "$REPO_ROOT"
-    go run ./cmd/progress-gen -write
-    go run ./cmd/progress-gen -validate
+    go run ./cmd/autoloop progress write
+    go run ./cmd/autoloop progress validate
     go test ./internal/progress -count=1
     go test ./docs -count=1
   ) >>"$VALIDATION_LOG" 2>&1 || {

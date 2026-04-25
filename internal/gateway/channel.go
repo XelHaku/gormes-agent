@@ -17,6 +17,12 @@ type Channel interface {
 	Send(ctx context.Context, chatID, text string) (msgID string, err error)
 }
 
+// DisconnectCapable is implemented by channels that can release resources
+// outside their Run loop after a failed startup.
+type DisconnectCapable interface {
+	Disconnect(ctx context.Context) error
+}
+
 // MessageEditor is implemented by channels that can edit an existing message.
 type MessageEditor interface {
 	EditMessage(ctx context.Context, chatID, msgID, text string) error

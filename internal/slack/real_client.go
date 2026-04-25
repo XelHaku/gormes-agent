@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	slackapi "github.com/slack-go/slack"
@@ -116,7 +117,9 @@ func (c *realClient) handleSocketEvent(evt socketmode.Event, fn func(Event)) {
 	switch evt.Type {
 	case socketmode.EventTypeEventsAPI:
 		c.handleEventsAPI(evt, fn)
-	case socketmode.EventTypeInteractive, socketmode.EventTypeSlashCommand:
+	case socketmode.EventTypeSlashCommand:
+		c.handleSlashCommand(evt, fn)
+	case socketmode.EventTypeInteractive:
 		_ = c.autoAck(evt.Request)
 	}
 }
@@ -156,6 +159,30 @@ func (c *realClient) handleEventsAPI(evt socketmode.Event, fn func(Event)) {
 		ThreadTS:  msg.ThreadTimeStamp,
 		SubType:   msg.SubType,
 		BotID:     msg.BotID,
+	})
+}
+
+func (c *realClient) handleSlashCommand(evt socketmode.Event, fn func(Event)) {
+	if evt.Request == nil {
+		return
+	}
+
+	cmd, ok := evt.Data.(slackapi.SlashCommand)
+	if !ok {
+		_ = c.autoAck(evt.Request)
+		return
+	}
+
+	requestID := evt.Request.EnvelopeID
+	c.mu.Lock()
+	c.pending[requestID] = *evt.Request
+	c.mu.Unlock()
+
+	fn(Event{
+		RequestID: requestID,
+		ChannelID: cmd.ChannelID,
+		UserID:    cmd.UserID,
+		Text:      strings.TrimSpace(cmd.Command + " " + cmd.Text),
 	})
 }
 

@@ -2,6 +2,7 @@ package discord
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -190,6 +191,29 @@ func TestBot_ReactToMessage(t *testing.T) {
 
 	undo()
 	undo()
+}
+
+func TestDiscordAdapter_ManagerCleansSessionWhenStartupOpenFails(t *testing.T) {
+	startupErr := errors.New("permission denied")
+	ms := newMockSession()
+	ms.openErr = startupErr
+	bot := New(Config{AllowedChannelID: "42"}, ms, nil)
+
+	mgr := gateway.NewManagerWithSubmitter(gateway.ManagerConfig{}, &smokeKernel{frames: make(chan kernel.RenderFrame)}, nil)
+	if err := mgr.Register(bot); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	err := mgr.Run(ctx)
+	if !errors.Is(err, startupErr) {
+		t.Fatalf("Run error = %v, want startup error %v", err, startupErr)
+	}
+	if !ms.closedSnapshot() {
+		t.Fatal("discord session was not closed after startup failure")
+	}
 }
 
 type smokeKernel struct {

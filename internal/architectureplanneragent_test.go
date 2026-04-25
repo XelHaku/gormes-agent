@@ -103,7 +103,7 @@ func TestArchitecturePlannerAgentRunsCodexuAndInstallsPeriodicTimer(t *testing.T
 		0o644,
 	)
 	writePlannerTestFile(t,
-		filepath.Join(gormesRepo, "cmd", "progress-gen", "main.go"),
+		filepath.Join(gormesRepo, "cmd", "autoloop", "progress.go"),
 		[]byte("package main\nfunc main() {}\n"),
 		0o644,
 	)
@@ -172,8 +172,8 @@ log_file="${GO_LOG:?}"
 printf '%q ' "$@" >> "$log_file"
 printf '\n' >> "$log_file"
 case "$*" in
-  "run ./cmd/progress-gen -write") echo "progress-gen: _index.md regenerated" ;;
-  "run ./cmd/progress-gen -validate") echo "progress-gen: validated 2 phases" ;;
+  "run ./cmd/autoloop progress write") echo "progress: _index.md regenerated" ;;
+  "run ./cmd/autoloop progress validate") echo "progress: validated 2 phases" ;;
   "test ./internal/progress -count=1") echo "ok github.com/example/internal/progress 0.001s" ;;
   "test ./docs -count=1") echo "ok github.com/example/docs 0.001s" ;;
   *) echo "unexpected go invocation: $*" >&2; exit 1 ;;
@@ -332,8 +332,8 @@ exit 0
 	}
 	goLog := string(goLogData)
 	for _, want := range []string{
-		"run ./cmd/progress-gen -write",
-		"run ./cmd/progress-gen -validate",
+		"run ./cmd/autoloop progress write",
+		"run ./cmd/autoloop progress validate",
 		"test ./internal/progress -count=1",
 		"test ./docs -count=1",
 	} {
@@ -416,7 +416,7 @@ func TestDocumentationImproverRunsAndWritesState(t *testing.T) {
 	writePlannerTestFile(t, filepath.Join(gormesRepo, "docs", "content", "building-gormes", "core-systems", "gateway.md"), []byte("# Gateway\n"), 0o644)
 	writePlannerTestFile(t, filepath.Join(gormesRepo, "www.gormes.ai", "content", "_index.md"), []byte("# Gormes site\n"), 0o644)
 	writePlannerTestFile(t, filepath.Join(gormesRepo, "www.gormes.ai", "internal", "site", "data", "progress.json"), []byte("{}\n"), 0o644)
-	writePlannerTestFile(t, filepath.Join(gormesRepo, "cmd", "progress-gen", "main.go"), []byte("package main\nfunc main() {}\n"), 0o644)
+	writePlannerTestFile(t, filepath.Join(gormesRepo, "cmd", "autoloop", "progress.go"), []byte("package main\nfunc main() {}\n"), 0o644)
 	writePlannerTestFile(t, filepath.Join(gormesRepo, "internal", "progress", "doc.go"), []byte("package progress\n"), 0o644)
 	writePlannerTestFile(t, filepath.Join(gormesRepo, "docs", "doc.go"), []byte("package docs\n"), 0o644)
 
@@ -465,8 +465,8 @@ log_file="${GO_LOG:?}"
 printf '%q ' "$@" >> "$log_file"
 printf '\n' >> "$log_file"
 case "$*" in
-  "run ./cmd/progress-gen -write") echo "progress-gen: _index.md regenerated" ;;
-  "run ./cmd/progress-gen -validate") echo "progress-gen: validated 2 phases" ;;
+  "run ./cmd/autoloop progress write") echo "progress: _index.md regenerated" ;;
+  "run ./cmd/autoloop progress validate") echo "progress: validated 2 phases" ;;
   "test ./internal/progress -count=1") echo "ok github.com/example/internal/progress 0.001s" ;;
   "test ./docs -count=1") echo "ok github.com/example/docs 0.001s" ;;
   *) echo "unexpected go invocation: $*" >&2; exit 1 ;;
@@ -549,8 +549,8 @@ esac
 	}
 	goLog := string(goLogData)
 	for _, want := range []string{
-		"run ./cmd/progress-gen -write",
-		"run ./cmd/progress-gen -validate",
+		"run ./cmd/autoloop progress write",
+		"run ./cmd/autoloop progress validate",
 		"test ./internal/progress -count=1",
 		"test ./docs -count=1",
 	} {

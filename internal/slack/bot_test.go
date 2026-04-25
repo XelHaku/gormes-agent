@@ -7,11 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TrebuchetDynamics/gormes-agent/internal/gateway"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/kernel"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/session"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/store"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/telemetry"
+	slackapi "github.com/slack-go/slack"
 	slackevents "github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
 )
@@ -114,6 +116,31 @@ func TestBot_AcksEventsBeforeHandling(t *testing.T) {
 	}
 	if calls[0] != "ack:req-1" {
 		t.Fatalf("first call = %q, want ack:req-1", calls[0])
+	}
+}
+
+func TestBot_MessageCommandsUseSharedGatewayRegistry(t *testing.T) {
+	mc := newMockClient()
+	k := newIdleSlackKernel()
+	b := New(Config{
+		AllowedChannelID: "C123",
+		ReplyInThread:    true,
+	}, mc, k, nil)
+
+	b.handleEvent(context.Background(), Event{
+		RequestID: "req-help",
+		ChannelID: "C123",
+		UserID:    "U1",
+		Text:      "/help",
+		Timestamp: "1711111111.000150",
+		ThreadTS:  "1711111111.000150",
+	})
+
+	got := mc.lastOutputText()
+	for _, line := range gateway.GatewayHelpLines() {
+		if !strings.Contains(got, line) {
+			t.Fatalf("help output = %q, want registry line %q", got, line)
+		}
 	}
 }
 
@@ -815,6 +842,44 @@ func TestRealClient_AckFailureRetainsPendingAndSuccessClearsIt(t *testing.T) {
 	}
 }
 
+func TestRealClient_HandleSlashCommand_ForwardsGatewayCommandEvent(t *testing.T) {
+	var got Event
+	rc := &realClient{
+		pending: make(map[string]socketmode.Request),
+		ackFn: func(req socketmode.Request) error {
+			t.Fatalf("slash command %q was auto-acked before bot handling", req.EnvelopeID)
+			return nil
+		},
+	}
+
+	rc.handleSocketEvent(socketmode.Event{
+		Type: socketmode.EventTypeSlashCommand,
+		Request: &socketmode.Request{
+			EnvelopeID: "slash-help-1",
+		},
+		Data: slackapi.SlashCommand{
+			ChannelID: "C123",
+			UserID:    "U1",
+			Command:   "/help",
+		},
+	}, func(e Event) {
+		got = e
+	})
+
+	if got.RequestID != "slash-help-1" {
+		t.Fatalf("RequestID = %q, want slash-help-1", got.RequestID)
+	}
+	if got.ChannelID != "C123" || got.UserID != "U1" {
+		t.Fatalf("event identity = %+v, want channel C123 user U1", got)
+	}
+	if got.Text != "/help" {
+		t.Fatalf("Text = %q, want /help for shared gateway parser", got.Text)
+	}
+	if _, ok := rc.pending["slash-help-1"]; !ok {
+		t.Fatal("slash command request not retained for bot-level Ack")
+	}
+}
+
 func TestRealClient_HandleSocketEvent_AutoAckUsesInjectedSeam(t *testing.T) {
 	var acked []string
 	rc := &realClient{
@@ -829,12 +894,6 @@ func TestRealClient_HandleSocketEvent_AutoAckUsesInjectedSeam(t *testing.T) {
 		Type: socketmode.EventTypeInteractive,
 		Request: &socketmode.Request{
 			EnvelopeID: "interactive-1",
-		},
-	}, nil)
-	rc.handleSocketEvent(socketmode.Event{
-		Type: socketmode.EventTypeSlashCommand,
-		Request: &socketmode.Request{
-			EnvelopeID: "slash-1",
 		},
 	}, nil)
 	rc.handleEventsAPI(socketmode.Event{
@@ -852,10 +911,10 @@ func TestRealClient_HandleSocketEvent_AutoAckUsesInjectedSeam(t *testing.T) {
 		t.Fatal("unexpected message callback")
 	})
 
-	if len(acked) != 3 {
-		t.Fatalf("acked = %v, want 3 acked envelopes", acked)
+	if len(acked) != 2 {
+		t.Fatalf("acked = %v, want 2 acked envelopes", acked)
 	}
-	if acked[0] != "interactive-1" || acked[1] != "slash-1" || acked[2] != "not-message-1" {
-		t.Fatalf("acked = %v, want injected ack order for interactive/slash/non-message events", acked)
+	if acked[0] != "interactive-1" || acked[1] != "not-message-1" {
+		t.Fatalf("acked = %v, want injected ack order for interactive/non-message events", acked)
 	}
 }

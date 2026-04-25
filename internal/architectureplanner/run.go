@@ -166,8 +166,8 @@ func plannerBackendCommand(backend, mode, rawReportPath string) ([]string, error
 
 func runValidation(ctx context.Context, runner autoloop.Runner, repoRoot, logPath string) error {
 	commands := []autoloop.Command{
-		{Name: "go", Args: []string{"run", "./cmd/progress-gen", "-write"}, Dir: repoRoot},
-		{Name: "go", Args: []string{"run", "./cmd/progress-gen", "-validate"}, Dir: repoRoot},
+		{Name: "go", Args: []string{"run", "./cmd/autoloop", "progress", "write"}, Dir: repoRoot},
+		{Name: "go", Args: []string{"run", "./cmd/autoloop", "progress", "validate"}, Dir: repoRoot},
 		{Name: "go", Args: []string{"test", "./internal/progress", "-count=1"}, Dir: repoRoot},
 		{Name: "go", Args: []string{"test", "./docs", "-count=1"}, Dir: repoRoot},
 	}

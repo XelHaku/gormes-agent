@@ -160,8 +160,8 @@ func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 		t.Fatalf("Commands length = %d, want %d", got, want)
 	}
 	wantArgs := [][]string{
-		{"run", "./cmd/progress-gen", "-write"},
-		{"run", "./cmd/progress-gen", "-validate"},
+		{"run", "./cmd/autoloop", "progress", "write"},
+		{"run", "./cmd/autoloop", "progress", "validate"},
 		{"test", "./internal/progress", "-count=1"},
 		{"test", "./docs", "-count=1"},
 	}

@@ -1,0 +1,14 @@
+{
+  "id": "thread-200",
+  "guild_id": "guild-1",
+  "parent_id": "forum-100",
+  "owner_id": "user-1",
+  "name": "Support case 123",
+  "type": 11,
+  "thread_metadata": {
+    "archived": true,
+    "auto_archive_duration": 1440,
+    "archive_timestamp": "2026-04-24T12:30:00.000000+00:00",
+    "locked": false
+  }
+}

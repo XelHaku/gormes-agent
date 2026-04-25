@@ -47,37 +47,36 @@ Optional repo health checks:
 
 ```sh
 make validate-progress
-go run ./cmd/repoctl progress sync
+go run ./cmd/autoloop progress validate
 ```
 
 `make validate-progress` is not required to run Gormes. It is a read-only check
 for this repository's roadmap/progress data. The Makefile expands it to:
 
 ```sh
-go run ./cmd/progress-gen -validate
+go run ./cmd/autoloop progress validate
 ```
 
 The shape of a Go command is:
 
 ```sh
-go run ./cmd/repoctl progress sync
+go run ./cmd/autoloop progress write
 ```
 
-Read it as: "compile and run the command in `./cmd/repoctl`, then pass it the
-arguments `progress sync`." `go run` uses a temporary build; it does not install
-anything.
+Read it as: "compile and run the command in `./cmd/autoloop`, then pass it the
+arguments `progress write`." `go run` uses a temporary build; it does not
+install anything.
 
 To build real binaries instead:
 
 ```sh
 go build -o bin/gormes ./cmd/gormes
-go build -o bin/repoctl ./cmd/repoctl
 go build -o bin/autoloop ./cmd/autoloop
 go build -o bin/architecture-planner-loop ./cmd/architecture-planner-loop
 
 ./bin/gormes --offline
-./bin/repoctl progress sync
 ./bin/autoloop run --dry-run
+./bin/autoloop progress validate
 ./bin/architecture-planner-loop run --dry-run
 ```
 
@@ -86,9 +85,7 @@ go build -o bin/architecture-planner-loop ./cmd/architecture-planner-loop
 | Command | Role | Typical invocation |
 |---|---|---|
 | `gormes` | User-facing runtime and TUI. Use `--offline` when you only want to see the UI without a running API server. | `go run ./cmd/gormes --offline` |
-| `progress-gen` | Progress document generator. It validates the roadmap progress JSON and rewrites generated Markdown pages. | `go run ./cmd/progress-gen -validate` or `make generate-progress` |
-| `repoctl` | Repository maintenance CLI. It records binary benchmarks, syncs progress mirrors, updates README benchmark text, and runs the Go 1.22 compatibility check. | `go run ./cmd/repoctl progress sync` |
-| `autoloop` | Self-development orchestration CLI. It consumes the building-gormes progress/docs control plane to execute roadmap phase work. Dry-run mode only lists selected work and does not start worker agents. | `go run ./cmd/autoloop run --dry-run` |
+| `autoloop` | Self-development and repo control-plane CLI. It executes roadmap phase work, audits/digests runs, validates/regenerates progress docs, and records repo benchmark/readme metadata. | `go run ./cmd/autoloop run --dry-run` |
 | `architecture-planner-loop` | Planning improvement CLI. It studies local Hermes/GBrain/Honcho sources plus upstream and building-gormes docs, then asks `codexu` or `claudeu` to refine the architecture plan and progress rows. Dry-run mode only writes planner context and prompt artifacts. | `go run ./cmd/architecture-planner-loop run --dry-run` |
 
 ## Common Recipes
@@ -112,16 +109,10 @@ make build
 ./bin/gormes --offline
 ```
 
-Sync progress JSON mirrors without regenerating Markdown:
-
-```sh
-go run ./cmd/repoctl progress sync
-```
-
 Update README benchmark text from `benchmarks.json`:
 
 ```sh
-go run ./cmd/repoctl readme update
+go run ./cmd/autoloop repo readme update
 ```
 
 Preview what autoloop would select:
@@ -142,25 +133,15 @@ go run ./cmd/architecture-planner-loop run --dry-run
 the self-development loop; they should not add behavior to the user-facing
 runtime unless that behavior belongs in the shipped Gormes binary.
 
-`progress-gen` is the source-of-truth generator for progress-driven docs. It
-loads the canonical architecture progress file, validates contract metadata,
-and regenerates pages such as the architecture checklist, autoloop handoff,
-agent queue, next slices, blocked slices, umbrella cleanup, and progress schema.
-
-`repoctl progress sync` is narrower than `progress-gen`. It updates progress
-metadata and copies progress JSON into the docs/site mirror locations used by
-the build and website. It does not render Markdown pages.
-
 `autoloop` is the executor for the building-gormes roadmap. It uses
 `docs/content/building-gormes/architecture_plan/progress.json` as the canonical
 candidate queue and the generated `docs/content/building-gormes/` pages as the
 operator-facing handoff for developing the full `gormes-agent`. See
 [`cmd/autoloop/README.md`](./autoloop/README.md) for the command-specific
-contract. Its Go port currently owns the CLI surface, audit/digest/service
-commands, candidate normalization, backend command construction, and typed
-orchestration primitives. Full end-to-end runtime parity for `autoloop run`
-remains staged follow-up work, so long-form legacy shell fixtures still live
-under `testdata/legacy-shell/` as the parity oracle.
+contract. It also owns progress validation/regeneration and repo-maintenance
+helpers so the root `cmd/` surface stays small: `autoloop progress validate`,
+`autoloop progress write`, `autoloop repo benchmark record`, and
+`autoloop repo readme update`.
 
 `architecture-planner-loop` is the planner-improvement loop. It does not execute
 roadmap implementation rows. Instead it builds a context bundle from
@@ -176,12 +157,12 @@ for the command-specific contract.
 The root `Makefile` wires these commands into normal contributor workflows:
 
 ```sh
-make validate-progress  # go run ./cmd/progress-gen -validate
-make generate-progress  # go run ./cmd/progress-gen -write
-make build              # build gormes, record repo metrics, sync progress, refresh generated docs
+make validate-progress  # go run ./cmd/autoloop progress validate
+make generate-progress  # go run ./cmd/autoloop progress write
+make build              # build gormes, record repo metrics, refresh generated docs
 ```
 
 Compatibility wrapper scripts under `scripts/` and `scripts/orchestrator/` exec
-`repoctl` or `autoloop` during the transition. New repo-maintenance or
-orchestrator behavior should be implemented in Go here first, with shell kept as
-a thin wrapper only when an existing entrypoint must be preserved.
+`autoloop` during the transition. New repo-maintenance or orchestrator behavior
+should be implemented in Go here first, with shell kept as a thin wrapper only
+when an existing entrypoint must be preserved.

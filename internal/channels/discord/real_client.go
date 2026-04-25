@@ -20,7 +20,8 @@ func NewRealSession(token string) (discordSession, error) {
 	if err != nil {
 		return nil, fmt.Errorf("discord: new session: %w", err)
 	}
-	s.Identify.Intents = discordgo.IntentsGuildMessages |
+	s.Identify.Intents = discordgo.IntentsGuilds |
+		discordgo.IntentsGuildMessages |
 		discordgo.IntentsDirectMessages |
 		discordgo.IntentsMessageContent
 	return &realSession{s: s}, nil
