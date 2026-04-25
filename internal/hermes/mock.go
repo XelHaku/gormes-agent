@@ -45,6 +45,7 @@ func (m *MockClient) ProviderStatus() ProviderStatus {
 		Runtime:  "test_harness",
 		Capabilities: ProviderCapabilities{
 			PromptCache:     unavailableCapability("mock provider status not configured"),
+			ReasoningEcho:   unavailableCapability("mock provider status not configured"),
 			RateGuard:       unavailableCapability("mock provider status not configured"),
 			BudgetTelemetry: unavailableCapability("mock provider status not configured"),
 		},

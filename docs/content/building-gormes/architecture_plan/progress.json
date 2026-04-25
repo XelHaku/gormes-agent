@@ -2316,7 +2316,7 @@
             },
             {
               "name": "DeepSeek/Kimi reasoning_content echo for tool-call replay",
-              "status": "planned",
+              "status": "complete",
               "contract": "Thinking-mode providers that require reasoning_content on assistant tool-call turns receive an echoed value during persistence and API replay",
               "contract_status": "fixture_ready",
               "slice_size": "small",
@@ -2348,7 +2348,7 @@
                 "Kimi/Moonshot detection keeps the existing reasoning_content padding behavior.",
                 "Explicit reasoning_content or reasoning fields are preserved, while non-tool assistant turns and non-thinking providers are left untouched."
               ],
-              "note": "Upstream Hermes commit d58b305a added DeepSeek V4 thinking-mode regression coverage and extracted Kimi/DeepSeek detection helpers so both creation and replay paths inject reasoning_content on assistant tool-call turns. Port this as a provider-boundary fixture over Gormes' shared Message/Event contract before more reasoning-model adapters land.",
+              "note": "Complete: TDD landed `internal/hermes/reasoning_content_echo_test.go` with provider-boundary fixtures proving DeepSeek and Kimi/Moonshot OpenAI-compatible replays inject `reasoning_content=\"\"` on assistant tool-call messages when no reasoning exists. Detection covers DeepSeek provider name, model substring, and `api.deepseek.com` host plus Kimi/Moonshot provider/host signals. Explicit `reasoning_content` and normalized `reasoning` echoes are preserved on thinking-provider tool-call turns, non-tool assistant turns and generic providers are left unpadded, ordinary assistant content is unchanged, and provider status exposes the reasoning_content padding/repair degraded mode.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"

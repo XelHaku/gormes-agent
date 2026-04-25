@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -14,9 +16,10 @@ const defaultChatCompletionsPath = "/v1/chat/completions"
 const defaultHealthPath = "/health"
 
 type httpClient struct {
-	baseURL string
-	apiKey  string
-	http    *http.Client
+	baseURL  string
+	apiKey   string
+	provider string
+	http     *http.Client
 }
 
 // NewHTTPClient returns a Client that talks HTTP+SSE to a Hermes-compatible
@@ -24,6 +27,13 @@ type httpClient struct {
 // The returned client streams without a global timeout so long turns
 // (minutes, with tool use) are not truncated; see per-phase timeouts inside.
 func NewHTTPClient(baseURL, apiKey string) Client {
+	return NewHTTPClientWithProvider(baseURL, apiKey, "")
+}
+
+// NewHTTPClientWithProvider returns an OpenAI-compatible HTTP client with a
+// provider identity hint for providers whose replay rules differ from the
+// generic Chat Completions shape.
+func NewHTTPClientWithProvider(baseURL, apiKey, provider string) Client {
 	// Clone the default transport and enforce the header-phase budget via
 	// ResponseHeaderTimeout. This caps time-to-first-byte WITHOUT affecting
 	// the streaming body read afterwards — unlike wrapping the request
@@ -31,14 +41,15 @@ func NewHTTPClient(baseURL, apiKey string) Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.ResponseHeaderTimeout = 5 * time.Second
 	return &httpClient{
-		baseURL: baseURL,
-		apiKey:  apiKey,
-		http:    &http.Client{Timeout: 0, Transport: transport},
+		baseURL:  baseURL,
+		apiKey:   apiKey,
+		provider: strings.TrimSpace(provider),
+		http:     &http.Client{Timeout: 0, Transport: transport},
 	}
 }
 
 func (c *httpClient) ProviderStatus() ProviderStatus {
-	return openAICompatibleProviderStatus()
+	return openAICompatibleProviderStatus(c.provider, c.baseURL)
 }
 
 func (c *httpClient) Health(ctx context.Context) error {
@@ -59,11 +70,12 @@ func (c *httpClient) Health(ctx context.Context) error {
 }
 
 type orMessage struct {
-	Role       string       `json:"role"`
-	Content    string       `json:"content"`
-	ToolCalls  []orToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string       `json:"tool_call_id,omitempty"`
-	Name       string       `json:"name,omitempty"`
+	Role             string       `json:"role"`
+	Content          string       `json:"content"`
+	ReasoningContent *string      `json:"reasoning_content,omitempty"`
+	ToolCalls        []orToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string       `json:"tool_call_id,omitempty"`
+	Name             string       `json:"name,omitempty"`
 }
 
 type orToolCall struct {
@@ -94,7 +106,7 @@ type orChatRequest struct {
 }
 
 func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, error) {
-	msgs := makeOpenAICompatibleMessages(req.Messages)
+	msgs := makeOpenAICompatibleMessages(req.Messages, c.provider, req.Model, c.baseURL)
 	tools := make([]orToolDescriptor, len(req.Tools))
 	for i, t := range req.Tools {
 		tools[i] = orToolDescriptor{
@@ -140,7 +152,7 @@ func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, e
 	return newChatStream(resp.Body, resp.Header.Get("X-Hermes-Session-Id")), nil
 }
 
-func makeOpenAICompatibleMessages(messages []Message) []orMessage {
+func makeOpenAICompatibleMessages(messages []Message, provider, model, baseURL string) []orMessage {
 	out := make([]orMessage, 0, len(messages))
 	for _, msg := range messages {
 		wire := orMessage{
@@ -148,6 +160,9 @@ func makeOpenAICompatibleMessages(messages []Message) []orMessage {
 			Content:    msg.Content,
 			ToolCallID: msg.ToolCallID,
 			Name:       msg.Name,
+		}
+		if msg.Role == "assistant" {
+			wire.ReasoningContent = openAICompatibleReasoningContent(msg, provider, model, baseURL)
 		}
 		if len(msg.ToolCalls) > 0 {
 			wire.ToolCalls = make([]orToolCall, 0, len(msg.ToolCalls))
@@ -169,6 +184,70 @@ func makeOpenAICompatibleMessages(messages []Message) []orMessage {
 		out = append(out, wire)
 	}
 	return out
+}
+
+func openAICompatibleReasoningContent(msg Message, provider, model, baseURL string) *string {
+	if len(msg.ToolCalls) == 0 || !openAICompatibleRequiresReasoningEcho(provider, model, baseURL) {
+		return nil
+	}
+	if msg.ReasoningContent != nil {
+		return msg.ReasoningContent
+	}
+	if msg.Reasoning != nil && msg.Reasoning.Text != "" {
+		text := msg.Reasoning.Text
+		return &text
+	}
+	empty := ""
+	return &empty
+}
+
+func openAICompatibleRequiresReasoningEcho(provider, model, baseURL string) bool {
+	return openAICompatibleNeedsDeepSeekToolReasoning(provider, model, baseURL) ||
+		openAICompatibleNeedsKimiToolReasoning(provider, baseURL)
+}
+
+func openAICompatibleNeedsDeepSeekToolReasoning(provider, model, baseURL string) bool {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	model = strings.ToLower(strings.TrimSpace(model))
+	return provider == "deepseek" ||
+		strings.Contains(model, "deepseek") ||
+		baseURLHostMatches(baseURL, "api.deepseek.com")
+}
+
+func openAICompatibleNeedsKimiToolReasoning(provider, baseURL string) bool {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	return provider == "kimi-coding" ||
+		provider == "kimi-coding-cn" ||
+		baseURLHostMatches(baseURL, "api.kimi.com") ||
+		baseURLHostMatches(baseURL, "moonshot.ai") ||
+		baseURLHostMatches(baseURL, "moonshot.cn")
+}
+
+func baseURLHostMatches(rawBaseURL, domain string) bool {
+	host := baseURLHostname(rawBaseURL)
+	if host == "" {
+		return false
+	}
+	domain = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(domain, ".")))
+	if domain == "" {
+		return false
+	}
+	return host == domain || strings.HasSuffix(host, "."+domain)
+}
+
+func baseURLHostname(rawBaseURL string) string {
+	rawBaseURL = strings.TrimSpace(rawBaseURL)
+	if rawBaseURL == "" {
+		return ""
+	}
+	parsed, err := url.Parse(rawBaseURL)
+	if err != nil || parsed.Host == "" {
+		parsed, err = url.Parse("https://" + rawBaseURL)
+		if err != nil {
+			return ""
+		}
+	}
+	return strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
 }
 
 // OpenRunEvents subscribes to SSE stream for a run's events.

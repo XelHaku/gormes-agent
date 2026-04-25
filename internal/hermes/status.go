@@ -12,6 +12,7 @@ type CapabilityStatus struct {
 // decisions depend on those surfaces.
 type ProviderCapabilities struct {
 	PromptCache     CapabilityStatus
+	ReasoningEcho   CapabilityStatus
 	RateGuard       CapabilityStatus
 	BudgetTelemetry CapabilityStatus
 }
@@ -39,12 +40,17 @@ func ProviderStatusOf(client Client) ProviderStatus {
 	return normalizeProviderStatus(reporter.ProviderStatus())
 }
 
-func openAICompatibleProviderStatus() ProviderStatus {
+func openAICompatibleProviderStatus(provider, baseURL string) ProviderStatus {
+	providerName := provider
+	if providerName == "" {
+		providerName = "openai_compatible"
+	}
 	return ProviderStatus{
-		Provider: "openai_compatible",
+		Provider: providerName,
 		Runtime:  "chat_completions",
 		Capabilities: ProviderCapabilities{
 			PromptCache:     unavailableCapability("cache_control stripped by openai_compatible request mapping"),
+			ReasoningEcho:   openAICompatibleReasoningEchoStatus(provider, baseURL),
 			RateGuard:       unavailableCapability("provider rate guard not implemented"),
 			BudgetTelemetry: unavailableCapability("budget telemetry not implemented"),
 		},
@@ -57,6 +63,7 @@ func anthropicProviderStatus() ProviderStatus {
 		Runtime:  "anthropic_messages",
 		Capabilities: ProviderCapabilities{
 			PromptCache:     CapabilityStatus{Available: true, Reason: "cache_control supported by anthropic messages content blocks"},
+			ReasoningEcho:   unavailableCapability("reasoning_content echo padding is not required by anthropic messages"),
 			RateGuard:       unavailableCapability("provider rate guard not implemented"),
 			BudgetTelemetry: unavailableCapability("budget telemetry not implemented"),
 		},
@@ -69,6 +76,7 @@ func unknownProviderStatus() ProviderStatus {
 		Runtime:  "unknown",
 		Capabilities: ProviderCapabilities{
 			PromptCache:     unavailableCapability("provider status unavailable"),
+			ReasoningEcho:   unavailableCapability("provider status unavailable"),
 			RateGuard:       unavailableCapability("provider status unavailable"),
 			BudgetTelemetry: unavailableCapability("provider status unavailable"),
 		},
@@ -83,6 +91,7 @@ func normalizeProviderStatus(status ProviderStatus) ProviderStatus {
 		status.Runtime = "unknown"
 	}
 	status.Capabilities.PromptCache = normalizeCapability(status.Capabilities.PromptCache, "prompt cache status unavailable")
+	status.Capabilities.ReasoningEcho = normalizeCapability(status.Capabilities.ReasoningEcho, "reasoning echo status unavailable")
 	status.Capabilities.RateGuard = normalizeCapability(status.Capabilities.RateGuard, "provider rate guard status unavailable")
 	status.Capabilities.BudgetTelemetry = normalizeCapability(status.Capabilities.BudgetTelemetry, "budget telemetry status unavailable")
 	return status
@@ -97,4 +106,14 @@ func normalizeCapability(status CapabilityStatus, fallback string) CapabilitySta
 
 func unavailableCapability(reason string) CapabilityStatus {
 	return CapabilityStatus{Available: false, Reason: reason}
+}
+
+func openAICompatibleReasoningEchoStatus(provider, baseURL string) CapabilityStatus {
+	if openAICompatibleRequiresReasoningEcho(provider, "", baseURL) {
+		return CapabilityStatus{
+			Available: true,
+			Reason:    "thinking-mode provider requires reasoning_content on assistant tool-call replay; stored transcripts without reasoning are repaired with empty reasoning_content padding",
+		}
+	}
+	return unavailableCapability("reasoning_content echo padding is not required for this openai-compatible provider")
 }
