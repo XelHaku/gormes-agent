@@ -3219,7 +3219,7 @@
             },
             {
               "name": "Tool registry inventory + schema parity harness",
-              "status": "planned",
+              "status": "complete",
               "contract": "Operation and tool descriptor parity before handler ports",
               "contract_status": "draft",
               "slice_size": "medium",
@@ -3252,7 +3252,7 @@
                 "No handler port can mark complete until its descriptor parity row exists.",
                 "Doctor can report missing dependencies or disabled provider-specific paths."
               ],
-              "note": "TDD: snapshot upstream `tools/registry.py`, `toolsets.py`, and discovered schemas into a Go parity fixture that proves names, toolsets, required env vars, and JSON result shapes before porting handlers.",
+              "note": "Complete: TDD added an embedded upstream tool parity manifest generated from `tools/registry.py`, `toolsets.py`, and discovered schemas. The fixture captures 55 tool rows plus static/resolved toolsets with required env vars, provider paths, JSON schemas, result envelopes, trust classes, dependencies, and degraded status metadata. `LoadUpstreamToolParityManifest`, descriptor-row port gating, and the parity doctor now report disabled tools, missing dependencies, schema drift, and unavailable provider-specific paths before any handler port can claim completion.",
               "write_scope": [
                 "internal/tools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
