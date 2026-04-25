@@ -3,8 +3,11 @@ package apiserver
 import (
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
+
+	pluginmeta "github.com/TrebuchetDynamics/gormes-agent/internal/plugins"
 )
 
 const (
@@ -96,7 +99,7 @@ func (s *Server) handleDashboardStatus(w http.ResponseWriter, r *http.Request) {
 		"models":        enabledPanel("/v1/models", "/api/model/info", "/api/model/options"),
 		"oauth":         enabledPanel("/api/providers/oauth"),
 		"tool_progress": enabledPanel("/v1/runs/{run_id}/events"),
-		"plugins":       disabledPanel("dashboard plugin runtime is not configured in the native API server"),
+		"plugins":       disabledPanel(dashboardPluginPanelReason(s.pluginInventory)),
 	}
 	if s.loop == nil {
 		panels["chat"] = disabledPanel("native turn loop is not configured")
@@ -120,6 +123,7 @@ func (s *Server) handleDashboardStatus(w http.ResponseWriter, r *http.Request) {
 		},
 		"responses": s.responseHealthStatus(),
 		"runs":      s.runHealthStatus(),
+		"plugins":   clonePluginInventory(s.pluginInventory),
 	})
 }
 
@@ -171,7 +175,7 @@ func (s *Server) handleDashboardPlugins(w http.ResponseWriter, r *http.Request) 
 		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
 		return
 	}
-	writeJSON(w, http.StatusOK, []any{})
+	writeJSON(w, http.StatusOK, clonePluginInventory(s.pluginInventory).Plugins)
 }
 
 func (s *Server) handleDashboardSessions(w http.ResponseWriter, r *http.Request) {
@@ -260,6 +264,13 @@ func disabledPanel(reason string) dashboardPanelStatus {
 	return dashboardPanelStatus{State: "disabled", Reason: reason}
 }
 
+func dashboardPluginPanelReason(inventory pluginmeta.Inventory) string {
+	if len(inventory.Plugins) > 0 || len(inventory.Capabilities) > 0 {
+		return "plugin manifest metadata is available, but plugin runtime execution is disabled in the native API server"
+	}
+	return "dashboard plugin runtime is not configured in the native API server"
+}
+
 func parseDashboardInt(raw string, fallback, min, max int) int {
 	n, err := strconv.Atoi(strings.TrimSpace(raw))
 	if err != nil {
@@ -284,4 +295,59 @@ func cloneDashboardModelProviders(in []DashboardModelProvider) []DashboardModelP
 
 func cloneDashboardOAuthProviders(in []DashboardOAuthProvider) []DashboardOAuthProvider {
 	return append([]DashboardOAuthProvider(nil), in...)
+}
+
+func clonePluginInventory(in pluginmeta.Inventory) pluginmeta.Inventory {
+	out := pluginmeta.Inventory{
+		Plugins:                 make([]pluginmeta.PluginStatus, len(in.Plugins)),
+		Capabilities:            make([]pluginmeta.CapabilityStatus, len(in.Capabilities)),
+		Evidence:                append([]pluginmeta.Evidence(nil), in.Evidence...),
+		ProjectDiscoveryEnabled: in.ProjectDiscoveryEnabled,
+	}
+	for i, plugin := range in.Plugins {
+		out.Plugins[i] = clonePluginStatus(plugin)
+	}
+	for i, capability := range in.Capabilities {
+		out.Capabilities[i] = clonePluginCapabilityStatus(capability)
+	}
+	sort.Slice(out.Plugins, func(i, j int) bool {
+		if out.Plugins[i].Name != out.Plugins[j].Name {
+			return out.Plugins[i].Name < out.Plugins[j].Name
+		}
+		return out.Plugins[i].Source < out.Plugins[j].Source
+	})
+	sort.Slice(out.Capabilities, func(i, j int) bool {
+		if out.Capabilities[i].Plugin != out.Capabilities[j].Plugin {
+			return out.Capabilities[i].Plugin < out.Capabilities[j].Plugin
+		}
+		if out.Capabilities[i].Kind != out.Capabilities[j].Kind {
+			return out.Capabilities[i].Kind < out.Capabilities[j].Kind
+		}
+		return out.Capabilities[i].Name < out.Capabilities[j].Name
+	})
+	return out
+}
+
+func clonePluginStatus(in pluginmeta.PluginStatus) pluginmeta.PluginStatus {
+	out := in
+	out.Manifest.RequiresEnv = append([]string(nil), in.Manifest.RequiresEnv...)
+	out.Manifest.RequiresAuth = append([]string(nil), in.Manifest.RequiresAuth...)
+	out.Manifest.Capabilities = append([]pluginmeta.Capability(nil), in.Manifest.Capabilities...)
+	out.Capabilities = make([]pluginmeta.CapabilityStatus, len(in.Capabilities))
+	for i, capability := range in.Capabilities {
+		out.Capabilities[i] = clonePluginCapabilityStatus(capability)
+	}
+	out.Evidence = append([]pluginmeta.Evidence(nil), in.Evidence...)
+	if in.Dashboard != nil {
+		dashboard := *in.Dashboard
+		dashboard.Slots = append([]string(nil), in.Dashboard.Slots...)
+		out.Dashboard = &dashboard
+	}
+	return out
+}
+
+func clonePluginCapabilityStatus(in pluginmeta.CapabilityStatus) pluginmeta.CapabilityStatus {
+	out := in
+	out.Evidence = append([]pluginmeta.Evidence(nil), in.Evidence...)
+	return out
 }

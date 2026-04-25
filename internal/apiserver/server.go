@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	pluginmeta "github.com/TrebuchetDynamics/gormes-agent/internal/plugins"
 )
 
 const (
@@ -24,15 +26,16 @@ const (
 
 // Config wires the native API server HTTP surface.
 type Config struct {
-	APIKey         string
-	ModelName      string
-	ProviderName   string
-	MaxBodyBytes   int64
-	Loop           TurnLoop
-	ResponseStore  *ResponseStore
-	RunTTL         time.Duration
-	ModelProviders []DashboardModelProvider
-	OAuthProviders []DashboardOAuthProvider
+	APIKey          string
+	ModelName       string
+	ProviderName    string
+	MaxBodyBytes    int64
+	Loop            TurnLoop
+	ResponseStore   *ResponseStore
+	RunTTL          time.Duration
+	ModelProviders  []DashboardModelProvider
+	OAuthProviders  []DashboardOAuthProvider
+	PluginInventory pluginmeta.Inventory
 }
 
 // Server exposes the OpenAI-compatible HTTP routes that can be mounted by the
@@ -47,6 +50,7 @@ type Server struct {
 	runs                   *runRegistry
 	modelProviders         []DashboardModelProvider
 	oauthProviders         []DashboardOAuthProvider
+	pluginInventory        pluginmeta.Inventory
 	statusMu               sync.Mutex
 	previousResponseMisses int
 	now                    func() time.Time
@@ -140,17 +144,18 @@ func NewServer(cfg Config) *Server {
 		runTTL = defaultRunStreamTTL
 	}
 	s := &Server{
-		apiKey:         cfg.APIKey,
-		modelName:      model,
-		providerName:   provider,
-		maxBodyBytes:   maxBody,
-		loop:           cfg.Loop,
-		responseStore:  responseStore,
-		runs:           newRunRegistry(runTTL, time.Now),
-		modelProviders: cloneDashboardModelProviders(cfg.ModelProviders),
-		oauthProviders: cloneDashboardOAuthProviders(cfg.OAuthProviders),
-		now:            time.Now,
-		mux:            http.NewServeMux(),
+		apiKey:          cfg.APIKey,
+		modelName:       model,
+		providerName:    provider,
+		maxBodyBytes:    maxBody,
+		loop:            cfg.Loop,
+		responseStore:   responseStore,
+		runs:            newRunRegistry(runTTL, time.Now),
+		modelProviders:  cloneDashboardModelProviders(cfg.ModelProviders),
+		oauthProviders:  cloneDashboardOAuthProviders(cfg.OAuthProviders),
+		pluginInventory: clonePluginInventory(cfg.PluginInventory),
+		now:             time.Now,
+		mux:             http.NewServeMux(),
 	}
 	s.routes()
 	return s

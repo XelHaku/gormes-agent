@@ -12,6 +12,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/internal/plugins"
 )
 
 // Tool is the contract every Go-native tool satisfies. See spec §5.1.
@@ -53,8 +55,9 @@ var ErrUnknownTool = errors.New("tools: unknown tool name")
 
 // Registry holds a set of named Tools. Safe for concurrent use.
 type Registry struct {
-	mu    sync.RWMutex
-	tools map[string]Tool
+	mu                 sync.RWMutex
+	tools              map[string]Tool
+	pluginCapabilities []plugins.CapabilityStatus
 }
 
 // NewRegistry returns an empty Registry.
@@ -110,4 +113,61 @@ func (r *Registry) Descriptors() []ToolDescriptor {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// RecordPluginInventory records plugin capability status rows without
+// registering executable tool handlers. This keeps plugin discovery metadata
+// visible while runtime execution remains disabled.
+func (r *Registry) RecordPluginInventory(inventory plugins.Inventory) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.pluginCapabilities = clonePluginCapabilities(inventory.Capabilities)
+	sortPluginCapabilities(r.pluginCapabilities)
+}
+
+// PluginCapabilities returns all recorded plugin capability rows.
+func (r *Registry) PluginCapabilities() []plugins.CapabilityStatus {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return clonePluginCapabilities(r.pluginCapabilities)
+}
+
+// DisabledPluginCapabilities returns the disabled plugin capability rows.
+func (r *Registry) DisabledPluginCapabilities() []plugins.CapabilityStatus {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]plugins.CapabilityStatus, 0, len(r.pluginCapabilities))
+	for _, row := range r.pluginCapabilities {
+		if row.State == plugins.StateDisabled {
+			out = append(out, clonePluginCapability(row))
+		}
+	}
+	sortPluginCapabilities(out)
+	return out
+}
+
+func clonePluginCapabilities(in []plugins.CapabilityStatus) []plugins.CapabilityStatus {
+	out := make([]plugins.CapabilityStatus, len(in))
+	for i, row := range in {
+		out[i] = clonePluginCapability(row)
+	}
+	return out
+}
+
+func clonePluginCapability(in plugins.CapabilityStatus) plugins.CapabilityStatus {
+	out := in
+	out.Evidence = append([]plugins.Evidence(nil), in.Evidence...)
+	return out
+}
+
+func sortPluginCapabilities(rows []plugins.CapabilityStatus) {
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Plugin != rows[j].Plugin {
+			return rows[i].Plugin < rows[j].Plugin
+		}
+		if rows[i].Kind != rows[j].Kind {
+			return rows[i].Kind < rows[j].Kind
+		}
+		return rows[i].Name < rows[j].Name
+	})
 }

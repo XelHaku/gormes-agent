@@ -3965,9 +3965,9 @@
             {
               "name": "Plugin SDK",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes loads plugin manifests, capability metadata, version constraints, and disabled-state evidence without executing plugin runtime code",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -4001,7 +4001,7 @@
                 "Capability registration can produce disabled tool/dashboard/backend-route inventory without executing plugin code.",
                 "Project plugin discovery remains disabled unless an explicit config/env gate is present."
               ],
-              "note": "TDD: port plugin manifest loading, capability registration metadata, version checks, and isolation boundaries from Hermes `plugins/` before third-party extension execution. The first worker slice should create the internal/plugins package and fixtures only; runtime hooks, dashboard assets, and Spotify handlers stay in dependent rows.",
+              "note": "Complete: TDD landed internal/plugins manifest fixtures and metadata-only inventory. Gormes now parses plugin.yaml plus dashboard/manifest.json for identity, version constraints, tool/hook/dashboard/backend-route capabilities, required env/auth, dashboard entry/css/api, tab override/hidden, and slots; malformed manifests, invalid names, unsupported capability kinds, incompatible constraints, missing credentials, disabled execution, and project-plugin gate denial all fail closed with structured evidence. internal/tools records disabled plugin capability rows without registering executable handlers, and internal/apiserver exposes disabled plugin inventory through /api/status and /api/dashboard/plugins without importing or executing plugin runtime code.",
               "write_scope": [
                 "internal/plugins/",
                 "internal/tools/",
