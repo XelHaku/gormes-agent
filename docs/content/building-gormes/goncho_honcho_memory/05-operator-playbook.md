@@ -104,6 +104,26 @@ Avoid too many tiny sessions. Summaries and `session.context()` are scoped to a
 session, so splitting a continuous conversation into many sessions fragments the
 context and delays summary usefulness.
 
+### SillyTavern Host Mapping
+
+Goncho fixture-locks the Honcho SillyTavern integration contract without
+porting the browser extension or Node server plugin.
+
+- Peer mode `Single peer for all personas` maps to one durable user peer.
+- Peer mode `Separate peer per persona` maps to a persona-scoped user peer and
+  degrades if the persona name is missing instead of merging back to the shared
+  peer.
+- Session naming `Auto` maps to one session per chat hash, `Per character` maps
+  to one persistent session per character, and `Custom` maps to a user-named
+  session. Existing sessions stay frozen; reset reports the orphaned active
+  session and resolves a new session for the next chat message.
+- Group chats map each character to a distinct peer and lazy-add characters
+  who join mid-chat on their first message. Never collapse a group chat into one
+  synthetic group peer.
+- Enrichment modes map to base prompt context, `honcho_chat`-style reasoning,
+  or honcho-prefixed tool exposure. Unsupported panel knobs are reported as
+  degraded host evidence until a Goncho status surface implements them.
+
 ## Ingestion Rules
 
 Storing a message is the canonical way to trigger future memory. A message is

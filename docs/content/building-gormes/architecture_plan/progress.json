@@ -1690,9 +1690,9 @@
             {
               "name": "SillyTavern persona and group-chat mapping fixtures",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Goncho maps Honcho SillyTavern peer modes, session naming, enrichment modes, and group-chat participants without widening recall or leaking the internal goncho name",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -1723,7 +1723,7 @@
                 "Group-chat fixtures register one peer per character and lazy-add mid-chat characters instead of collapsing to one group peer.",
                 "Context-only, reasoning, and tool-call enrichment modes map to prompt context, honcho_chat-style reasoning, and tool exposure with explicit degraded evidence for unsupported modes."
               ],
-              "note": "Honcho upstream added the SillyTavern guide in e659b6b with concrete panel labels, config resolution, peer modes, session naming, and group-chat behavior. Current Gormes fixtures only cover generic chat-instance and recall-mode mapping, so this row narrows the remaining host drift into one testable Goncho contract.",
+              "note": "TDD landed: `internal/goncho/sillytavern_mapping_test.go` fixture-locks Honcho SillyTavern peer modes, auto/per-character/custom session naming with reset/orphan evidence, group-chat one-peer-per-character mapping with lazy mid-chat additions, context/reasoning/tool-call enrichment mapping, and degraded evidence for unsupported panel knobs or missing peer/session identifiers. The mapper stays pure Goncho host evidence: no SillyTavern extension, no Node/browser imports, no hosted Honcho calls, no persistence changes, and external tool evidence preserves honcho_* names including honcho_chat.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/gonchotools/",

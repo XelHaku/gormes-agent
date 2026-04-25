@@ -195,6 +195,7 @@ func HonchoExternalCompatibility() ExternalCompatibility {
 			"honcho_profile",
 			"honcho_search",
 			"honcho_context",
+			"honcho_chat",
 			"honcho_reasoning",
 			"honcho_conclude",
 		},
