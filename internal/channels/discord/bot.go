@@ -38,6 +38,7 @@ type discordThread struct {
 	id       string
 	parentID string
 	name     string
+	guildID  string
 }
 
 var (
@@ -147,20 +148,30 @@ func (b *Bot) toInboundEvent(m *discordgo.Message) (gateway.InboundEvent, bool) 
 	chatID := m.ChannelID
 	threadID := ""
 	chatName := ""
+	parentChatID := ""
+	guildID := strings.TrimSpace(m.GuildID)
 	if thread, ok := b.threadForMessageChannel(m.ChannelID); ok {
 		chatID = thread.parentID
 		threadID = thread.id
 		chatName = thread.name
+		parentChatID = thread.parentID
+		if guildID == "" {
+			guildID = thread.guildID
+		}
 	}
+	messageID := strings.TrimSpace(m.ID)
 	return gateway.InboundEvent{
-		Platform: "discord",
-		ChatID:   chatID,
-		ChatName: chatName,
-		UserID:   userID,
-		ThreadID: threadID,
-		MsgID:    m.ID,
-		Kind:     kind,
-		Text:     body,
+		Platform:     "discord",
+		ChatID:       chatID,
+		ChatName:     chatName,
+		UserID:       userID,
+		ThreadID:     threadID,
+		MsgID:        messageID,
+		GuildID:      guildID,
+		ParentChatID: parentChatID,
+		MessageID:    messageID,
+		Kind:         kind,
+		Text:         body,
 	}, true
 }
 
@@ -178,6 +189,7 @@ func (b *Bot) rememberThread(ch *discordgo.Channel) {
 		id:       strings.TrimSpace(ch.ID),
 		parentID: parentID,
 		name:     strings.TrimSpace(ch.Name),
+		guildID:  strings.TrimSpace(ch.GuildID),
 	}
 }
 
@@ -213,11 +225,13 @@ func (b *Bot) toThreadLifecycleEvent(ch *discordgo.Channel) (gateway.InboundEven
 	parentID := strings.TrimSpace(ch.ParentID)
 	name := strings.TrimSpace(ch.Name)
 	return gateway.InboundEvent{
-		Platform: "discord",
-		ChatID:   parentID,
-		ChatName: name,
-		ThreadID: threadID,
-		Kind:     gateway.EventThreadLifecycle,
+		Platform:     "discord",
+		ChatID:       parentID,
+		ChatName:     name,
+		ThreadID:     threadID,
+		GuildID:      strings.TrimSpace(ch.GuildID),
+		ParentChatID: parentID,
+		Kind:         gateway.EventThreadLifecycle,
 		ThreadLifecycle: &gateway.ThreadLifecycleEvent{
 			ID:       threadID,
 			ParentID: parentID,

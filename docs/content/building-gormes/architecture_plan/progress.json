@@ -790,9 +790,9 @@
             },
             {
               "name": "Discord SessionSource guild/parent/message evidence",
-              "status": "planned",
+              "status": "complete",
               "contract": "Discord ingress preserves guild, parent channel, and triggering message IDs in the gateway SessionSource without changing existing chat/thread routing",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -828,7 +828,7 @@
                 "Forum/thread messages preserve the parent channel/forum ID separately from the effective ChatID and canonical ThreadID.",
                 "DMs and platforms without these identifiers render no fabricated values and preserve existing chat/thread routing."
               ],
-              "note": "Hermes b35d692f added guild_id, parent_chat_id, and message_id to SessionSource so Discord tools can act on the current server/channel/message without asking the model to rediscover IDs. Gormes should port this as source metadata only before widening Discord admin/tool behavior.",
+              "note": "TDD landed: fixture-backed Discord ingress now preserves guild_id, parent_chat_id, and message_id as gateway SessionSource metadata, renders only available values in session context, and keeps existing forum ChatID/ThreadID routing unchanged.",
               "write_scope": [
                 "internal/gateway/session_context.go",
                 "internal/gateway/event.go",
