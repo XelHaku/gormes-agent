@@ -179,58 +179,102 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	if err != nil {
 		return RunSummary{}, err
 	}
-	result := runner.Run(ctx, autoloop.Command{
-		Name: argv[0],
-		Args: append(append([]string(nil), argv[1:]...), prompt),
-		Dir:  cfg.RepoRoot,
-	})
-	if result.Err != nil {
-		appendPlannerLedger(ledgerPath, LedgerEvent{
-			TS:            now.UTC().Format(time.RFC3339),
-			RunID:         runID,
-			Trigger:       trigger,
-			TriggerEvents: triggerEventIDs,
-			Backend:       cfg.Backend,
-			Mode:          cfg.Mode,
-			Status:        "backend_failed",
-			Detail:        strings.TrimSpace(result.Stderr),
-			BeforeStats:   computeStats(beforeDoc),
-			Keywords:      opts.Keywords,
-		})
-		return RunSummary{}, commandError(argv[0], result)
-	}
 
-	// Reload progress.json after the backend's edits and reject the
-	// regeneration if any Health block was dropped or modified. Skipped
-	// entirely when there was no before-doc (fresh checkout) or when the
-	// after-doc cannot be loaded (treat as no regeneration to validate).
-	var afterDoc *progress.Progress
-	if beforeDoc != nil {
-		loaded, loadErr := loadProgressForValidation(cfg.ProgressJSON)
-		if loadErr != nil {
-			return RunSummary{}, fmt.Errorf("planner: load after-doc: %w", loadErr)
+	// L3 retry-with-feedback loop. The initial attempt uses the prompt built
+	// above; any retry appends RetryFeedback() naming the rows whose Health
+	// blocks were dropped, so the same LLM session can self-correct without
+	// re-doing the upstream sync analysis. Backend failures are NEVER
+	// retried — only validation rejections trigger another attempt. The
+	// before-doc is captured ONCE outside the loop so it is not reloaded
+	// against in-flight autoloop writes between attempts.
+	maxRetries := cfg.MaxRetries
+	currentPrompt := prompt
+	attempts := make([]retryAttempt, 0, maxRetries+1)
+	var (
+		afterDoc   *progress.Progress
+		lastResult autoloop.Result
+	)
+	for i := 0; i <= maxRetries; i++ {
+		attempt := retryAttempt{Index: i}
+		result := runner.Run(ctx, autoloop.Command{
+			Name: argv[0],
+			Args: append(append([]string(nil), argv[1:]...), currentPrompt),
+			Dir:  cfg.RepoRoot,
+		})
+		lastResult = result
+		if result.Err != nil {
+			// Backend failure short-circuits the retry loop: this is
+			// infrastructure, not an LLM-correctable mistake.
+			attempt.Status = "backend_failed"
+			attempt.Detail = strings.TrimSpace(result.Stderr)
+			attempts = append(attempts, attempt)
+			appendPlannerLedger(ledgerPath, LedgerEvent{
+				TS:            now.UTC().Format(time.RFC3339),
+				RunID:         runID,
+				Trigger:       trigger,
+				TriggerEvents: triggerEventIDs,
+				Backend:       cfg.Backend,
+				Mode:          cfg.Mode,
+				Status:        "backend_failed",
+				Detail:        strings.TrimSpace(result.Stderr),
+				BeforeStats:   computeStats(beforeDoc),
+				Keywords:      opts.Keywords,
+				RetryAttempt:  attempt.Index,
+				Attempts:      attempts,
+			})
+			return RunSummary{}, commandError(argv[0], result)
 		}
-		afterDoc = loaded
-		if afterDoc != nil {
-			if err := validateHealthPreservation(beforeDoc, afterDoc); err != nil {
-				appendPlannerLedger(ledgerPath, LedgerEvent{
-					TS:            now.UTC().Format(time.RFC3339),
-					RunID:         runID,
-					Trigger:       trigger,
-					TriggerEvents: triggerEventIDs,
-					Backend:       cfg.Backend,
-					Mode:          cfg.Mode,
-					Status:        "validation_rejected",
-					Detail:        err.Error(),
-					BeforeStats:   computeStats(beforeDoc),
-					AfterStats:    computeStats(afterDoc),
-					RowsChanged:   diffRows(beforeDoc, afterDoc),
-					Keywords:      opts.Keywords,
-				})
-				return RunSummary{}, fmt.Errorf("planner: regeneration rejected: %w", err)
+
+		// Reload progress.json after the backend's edits and check Health
+		// preservation. Skipped when there was no before-doc (fresh
+		// checkout) or when the after-doc cannot be parsed.
+		afterDoc = nil
+		if beforeDoc != nil {
+			loaded, loadErr := loadProgressForValidation(cfg.ProgressJSON)
+			if loadErr != nil {
+				return RunSummary{}, fmt.Errorf("planner: load after-doc: %w", loadErr)
+			}
+			afterDoc = loaded
+		}
+		if beforeDoc != nil && afterDoc != nil {
+			if vErr := validateHealthPreservation(beforeDoc, afterDoc); vErr != nil {
+				attempt.Status = "validation_rejected"
+				attempt.Detail = vErr.Error()
+				attempt.DroppedRows = extractDroppedRows(beforeDoc, afterDoc)
+				attempts = append(attempts, attempt)
+				if i == maxRetries {
+					appendPlannerLedger(ledgerPath, LedgerEvent{
+						TS:            now.UTC().Format(time.RFC3339),
+						RunID:         runID,
+						Trigger:       trigger,
+						TriggerEvents: triggerEventIDs,
+						Backend:       cfg.Backend,
+						Mode:          cfg.Mode,
+						Status:        "validation_rejected",
+						Detail:        vErr.Error(),
+						BeforeStats:   computeStats(beforeDoc),
+						AfterStats:    computeStats(afterDoc),
+						RowsChanged:   diffRows(beforeDoc, afterDoc),
+						Keywords:      opts.Keywords,
+						RetryAttempt:  attempt.Index,
+						Attempts:      attempts,
+					})
+					return RunSummary{}, fmt.Errorf("planner: regeneration rejected: %w", vErr)
+				}
+				// Build a corrective follow-up prompt naming the dropped
+				// rows. The original prompt is preserved as the prefix so
+				// the LLM keeps full context (sync results, quarantine
+				// priorities, etc.).
+				currentPrompt = prompt + RetryFeedback(vErr, beforeDoc, afterDoc)
+				continue
 			}
 		}
+		attempt.Status = "ok"
+		attempts = append(attempts, attempt)
+		break
 	}
+	// Result used by writeReport below comes from the last successful attempt.
+	result := lastResult
 
 	if err := writeReport(reportPath, rawReportPath, result, bundle, now); err != nil {
 		return RunSummary{}, err
@@ -260,6 +304,10 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	if beforeDoc == nil || afterDoc == nil {
 		runStatus = "no_changes"
 	}
+	finalAttempt := 0
+	if len(attempts) > 0 {
+		finalAttempt = attempts[len(attempts)-1].Index
+	}
 	appendPlannerLedger(ledgerPath, LedgerEvent{
 		TS:            now.UTC().Format(time.RFC3339),
 		RunID:         runID,
@@ -272,6 +320,8 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		AfterStats:    computeStats(afterDoc),
 		RowsChanged:   diffRows(beforeDoc, afterDoc),
 		Keywords:      opts.Keywords,
+		RetryAttempt:  finalAttempt,
+		Attempts:      attempts,
 	})
 
 	return summary, nil

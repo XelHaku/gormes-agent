@@ -406,6 +406,7 @@ func TestRunOnce_AppendsLedgerEventOnSuccess(t *testing.T) {
 func TestRunOnce_AppendsLedgerEventOnValidationReject(t *testing.T) {
 	repoRoot := writePlannerFixture(t)
 	cfg := mustConfig(t, repoRoot)
+	cfg.MaxRetries = 0
 	progressPath := cfg.ProgressJSON
 
 	// Seed a Health block on an existing row so the planner regen has
@@ -729,6 +730,7 @@ func TestRunOnce_NoTriggerEventsKeepsScheduledTrigger(t *testing.T) {
 func TestRunOnce_CursorAdvancesEvenOnValidationReject(t *testing.T) {
 	repoRoot := writePlannerFixture(t)
 	cfg := mustConfig(t, repoRoot)
+	cfg.MaxRetries = 0
 	progressPath := cfg.ProgressJSON
 
 	// Seed a Health block so the planner regen has something to drop.
