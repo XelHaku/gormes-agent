@@ -72,10 +72,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 	}
 	if cfg.MergeOpenPullRequests && !opts.DryRun {
 		if _, err := autoloop.MergeOpenPullRequests(ctx, autoloop.PullRequestIntakeOptions{
-			Runner:   runner,
-			RepoRoot: cfg.RepoRoot,
-			RunRoot:  cfg.RunRoot,
-			RunID:    runID,
+			Runner:         runner,
+			RepoRoot:       cfg.RepoRoot,
+			RunRoot:        cfg.RunRoot,
+			RunID:          runID,
+			ConflictAction: cfg.PRConflictAction,
 		}); err != nil {
 			return RunSummary{}, err
 		}

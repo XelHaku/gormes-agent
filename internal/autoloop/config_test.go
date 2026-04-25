@@ -165,6 +165,9 @@ func TestConfigFromEnvReactiveDefaults(t *testing.T) {
 	if cfg.MergeOpenPullRequests != true {
 		t.Fatalf("MergeOpenPullRequests = %v, want true", cfg.MergeOpenPullRequests)
 	}
+	if cfg.PRConflictAction != PRConflictActionClose {
+		t.Fatalf("PRConflictAction = %q, want %q", cfg.PRConflictAction, PRConflictActionClose)
+	}
 	if cfg.AutoCommitDirtyWorktree != true {
 		t.Fatalf("AutoCommitDirtyWorktree = %v, want true", cfg.AutoCommitDirtyWorktree)
 	}
@@ -190,6 +193,7 @@ func TestConfigFromEnvReactiveOverrides(t *testing.T) {
 		"GORMES_REPORT_REPAIR":            "0",
 		"GORMES_PLANNER_QUARANTINE_LIMIT": "9",
 		"MERGE_OPEN_PULL_REQUESTS":        "0",
+		"PR_INTAKE_CONFLICT_ACTION":       "skip",
 		"AUTO_COMMIT_DIRTY_WORKTREE":      "false",
 		"POST_PROMOTION_VERIFY_COMMANDS":  "go test ./internal/autoloop -count=1;;go run ./cmd/autoloop progress validate",
 		"POST_PROMOTION_REPAIR":           "off",
@@ -222,6 +226,9 @@ func TestConfigFromEnvReactiveOverrides(t *testing.T) {
 	}
 	if cfg.MergeOpenPullRequests != false {
 		t.Fatalf("MergeOpenPullRequests = %v, want false", cfg.MergeOpenPullRequests)
+	}
+	if cfg.PRConflictAction != PRConflictActionSkip {
+		t.Fatalf("PRConflictAction = %q, want %q", cfg.PRConflictAction, PRConflictActionSkip)
 	}
 	if cfg.AutoCommitDirtyWorktree != false {
 		t.Fatalf("AutoCommitDirtyWorktree = %v, want false", cfg.AutoCommitDirtyWorktree)

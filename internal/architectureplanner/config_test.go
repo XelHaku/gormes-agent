@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/internal/autoloop"
 )
 
 func TestConfigFromEnvDefaultsToArchitecturePlannerPaths(t *testing.T) {
@@ -36,6 +38,9 @@ func TestConfigFromEnvDefaultsToArchitecturePlannerPaths(t *testing.T) {
 	if cfg.MergeOpenPullRequests != true {
 		t.Fatalf("MergeOpenPullRequests = %v, want true", cfg.MergeOpenPullRequests)
 	}
+	if cfg.PRConflictAction != autoloop.PRConflictActionClose {
+		t.Fatalf("PRConflictAction = %q, want %q", cfg.PRConflictAction, autoloop.PRConflictActionClose)
+	}
 }
 
 func TestConfigFromEnvReadsOverrides(t *testing.T) {
@@ -51,6 +56,7 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 		"GBRAIN_DIR":                    "/tmp/gbrain",
 		"HONCHO_DIR":                    "/tmp/honcho",
 		"MERGE_OPEN_PULL_REQUESTS":      "0",
+		"PR_INTAKE_CONFLICT_ACTION":     "skip",
 		"PLANNER_GORMES_ORIGINAL_PATHS": "cmd/autoloop/,internal/progress/",
 		"PLANNER_IMPL_LOOKBACK":         "48h",
 		"PLANNER_TRIGGER_REASON":        "impl_change",
@@ -85,6 +91,9 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 	}
 	if cfg.MergeOpenPullRequests != false {
 		t.Fatalf("MergeOpenPullRequests = %v, want false", cfg.MergeOpenPullRequests)
+	}
+	if cfg.PRConflictAction != autoloop.PRConflictActionSkip {
+		t.Fatalf("PRConflictAction = %q, want %q", cfg.PRConflictAction, autoloop.PRConflictActionSkip)
 	}
 	if !reflect.DeepEqual(cfg.GormesOriginalPaths, []string{"cmd/autoloop/", "internal/progress/"}) {
 		t.Fatalf("GormesOriginalPaths = %#v", cfg.GormesOriginalPaths)

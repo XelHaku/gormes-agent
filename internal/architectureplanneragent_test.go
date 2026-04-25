@@ -192,6 +192,8 @@ case "$*" in
 ]
 EOF
     ;;
+  pr\ close\ 4*)
+    ;;
   pr\ merge\ 4*|pr\ merge\ 7*)
     ;;
   *)
@@ -285,7 +287,7 @@ exit 0
 	ghLog := string(ghLogData)
 	for _, want := range []string{
 		"pr list",
-		"pr merge 4",
+		"pr close 4",
 		"pr merge 7",
 	} {
 		if !strings.Contains(ghLog, want) {

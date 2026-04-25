@@ -159,6 +159,7 @@ func plannerEnv(opts runOptions) map[string]string {
 		"PLANNER_MAX_RETRIES",
 		"PLANNER_TRIGGER_REASON",
 		"MERGE_OPEN_PULL_REQUESTS",
+		"PR_INTAKE_CONFLICT_ACTION",
 	} {
 		env[key] = os.Getenv(key)
 	}

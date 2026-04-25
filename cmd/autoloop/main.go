@@ -281,6 +281,7 @@ func autoloopEnv() map[string]string {
 		"POST_PROMOTION_REPAIR_ATTEMPTS",
 		"PLANNER_TRIGGERS_PATH",
 		"MERGE_OPEN_PULL_REQUESTS",
+		"PR_INTAKE_CONFLICT_ACTION",
 		"AUTO_COMMIT_DIRTY_WORKTREE",
 	} {
 		env[key] = os.Getenv(key)

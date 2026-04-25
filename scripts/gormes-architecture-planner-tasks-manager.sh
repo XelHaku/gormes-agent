@@ -122,6 +122,8 @@ JSON_LOG="${JSON_LOG:-}"
 MERGE_OPEN_PULL_REQUESTS="${MERGE_OPEN_PULL_REQUESTS:-1}"
 PR_INTAKE_REMOTE="${PR_INTAKE_REMOTE:-$REMOTE_NAME}"
 PR_INTAKE_BASE_BRANCH="${PR_INTAKE_BASE_BRANCH:-$MAIN_BRANCH}"
+PR_INTAKE_CONFLICT_ACTION="${PR_INTAKE_CONFLICT_ACTION:-close}"
+PR_DIRTY_CLOSE_COMMENT="Closed by Gormes PR intake: mergeStateStatus=DIRTY means this PR has merge conflicts and cannot be merged automatically at cycle start."
 
 mkdir -p "$PLANNER_ROOT" "$LOG_DIR"
 
@@ -351,6 +353,20 @@ parse_bool_enabled() {
   esac
 }
 
+normalize_pr_conflict_action() {
+  local value="${1:-close}"
+  local normalized
+  normalized="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  case "$normalized" in
+    close|skip)
+      printf '%s\n' "$normalized"
+      ;;
+    *)
+      fail "PR_INTAKE_CONFLICT_ACTION must be close or skip"
+      ;;
+  esac
+}
+
 parse_pr_repo() {
   local raw="$1"
   local host path rest
@@ -446,9 +462,10 @@ merge_open_pull_requests() {
   require_cmd gh
   ensure_pr_intake_worktree_ready
 
-  local remote_url repo prs_json listed skipped merged failed
+  local remote_url repo prs_json listed skipped merged closed failed conflict_action
   remote_url="$(git -C "$REPO_ROOT" remote get-url "$PR_INTAKE_REMOTE" 2>/dev/null || true)"
   repo="$(parse_pr_repo "$remote_url" || true)"
+  conflict_action="$(normalize_pr_conflict_action "$PR_INTAKE_CONFLICT_ACTION")"
 
   local list_args=(pr list)
   if [[ -n "$repo" ]]; then
@@ -464,15 +481,43 @@ merge_open_pull_requests() {
   listed="$(jq -r 'length' <<<"$prs_json")"
   skipped="$(jq -r '[.[] | select(.isDraft // false)] | length' <<<"$prs_json")"
   merged=0
+  closed=0
   failed=0
 
-  local pr_number merge_output
-  local merge_numbers=()
-  while IFS= read -r pr_number; do
-    [[ -n "$pr_number" ]] && merge_numbers+=("$pr_number")
-  done < <(jq -r 'map(select((.isDraft // false) | not) | .number) | sort | .[]' <<<"$prs_json")
+  local pr_number merge_state merge_output close_output
+  local merge_rows=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && merge_rows+=("$line")
+  done < <(jq -r 'map(select((.isDraft // false) | not)) | sort_by(.number)[] | [.number, (.mergeStateStatus // "")] | @tsv' <<<"$prs_json")
 
-  for pr_number in "${merge_numbers[@]}"; do
+  for line in "${merge_rows[@]}"; do
+    IFS=$'\t' read -r pr_number merge_state <<<"$line"
+    if [[ "$merge_state" == "DIRTY" ]]; then
+      case "$conflict_action" in
+        close)
+          local close_args=(pr close "$pr_number")
+          if [[ -n "$repo" ]]; then
+            close_args+=(--repo "$repo")
+          fi
+          close_args+=(--delete-branch --comment "$PR_DIRTY_CLOSE_COMMENT")
+
+          if close_output="$(gh "${close_args[@]}" 2>&1)"; then
+            closed=$((closed + 1))
+            log "PR intake: closed conflicted #$pr_number"
+            [[ -n "$close_output" ]] && log_debug "$close_output"
+          else
+            failed=$((failed + 1))
+            log_warn "PR intake: close failed for conflicted #$pr_number: $close_output"
+          fi
+          ;;
+        skip)
+          skipped=$((skipped + 1))
+          log "PR intake: skipped conflicted #$pr_number"
+          ;;
+      esac
+      continue
+    fi
+
     local merge_args=(pr merge "$pr_number")
     if [[ -n "$repo" ]]; then
       merge_args+=(--repo "$repo")
@@ -493,7 +538,7 @@ merge_open_pull_requests() {
     sync_merged_pull_requests
   fi
 
-  log "PR intake complete: listed=$listed merged=$merged failed=$failed skipped=$skipped"
+  log "PR intake complete: listed=$listed merged=$merged closed=$closed failed=$failed skipped=$skipped"
 }
 
 usage() {
@@ -532,6 +577,7 @@ Environment:
   MERGE_OPEN_PULL_REQUESTS  Merge ready GitHub PRs before planner context (default: 1)
   PR_INTAKE_REMOTE          Remote used for PR-intake sync (default: REMOTE_NAME)
   PR_INTAKE_BASE_BRANCH     Base branch fetched after PR merges (default: MAIN_BRANCH)
+  PR_INTAKE_CONFLICT_ACTION close or skip DIRTY/conflicted PRs (default: close)
 
 Examples:
   VERBOSE=1 ./gormes-architecture-planner-tasks-manager.sh
@@ -1241,6 +1287,7 @@ cmd_doctor() {
   require_cmd go
   if parse_bool_enabled "$MERGE_OPEN_PULL_REQUESTS" "MERGE_OPEN_PULL_REQUESTS"; then
     require_cmd gh
+    normalize_pr_conflict_action "$PR_INTAKE_CONFLICT_ACTION" >/dev/null
   fi
   require_dir "$REPO_ROOT"
   require_dir "$ARCH_PLAN_DIR"

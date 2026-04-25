@@ -26,6 +26,7 @@ type Config struct {
 	ReportRepairEnabled     bool     // GORMES_REPORT_REPAIR, default true (Task 6)
 	PlannerQuarantineLimit  int      // GORMES_PLANNER_QUARANTINE_LIMIT, default 5 (Task 7)
 	MergeOpenPullRequests   bool     // MERGE_OPEN_PULL_REQUESTS, default true
+	PRConflictAction        string   // PR_INTAKE_CONFLICT_ACTION, default close
 	AutoCommitDirtyWorktree bool     // AUTO_COMMIT_DIRTY_WORKTREE, default true for CLI cycles
 
 	PostPromotionVerifyCommands []string // POST_PROMOTION_VERIFY_COMMANDS, default full-suite gate
@@ -64,6 +65,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		ReportRepairEnabled:     true,
 		PlannerQuarantineLimit:  5,
 		MergeOpenPullRequests:   true,
+		PRConflictAction:        PRConflictActionClose,
 		AutoCommitDirtyWorktree: true,
 
 		PostPromotionVerifyCommands: defaultPostPromotionVerifyCommands(),
@@ -171,6 +173,13 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		}
 		cfg.MergeOpenPullRequests = b
 	}
+	if value := env["PR_INTAKE_CONFLICT_ACTION"]; value != "" {
+		action, err := parsePRConflictAction(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("PR_INTAKE_CONFLICT_ACTION: %w", err)
+		}
+		cfg.PRConflictAction = action
+	}
 	if value := env["AUTO_COMMIT_DIRTY_WORKTREE"]; value != "" {
 		b, err := parseBoolEnv(value)
 		if err != nil {
@@ -256,4 +265,14 @@ func parseBoolEnv(value string) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("invalid boolean %q (want 1/0/true/false/yes/no/on/off)", value)
+}
+
+func parsePRConflictAction(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case PRConflictActionClose:
+		return PRConflictActionClose, nil
+	case PRConflictActionSkip:
+		return PRConflictActionSkip, nil
+	}
+	return "", fmt.Errorf("invalid action %q (want close or skip)", value)
 }

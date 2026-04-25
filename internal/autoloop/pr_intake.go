@@ -12,21 +12,30 @@ import (
 )
 
 type PullRequestIntakeOptions struct {
-	Runner     Runner
-	RepoRoot   string
-	RunRoot    string
-	RunID      string
-	Repo       string
-	Remote     string
-	BaseBranch string
+	Runner         Runner
+	RepoRoot       string
+	RunRoot        string
+	RunID          string
+	Repo           string
+	Remote         string
+	BaseBranch     string
+	ConflictAction string
 }
 
 type PullRequestIntakeSummary struct {
 	Listed  int
 	Merged  int
+	Closed  int
 	Failed  int
 	Skipped int
 }
+
+const (
+	PRConflictActionClose = "close"
+	PRConflictActionSkip  = "skip"
+
+	prDirtyCloseComment = "Closed by Gormes PR intake: mergeStateStatus=DIRTY means this PR has merge conflicts and cannot be merged automatically at cycle start."
+)
 
 type pullRequestInfo struct {
 	Number           int    `json:"number"`
@@ -91,6 +100,7 @@ func MergeOpenPullRequests(ctx context.Context, opts PullRequestIntakeOptions) (
 	sort.Slice(prs, func(i, j int) bool { return prs[i].Number < prs[j].Number })
 
 	var ready []pullRequestInfo
+	conflictAction := prConflictAction(opts)
 	for _, pr := range prs {
 		if pr.IsDraft {
 			summary.Skipped++
@@ -102,6 +112,49 @@ func MergeOpenPullRequests(ctx context.Context, opts PullRequestIntakeOptions) (
 				Detail: prDetail(pr),
 			}); err != nil {
 				return summary, err
+			}
+			continue
+		}
+		if prIsDirty(pr) {
+			switch conflictAction {
+			case PRConflictActionClose:
+				closeResult := opts.Runner.Run(ctx, Command{
+					Name: "gh",
+					Args: prCloseArgs(pr.Number, repo),
+					Dir:  opts.RepoRoot,
+				})
+				if closeResult.Err != nil {
+					summary.Failed++
+					_ = appendPRIntakeEvent(opts, LedgerEvent{
+						TS:     time.Now().UTC(),
+						RunID:  opts.RunID,
+						Event:  "pr_intake_failed",
+						Status: "close_failed",
+						Detail: prDetail(pr) + " " + strings.TrimSpace(closeResult.Stderr),
+					})
+					continue
+				}
+				summary.Closed++
+				if err := appendPRIntakeEvent(opts, LedgerEvent{
+					TS:     time.Now().UTC(),
+					RunID:  opts.RunID,
+					Event:  "pr_intake_closed",
+					Status: "dirty",
+					Detail: prDetail(pr),
+				}); err != nil {
+					return summary, err
+				}
+			case PRConflictActionSkip:
+				summary.Skipped++
+				if err := appendPRIntakeEvent(opts, LedgerEvent{
+					TS:     time.Now().UTC(),
+					RunID:  opts.RunID,
+					Event:  "pr_intake_skipped",
+					Status: "dirty",
+					Detail: prDetail(pr),
+				}); err != nil {
+					return summary, err
+				}
 			}
 			continue
 		}
@@ -149,7 +202,7 @@ func MergeOpenPullRequests(ctx context.Context, opts PullRequestIntakeOptions) (
 		RunID:  opts.RunID,
 		Event:  "pr_intake_completed",
 		Status: "completed",
-		Detail: fmt.Sprintf("listed=%d merged=%d failed=%d skipped=%d", summary.Listed, summary.Merged, summary.Failed, summary.Skipped),
+		Detail: fmt.Sprintf("listed=%d merged=%d closed=%d failed=%d skipped=%d", summary.Listed, summary.Merged, summary.Closed, summary.Failed, summary.Skipped),
 	})
 }
 
@@ -216,6 +269,29 @@ func prMergeArgs(number int, repo string) []string {
 		args = append(args, "--repo", repo)
 	}
 	return append(args, "--merge", "--delete-branch", "--admin")
+}
+
+func prCloseArgs(number int, repo string) []string {
+	args := []string{"pr", "close", fmt.Sprint(number)}
+	if repo != "" {
+		args = append(args, "--repo", repo)
+	}
+	return append(args, "--delete-branch", "--comment", prDirtyCloseComment)
+}
+
+func prIsDirty(pr pullRequestInfo) bool {
+	return strings.EqualFold(strings.TrimSpace(pr.MergeStateStatus), "DIRTY")
+}
+
+func prConflictAction(opts PullRequestIntakeOptions) string {
+	switch strings.ToLower(strings.TrimSpace(opts.ConflictAction)) {
+	case "", PRConflictActionClose:
+		return PRConflictActionClose
+	case PRConflictActionSkip:
+		return PRConflictActionSkip
+	default:
+		return PRConflictActionClose
+	}
 }
 
 func syncMergedPullRequests(ctx context.Context, opts PullRequestIntakeOptions, summary PullRequestIntakeSummary) error {
@@ -298,7 +374,7 @@ func prIntakeBaseBranch(opts PullRequestIntakeOptions) string {
 }
 
 func prSyncDetail(summary PullRequestIntakeSummary, result Result) string {
-	detail := fmt.Sprintf("listed=%d merged=%d failed=%d skipped=%d", summary.Listed, summary.Merged, summary.Failed, summary.Skipped)
+	detail := fmt.Sprintf("listed=%d merged=%d closed=%d failed=%d skipped=%d", summary.Listed, summary.Merged, summary.Closed, summary.Failed, summary.Skipped)
 	output := strings.TrimSpace(result.Stderr)
 	if output == "" {
 		output = strings.TrimSpace(result.Stdout)

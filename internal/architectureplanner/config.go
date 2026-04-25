@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/internal/autoloop"
 )
 
 type Config struct {
@@ -53,6 +55,9 @@ type Config struct {
 	// MergeOpenPullRequests controls whether planner cycles merge all
 	// non-draft open pull requests before collecting context.
 	MergeOpenPullRequests bool
+	// PRConflictAction controls DIRTY/conflicted PR handling during planner
+	// PR intake. "close" deletes the branch after closing; "skip" leaves it.
+	PRConflictAction string
 	// EvaluationWindow is the lookback for L4 self-evaluation. The planner
 	// correlates row reshapes recorded in its own ledger within this window
 	// against autoloop's ledger to determine whether previous reshapes
@@ -111,6 +116,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		PlannerTriggersPath:    filepath.Join(repoRoot, ".codex", "architecture-planner", "triggers.jsonl"),
 		MaxRetries:             DefaultMaxRetries,
 		MergeOpenPullRequests:  true,
+		PRConflictAction:       autoloop.PRConflictActionClose,
 		EvaluationWindow:       DefaultEvaluationWindow,
 		EscalationThreshold:    DefaultEscalationThreshold,
 		GormesOriginalPaths:    nil, // ScanImplementation falls back to DefaultGormesOriginalPaths
@@ -187,6 +193,13 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		}
 		cfg.MergeOpenPullRequests = b
 	}
+	if value := env["PR_INTAKE_CONFLICT_ACTION"]; value != "" {
+		action, err := parsePRConflictAction(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("PR_INTAKE_CONFLICT_ACTION: %w", err)
+		}
+		cfg.PRConflictAction = action
+	}
 	if value := env["PLANNER_EVALUATION_WINDOW"]; value != "" {
 		d, err := time.ParseDuration(value)
 		if err != nil {
@@ -255,6 +268,16 @@ func parseBoolEnv(value string) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("invalid boolean %q (want 1/0/true/false/yes/no/on/off)", value)
+}
+
+func parsePRConflictAction(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case autoloop.PRConflictActionClose:
+		return autoloop.PRConflictActionClose, nil
+	case autoloop.PRConflictActionSkip:
+		return autoloop.PRConflictActionSkip, nil
+	}
+	return "", fmt.Errorf("invalid action %q (want close or skip)", value)
 }
 
 func (cfg Config) ExternalRepos() []ExternalRepo {
