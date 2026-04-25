@@ -3,7 +3,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -41,27 +43,34 @@ func main() {
 
 func newRootCommand() *cobra.Command {
 	return newRootCommandWithRuntime(rootRuntime{
-		runTUI:     runTUI,
-		runOneshot: runResolvedOneshot,
+		runTUI: runTUI,
 	})
 }
 
 type rootRuntime struct {
-	runTUI     func(*cobra.Command, []string) error
-	runOneshot func(*cobra.Command, oneshotInvocation) error
+	runTUI           func(*cobra.Command, []string) error
+	runOneshot       func(*cobra.Command, oneshotInvocation) error
+	newOneshotClient oneshotClientFactory
 }
 
 type oneshotInvocation struct {
 	Prompt    string
 	Inference config.OneshotInferenceResolution
+	Config    config.Config
 }
 
 func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
 	if runtime.runTUI == nil {
 		runtime.runTUI = runTUI
 	}
+	if runtime.newOneshotClient == nil {
+		runtime.newOneshotClient = newOneshotHTTPClient
+	}
 	if runtime.runOneshot == nil {
-		runtime.runOneshot = runResolvedOneshot
+		newClient := runtime.newOneshotClient
+		runtime.runOneshot = func(cmd *cobra.Command, invocation oneshotInvocation) error {
+			return runResolvedOneshotWithClient(cmd, invocation, newClient)
+		}
 	}
 	resetGonchoDoctorFlags()
 	root := &cobra.Command{
@@ -109,6 +118,7 @@ func resolveOneshotInvocation(cmd *cobra.Command) (oneshotInvocation, error) {
 	invocation := oneshotInvocation{
 		Prompt:    prompt,
 		Inference: resolution,
+		Config:    cfg,
 	}
 	if err != nil {
 		return invocation, newExitCodeError(2, err)
@@ -116,8 +126,113 @@ func resolveOneshotInvocation(cmd *cobra.Command) (oneshotInvocation, error) {
 	return invocation, nil
 }
 
-func runResolvedOneshot(_ *cobra.Command, _ oneshotInvocation) error {
+type oneshotClientFactory func(context.Context, config.Config, oneshotInvocation) (hermes.Client, error)
+
+func newOneshotHTTPClient(_ context.Context, cfg config.Config, invocation oneshotInvocation) (hermes.Client, error) {
+	return hermes.NewHTTPClientWithProvider(cfg.Hermes.Endpoint, cfg.Hermes.APIKey, invocation.Inference.Provider), nil
+}
+
+func runResolvedOneshot(cmd *cobra.Command, invocation oneshotInvocation) error {
+	return runResolvedOneshotWithClient(cmd, invocation, newOneshotHTTPClient)
+}
+
+func runResolvedOneshotWithClient(cmd *cobra.Command, invocation oneshotInvocation, newClient oneshotClientFactory) error {
+	if newClient == nil {
+		newClient = newOneshotHTTPClient
+	}
+	cfg := invocation.Config
+	model := invocation.Inference.Model
+	if model == "" {
+		model = cfg.Hermes.Model
+	}
+
+	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	client, err := newClient(rootCtx, cfg, invocation)
+	if err != nil {
+		return newExitCodeError(1, fmt.Errorf("gormes -z: provider setup failed: %w", err))
+	}
+	if client == nil {
+		return newExitCodeError(1, fmt.Errorf("gormes -z: provider setup failed: %w", errors.New("nil hermes client")))
+	}
+
+	k := kernel.New(kernel.Config{
+		Model:     model,
+		Endpoint:  cfg.Hermes.Endpoint,
+		Admission: kernel.Admission{MaxBytes: cfg.Input.MaxBytes, MaxLines: cfg.Input.MaxLines},
+	}, client, store.NewNoop(), telemetry.New(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	runDone := make(chan error, 1)
+	go func() {
+		runDone <- k.Run(rootCtx)
+	}()
+	defer func() {
+		stop()
+		select {
+		case <-runDone:
+		case <-time.After(kernel.ShutdownBudget):
+		}
+	}()
+
+	initial, err := readOneshotFrame(rootCtx, k.Render())
+	if err != nil {
+		return newExitCodeError(1, fmt.Errorf("gormes -z: kernel startup failed: %w", err))
+	}
+	if err := k.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventSubmit, Text: invocation.Prompt}); err != nil {
+		return newExitCodeError(1, fmt.Errorf("gormes -z: submit failed: %w", err))
+	}
+	final, err := waitForOneshotFinalFrame(rootCtx, k.Render(), initial.Seq)
+	if err != nil {
+		return newExitCodeError(1, fmt.Errorf("gormes -z: kernel turn failed: %w", err))
+	}
+	if final.LastError != "" {
+		return newExitCodeError(1, fmt.Errorf("gormes -z: %s", final.LastError))
+	}
+	content, ok := finalAssistantContent(final.History)
+	if !ok {
+		return newExitCodeError(1, errors.New("gormes -z: no final assistant content"))
+	}
+	if _, err := fmt.Fprintln(cmd.OutOrStdout(), content); err != nil {
+		return newExitCodeError(1, fmt.Errorf("gormes -z: write stdout: %w", err))
+	}
 	return nil
+}
+
+func readOneshotFrame(ctx context.Context, frames <-chan kernel.RenderFrame) (kernel.RenderFrame, error) {
+	select {
+	case frame, ok := <-frames:
+		if !ok {
+			return kernel.RenderFrame{}, errors.New("render stream closed")
+		}
+		return frame, nil
+	case <-ctx.Done():
+		return kernel.RenderFrame{}, ctx.Err()
+	}
+}
+
+func waitForOneshotFinalFrame(ctx context.Context, frames <-chan kernel.RenderFrame, initialSeq uint64) (kernel.RenderFrame, error) {
+	for {
+		frame, err := readOneshotFrame(ctx, frames)
+		if err != nil {
+			return kernel.RenderFrame{}, err
+		}
+		if frame.LastError != "" || frame.Phase == kernel.PhaseFailed {
+			return frame, nil
+		}
+		if frame.Phase == kernel.PhaseIdle && frame.Seq > initialSeq {
+			return frame, nil
+		}
+	}
+}
+
+func finalAssistantContent(history []hermes.Message) (string, bool) {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == "assistant" {
+			return history[i].Content, true
+		}
+	}
+	return "", false
 }
 
 func runTUI(cmd *cobra.Command, _ []string) error {

@@ -6584,9 +6584,9 @@
             {
               "name": "Oneshot final-output writer boundary",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "One-shot mode runs one native Gormes kernel turn over a fake provider and writes only final assistant content plus one trailing newline to stdout",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -6618,7 +6618,7 @@
                 "Provider/client setup failures return nonzero exit status with operator-readable stderr and empty stdout.",
                 "The command starts no TUI, gateway transport, api_server bridge, or live provider request in the focused fixture."
               ],
-              "note": "Split from the failed broad oneshot row so the first worker owns only output capture and one fake kernel turn. Safety/clarify behavior follows in the dependent row.",
+              "note": "Complete: TDD landed cmd/gormes/oneshot_output_test.go and the native one-shot runner boundary. Fixtures inject a fake hermes.Client, prove one kernel ChatRequest for `gormes -z 'hi' --model fixture-model`, exact stdout final content plus one newline, setup failures on stderr with exit 1, and no TUI/gateway/api_server startup or stdout leakage of render/status/session/tool/log text. Safety/clarify behavior follows in the dependent row.",
               "write_scope": [
                 "cmd/gormes/main.go",
                 "cmd/gormes/oneshot_output_test.go",
