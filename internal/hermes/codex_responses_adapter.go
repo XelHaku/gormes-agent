@@ -116,7 +116,7 @@ func buildCodexResponsesPayload(req ChatRequest) (codexResponsesPayload, error) 
 			if len(msg.ContentParts) > 0 {
 				input = append(input, codexResponsesMessageItem{
 					Role:    msg.Role,
-					Content: codexResponsesContentParts(msg.ContentParts),
+					Content: codexResponsesContentParts(msg.Role, msg.ContentParts),
 				})
 			} else if msg.Content != "" || msg.Role == "user" {
 				input = append(input, codexResponsesMessageItem{Role: msg.Role, Content: msg.Content})
@@ -303,8 +303,12 @@ func normalizeCodexResponsesResponseWithTools(response codexResponsesResponse, t
 	}, nil
 }
 
-func codexResponsesContentParts(parts []MessageContentPart) []codexResponsesContentPart {
+func codexResponsesContentParts(role string, parts []MessageContentPart) []codexResponsesContentPart {
 	out := make([]codexResponsesContentPart, 0, len(parts))
+	textType := "input_text"
+	if strings.ToLower(strings.TrimSpace(role)) == "assistant" {
+		textType = "output_text"
+	}
 	for _, part := range parts {
 		partType := strings.ToLower(strings.TrimSpace(part.Type))
 		switch partType {
@@ -312,7 +316,7 @@ func codexResponsesContentParts(parts []MessageContentPart) []codexResponsesCont
 			if part.Text == "" {
 				continue
 			}
-			out = append(out, codexResponsesContentPart{Type: "input_text", Text: part.Text})
+			out = append(out, codexResponsesContentPart{Type: textType, Text: part.Text})
 		case "image_url", "input_image":
 			if part.ImageURL == "" {
 				continue

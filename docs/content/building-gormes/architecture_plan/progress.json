@@ -4113,9 +4113,9 @@
             {
               "name": "Codex Responses assistant content role types",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Codex Responses payload conversion emits role-correct text content parts: input_text for user messages and output_text for assistant replay messages",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4145,7 +4145,7 @@
                 "A user -> assistant -> user round-trip fixture proves the preflight/payload builder preserves role-correct content part types before tool-call replay.",
                 "Existing temperature, stream-repair, and tool-call conversion fixtures remain green without live Codex credentials."
               ],
-              "note": "Hermes 648b8991 fixed a Responses API rejection where assistant message list content was replayed with input_text. Gormes has the pure converter but still emits input_text for every text part, so add a narrow fixture before auth/live Codex work.",
+              "note": "Complete: TDD added `internal/hermes/codex_responses_role_content_test.go` and made Codex Responses content-part conversion role-aware. User text/text-like parts normalize to input_text with image parts preserved as input_image; assistant text, input_text, and output_text parts normalize to output_text, including a user -> assistant tool-call replay -> user payload-builder fixture. No Codex OAuth, live Responses requests, stream repair, tool-call argument repair, or generic chat-completions mapping changed.",
               "write_scope": [
                 "internal/hermes/codex_responses_adapter.go",
                 "internal/hermes/codex_responses_adapter_test.go",
