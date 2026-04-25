@@ -1961,9 +1961,9 @@
             {
               "name": "Goncho topology design fixtures",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Goncho workspace, peer, session, and observation defaults are fixture-locked before more memory behavior is added",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -2006,7 +2006,7 @@
                 "Conversation sessions follow real context boundaries such as thread, channel, repo, import batch, or delegated child run.",
                 "Cross-peer observation is opt-in and cannot become a default side effect."
               ],
-              "note": "Honcho design-pattern docs show that most memory mistakes start with topology mistakes. This row makes the topology contract executable before adding more context, card, summary, or import behavior.",
+              "note": "TDD landed: internal/goncho/topology_design_test.go locks the default gormes workspace, rejects workspace-per-user, proves canonical session user IDs before source-prefixed external fallback IDs with evidence, keeps deterministic assistants/transport bots/import helpers unobserved by default, names real session boundaries, and keeps cross-peer observation opt-in.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/session/",

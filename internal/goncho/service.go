@@ -31,11 +31,11 @@ func NewService(db *sql.DB, cfg Config, log *slog.Logger) *Service {
 	}
 	workspaceID := strings.TrimSpace(cfg.WorkspaceID)
 	if workspaceID == "" {
-		workspaceID = "default"
+		workspaceID = DefaultWorkspaceID
 	}
 	observer := strings.TrimSpace(cfg.ObserverPeerID)
 	if observer == "" {
-		observer = "gormes"
+		observer = DefaultObserverPeerID
 	}
 	recentLimit := cfg.RecentMessages
 	if recentLimit <= 0 {
