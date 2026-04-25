@@ -98,16 +98,22 @@ func NewRuntime(root string, maxBytes, selectionCap int, usageLogPath string) *R
 	}
 }
 
-func (r *Runtime) BuildSkillBlock(_ context.Context, userMessage string) (string, []string, error) {
+func (r *Runtime) BuildSkillBlock(ctx context.Context, userMessage string) (string, []string, error) {
+	block, names, _, err := r.BuildSkillBlockWithOptions(ctx, userMessage, RuntimeOptions{})
+	return block, names, err
+}
+
+func (r *Runtime) BuildSkillBlockWithOptions(ctx context.Context, userMessage string, opts RuntimeOptions) (string, []string, []SkillStatus, error) {
 	if r == nil || r.store == nil {
-		return "", nil, nil
+		return "", nil, nil, nil
 	}
 	snapshot, err := r.store.SnapshotActive()
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
-	selected := Select(snapshot.Skills, userMessage, r.selectionCap)
-	return RenderBlock(selected), skillNames(selected), nil
+	prepared, statuses := prepareSkills(ctx, snapshot.Skills, opts)
+	selected := Select(prepared, userMessage, r.selectionCap)
+	return RenderBlock(selected), skillNames(selected), statuses, nil
 }
 
 func (r *Runtime) RecordSkillUsage(ctx context.Context, skillNames []string) error {

@@ -3386,7 +3386,7 @@
             },
             {
               "name": "Skill preprocessing + dynamic slash commands",
-              "status": "planned",
+              "status": "complete",
               "contract": "Skill content preprocessing and skill-backed slash commands are deterministic, disabled-skill aware, and prompt-safe",
               "contract_status": "fixture_ready",
               "slice_size": "small",
@@ -3420,7 +3420,7 @@
                 "Inline shell preprocessing is disabled by default and bounded when explicitly enabled.",
                 "Skill slash commands skip disabled/incompatible skills and build stable user-message content."
               ],
-              "note": "Hermes split shared SKILL.md preprocessing into `agent/skill_preprocessing.py` and expanded skill slash command scanning. Gormes has the core Phase 2.G store; this slice adds the remaining prompt/command preprocessing contract without widening automatic skill execution.",
+              "note": "TDD landed: internal/skills/preprocessing_commands_test.go covers deterministic template preprocessing, inline shell remaining disabled by default and output-bounded when explicitly enabled, status reporting for disabled/unsupported/missing-prerequisite/preprocessing-failed skills without prompt injection, and skill slash-command generation that exposes only available skills through stable gateway command surfaces.",
               "write_scope": [
                 "internal/skills/",
                 "internal/gateway/",

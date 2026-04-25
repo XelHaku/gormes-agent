@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -114,6 +115,23 @@ func TelegramBotCommands() []PlatformCommand {
 	return out
 }
 
+// TelegramBotCommandsWith returns the canonical Telegram menu plus dynamic
+// commands. Dynamic command names are normalized for Telegram's underscore-only
+// command shape and sorted for deterministic platform registration.
+func TelegramBotCommandsWith(dynamic []PlatformCommand) []PlatformCommand {
+	out := TelegramBotCommands()
+	seen := platformCommandNameSet(out)
+	for _, cmd := range sortedPlatformCommands(dynamic) {
+		name := normalizeTelegramCommandName(cmd.Name)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, PlatformCommand{Name: name, Description: strings.TrimSpace(cmd.Description)})
+	}
+	return out
+}
+
 // SlackSubcommandMap returns the canonical slash mapping Slack should expose.
 // Both canonical names and aliases resolve to their slash-prefixed entry.
 func SlackSubcommandMap() map[string]string {
@@ -125,4 +143,49 @@ func SlackSubcommandMap() map[string]string {
 		}
 	}
 	return out
+}
+
+// SlackSubcommandMapWith returns the canonical Slack command mapping plus
+// dynamic commands. Callers are responsible for passing only enabled commands.
+func SlackSubcommandMapWith(dynamic []PlatformCommand) map[string]string {
+	out := SlackSubcommandMap()
+	for _, cmd := range sortedPlatformCommands(dynamic) {
+		name := normalizeSlackCommandName(cmd.Name)
+		if name == "" {
+			continue
+		}
+		out[name] = "/" + name
+	}
+	return out
+}
+
+func platformCommandNameSet(commands []PlatformCommand) map[string]bool {
+	out := make(map[string]bool, len(commands))
+	for _, cmd := range commands {
+		out[cmd.Name] = true
+	}
+	return out
+}
+
+func sortedPlatformCommands(commands []PlatformCommand) []PlatformCommand {
+	out := append([]PlatformCommand(nil), commands...)
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Name != out[j].Name {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].Description < out[j].Description
+	})
+	return out
+}
+
+func normalizeTelegramCommandName(name string) string {
+	name = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(name)), "/")
+	name = strings.ReplaceAll(name, "-", "_")
+	return strings.Trim(name, "_")
+}
+
+func normalizeSlackCommandName(name string) string {
+	name = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(name)), "/")
+	name = strings.ReplaceAll(name, "_", "-")
+	return strings.Trim(name, "-")
 }
