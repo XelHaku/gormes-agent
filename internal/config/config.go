@@ -119,6 +119,7 @@ type DelegationCfg struct {
 	DefaultMaxIterations  int           `toml:"default_max_iterations"`
 	DefaultTimeout        time.Duration `toml:"default_timeout"`
 	RunLogPath            string        `toml:"run_log_path"`
+	MaxWaiting            int           `toml:"max_waiting"`
 }
 
 // GonchoCfg configures the in-process Honcho-compatible memory facade.
@@ -166,6 +167,7 @@ func (d *DelegationCfg) UnmarshalTOML(data []byte) error {
 		DefaultMaxIterations  int    `toml:"default_max_iterations"`
 		DefaultTimeout        string `toml:"default_timeout"`
 		RunLogPath            string `toml:"run_log_path"`
+		MaxWaiting            int    `toml:"max_waiting"`
 	}
 
 	var raw rawDelegationCfg
@@ -179,6 +181,7 @@ func (d *DelegationCfg) UnmarshalTOML(data []byte) error {
 		MaxConcurrentChildren: raw.MaxConcurrentChildren,
 		DefaultMaxIterations:  raw.DefaultMaxIterations,
 		RunLogPath:            raw.RunLogPath,
+		MaxWaiting:            raw.MaxWaiting,
 	}
 	if raw.DefaultTimeout == "" {
 		return nil
@@ -294,6 +297,7 @@ func defaults() Config {
 			DefaultMaxIterations:  8,
 			DefaultTimeout:        45 * time.Second,
 			RunLogPath:            "",
+			MaxWaiting:            128,
 		},
 		Goncho: GonchoCfg{
 			Enabled:                      true,
@@ -550,6 +554,9 @@ func validateConfig(cfg *Config) error {
 	}
 	if cfg.Goncho.DeriverWorkers == 0 {
 		return fmt.Errorf("config: goncho.deriver_workers must be at least 1")
+	}
+	if cfg.Delegation.MaxWaiting < 0 {
+		return fmt.Errorf("config: delegation.max_waiting must be non-negative, got %d", cfg.Delegation.MaxWaiting)
 	}
 	return nil
 }

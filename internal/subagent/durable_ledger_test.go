@@ -12,11 +12,16 @@ import (
 
 func newTestDurableLedger(t *testing.T) (*DurableLedger, *memory.SqliteStore, func()) {
 	t.Helper()
+	return newTestDurableLedgerWithOptions(t, DurableLedgerOptions{})
+}
+
+func newTestDurableLedgerWithOptions(t *testing.T, opts DurableLedgerOptions) (*DurableLedger, *memory.SqliteStore, func()) {
+	t.Helper()
 	ms, err := memory.OpenSqlite(filepath.Join(t.TempDir(), "memory.db"), 0, nil)
 	if err != nil {
 		t.Fatalf("OpenSqlite: %v", err)
 	}
-	ledger, err := NewDurableLedger(ms.DB())
+	ledger, err := NewDurableLedgerWithOptions(ms.DB(), opts)
 	if err != nil {
 		_ = ms.Close(context.Background())
 		t.Fatalf("NewDurableLedger: %v", err)

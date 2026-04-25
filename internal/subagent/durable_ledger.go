@@ -11,6 +11,9 @@ import (
 )
 
 var ErrDurableJobNotFound = errors.New("subagent: durable job not found")
+var ErrDurableBackpressure = errors.New("subagent: durable queue backpressure")
+
+const durableStaleWaitingAfter = time.Hour
 
 type DurableJobStatus string
 
@@ -32,17 +35,38 @@ const (
 )
 
 type DurableJobSubmission struct {
-	ID       string
-	Kind     WorkKind
-	ParentID string
-	Depth    int
-	Progress json.RawMessage
+	ID         string
+	Kind       WorkKind
+	ParentID   string
+	Depth      int
+	Progress   json.RawMessage
+	MaxWaiting int
 }
 
 type DurableClaim struct {
 	WorkerID  string
 	LockUntil time.Time
+	TimeoutAt time.Time
+	Timeout   time.Duration
 	Kinds     []WorkKind
+}
+
+type DurableLedgerOptions struct {
+	MaxWaiting int
+}
+
+type DurableBackpressureError struct {
+	JobID      string
+	Waiting    int
+	MaxWaiting int
+}
+
+func (e DurableBackpressureError) Error() string {
+	return fmt.Sprintf("subagent: durable queue backpressure: %d waiting jobs reached maxWaiting=%d", e.Waiting, e.MaxWaiting)
+}
+
+func (e DurableBackpressureError) Is(target error) bool {
+	return target == ErrDurableBackpressure
 }
 
 type DurableJob struct {
@@ -58,6 +82,7 @@ type DurableJob struct {
 	CancelReason    string
 	LockOwner       string
 	LockUntil       time.Time
+	TimeoutAt       time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	StartedAt       time.Time
@@ -76,26 +101,47 @@ type DurableChildEvent struct {
 }
 
 type DurableLedgerStatus struct {
-	ReplayAvailable bool
-	Total           int
-	Waiting         int
-	Active          int
-	Stalled         int
-	CancelRequested int
+	ReplayAvailable    bool
+	Total              int
+	Waiting            int
+	Active             int
+	Claimed            int
+	Stalled            int
+	TimeoutScheduled   int
+	TimedOut           int
+	StaleWaiting       int
+	BackpressureDenied int
+	QueueFull          bool
+	MaxWaiting         int
+	CancelRequested    int
 }
 
 type DurableLedger struct {
-	db *sql.DB
+	db         *sql.DB
+	maxWaiting int
 }
 
 func NewDurableLedger(db *sql.DB) (*DurableLedger, error) {
+	return NewDurableLedgerWithOptions(db, DurableLedgerOptions{})
+}
+
+func NewDurableLedgerWithOptions(db *sql.DB, opts DurableLedgerOptions) (*DurableLedger, error) {
 	if db == nil {
 		return nil, errors.New("subagent: durable ledger db is nil")
+	}
+	if opts.MaxWaiting < 0 {
+		return nil, errors.New("subagent: durable ledger max waiting cannot be negative")
 	}
 	if _, err := db.Exec(durableLedgerSchema); err != nil {
 		return nil, fmt.Errorf("subagent: init durable ledger: %w", err)
 	}
-	return &DurableLedger{db: db}, nil
+	if err := durableLedgerMigrate(db); err != nil {
+		return nil, fmt.Errorf("subagent: migrate durable ledger: %w", err)
+	}
+	if _, err := db.Exec(durableLedgerPostMigrationSchema); err != nil {
+		return nil, fmt.Errorf("subagent: index durable ledger: %w", err)
+	}
+	return &DurableLedger{db: db, maxWaiting: opts.MaxWaiting}, nil
 }
 
 func (l *DurableLedger) Submit(ctx context.Context, sub DurableJobSubmission) (DurableJob, error) {
@@ -120,6 +166,30 @@ func (l *DurableLedger) Submit(ctx context.Context, sub DurableJobSubmission) (D
 		return DurableJob{}, err
 	}
 	defer tx.Rollback()
+
+	maxWaiting := sub.MaxWaiting
+	if maxWaiting <= 0 {
+		maxWaiting = l.maxWaiting
+	}
+	if maxWaiting > 0 {
+		waiting, err := durableCountWaiting(ctx, tx)
+		if err != nil {
+			return DurableJob{}, err
+		}
+		if waiting >= maxWaiting {
+			if err := durableInsertBackpressureEvent(ctx, tx, id, sub.Kind, waiting, maxWaiting); err != nil {
+				return DurableJob{}, err
+			}
+			if err := tx.Commit(); err != nil {
+				return DurableJob{}, err
+			}
+			return DurableJob{}, DurableBackpressureError{
+				JobID:      id,
+				Waiting:    waiting,
+				MaxWaiting: maxWaiting,
+			}
+		}
+	}
 
 	parentID := strings.TrimSpace(sub.ParentID)
 	depth := sub.Depth
@@ -355,6 +425,7 @@ func (l *DurableLedger) Status(ctx context.Context) (DurableLedgerStatus, error)
 		return DurableLedgerStatus{}, errors.New("subagent: durable ledger is nil")
 	}
 	st := DurableLedgerStatus{ReplayAvailable: true}
+	st.MaxWaiting = l.maxWaiting
 	rows, err := l.db.QueryContext(ctx, `
 		SELECT status, COUNT(*)
 		FROM durable_jobs
@@ -375,6 +446,7 @@ func (l *DurableLedger) Status(ctx context.Context) (DurableLedgerStatus, error)
 			st.Waiting = n
 		case DurableJobActive:
 			st.Active = n
+			st.Claimed = n
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -384,9 +456,25 @@ func (l *DurableLedger) Status(ctx context.Context) (DurableLedgerStatus, error)
 		SELECT COUNT(*) FROM durable_jobs
 		WHERE status = ? AND lock_until IS NOT NULL AND lock_until < ?`,
 		DurableJobActive, durableNow()).Scan(&st.Stalled)
+	now := durableNow()
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM durable_jobs
+		WHERE timeout_at IS NOT NULL`).Scan(&st.TimeoutScheduled)
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM durable_jobs
+		WHERE status = ? AND timeout_at IS NOT NULL AND timeout_at < ?`,
+		DurableJobActive, now).Scan(&st.TimedOut)
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM durable_jobs
+		WHERE status = ? AND created_at < ?`,
+		DurableJobWaiting, now-int64(durableStaleWaitingAfter)).Scan(&st.StaleWaiting)
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM durable_job_events
+		WHERE type = 'backpressure_denied'`).Scan(&st.BackpressureDenied)
 	_ = l.db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM durable_jobs
 		WHERE cancel_requested = 1`).Scan(&st.CancelRequested)
+	st.QueueFull = st.MaxWaiting > 0 && st.Waiting >= st.MaxWaiting
 	return st, nil
 }
 
@@ -449,11 +537,11 @@ func durableGet(ctx context.Context, q durableQuerier, id string) (DurableJob, e
 	var progress, result string
 	var cancelRequested int
 	var created, updated int64
-	var started, finished, lockUntil sql.NullInt64
+	var started, finished, lockUntil, timeoutAt sql.NullInt64
 	err := q.QueryRowContext(ctx, durableJobSelectSQL+` WHERE id = ?`, id).Scan(
 		&j.ID, &j.Kind, &j.Status, &j.ParentID, &j.Depth, &progress, &result,
 		&j.ErrorText, &cancelRequested, &j.CancelReason, &j.LockOwner,
-		&lockUntil, &created, &updated, &started, &finished,
+		&lockUntil, &timeoutAt, &created, &updated, &started, &finished,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return DurableJob{}, ErrDurableJobNotFound
@@ -467,6 +555,7 @@ func durableGet(ctx context.Context, q durableQuerier, id string) (DurableJob, e
 	j.CreatedAt = durableTime(created)
 	j.UpdatedAt = durableTime(updated)
 	j.LockUntil = durableNullTime(lockUntil)
+	j.TimeoutAt = durableNullTime(timeoutAt)
 	j.StartedAt = durableNullTime(started)
 	j.FinishedAt = durableNullTime(finished)
 	return j, nil
@@ -478,14 +567,15 @@ func durableClaimJob(ctx context.Context, tx *sql.Tx, id string, claim DurableCl
 		return DurableJob{}, false, errors.New("subagent: worker id is empty")
 	}
 	lockUntil := durableLockUntil(claim.LockUntil)
+	timeoutAt := durableClaimTimeoutAt(claim, now)
 	res, err := tx.ExecContext(ctx, `
 		UPDATE durable_jobs
-		SET status = ?, lock_owner = ?, lock_until = ?,
+		SET status = ?, lock_owner = ?, lock_until = ?, timeout_at = ?,
 		    started_at = COALESCE(started_at, ?), updated_at = ?
 		WHERE id = ? AND cancel_requested = 0 AND (
 			status = ? OR (status = ? AND lock_until IS NOT NULL AND lock_until < ?)
 		)`,
-		DurableJobActive, workerID, lockUntil, now, now, id,
+		DurableJobActive, workerID, lockUntil, timeoutAt, now, now, id,
 		DurableJobWaiting, DurableJobActive, now)
 	if err != nil {
 		return DurableJob{}, false, err
@@ -520,6 +610,34 @@ func durableClaimSelectSQL(kinds []WorkKind, now int64) (string, []any) {
 	}
 	b.WriteString(` ORDER BY created_at, id LIMIT 1`)
 	return b.String(), args
+}
+
+func durableCountWaiting(ctx context.Context, q durableQuerier) (int, error) {
+	var waiting int
+	err := q.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM durable_jobs
+		WHERE status = ?`, DurableJobWaiting).Scan(&waiting)
+	return waiting, err
+}
+
+func durableInsertBackpressureEvent(ctx context.Context, tx *sql.Tx, id string, kind WorkKind, waiting, maxWaiting int) error {
+	payload := map[string]any{
+		"type":          "backpressure_denied",
+		"job_id":        id,
+		"job_kind":      string(kind),
+		"waiting_count": waiting,
+		"max_waiting":   maxWaiting,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO durable_job_events
+			(job_id, type, job_kind, payload_json, created_at)
+		VALUES (?, 'backpressure_denied', ?, ?, ?)`,
+		id, kind, string(raw), durableNow())
+	return err
 }
 
 func durableInsertChildEvent(ctx context.Context, tx *sql.Tx, job DurableJob, outcome DurableChildOutcome, errorText string) error {
@@ -584,6 +702,16 @@ func durableLockUntil(t time.Time) int64 {
 	return t.UTC().UnixNano()
 }
 
+func durableClaimTimeoutAt(claim DurableClaim, now int64) any {
+	if !claim.TimeoutAt.IsZero() {
+		return claim.TimeoutAt.UTC().UnixNano()
+	}
+	if claim.Timeout > 0 {
+		return durableTime(now).Add(claim.Timeout).UnixNano()
+	}
+	return nil
+}
+
 func durableNow() int64 {
 	return time.Now().UTC().UnixNano()
 }
@@ -613,7 +741,7 @@ func validDurableKind(kind WorkKind) bool {
 
 const durableJobSelectSQL = `
 	SELECT id, kind, status, parent_id, depth, progress_json, result_json,
-	       error_text, cancel_requested, cancel_reason, lock_owner, lock_until,
+	       error_text, cancel_requested, cancel_reason, lock_owner, lock_until, timeout_at,
 	       created_at, updated_at, started_at, finished_at
 	FROM durable_jobs`
 
@@ -631,6 +759,7 @@ CREATE TABLE IF NOT EXISTS durable_jobs (
 	cancel_reason    TEXT    NOT NULL DEFAULT '',
 	lock_owner       TEXT    NOT NULL DEFAULT '',
 	lock_until       INTEGER,
+	timeout_at       INTEGER,
 	created_at       INTEGER NOT NULL,
 	updated_at       INTEGER NOT NULL,
 	started_at       INTEGER,
@@ -655,3 +784,39 @@ CREATE TABLE IF NOT EXISTS durable_job_events (
 CREATE INDEX IF NOT EXISTS idx_durable_job_events_job
 	ON durable_job_events(job_id, id);
 `
+
+const durableLedgerPostMigrationSchema = `
+CREATE INDEX IF NOT EXISTS idx_durable_jobs_timeout
+	ON durable_jobs(status, timeout_at);
+CREATE INDEX IF NOT EXISTS idx_durable_job_events_type
+	ON durable_job_events(type, created_at);
+`
+
+func durableLedgerMigrate(db *sql.DB) error {
+	return durableEnsureColumn(db, "durable_jobs", "timeout_at", "INTEGER")
+}
+
+func durableEnsureColumn(db *sql.DB, table, column, spec string) error {
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, columnType string
+		var notNull, pk int
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + column + ` ` + spec)
+	return err
+}
