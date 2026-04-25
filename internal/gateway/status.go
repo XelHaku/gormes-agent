@@ -57,6 +57,7 @@ type RuntimeStatus struct {
 	ResumePending             []RuntimeResumePendingEvidence             `json:"resume_pending,omitempty"`
 	NonResumable              []RuntimeNonResumableEvidence              `json:"non_resumable,omitempty"`
 	ExpiryFinalized           []RuntimeExpiryFinalizedEvidence           `json:"expiry_finalized,omitempty"`
+	ExpiryFinalize            []RuntimeExpiryFinalizeEvidence            `json:"expiry_finalize,omitempty"`
 	TakeoverMarkers           []RuntimeRestartTakeoverEvidence           `json:"takeover_marker_seen,omitempty"`
 	DuplicateRestarts         []RuntimeRestartDuplicateEvidence          `json:"duplicate_restart_suppressed,omitempty"`
 	ServiceManagerUnavailable []RuntimeServiceManagerUnavailableEvidence `json:"service_manager_unavailable,omitempty"`
@@ -146,6 +147,18 @@ type RuntimeExpiryFinalizedEvidence struct {
 	MigratedMemoryFlushed bool   `json:"migrated_memory_flushed,omitempty"`
 }
 
+type RuntimeExpiryFinalizeEvidence struct {
+	SessionKey string `json:"session_key,omitempty"`
+	SessionID  string `json:"session_id,omitempty"`
+	Source     string `json:"source,omitempty"`
+	ChatID     string `json:"chat_id,omitempty"`
+	UserID     string `json:"user_id,omitempty"`
+	Status     string `json:"status,omitempty"`
+	Attempts   int    `json:"attempts"`
+	Error      string `json:"error,omitempty"`
+	At         string `json:"at,omitempty"`
+}
+
 type RestartTakeoverMarkerStatus string
 
 const (
@@ -209,6 +222,7 @@ type RuntimeStatusUpdate struct {
 	ResumePendingEvidence             *RuntimeResumePendingEvidence
 	NonResumableEvidence              *RuntimeNonResumableEvidence
 	ExpiryFinalizedEvidence           *RuntimeExpiryFinalizedEvidence
+	ExpiryFinalizeEvidence            *RuntimeExpiryFinalizeEvidence
 	TokenLockEvidence                 *TokenLockEvidence
 	TakeoverMarkerEvidence            *RuntimeRestartTakeoverEvidence
 	DuplicateRestartEvidence          *RuntimeRestartDuplicateEvidence
@@ -532,6 +546,10 @@ func (s *RuntimeStatusStore) merge(status *RuntimeStatus, update RuntimeStatusUp
 	if update.ExpiryFinalizedEvidence != nil {
 		evidence := *update.ExpiryFinalizedEvidence
 		status.ExpiryFinalized = append(status.ExpiryFinalized, evidence)
+	}
+	if update.ExpiryFinalizeEvidence != nil {
+		evidence := *update.ExpiryFinalizeEvidence
+		status.ExpiryFinalize = append(status.ExpiryFinalize, evidence)
 	}
 	if update.TokenLockEvidence != nil {
 		evidence := *update.TokenLockEvidence
