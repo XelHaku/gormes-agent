@@ -1,66 +1,46 @@
 {{define "index"}}
 <section id="top" class="hero">
   <div class="hero-inner">
-    <p class="kicker">{{.HeroKicker}}</p>
-    <h1 class="hero-title">{{.HeroHeadline}}</h1>
-    <div class="hero-subhead">
-      {{range .HeroSubheadLines}}<p class="hero-subhead-line">{{.}}</p>{{end}}
+    <div class="hero-content">
+      <p class="kicker">{{.HeroKicker}}</p>
+      <h1 class="hero-title">{{.HeroHeadline}}</h1>
+      <div class="hero-subhead">
+        {{range .HeroLines}}<p>{{.}}</p>{{end}}
+      </div>
+      <p class="hero-note">{{.HeroFilterLine}}</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="{{.PrimaryCTA.Href}}">{{.PrimaryCTA.Label}}</a>
+        <a class="btn btn-secondary" href="{{.SecondaryCTA.Href}}">{{.SecondaryCTA.Label}}</a>
+      </div>
     </div>
-    <p class="hero-filter">
-      <span class="hero-filter-stamp">{{.HeroFilterStamp}}</span>
-      <span class="hero-filter-body">{{.HeroFilterLine}}</span>
-    </p>
-    <div class="hero-ctas">
-      <a class="btn btn-primary" href="{{.PrimaryCTA.Href}}">{{.PrimaryCTA.Label}}</a>
-      <a class="btn btn-ghost" href="{{.SecondaryCTA.Href}}">{{.SecondaryCTA.Label}}</a>
-    </div>
-    <p class="hero-status">{{.HeroStatusLine}}</p>
   </div>
 </section>
 
 <section id="install" class="install">
   <div class="install-inner">
+    <div class="install-header">
+      <p class="kicker">INSTALL</p>
+      <h2 class="section-title">Source-backed installers. One managed checkout.</h2>
+    </div>
     <div class="install-grid">
       {{range .InstallSteps}}{{template "install_step" .}}{{end}}
     </div>
     <p class="install-footnote">{{.InstallFootnote}} <a href="{{.InstallFootnoteHref}}">{{.InstallFootnoteLink}}</a></p>
-    <p class="docs-note">{{.DocsNote}} <a href="{{.DocsLinkHref}}">{{.DocsLinkLabel}}</a></p>
   </div>
 </section>
 
 <section id="why" class="why">
   <div class="why-inner">
     <p class="kicker">{{.WhyLabel}}</p>
-
-    <div class="why-manifesto">
-      <p class="why-manifesto-line">{{.WhyManifestoLine}}</p>
-      <p class="why-manifesto-intro">{{.WhyManifestoIntro}}</p>
-      <ul class="why-manifesto-list">
-        {{range .WhyManifestoBullets}}<li>{{.}}</li>{{end}}
-      </ul>
-    </div>
-
-    <div class="why-pain">
-      <p class="why-pain-kicker">{{.WhyPainKicker}}</p>
-      <h2 class="section-title why-pain-headline">{{.WhyPainHeadline}}</h2>
+    <h2 class="section-title">{{.WhyPainHeadline}}</h2>
+    <div class="pain-block">
+      <p>Hermes breaks in production because:</p>
       <ul class="why-pain-list">
         {{range .WhyPainBullets}}<li>{{.}}</li>{{end}}
       </ul>
     </div>
-
-    <h3 class="why-fix-subhead">{{.WhyFixSubhead}}</h3>
     <div class="features-grid">
       {{range .FeatureCards}}{{template "feature_card" .}}{{end}}
-    </div>
-  </div>
-</section>
-
-<section id="audience" class="audience">
-  <div class="audience-inner">
-    <p class="kicker">{{.AudienceLabel}}</p>
-    <h2 class="section-title">{{.AudienceHeadline}}</h2>
-    <div class="audience-grid">
-      {{range .AudienceCards}}{{template "audience_card" .}}{{end}}
     </div>
   </div>
 </section>

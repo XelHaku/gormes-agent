@@ -1,34 +1,29 @@
-/* gormes.ai — operator's manual meets editorial quarterly.
-   Fraunces (variable serif) for display, JetBrains Mono for technical
-   surfaces, DM Sans for body. Amber accent, dark bed, paper grain. */
+/* gormes.ai landing - serious runtime hierarchy. */
 
 :root {
   --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
 
-  --bg-0: #0a0d11;
-  --bg-1: #121720;
-  --bg-2: #1a1f29;
-  --border: #1e232e;
-  --border-strong: #2a3140;
+  --bg-0: #090b0f;
+  --bg-1: #10141b;
+  --bg-2: #161b24;
+  --border: #232935;
+  --border-strong: #343d4d;
 
-  --text: #ebe9e2;
-  --muted: rgba(235, 233, 226, 0.62);
-  --muted-strong: rgba(235, 233, 226, 0.80);
-  --label: rgba(235, 233, 226, 0.48);
+  --text: #eeece5;
+  --muted: rgba(238, 236, 229, 0.62);
+  --muted-strong: rgba(238, 236, 229, 0.80);
+  --label: rgba(238, 236, 229, 0.48);
 
-  --accent: #e8c547;
-  --accent-hover: #f0d66c;
-  --accent-ink: #1a1300;
+  --accent: #f0c84b;
+  --accent-hover: #ffd968;
+  --accent-ink: #171000;
+  --danger: #df6f67;
 
-  --status-shipped-bg: #0e3b21;
   --status-shipped-fg: #5be79a;
-  --status-progress-bg: #0e2b3b;
   --status-progress-fg: #5bc7e7;
-  --status-next-bg: #3b2c0e;
   --status-next-fg: #e7c25b;
-  --status-later-bg: #1f2434;
   --status-later-fg: #8a99c7;
 
   --max-width: 880px;
@@ -37,7 +32,8 @@
 
 * { box-sizing: border-box; }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   background: var(--bg-0);
@@ -50,25 +46,31 @@ html, body {
   font-feature-settings: 'kern', 'liga', 'calt';
 }
 
-/* Paper grain. Inline SVG noise, barely-visible overlay, pointer-events
-   pass-through. Uses soft-light blend so it warms the surface without
-   touching saturation. */
 .grain {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 100;
-  opacity: 0.05;
+  opacity: 0.035;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
-a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s ease, color 0.15s ease; }
-a:hover { color: var(--accent-hover); border-bottom-color: currentColor; }
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+a:hover {
+  color: var(--accent-hover);
+  border-bottom-color: currentColor;
+}
 
 a:focus-visible,
 .btn:focus-visible,
-.copy-btn:focus-visible {
+.copy-btn:focus-visible,
+.roadmap-details-summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 2px;
@@ -81,201 +83,188 @@ a:focus-visible,
   padding-right: env(safe-area-inset-right);
 }
 
-/* ── Topbar ────────────────────────────────────────────────────────── */
-.topbar { border-bottom: 1px solid var(--border); }
+.topbar {
+  border-bottom: 1px solid var(--border);
+}
 .topbar-inner {
   padding: 18px var(--pad);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 .brand {
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: 22px;
-  font-variation-settings: "opsz" 144, "SOFT" 0;
-  letter-spacing: -0.01em;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 20px;
   color: var(--text);
   border: none;
 }
-.brand:hover { color: var(--accent); border: none; }
+.brand:hover {
+  color: var(--accent);
+  border: none;
+}
 .topnav {
   display: flex;
-  gap: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 18px;
   align-items: center;
 }
 .topnav a {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
   color: var(--muted);
-  margin-left: 24px;
   border: none;
   padding: 4px 0;
 }
-.topnav a:hover { color: var(--text); border: none; }
+.topnav a:hover {
+  color: var(--text);
+  border: none;
+}
 
-/* ── Kickers & section titles ──────────────────────────────────────── */
 .kicker {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.22em;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
   color: var(--label);
-  margin: 0 0 20px;
+  margin: 0 0 18px;
   text-transform: uppercase;
 }
 
-/* Section titles sit a clear step below the hero (Fraunces 60+) so
-   they don't compete: DM Sans, 22px, weight 600, slight muted-strong
-   tint. Hero leads, sections support. */
 .section-title {
   font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 22px;
-  line-height: 1.2;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.12;
   margin: 0 0 24px;
-  color: var(--muted-strong);
+  color: var(--text);
+  overflow-wrap: break-word;
 }
 
-/* ── Hero ──────────────────────────────────────────────────────────── */
-/* Editorial typography lane: Fraunces *only* on the hero title and the
-   brand wordmark. Everything else (section titles, card titles, body)
-   uses DM Sans. Mono is reserved for kickers, code, and CTAs. */
+.hero {
+  border-bottom: 1px solid var(--border);
+}
 .hero-inner {
-  padding: 96px var(--pad) 72px;
-  display: block;
-  max-width: 720px;
+  padding: 76px var(--pad) 58px;
+}
+.hero-content {
+  max-width: 680px;
+  min-width: 0;
 }
 .hero-title {
   font-family: var(--font-display);
   font-weight: 900;
-  font-size: clamp(40px, 8vw, 64px);
-  line-height: 0.96;
-  letter-spacing: -0.028em;
-  margin: 0 0 28px;
+  font-size: clamp(38px, 8vw, 66px);
+  line-height: 0.98;
+  margin: 0 0 24px;
   overflow-wrap: break-word;
-  font-variation-settings: "opsz" 144, "SOFT" 30;
+  font-variation-settings: "opsz" 144, "SOFT" 18;
   color: var(--text);
 }
 .hero-subhead {
-  margin: 0 0 22px;
-  max-width: 620px;
+  margin: 0 0 16px;
+  max-width: 560px;
 }
-.hero-subhead-line {
+.hero-subhead p {
   font-size: 17px;
-  color: var(--text);
-  line-height: 1.5;
+  color: var(--muted-strong);
   margin: 0 0 8px;
+  line-height: 1.48;
   overflow-wrap: break-word;
 }
-.hero-subhead-line:last-child { margin-bottom: 0; }
-.hero-subhead-line:nth-child(2) { color: var(--muted-strong); }
-.hero-subhead-line:nth-child(3) { color: var(--muted-strong); font-size: 15.5px; }
-
-/* Filter line: "EARLY-STAGE." reads as a positioning stamp (accent
-   color, uppercase, mono caps); the audience caveat below it stays
-   muted. Two lines so "Early-stage" lands as identity, not disclaimer. */
-.hero-filter {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin: 0 0 32px;
-  max-width: 620px;
-  line-height: 1.55;
-  border-left: 2px solid var(--accent);
-  padding: 6px 0 6px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.hero-filter-stamp {
-  color: var(--accent);
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  font-size: 11px;
-}
-.hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0 0 28px; }
-.hero-status {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--label);
-  margin: 0;
-  max-width: 620px;
+.hero-note {
+  font-size: 13px;
+  color: var(--muted-strong);
+  margin: 22px 0 30px;
+  max-width: 520px;
   line-height: 1.5;
+  border-left: 2px solid var(--accent);
+  background: var(--bg-1);
+  padding: 12px 14px;
+}
+.hero-ctas {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-/* Buttons. Primary is the dominant CTA — filled accent, larger
-   padding, stronger weight. Ghost (formerly secondary) is a subtle
-   outline-less link with muted color so it sits below the primary in
-   the visual hierarchy. */
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  border-radius: 3px;
+  justify-content: center;
+  border-radius: 2px;
   border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: var(--font-body);
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+}
+.btn:hover {
+  transform: translateY(-1px);
+  border-bottom: 1px solid transparent;
 }
 .btn-primary {
   background: var(--accent);
   color: var(--accent-ink);
   font-size: 13px;
-  padding: 14px 26px;
+  padding: 14px 24px;
 }
-.btn-primary:hover { background: var(--accent-hover); color: var(--accent-ink); }
-.btn-ghost {
-  background: transparent;
-  color: var(--muted);
-  font-size: 11px;
-  padding: 10px 4px;
-  letter-spacing: 0.16em;
-  border-bottom: 1px solid transparent;
+.btn-primary:hover {
+  background: var(--accent-hover);
+  color: var(--accent-ink);
 }
-.btn-ghost:hover { color: var(--accent); border-bottom-color: var(--accent); }
-/* Legacy secondary class — still rendered by the .btn-secondary
-   selector elsewhere (e.g. cached pages) until the deploy lands. */
 .btn-secondary {
   background: transparent;
-  color: var(--muted);
-  font-size: 11px;
-  padding: 10px 4px;
+  color: var(--muted-strong);
+  border-color: var(--border-strong);
+  font-size: 12px;
+  padding: 10px 16px;
 }
-.btn-secondary:hover { color: var(--accent); }
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
-/* ── Install ───────────────────────────────────────────────────────── */
-.install { border-top: 2px solid var(--border-strong); }
-.install-inner { padding: 44px var(--pad); }
-.install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.install {
+  border-bottom: 1px solid var(--border);
+}
+.install-inner {
+  padding: 50px var(--pad);
+}
+.install-header {
+  max-width: 560px;
+  margin-bottom: 24px;
+}
+.install-grid {
+  display: grid;
+  gap: 16px;
+}
 .install-step {
-  display: flex;
-  flex-direction: column;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 16px;
+  display: grid;
   gap: 10px;
   min-width: 0;
 }
 .install-step .kicker {
   margin: 0;
   color: var(--accent);
-  font-weight: 700;
 }
 
-.cmd-wrap { position: relative; min-width: 0; }
+.cmd-wrap {
+  position: relative;
+  min-width: 0;
+}
 .cmd {
   background: var(--bg-1);
-  border: 1px solid var(--border);
-  padding: 16px 92px 16px 16px;
-  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  padding: 15px 92px 15px 15px;
+  border-radius: 2px;
   font-family: var(--font-mono);
   font-size: 12.5px;
   margin: 0;
@@ -284,7 +273,10 @@ a:focus-visible,
   overflow-x: auto;
   color: var(--text);
 }
-.cmd code { color: var(--text); }
+.cmd code {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
 
 .copy-btn {
   position: absolute;
@@ -293,13 +285,12 @@ a:focus-visible,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: transparent;
+  background: var(--bg-2);
   border: 1px solid var(--border-strong);
-  color: var(--muted);
+  color: var(--muted-strong);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 6px 10px;
   border-radius: 2px;
@@ -307,348 +298,276 @@ a:focus-visible,
   min-height: 32px;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
-.copy-btn.copied {
-  background: var(--status-shipped-bg);
-  color: var(--status-shipped-fg);
-  border-color: var(--status-shipped-bg);
+.copy-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
-.copy-btn svg { display: block; }
-.copy-label { line-height: 1; }
+.copy-btn.copied {
+  background: rgba(91, 231, 154, 0.12);
+  color: var(--status-shipped-fg);
+  border-color: rgba(91, 231, 154, 0.4);
+}
+.copy-btn svg {
+  display: block;
+}
+.copy-label {
+  line-height: 1;
+}
 
 .install-footnote {
   font-size: 13px;
   color: var(--muted-strong);
-  margin: 24px 0 0;
-  font-family: var(--font-mono);
-  letter-spacing: 0.01em;
-  overflow-wrap: break-word;
-  padding: 12px 14px;
+  margin: 20px 0 0;
+  line-height: 1.5;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
   background: var(--bg-1);
-  border-left: 2px solid var(--accent);
-}
-.install-footnote a { color: var(--accent); font-weight: 700; }
-.docs-note {
-  font-size: 12px;
-  color: var(--label);
-  margin: 14px 0 0;
-  font-family: var(--font-mono);
-  letter-spacing: 0.01em;
+  border-radius: 2px;
   overflow-wrap: break-word;
 }
-.docs-note a { color: var(--accent); }
 
-/* ── Why Gormes ────────────────────────────────────────────────────── */
-.why { border-top: 2px solid var(--border-strong); }
-.why-inner { padding: 64px var(--pad); }
-
-.why-manifesto {
+.why {
+  border-bottom: 1px solid var(--border);
+}
+.why-inner {
+  padding: 58px var(--pad);
+}
+.pain-block {
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  padding: 22px 24px 24px;
-  border-radius: 0;
+  border-left: 3px solid var(--danger);
   background: var(--bg-1);
-  margin: 18px 0 44px;
+  border-radius: 2px;
+  padding: 18px 20px;
+  margin: 0 0 20px;
 }
-.why-manifesto-line {
-  font-family: var(--font-body);
-  font-size: 21px;
+.pain-block p {
   font-weight: 700;
-  letter-spacing: -0.015em;
-  line-height: 1.2;
-  margin: 0 0 16px;
   color: var(--text);
-}
-.why-manifesto-intro {
-  font-size: 14.5px;
-  color: var(--muted-strong);
-  margin: 0 0 14px;
-  line-height: 1.5;
-  font-weight: 500;
-}
-.why-manifesto-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 8px;
-}
-.why-manifesto-list li {
-  font-size: 14.5px;
-  color: var(--text);
-  line-height: 1.5;
-  padding-left: 22px;
-  position: relative;
-  font-weight: 500;
-}
-.why-manifesto-list li::before {
-  content: '✓';
-  color: var(--accent);
-  position: absolute;
-  left: 0;
-  font-weight: 700;
-}
-
-/* Pain block — distinct visual treatment from the fix cards. Red-accent
-   left rule + slightly darker bg + ⚠ kicker so it reads as the
-   emotional spike before the solution, not "more cards". Tighter
-   typography than the manifesto so it feels compressed/intense. */
-.why-pain {
-  border: 1px solid var(--border);
-  border-left: 3px solid #d77;
-  background: var(--bg-2);
-  padding: 18px 22px 22px;
-  border-radius: 0;
-  margin: 0 0 44px;
-}
-.why-pain-kicker {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #e89999;
   margin: 0 0 10px;
-}
-.why-pain-headline {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.25;
-  margin: 0 0 12px;
 }
 .why-pain-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 .why-pain-list li {
   font-size: 14px;
   color: var(--muted-strong);
-  line-height: 1.55;
-  padding-left: 22px;
+  line-height: 1.5;
+  padding-left: 18px;
   position: relative;
 }
 .why-pain-list li::before {
-  content: '✗';
-  color: #d77;
+  content: '-';
+  color: var(--danger);
   position: absolute;
   left: 0;
   font-weight: 700;
 }
 
-.why-fix-subhead {
-  font-family: var(--font-body);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.005em;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0 0 18px;
-  color: var(--accent);
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
-
-.features-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-/* Cards: brutal/technical, not soft-marketing. No glow, no hover lift,
-   sharp corners, tight padding, strong title:body weight contrast. */
 .feature-card {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-top: 2px solid var(--accent);
-  padding: 20px 22px;
-  border-radius: 0;
+  padding: 18px 18px 20px;
+  border-radius: 2px;
   min-width: 0;
   position: relative;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 16px;
+  width: 36px;
+  height: 1px;
+  background: var(--accent);
+}
+.feature-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 .feature-card h3 {
   font-family: var(--font-body);
-  margin: 0 0 8px;
-  font-size: 15px;
+  margin: 0 0 10px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.005em;
   overflow-wrap: break-word;
   color: var(--text);
-  text-transform: none;
+}
+.feature-card h3::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 1px;
+  margin-top: 10px;
+  background: var(--border);
 }
 .feature-card p {
   margin: 0;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--muted-strong);
   line-height: 1.55;
   overflow-wrap: break-word;
 }
 
-/* ── Audience ──────────────────────────────────────────────────────── */
-.audience { border-top: 2px solid var(--border-strong); }
-.audience-inner { padding: 64px var(--pad); }
-.audience-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-top: 18px;
+.roadmap {
+  border-bottom: 1px solid var(--border);
 }
-.audience-card {
-  background: var(--bg-1);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--border-strong);
-  padding: 20px 22px;
-  border-radius: 0;
+.roadmap-inner {
+  padding: 58px var(--pad);
 }
-.audience-card-title {
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 14.5px;
-  margin: 0 0 8px;
-  color: var(--text);
-  letter-spacing: -0.005em;
-}
-.audience-card-body {
-  font-size: 13px;
-  color: var(--muted-strong);
-  line-height: 1.55;
-  margin: 0;
-}
-
-/* ── Roadmap ───────────────────────────────────────────────────────── */
-.roadmap { border-top: 2px solid var(--border-strong); }
-.roadmap-inner { padding: 64px var(--pad); }
-
 .roadmap-summary {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 20px;
-  margin: 18px 0 28px;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 0 0 22px;
 }
 .roadmap-summary-block {
   background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 22px 24px;
+  border-radius: 2px;
+  padding: 18px 20px;
 }
 .roadmap-summary-heading {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  letter-spacing: 0.08em;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
-  color: var(--muted);
-  margin: 0 0 12px;
+  color: var(--label);
+  margin: 0 0 10px;
 }
 .roadmap-summary-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
-.roadmap-summary-list li {
+.roadmap-summary-list li,
+.roadmap-summary-milestone {
   font-size: 14px;
   color: var(--muted-strong);
-  line-height: 1.55;
+  line-height: 1.5;
+  margin: 0;
+}
+.roadmap-summary-list li {
   padding-left: 16px;
   position: relative;
 }
 .roadmap-summary-list li::before {
-  content: '→';
+  content: '-';
   color: var(--accent);
   position: absolute;
   left: 0;
-}
-.roadmap-summary-milestone {
-  font-size: 14.5px;
-  color: var(--text);
-  line-height: 1.55;
-  margin: 0;
+  font-weight: 700;
 }
 
 .roadmap-details {
   margin: 0 0 18px;
 }
 .roadmap-details-summary {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-family: var(--font-body);
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   color: var(--accent);
   cursor: pointer;
-  padding: 16px 20px;
+  padding: 14px 16px;
   background: var(--bg-1);
-  border: 1px solid var(--accent);
-  border-radius: 0;
+  border: 1px solid rgba(240, 200, 75, 0.45);
+  border-radius: 2px;
   list-style: none;
   user-select: none;
-  transition: background 0.15s ease, color 0.15s ease;
-  text-align: center;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
-.roadmap-details-summary:hover {
-  background: var(--accent);
-  color: var(--accent-ink);
+.roadmap-details-summary::-webkit-details-marker {
+  display: none;
 }
-.roadmap-details-summary::-webkit-details-marker { display: none; }
 .roadmap-details-summary::before {
-  content: '▸ ';
+  content: '+';
   display: inline-block;
-  margin-right: 6px;
-  transition: transform 0.2s ease;
+  width: 16px;
+  color: var(--muted);
 }
 .roadmap-details[open] .roadmap-details-summary::before {
-  content: '▾ ';
+  content: '-';
+}
+.roadmap-details-summary:hover {
+  border-color: var(--border-strong);
+  color: var(--accent-hover);
 }
 .roadmap-details[open] .roadmap-details-summary {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
+  border-color: var(--border-strong);
 }
 
-.roadmap-phases { display: grid; gap: 16px; }
-
+.roadmap-phases {
+  display: grid;
+  gap: 12px;
+}
 .roadmap-phase {
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-left: 3px solid var(--border-strong);
-  border-radius: 4px;
-  padding: 22px 24px 24px;
+  border-radius: 2px;
+  padding: 18px 20px 20px;
   min-width: 0;
-  transition: border-left-color 0.2s ease;
 }
-.roadmap-phase:has(.roadmap-status-shipped)  { border-left-color: var(--status-shipped-fg); }
-.roadmap-phase:has(.roadmap-status-progress) { border-left-color: var(--status-progress-fg); }
-.roadmap-phase:has(.roadmap-status-planned)  { border-left-color: var(--status-next-fg); }
-.roadmap-phase:has(.roadmap-status-later)    { border-left-color: var(--status-later-fg); }
-
+.roadmap-phase:has(.roadmap-status-shipped) {
+  border-left-color: var(--status-shipped-fg);
+}
+.roadmap-phase:has(.roadmap-status-progress) {
+  border-left-color: var(--status-progress-fg);
+}
+.roadmap-phase:has(.roadmap-status-planned) {
+  border-left-color: var(--status-next-fg);
+}
+.roadmap-phase:has(.roadmap-status-later) {
+  border-left-color: var(--status-later-fg);
+}
 .roadmap-phase-header {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px 14px;
-  margin-bottom: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px dashed var(--border);
+  gap: 10px 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
-
-/* Stamp-style status pill — outline, monospace, letter-spaced. */
 .roadmap-status {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 10px;
   font-weight: 700;
-  padding: 4px 10px;
+  padding: 4px 9px;
   border-radius: 2px;
-  letter-spacing: 0.14em;
   flex-shrink: 0;
   white-space: nowrap;
   border: 1px solid currentColor;
   background: transparent;
 }
-.roadmap-status-shipped  { color: var(--status-shipped-fg); }
-.roadmap-status-progress { color: var(--status-progress-fg); }
-.roadmap-status-planned  { color: var(--status-next-fg); }
-.roadmap-status-later    { color: var(--status-later-fg); }
-
+.roadmap-status-shipped {
+  color: var(--status-shipped-fg);
+}
+.roadmap-status-progress {
+  color: var(--status-progress-fg);
+}
+.roadmap-status-planned {
+  color: var(--status-next-fg);
+}
+.roadmap-status-later {
+  color: var(--status-later-fg);
+}
 .roadmap-title {
   font-family: var(--font-body);
   font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.01em;
   margin: 0;
   color: var(--text);
   overflow-wrap: break-word;
@@ -658,122 +577,144 @@ a:focus-visible,
   font-size: 13px;
   color: var(--muted-strong);
   margin: 0;
-  line-height: 1.55;
-  font-style: italic;
+  line-height: 1.5;
   overflow-wrap: break-word;
 }
-
 .roadmap-items {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 .roadmap-item {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  gap: 10px;
+  font-size: 12.5px;
   color: var(--muted-strong);
-  line-height: 1.6;
+  line-height: 1.5;
   min-width: 0;
 }
 .roadmap-icon {
   flex-shrink: 0;
   width: 16px;
   text-align: center;
-  line-height: 1.6;
+  line-height: 1.5;
 }
-.roadmap-item-shipped .roadmap-icon { color: var(--status-shipped-fg); }
-.roadmap-item-pending .roadmap-icon { color: var(--muted); }
-.roadmap-item-ongoing .roadmap-icon { color: var(--status-next-fg); }
+.roadmap-item-shipped .roadmap-icon {
+  color: var(--status-shipped-fg);
+}
+.roadmap-item-pending .roadmap-icon {
+  color: var(--muted);
+}
+.roadmap-item-ongoing .roadmap-icon {
+  color: var(--status-next-fg);
+}
 .roadmap-label {
   min-width: 0;
   flex: 1;
   overflow-wrap: anywhere;
 }
+.roadmap-footer {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
 
-/* ── Footer ────────────────────────────────────────────────────────── */
-.footer { border-top: 2px solid var(--border-strong); }
+.footer {
+  border-bottom: 1px solid transparent;
+}
 .footer-inner {
-  padding: 36px var(--pad) 28px;
+  padding: 26px var(--pad);
   display: flex;
-  flex-direction: column;
-  gap: 18px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
 }
 .footer-nav {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 0;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 .footer-nav a {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-  border: none;
-  padding: 4px 16px 4px 0;
-  margin-right: 16px;
-  position: relative;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-strong);
+  border-bottom-color: rgba(240, 200, 75, 0.35);
 }
-.footer-nav a + a::before {
-  content: '·';
-  position: absolute;
-  left: -18px;
-  color: var(--label);
-  font-weight: 400;
-}
-.footer-nav a:hover { color: var(--text); border: none; }
 .footer-meta {
   display: flex;
-  justify-content: space-between;
-  gap: 14px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
   flex-wrap: wrap;
-  border-top: 1px solid var(--border);
-  padding-top: 14px;
 }
 .footer p {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--label);
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
 }
 
-/* ── Responsive ────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .install-grid { grid-template-columns: 1fr; }
-  .features-grid { grid-template-columns: 1fr; }
-  .audience-grid { grid-template-columns: 1fr; }
-  .roadmap-summary { grid-template-columns: 1fr; }
-  .topnav a { margin-left: 14px; }
-  .footer-inner { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .topbar-inner {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 14px var(--pad);
+  }
+  .topnav {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 14px;
+  }
+  .hero-inner {
+    padding: 54px var(--pad) 42px;
+  }
+  .hero-title {
+    font-size: clamp(34px, 13vw, 46px);
+  }
+  .hero-subhead p {
+    font-size: 16px;
+  }
+  .hero-ctas .btn-primary {
+    flex: 1 1 100%;
+  }
+  .install-inner,
+  .why-inner,
+  .roadmap-inner {
+    padding: 42px var(--pad);
+  }
+  .features-grid,
+  .roadmap-summary {
+    grid-template-columns: 1fr;
+  }
+  .footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .footer-meta {
+    justify-content: flex-start;
+  }
 }
 
-@media (max-width: 480px) {
-  .topbar-inner { flex-wrap: wrap; gap: 10px 0; padding: 14px var(--pad); }
-  .topnav { flex-wrap: wrap; gap: 4px 14px; }
-  .topnav a { margin-left: 0; }
-  .cmd { padding-right: 80px; }
-  .hero-inner { padding: 64px var(--pad) 48px; }
-  .hero-title { font-size: clamp(34px, 9vw, 44px); }
-  .hero-subhead-line { font-size: 16px; }
-  .why-inner { padding: 52px var(--pad); }
-  .audience-inner { padding: 52px var(--pad); }
-  .roadmap-inner { padding: 52px var(--pad); }
-  .hero-ctas { gap: 10px; }
-  .btn-primary { flex: 1 1 auto; justify-content: center; text-align: center; }
-  .roadmap-phase { padding: 18px 18px 20px; }
-  .footer-meta { flex-direction: column; gap: 6px; }
+@media (max-width: 420px) {
+  :root {
+    --pad: 22px;
+  }
+  .cmd {
+    padding-right: 82px;
+  }
+  .copy-btn {
+    padding: 6px 8px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     transition: none !important;
     animation-duration: 0.001ms !important;
   }

@@ -3,15 +3,37 @@ import { test, expect } from '@playwright/test';
 test('homepage renders the redesigned landing', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page).toHaveTitle('Gormes — One Go Binary. Same Hermes Brain.');
-  await expect(page.getByRole('heading', { name: 'One Go Binary. Same Hermes Brain.' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Why a Go layer matters.' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: "What ships now, what doesn't." })).toBeVisible();
+  await expect(page).toHaveTitle('Gormes — One Go Binary. No Python. No Drift.');
+  await expect(page.getByRole('heading', { name: 'One Go Binary. No Python. No Drift.' })).toBeVisible();
+  await expect(page.getByText('Gormes is a Go-native runtime for AI agents.')).toBeVisible();
+  await expect(page.getByText('Built to solve the operations problem')).toBeVisible();
+  await expect(page.getByText('One static binary. No virtualenvs. No dependency hell.')).toBeVisible();
+  await expect(page.getByText('Early-stage, reliability-first runtime.')).toBeVisible();
+  await expect(page.getByText('Built for developers who care about reliability over polish.')).toBeVisible();
+  await expect(page.locator('.topnav a')).toHaveText(['Install', 'Roadmap', 'GitHub']);
+  await expect(page.locator('.hero-image')).toHaveCount(0);
+  await expect(page.locator('img[src="/static/go-gopher-bear-lowpoly.png"]')).toHaveCount(0);
+  await expect(page.locator('.hero-ctas .btn-primary')).toHaveText('Install');
+  await expect(page.locator('.hero-ctas .btn-secondary')).toHaveText('View Source');
+  await expect(page.getByRole('heading', { name: 'Why Hermes breaks in production — and how Gormes fixes it.' })).toBeVisible();
+  await expect(page.getByText('Hermes breaks in production because:')).toBeVisible();
+  await expect(page.getByText('environments drift')).toBeVisible();
+  await expect(page.getByText('installs fail')).toBeVisible();
+  await expect(page.getByText('agents crash mid-run')).toBeVisible();
+  await expect(page.getByText('streams drop and lose work')).toBeVisible();
+  await expect(page.getByRole('heading', { name: "What works today, and what's still being wired up." })).toBeVisible();
+  await expect(page.getByText('Current focus')).toBeVisible();
+  await expect(page.getByText('Gateway stability')).toBeVisible();
+  await expect(page.getByText('Memory system')).toBeVisible();
+  await expect(page.getByText('Next milestone')).toBeVisible();
+  await expect(page.getByText('Full Go-native runtime, no Hermes')).toBeVisible();
   await expect(page.getByText('curl -fsSL https://gormes.ai/install.sh | sh')).toBeVisible();
   await expect(page.getByText('irm https://gormes.ai/install.ps1 | iex')).toBeVisible();
-  await expect(page.getByText('Rerun the installer to update the managed Gormes checkout.')).toBeVisible();
+  await expect(page.getByText('Source-backed for now')).toBeVisible();
+  await expect(page.getByText('Read the installer source →')).toBeVisible();
   await expect(page.getByText('Requires Hermes backend at localhost:8642.')).toHaveCount(0);
   await expect(page.getByText('Run Hermes Through a Go Operator Console.')).toHaveCount(0);
+  await expect(page.getByText('Deeper reference material lives at')).toHaveCount(0);
   await expect(page.locator('link[href="/static/site.css"]')).toHaveCount(1);
   // Copy buttons require a tiny inline clipboard script — bounded to install steps.
   // Three steps now: Unix install, Windows install, run.
@@ -34,22 +56,19 @@ for (const vp of MOBILE_VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'One Go Binary. Same Hermes Brain.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'One Go Binary. No Python. No Drift.' })).toBeVisible();
     await expect(page.getByText('curl -fsSL https://gormes.ai/install.sh | sh')).toBeVisible();
 
     const heroLayout = await page.evaluate(() => {
       const content = document.querySelector('.hero-content')?.getBoundingClientRect();
-      const image = document.querySelector('.hero-image')?.getBoundingClientRect();
+      const title = document.querySelector('.hero-title')?.getBoundingClientRect();
       return {
         contentWidth: content?.width ?? 0,
-        contentBottom: content?.bottom ?? 0,
-        imageTop: image?.top ?? 0,
+        titleWidth: title?.width ?? 0,
       };
     });
     expect(heroLayout.contentWidth, `hero content collapsed at ${vp.width}px`).toBeGreaterThan(vp.width * 0.6);
-    expect(heroLayout.imageTop, `hero image should stack below copy at ${vp.width}px`).toBeGreaterThanOrEqual(
-      heroLayout.contentBottom - 1,
-    );
+    expect(heroLayout.titleWidth, `hero title too wide at ${vp.width}px`).toBeLessThanOrEqual(vp.width);
 
     // The page itself must never generate a horizontal scrollbar. Long code
     // blocks get their own scroll inside .cmd via overflow-x: auto.
@@ -74,7 +93,7 @@ for (const vp of MOBILE_VIEWPORTS) {
       expect(box.width, `copy button ${i} too narrow at ${vp.width}px`).toBeGreaterThanOrEqual(28);
     }
 
-    // The roadmap has 6 phase groups with expanded sub-items. No phase
+    // The roadmap has 7 phase groups under a single disclosure. No phase
     // card or roadmap item should overflow its container on any mobile
     // viewport — long sub-item labels (4.A Provider adapters has ~100
     // chars, Phase 5 collapsed row has ~200 chars) must wrap cleanly.
@@ -88,7 +107,9 @@ for (const vp of MOBILE_VIEWPORTS) {
     });
     expect(overflowingNodes, 'roadmap nodes overflow their container').toHaveLength(0);
 
-    // All six phase groups must be visible.
-    await expect(page.locator('.roadmap-phase')).toHaveCount(6);
+    // All seven phase groups are present in the generated roadmap, but the
+    // full checklist starts collapsed so mobile users get a clear entry point.
+    await expect(page.locator('.roadmap-phase')).toHaveCount(7);
+    await expect(page.locator('.roadmap-details')).not.toHaveAttribute('open', '');
   });
 }

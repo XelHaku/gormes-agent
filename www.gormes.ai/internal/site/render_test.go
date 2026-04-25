@@ -15,73 +15,55 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 
 	text := string(body)
 	wants := []string{
-		// Hero — multi-line subhead (3 punchy lines), filter line for
-		// audience self-selection, status line tucked below CTAs as
-		// tertiary, no hero illustration.
-		"OPEN SOURCE · MIT",
+		// Hero — serious infrastructure framing with short mobile lines.
+		"OPEN SOURCE · MIT LICENSE",
 		"UNDER CONSTRUCTION",
 		"One Go Binary. No Python. No Drift.",
-		`class="hero-subhead-line"`,
 		"Gormes is a Go-native runtime for AI agents.",
-		"Built to solve the operations problem — not the AI problem.",
+		"Built to solve the operations problem",
 		"One static binary. No virtualenvs. No dependency hell.",
-		`class="hero-filter"`,
-		`class="hero-filter-stamp"`,
-		"Early-stage.",
+		"Early-stage, reliability-first runtime.",
 		"Built for developers who care about reliability over polish.",
-		`class="hero-status"`,
-		"Hermes is no longer required. The full Go runtime is still under active construction.",
-		// CTA hierarchy — primary dominant, ghost secondary.
-		`class="btn btn-primary"`,
-		`class="btn btn-ghost"`,
-		// Install — footnote rewritten for clarity (prebuilt binary,
-		// source-backed installer is temporary).
+		`class="hero-note"`,
+		// Trimmed primary nav.
+		`<a href="#install">Install</a>`,
+		`<a href="#roadmap">Roadmap</a>`,
+		`<a href="https://github.com/TrebuchetDynamics/gormes-agent">GitHub</a>`,
+		// Install — clearer structure and promoted source-backed note.
+		"INSTALL",
+		"Source-backed installers. One managed checkout.",
 		"1. UNIX / MACOS / TERMUX",
 		"curl -fsSL https://gormes.ai/install.sh | sh",
 		"2. WINDOWS POWERSHELL",
 		"irm https://gormes.ai/install.ps1 | iex",
 		"3. RUN",
-		"Installs a prebuilt static binary",
-		"Source-backed installer is temporary during early development →",
+		"Source-backed for now",
+		"Read the installer source →",
 		// Copy button (clipboard JS is allowed for this widget only)
 		`class="copy-btn"`,
 		"navigator.clipboard.writeText",
-		// Why Gormes — manifesto + pain frame + fix cards under one section.
-		`id="why"`,
+		// Features — pain frame before technical cards.
 		"WHY GORMES",
-		"Gormes is not about smarter agents.",
-		"It&#39;s about agents that:",
-		`class="why-manifesto-intro"`,
-		"don&#39;t fail to install.",
-		"don&#39;t crash after six hours.",
-		`class="why-pain-kicker"`,
-		"⚠ THE PROBLEM",
-		"Why Hermes-stack agents break in production.",
-		"Python environments drift between dev, staging, and prod.",
-		"SSE streams drop on flaky networks and kill long-running agents.",
-		"How Gormes fixes it.",
+		"Why Hermes breaks in production — and how Gormes fixes it.",
+		"Hermes breaks in production because:",
+		"environments drift",
+		"installs fail",
+		"agents crash mid-run",
+		"streams drop and lose work",
 		"Single Static Binary",
 		"No Runtime Drift",
 		"Streams That Don&#39;t Drop",
 		"Local Validation",
 		"Route-B reconnect treats SSE drops",
 		"gormes doctor --offline",
-		// Audience filter — "Who Gormes is for" personas.
-		`id="audience"`,
-		"WHO GORMES IS FOR",
-		"Operators of long-running agents",
-		"Developers tired of Python/Nix/npm breakage",
-		"Builders who want one binary that just runs",
-		// Roadmap section — summary block (current focus + next milestone)
-		// up top, full phase checklist behind a <details> disclosure.
+		// Roadmap section — summary block first, full generated checklist collapsed.
 		"BUILD STATE",
 		"What works today, and what&#39;s still being wired up.",
 		"Current focus",
-		"Next milestone",
 		"Gateway stability",
 		"Memory system",
-		"Brain transplant",
-		"Fully independent Go-native brain",
+		"Next milestone",
+		"Full Go-native runtime, no Hermes",
 		`<details class="roadmap-details">`,
 		"View full phase-by-phase checklist",
 		// Fuzzy phase-title presence (each phase renders)
@@ -98,17 +80,12 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		"roadmap-item-shipped",
 		// Structural class anchors
 		"roadmap-phase",
-		// Footer — brand text + license. Footer-nav now carries the
-		// secondary links (Why Gormes, Who it's for, Docs, Company) so
-		// the topnav can stay minimal (Install / Roadmap / GitHub).
+		// Footer — brand text + company anchor + license
 		`Gormes v0.1.0 · <a href="https://trebuchetdynamics.com/">TrebuchetDynamics</a>`,
-		"MIT License · 2026",
-		`class="footer-nav"`,
-		`<a href="https://trebuchetdynamics.com/">Company</a>`,
+		`<nav class="footer-nav" aria-label="Secondary">`,
 		`<a href="https://docs.gormes.ai/">Docs</a>`,
-		// In-page note pointing at the Hugo docs site
-		"Deeper reference material lives at",
-		`<a href="https://docs.gormes.ai/">docs.gormes.ai →</a>`,
+		`<a href="https://trebuchetdynamics.com/">Company</a>`,
+		"MIT License · 2026",
 		// CSS link
 		`href="/static/site.css"`,
 		// Favicons — full set wired into <head>.
@@ -128,6 +105,8 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		`name="twitter:image" content="https://gormes.ai/static/social-card.png"`,
 	}
 	rejects := []string{
+		`<div class="hero-image">`,
+		`go-gopher-bear-lowpoly.png`,
 		"Run Hermes Through a Go Operator Console.",
 		"Hermes, In a Single Static Binary.",
 		"Requires Hermes backend at localhost:8642.",
@@ -147,33 +126,13 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		"Boots Like a Tool",
 		"In-Process Tool Loop",
 		"Survives Dropped Streams",
-		// Operations-first rewrite that buried the "what is Gormes for"
-		// answer behind lineage detail. Replaced with "Go-native runtime
-		// for AI agents" framing.
+		// Older revisions that buried the first-screen hierarchy.
 		"Gormes is a Go-native rewrite of Hermes Agent — built to solve the operations problem, not the AI problem.",
-		"Why Hermes breaks in production — and how Gormes fixes it.",
+		"Gormes is a Go-native runtime for AI agents — built to fix",
+		"Why Hermes-stack agents break in production.",
 		"Rerun the installer to update the managed Gormes checkout.",
 		"Source-backed for now →",
 		"not production-ready yet",
-		// v2 single-paragraph subhead replaced by 3-line stack.
-		"Gormes is a Go-native runtime for AI agents — built to fix the reliability and deployment problems",
-		// Hero illustration removed in v3 — assert the gopher PNG and
-		// the .hero-image / .hero-content flex wrappers no longer ship.
-		`alt="Gormes Gopher"`,
-		"go-gopher-bear-lowpoly.png",
-		`class="hero-image"`,
-		`class="hero-content"`,
-		`class="btn-secondary"`,
-		// v3 manifesto bullets had a repetitive "It's about agents that"
-		// stem on every line. v4 collapses to one intro line + clean bullets.
-		"It&#39;s about agents that don&#39;t fail to install.",
-		"It&#39;s about agents that don&#39;t drift between environments.",
-		"It&#39;s about agents that don&#39;t crash after six hours.",
-		"It&#39;s about agents that don&#39;t lose work on dropped connections.",
-		// v3 "Early-stage. Built for developers..." was one line; v4
-		// splits it into a stamp + body so "Early-stage" lands as
-		// positioning rather than disclaimer.
-		"Early-stage. Built for developers who care about reliability over polish.",
 		// Obsolete single-row ledger copy replaced by grouped roadmap
 		"Phase 3 — SQLite + FTS5 transcript memory.",
 		"Phase 3.A–C — SQLite + FTS5 lattice, ontological graph, neural recall.",
@@ -214,7 +173,6 @@ func TestEmbeddedTemplates_ArePresentAndParse(t *testing.T) {
 		"templates/index.tmpl",
 		"templates/partials/install_step.tmpl",
 		"templates/partials/feature_card.tmpl",
-		"templates/partials/audience_card.tmpl",
 		"templates/partials/roadmap_phase.tmpl",
 	}
 
@@ -233,7 +191,7 @@ func TestEmbeddedTemplates_ArePresentAndParse(t *testing.T) {
 		t.Fatalf("parseTemplates: %v", err)
 	}
 
-	for _, want := range []string{"layout", "index", "install_step", "feature_card", "audience_card", "roadmap_phase"} {
+	for _, want := range []string{"layout", "index", "install_step", "feature_card", "roadmap_phase"} {
 		if templates.Lookup(want) == nil {
 			t.Fatalf("parsed templates missing %q", want)
 		}
