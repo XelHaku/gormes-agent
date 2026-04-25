@@ -7,13 +7,13 @@
       <div class="hero-subhead">
         {{range .HeroLines}}<p>{{.}}</p>{{end}}
       </div>
-      <div class="hero-ctas">
-        <a class="btn btn-primary" href="{{.PrimaryCTA.Href}}">{{.PrimaryCTA.Label}}</a>
-        <a class="btn btn-secondary" href="{{.SecondaryCTA.Href}}">{{.SecondaryCTA.Label}}</a>
-      </div>
       <div class="hero-note">
         <span class="hero-note-stamp">{{.HeroFilterStamp}}</span>
         <span class="hero-note-body">{{.HeroFilterLine}}</span>
+      </div>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="{{.PrimaryCTA.Href}}">{{.PrimaryCTA.Label}}</a>
+        <a class="btn btn-secondary" href="{{.SecondaryCTA.Href}}">{{.SecondaryCTA.Label}}</a>
       </div>
     </div>
   </div>

@@ -174,8 +174,8 @@ a:focus-visible,
   pointer-events: none;
   z-index: 0;
   background-image:
-    linear-gradient(to right, rgba(238, 236, 229, 0.10) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(238, 236, 229, 0.10) 1px, transparent 1px);
+    linear-gradient(to right, rgba(238, 236, 229, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(238, 236, 229, 0.07) 1px, transparent 1px);
   background-size: 32px 32px;
   -webkit-mask-image: linear-gradient(to right, transparent 50%, black 100%);
           mask-image: linear-gradient(to right, transparent 50%, black 100%);
@@ -253,15 +253,12 @@ a:focus-visible,
 }
 .hero-subhead p:nth-child(2) { color: var(--muted-strong); }
 .hero-subhead p:nth-child(3) { color: var(--muted); }
-/* "Early-stage." stamp reads as positioning identity (mono caps,
-   accent color); the caveat body underneath stays muted. Two-line
-   stack so the stamp lands as a label, not a sentence opener.
-   v12 moved the stamp BELOW the CTA row in the DOM, so the mobile
-   first-screen target (headline → subhead → CTAs) is a complete
-   unit. The stamp scrolls in below — never half-visible. Margin
-   moved from bottom to top accordingly. */
+/* "Early-stage." stamp sits between subhead and CTAs: claim →
+   qualifier → action. The qualifier reads before the user
+   commits to the action below. Margin lives at the bottom now
+   so the gap-to-CTA is owned by this block. */
 .hero-note {
-  margin: 28px 0 0;
+  margin: 0 0 24px;
   max-width: 560px;
   border-left: 2px solid var(--accent);
   background: var(--bg-1);
@@ -284,13 +281,13 @@ a:focus-visible,
   color: var(--muted-strong);
 }
 .hero-ctas {
-  /* CTAs sit directly below the subhead — primary fold close.
-     The early-stage stamp (.hero-note) follows below with its
-     own top margin so the buttons aren't visually attached to it. */
+  /* INSTALL + VIEW SOURCE form a tighter pair — narrower gap so
+     the secondary link reads as attached to the button, not a
+     detached afterthought below it. */
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
@@ -316,9 +313,9 @@ a:focus-visible,
 .btn-primary {
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 14px;
+  font-size: 13.5px;
   letter-spacing: 0.10em;
-  padding: 16px 32px;
+  padding: 14px 28px;
   /* 1px inner highlight + 1px inner shadow gives the button a
      subtle embossed depth without the SaaS-y drop shadow. */
   box-shadow:
@@ -865,14 +862,9 @@ a:focus-visible,
     font-size: 16px;
   }
   .hero-note {
-    /* v12 places .hero-note BELOW .hero-ctas in the DOM. Mobile
-       margin-top is enough to push it cleanly below the fold so
-       it never gets clipped — the user always sees either none of
-       the stamp or all of it on first paint. */
-    margin-top: 22px;
-  }
-  .hero-ctas .btn-primary {
-    flex: 1 1 100%;
+    /* Tighter bottom gap on mobile so the qualifier sits closer to
+       the CTAs it precedes. */
+    margin-bottom: 18px;
   }
   .install-inner,
   .why-inner,
