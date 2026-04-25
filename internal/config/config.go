@@ -219,6 +219,95 @@ type InputCfg struct {
 	MaxLines int `toml:"max_lines"`
 }
 
+type InferenceValueSource string
+
+const (
+	InferenceValueSourceUnset  InferenceValueSource = "unset"
+	InferenceValueSourceFlag   InferenceValueSource = "flag"
+	InferenceValueSourceEnv    InferenceValueSource = "env"
+	InferenceValueSourceConfig InferenceValueSource = "config"
+)
+
+type OneshotInferenceRequest struct {
+	Config       Config
+	ModelFlag    string
+	ProviderFlag string
+	LookupEnv    func(string) (string, bool)
+}
+
+type OneshotInferenceResolution struct {
+	Model                      string
+	ModelSource                InferenceValueSource
+	Provider                   string
+	ProviderSource             InferenceValueSource
+	ProviderAutoDetectRequired bool
+}
+
+// ResolveOneshotInference applies the Hermes-compatible one-shot precedence:
+// flag > GORMES_INFERENCE_* env > config defaults. A provider override without
+// a flag/env model is rejected so a stale configured model is not silently
+// paired with a different provider.
+func ResolveOneshotInference(req OneshotInferenceRequest) (OneshotInferenceResolution, error) {
+	lookupEnv := req.LookupEnv
+	if lookupEnv == nil {
+		lookupEnv = os.LookupEnv
+	}
+
+	model, modelSource := firstInferenceValue(
+		inferenceCandidate{value: req.ModelFlag, source: InferenceValueSourceFlag},
+		inferenceCandidate{value: lookupInferenceEnv(lookupEnv, "GORMES_INFERENCE_MODEL"), source: InferenceValueSourceEnv},
+		inferenceCandidate{value: req.Config.Hermes.Model, source: InferenceValueSourceConfig},
+	)
+	provider, providerSource := firstInferenceValue(
+		inferenceCandidate{value: req.ProviderFlag, source: InferenceValueSourceFlag},
+		inferenceCandidate{value: lookupInferenceEnv(lookupEnv, "GORMES_INFERENCE_PROVIDER"), source: InferenceValueSourceEnv},
+	)
+
+	resolution := OneshotInferenceResolution{
+		Model:          model,
+		ModelSource:    modelSource,
+		Provider:       provider,
+		ProviderSource: providerSource,
+	}
+	explicitModel := modelSource == InferenceValueSourceFlag || modelSource == InferenceValueSourceEnv
+	explicitProvider := providerSource == InferenceValueSourceFlag || providerSource == InferenceValueSourceEnv
+	if explicitProvider && !explicitModel {
+		return resolution, oneshotProviderRequiresExplicitModelError(providerSource)
+	}
+	resolution.ProviderAutoDetectRequired = explicitModel && providerSource == InferenceValueSourceUnset
+	return resolution, nil
+}
+
+type inferenceCandidate struct {
+	value  string
+	source InferenceValueSource
+}
+
+func firstInferenceValue(candidates ...inferenceCandidate) (string, InferenceValueSource) {
+	for _, candidate := range candidates {
+		value := strings.TrimSpace(candidate.value)
+		if value != "" {
+			return value, candidate.source
+		}
+	}
+	return "", InferenceValueSourceUnset
+}
+
+func lookupInferenceEnv(lookup func(string) (string, bool), name string) string {
+	value, ok := lookup(name)
+	if !ok {
+		return ""
+	}
+	return value
+}
+
+func oneshotProviderRequiresExplicitModelError(source InferenceValueSource) error {
+	if source == InferenceValueSourceEnv {
+		return fmt.Errorf("gormes -z: GORMES_INFERENCE_PROVIDER requires --model or GORMES_INFERENCE_MODEL. Set both inference env vars, pass both flags, or neither to use your configured defaults")
+	}
+	return fmt.Errorf("gormes -z: --provider requires --model (or GORMES_INFERENCE_MODEL). Pass both explicitly, or neither to use your configured defaults.")
+}
+
 // Load resolves configuration from (in precedence order) CLI flags, env vars,
 // a TOML file at $XDG_CONFIG_HOME/gormes/config.toml, and built-in defaults.
 // Pass os.Args[1:] as args; pass nil to skip flag parsing entirely (useful in tests).

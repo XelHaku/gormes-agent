@@ -6316,9 +6316,9 @@
             {
               "name": "Top-level oneshot flag and model/provider resolver",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes accepts a top-level `-z/--oneshot` prompt plus `--model`, `--provider`, GORMES_INFERENCE_MODEL, and GORMES_INFERENCE_PROVIDER overrides with Hermes-compatible ambiguity errors before any agent execution starts",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [

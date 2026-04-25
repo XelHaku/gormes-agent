@@ -40,17 +40,84 @@ func main() {
 }
 
 func newRootCommand() *cobra.Command {
+	return newRootCommandWithRuntime(rootRuntime{
+		runTUI:     runTUI,
+		runOneshot: runResolvedOneshot,
+	})
+}
+
+type rootRuntime struct {
+	runTUI     func(*cobra.Command, []string) error
+	runOneshot func(*cobra.Command, oneshotInvocation) error
+}
+
+type oneshotInvocation struct {
+	Prompt    string
+	Inference config.OneshotInferenceResolution
+}
+
+func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
+	if runtime.runTUI == nil {
+		runtime.runTUI = runTUI
+	}
+	if runtime.runOneshot == nil {
+		runtime.runOneshot = runResolvedOneshot
+	}
 	resetGonchoDoctorFlags()
 	root := &cobra.Command{
 		Use:          "gormes",
 		Short:        "Go frontend for Hermes Agent",
 		SilenceUsage: true,
-		RunE:         runTUI,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runRootCommand(cmd, args, runtime)
+		},
 	}
+	root.Flags().StringP("oneshot", "z", "", "one-shot mode: send a single prompt and resolve model/provider selection without starting the TUI")
+	root.Flags().StringP("model", "m", "", "model override for -z/--oneshot; also settable via GORMES_INFERENCE_MODEL")
+	root.Flags().String("provider", "", "provider override for -z/--oneshot; also settable via GORMES_INFERENCE_PROVIDER")
 	root.Flags().Bool("offline", false, "skip startup api_server health check (dev only — turns the TUI into a cosmetic smoke-tester)")
 	root.Flags().String("resume", "", "override persisted session_id for the TUI's default key")
 	root.AddCommand(doctorCmd, versionCmd, telegramCmd, gatewayCmd, sessionCmd, memoryCmd, gonchoCmd)
 	return root
+}
+
+func runRootCommand(cmd *cobra.Command, args []string, runtime rootRuntime) error {
+	if cmd.Flags().Changed("oneshot") {
+		invocation, err := resolveOneshotInvocation(cmd)
+		if err != nil {
+			return err
+		}
+		return runtime.runOneshot(cmd, invocation)
+	}
+	return runtime.runTUI(cmd, args)
+}
+
+func resolveOneshotInvocation(cmd *cobra.Command) (oneshotInvocation, error) {
+	prompt, _ := cmd.Flags().GetString("oneshot")
+	modelFlag, _ := cmd.Flags().GetString("model")
+	providerFlag, _ := cmd.Flags().GetString("provider")
+
+	cfg, err := config.Load(nil)
+	if err != nil {
+		return oneshotInvocation{Prompt: prompt}, err
+	}
+	resolution, err := config.ResolveOneshotInference(config.OneshotInferenceRequest{
+		Config:       cfg,
+		ModelFlag:    modelFlag,
+		ProviderFlag: providerFlag,
+	})
+	invocation := oneshotInvocation{
+		Prompt:    prompt,
+		Inference: resolution,
+	}
+	if err != nil {
+		return invocation, newExitCodeError(2, err)
+	}
+	return invocation, nil
+}
+
+func runResolvedOneshot(_ *cobra.Command, _ oneshotInvocation) error {
+	return nil
 }
 
 func runTUI(cmd *cobra.Command, _ []string) error {
