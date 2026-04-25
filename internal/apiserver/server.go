@@ -622,18 +622,21 @@ func nullableString(s string) any {
 
 func stringPtr(s string) *string { return &s }
 
-func writeSSEData(w http.ResponseWriter, body any) {
+func writeSSEData(w http.ResponseWriter, body any) error {
 	raw, _ := json.Marshal(body)
-	_, _ = fmt.Fprintf(w, "data: %s\n\n", raw)
+	_, err := fmt.Fprintf(w, "data: %s\n\n", raw)
+	return err
 }
 
-func writeSSEEvent(w http.ResponseWriter, event string, body any) {
+func writeSSEEvent(w http.ResponseWriter, event string, body any) error {
 	raw, _ := json.Marshal(body)
-	_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, raw)
+	_, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, raw)
+	return err
 }
 
-func writeSSEDone(w http.ResponseWriter) {
-	_, _ = io.WriteString(w, "data: [DONE]\n\n")
+func writeSSEDone(w http.ResponseWriter) error {
+	_, err := io.WriteString(w, "data: [DONE]\n\n")
+	return err
 }
 
 func flush(w http.ResponseWriter) {

@@ -1,7 +1,9 @@
 package apiserver
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -38,6 +40,13 @@ func (s *Server) handleResponses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	responseID := "resp_" + randomHexFromTime(s.now())
+	created := s.now().Unix()
+	if boolField(req, "stream", false) {
+		s.writeStreamingResponse(w, r, responseID, created, turnReq, responseContext)
+		return
+	}
+
 	result, err := s.loop.RunTurn(r.Context(), turnReq)
 	if err != nil {
 		writeOpenAIError(w, http.StatusInternalServerError, "Internal server error: "+err.Error(), "server_error", "", "turn_failed")
@@ -51,8 +60,7 @@ func (s *Server) handleResponses(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Hermes-Session-Id", sessionID)
 	}
 
-	responseID := "resp_" + randomHexFromTime(s.now())
-	response := responseObjectFromTurn(responseID, s.now().Unix(), turnReq.Model, result)
+	response := responseObjectFromTurn(responseID, created, turnReq.Model, result)
 	if responseContext.store {
 		fullHistory := append([]ChatMessage(nil), responseContext.historyForStorage...)
 		fullHistory = append(fullHistory, responseMessagesForStorage(result)...)
@@ -74,6 +82,142 @@ func (s *Server) handleResponses(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) writeStreamingResponse(w http.ResponseWriter, r *http.Request, responseID string, created int64, turnReq TurnRequest, responseContext responseTurnContext) {
+	sessionID := turnReq.SessionID
+	if sessionID != "" {
+		w.Header().Set("X-Hermes-Session-Id", sessionID)
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	streamCtx, cancelStream := context.WithCancel(r.Context())
+	defer cancelStream()
+
+	var (
+		partialText strings.Builder
+		writeErr    error
+	)
+	persist := func(response ResponseObject, history []ChatMessage, snapshotSessionID string) error {
+		if snapshotSessionID == "" {
+			snapshotSessionID = sessionID
+		}
+		return s.persistResponseSnapshot(responseID, response, responseContext, history, snapshotSessionID)
+	}
+	persistIncomplete := func(result TurnResult) {
+		text := partialText.String()
+		if text == "" {
+			text = result.Content
+		}
+		incomplete := responseObjectFromText(responseID, created, turnReq.Model, "incomplete", text, result.Usage)
+		_ = persist(incomplete, responseHistoryWithAssistant(responseContext.historyForStorage, text), sessionID)
+	}
+
+	createdResponse := responseObjectFromText(responseID, created, turnReq.Model, "in_progress", "", Usage{})
+	if err := writeSSEEvent(w, "response.created", map[string]any{
+		"type":     "response.created",
+		"response": createdResponse,
+	}); err != nil {
+		writeErr = err
+		cancelStream()
+		persistIncomplete(TurnResult{})
+		return
+	}
+	if err := persist(createdResponse, append([]ChatMessage(nil), responseContext.historyForStorage...), sessionID); err != nil {
+		_ = writeSSEEvent(w, "response.failed", map[string]any{
+			"type":  "response.failed",
+			"error": err.Error(),
+		})
+		flush(w)
+		return
+	}
+	flush(w)
+
+	result, err := s.loop.StreamTurn(streamCtx, turnReq, StreamCallbacks{
+		OnToken: func(token string) error {
+			if token == "" {
+				return nil
+			}
+			partialText.WriteString(token)
+			if err := writeSSEEvent(w, "response.output_text.delta", map[string]any{
+				"type":        "response.output_text.delta",
+				"response_id": responseID,
+				"delta":       token,
+			}); err != nil {
+				writeErr = err
+				cancelStream()
+				return err
+			}
+			flush(w)
+			return nil
+		},
+	})
+	if result.SessionID != "" {
+		sessionID = result.SessionID
+	}
+	if err != nil {
+		if writeErr != nil || errors.Is(err, context.Canceled) || streamCtx.Err() != nil || r.Context().Err() != nil {
+			persistIncomplete(result)
+			return
+		}
+		text := partialText.String()
+		if text == "" {
+			text = err.Error()
+		}
+		failed := responseObjectFromText(responseID, created, turnReq.Model, "failed", text, result.Usage)
+		_ = persist(failed, responseHistoryWithAssistant(responseContext.historyForStorage, text), sessionID)
+		_ = writeSSEEvent(w, "response.failed", map[string]any{
+			"type":     "response.failed",
+			"response": failed,
+		})
+		flush(w)
+		return
+	}
+
+	if result.SessionID == "" {
+		result.SessionID = sessionID
+	}
+	if result.Content == "" && len(result.Messages) == 0 && partialText.Len() > 0 {
+		result.Content = partialText.String()
+	}
+	completed := responseObjectFromTurn(responseID, created, turnReq.Model, result)
+	fullHistory := append([]ChatMessage(nil), responseContext.historyForStorage...)
+	fullHistory = append(fullHistory, responseMessagesForStorage(result)...)
+	if err := persist(completed, fullHistory, sessionID); err != nil {
+		_ = writeSSEEvent(w, "response.failed", map[string]any{
+			"type":  "response.failed",
+			"error": err.Error(),
+		})
+		flush(w)
+		return
+	}
+	_ = writeSSEEvent(w, "response.completed", map[string]any{
+		"type":     "response.completed",
+		"response": completed,
+	})
+	flush(w)
+}
+
+func (s *Server) persistResponseSnapshot(responseID string, response ResponseObject, responseContext responseTurnContext, history []ChatMessage, sessionID string) error {
+	if !responseContext.store {
+		return nil
+	}
+	stored := StoredResponse{
+		Response:            response,
+		ConversationHistory: append([]ChatMessage(nil), history...),
+		Instructions:        responseContext.instructions,
+		SessionID:           sessionID,
+	}
+	if err := s.responseStore.Put(responseID, stored); err != nil {
+		return err
+	}
+	if responseContext.conversation != "" {
+		return s.responseStore.SetConversation(responseContext.conversation, responseID)
+	}
+	return nil
 }
 
 func (s *Server) handleResponseByID(w http.ResponseWriter, r *http.Request) {
@@ -332,6 +476,26 @@ func parseToolCalls(raw any) []ToolCall {
 	return out
 }
 
+func responseObjectFromText(id string, created int64, model, status, text string, usage Usage) ResponseObject {
+	output := []ResponseOutputItem{}
+	if strings.TrimSpace(text) != "" {
+		output = append(output, responseMessageItem(text))
+	}
+	return ResponseObject{
+		ID:        id,
+		Object:    "response",
+		Status:    status,
+		CreatedAt: created,
+		Model:     model,
+		Output:    output,
+		Usage: ResponseUsage{
+			InputTokens:  usage.PromptTokens,
+			OutputTokens: usage.CompletionTokens,
+			TotalTokens:  usage.TotalTokens,
+		},
+	}
+}
+
 func responseObjectFromTurn(id string, created int64, model string, result TurnResult) ResponseObject {
 	return ResponseObject{
 		ID:        id,
@@ -401,6 +565,14 @@ func responseMessagesForStorage(result TurnResult) []ChatMessage {
 	return []ChatMessage{{Role: "assistant", Content: result.Content}}
 }
 
+func responseHistoryWithAssistant(base []ChatMessage, assistantText string) []ChatMessage {
+	history := append([]ChatMessage(nil), base...)
+	if strings.TrimSpace(assistantText) != "" {
+		history = append(history, ChatMessage{Role: "assistant", Content: assistantText})
+	}
+	return history
+}
+
 func firstUserContent(messages []ChatMessage) string {
 	for _, msg := range messages {
 		if msg.Role == "user" && strings.TrimSpace(msg.Content) != "" {
@@ -419,6 +591,18 @@ func stringField(body map[string]any, key string) string {
 		return strings.TrimSpace(s)
 	}
 	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func boolField(body map[string]any, key string, fallback bool) bool {
+	value, ok := body[key]
+	if !ok {
+		return fallback
+	}
+	b, ok := value.(bool)
+	if !ok {
+		return fallback
+	}
+	return b
 }
 
 func (s *Server) recordPreviousResponseMiss() {

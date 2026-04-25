@@ -3977,9 +3977,9 @@
             },
             {
               "name": "API server disconnect snapshot persistence",
-              "status": "planned",
+              "status": "complete",
               "contract": "Streaming disconnects and server cancellations persist incomplete Responses snapshots when store=true",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -4007,7 +4007,7 @@
                 "async cancellation stores the same incomplete snapshot before returning cancellation.",
                 "previous_response_id can continue from the incomplete snapshot without losing emitted text."
               ],
-              "note": "Upstream Hermes now persists incomplete Responses snapshots on client disconnect and asyncio cancellation. Keep this as a separate resilience slice after the stateful Responses store exists.",
+              "note": "Complete: TDD landed Responses stream snapshot persistence for response.created/in_progress, incomplete snapshots on client disconnect or request cancellation, failed/completed status separation, previous_response_id continuation from partial assistant text, and KernelTurnLoop cancellation propagation.",
               "write_scope": [
                 "internal/apiserver/",
                 "internal/kernel/",
@@ -4018,7 +4018,12 @@
               ],
               "done_signal": [
                 "Disconnect/cancellation fixtures prove store=true responses retain incomplete snapshots and interrupt running turns."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T07:03:39Z",
+                "last_success": "2026-04-25T07:03:39Z"
+              }
             },
             {
               "name": "Gateway proxy mode forwarding contract",

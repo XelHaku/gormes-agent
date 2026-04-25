@@ -67,6 +67,7 @@ func (l *KernelTurnLoop) run(ctx context.Context, req TurnRequest, onToken func(
 	for {
 		select {
 		case <-ctx.Done():
+			l.cancelActiveTurn()
 			return TurnResult{}, ctx.Err()
 		case f, ok := <-l.frames:
 			if !ok {
@@ -80,6 +81,7 @@ func (l *KernelTurnLoop) run(ctx context.Context, req TurnRequest, onToken func(
 			if onToken != nil && (f.Phase == kernel.PhaseStreaming || f.Phase == kernel.PhaseFinalizing || f.Phase == kernel.PhaseReconnecting) {
 				if delta := draftDelta(streamedDraft, f.DraftText); delta != "" {
 					if err := onToken(delta); err != nil {
+						l.cancelActiveTurn()
 						return TurnResult{}, err
 					}
 					streamedDraft = f.DraftText
@@ -100,6 +102,13 @@ func (l *KernelTurnLoop) run(ctx context.Context, req TurnRequest, onToken func(
 			}
 		}
 	}
+}
+
+func (l *KernelTurnLoop) cancelActiveTurn() {
+	if l == nil || l.kernel == nil {
+		return
+	}
+	_ = l.kernel.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventCancel})
 }
 
 func (l *KernelTurnLoop) drainPendingFrames() {

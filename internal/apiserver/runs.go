@@ -281,6 +281,7 @@ func (s *Server) runHealthStatus() map[string]any {
 	return s.runs.stats()
 }
 
-func writeSSEComment(w http.ResponseWriter, text string) {
-	_, _ = w.Write([]byte(": " + text + "\n\n"))
+func writeSSEComment(w http.ResponseWriter, text string) error {
+	_, err := w.Write([]byte(": " + text + "\n\n"))
+	return err
 }
