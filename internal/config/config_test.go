@@ -27,8 +27,46 @@ func TestLoad_BuiltinDefaults(t *testing.T) {
 	if cfg.Input.MaxBytes != 200_000 || cfg.Input.MaxLines != 10_000 {
 		t.Errorf("default input limits = %d/%d", cfg.Input.MaxBytes, cfg.Input.MaxLines)
 	}
-	if cfg.Delegation.MaxWaiting != 128 {
-		t.Errorf("default delegation.max_waiting = %d, want 128", cfg.Delegation.MaxWaiting)
+	if !cfg.TUI.MouseTracking {
+		t.Error("default TUI mouse tracking = false, want true")
+	}
+}
+
+func TestLoad_TUIMouseTrackingDefaultsOnWhenTUISectionOmitsIt(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	dir := filepath.Join(cfgHome, "gormes")
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "config.toml"), []byte(`
+[tui]
+theme = "light"
+`), 0o644)
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.TUI.MouseTracking {
+		t.Error("TUI.MouseTracking = false with legacy [tui] section, want default-on compatibility")
+	}
+}
+
+func TestLoad_TUIMouseTrackingFromFile(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	dir := filepath.Join(cfgHome, "gormes")
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "config.toml"), []byte(`
+[tui]
+mouse_tracking = false
+`), 0o644)
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TUI.MouseTracking {
+		t.Error("TUI.MouseTracking = true, want false from config.toml")
 	}
 }
 

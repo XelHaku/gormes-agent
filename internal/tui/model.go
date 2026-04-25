@@ -22,6 +22,12 @@ type Submitter func(text string)
 // Canceller is the callback wired by main.go to send PlatformEventCancel.
 type Canceller func()
 
+// Options carries local TUI settings that do not belong to kernel state.
+type Options struct {
+	MouseTracking bool
+	MouseModeCmd  func(enabled bool) tea.Cmd
+}
+
 // Model is the Bubble Tea state. The only external dependency is the
 // read-side of the render channel (from kernel.Render()). Everything else
 // is local UI state.
@@ -38,21 +44,34 @@ type Model struct {
 	submit   Submitter
 	cancel   Canceller
 	inFlight bool // true between a user submit and the next PhaseIdle frame
+
+	mouseTracking bool
+	mouseModeCmd  func(enabled bool) tea.Cmd
+	statusMessage string
 }
 
 // NewModel constructs the Bubble Tea model. frames is the kernel's Render()
 // channel; submit/cancel are closures from main.go that forward to
 // kernel.Submit with the appropriate PlatformEvent kind.
 func NewModel(frames <-chan kernel.RenderFrame, submit Submitter, cancel Canceller) Model {
+	return NewModelWithOptions(frames, submit, cancel, Options{MouseTracking: true})
+}
+
+// NewModelWithOptions constructs the Bubble Tea model with explicit local TUI
+// options. cmd/gormes seeds these from config; tests can inject MouseModeCmd to
+// assert terminal mode changes without a real terminal.
+func NewModelWithOptions(frames <-chan kernel.RenderFrame, submit Submitter, cancel Canceller, opts Options) Model {
 	ta := textarea.New()
 	ta.Placeholder = "Type a message and hit Enter…"
 	ta.ShowLineNumbers = false
 	ta.Focus()
 	return Model{
-		editor: ta,
-		frames: frames,
-		submit: submit,
-		cancel: cancel,
+		editor:        ta,
+		frames:        frames,
+		submit:        submit,
+		cancel:        cancel,
+		mouseTracking: opts.MouseTracking,
+		mouseModeCmd:  opts.MouseModeCmd,
 	}
 }
 
@@ -77,5 +96,9 @@ func (m Model) waitFrame() tea.Cmd {
 // Init is the Bubble Tea entry point. We start the cursor blink and the
 // first render-frame wait in parallel.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.waitFrame())
+	cmds := []tea.Cmd{textarea.Blink, m.waitFrame()}
+	if !m.mouseTracking {
+		cmds = append(cmds, m.emitMouseModeCmd(false))
+	}
+	return tea.Batch(cmds...)
 }

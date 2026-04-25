@@ -207,7 +207,8 @@ type GatewayCfg struct {
 }
 
 type TUICfg struct {
-	Theme string `toml:"theme"`
+	Theme         string `toml:"theme"`
+	MouseTracking bool   `toml:"mouse_tracking"`
 }
 
 type InputCfg struct {
@@ -249,7 +250,7 @@ func defaults() Config {
 			Endpoint: "http://127.0.0.1:8642",
 			Model:    "hermes-agent",
 		},
-		TUI:   TUICfg{Theme: "dark"},
+		TUI:   TUICfg{Theme: "dark", MouseTracking: true},
 		Input: InputCfg{MaxBytes: 200_000, MaxLines: 10_000},
 		Telegram: TelegramCfg{
 			CoalesceMs:             1000,
@@ -374,6 +375,13 @@ func loadEnv(cfg *Config) error {
 	}
 	if v := strings.TrimSpace(os.Getenv("GATEWAY_PROXY_KEY")); v != "" {
 		cfg.Gateway.ProxyKey = v
+	}
+	if v := os.Getenv("GORMES_TUI_MOUSE_TRACKING"); v != "" {
+		parsed, err := parseEnvBool("GORMES_TUI_MOUSE_TRACKING", v)
+		if err != nil {
+			return err
+		}
+		cfg.TUI.MouseTracking = parsed
 	}
 	if v := os.Getenv("GORMES_TELEGRAM_TOKEN"); v != "" {
 		cfg.Telegram.BotToken = v

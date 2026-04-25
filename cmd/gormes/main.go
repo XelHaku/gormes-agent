@@ -154,8 +154,14 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 		_ = k.Submit(kernel.PlatformEvent{Kind: kernel.PlatformEventCancel})
 	}
 
-	model := tui.NewModel(hookedFrames, submit, cancelTurn)
-	prog := tea.NewProgram(model, tea.WithAltScreen())
+	model := tui.NewModelWithOptions(hookedFrames, submit, cancelTurn, tui.Options{
+		MouseTracking: cfg.TUI.MouseTracking,
+	})
+	programOptions := []tea.ProgramOption{tea.WithAltScreen()}
+	if cfg.TUI.MouseTracking {
+		programOptions = append(programOptions, tea.WithMouseAllMotion())
+	}
+	prog := tea.NewProgram(model, programOptions...)
 
 	// Signal → shutdown-budget force-exit watcher.
 	go func() {

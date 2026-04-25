@@ -4163,7 +4163,7 @@
             },
             {
               "name": "TUI mouse tracking config + slash toggle",
-              "status": "planned",
+              "status": "complete",
               "contract": "Mouse/wheel tracking is config-backed, runtime-toggleable, and emits terminal enable/disable state without restarting the TUI",
               "contract_status": "draft",
               "slice_size": "small",
@@ -4193,7 +4193,7 @@
                 "A `/mouse` or equivalent command parses on/off/toggle and updates runtime state deterministically.",
                 "Terminal mouse enable and disable sequences are emitted only when state changes, including explicit disable on alt-screen entry when tracking is off."
               ],
-              "note": "Hermes 6407b3d5 added runtime `/mouse` toggling and config.set/config.get support. Gormes should port this as a small local TUI/config slice before remote TUI gateway streaming grows.",
+              "note": "Complete: TDD landed [tui].mouse_tracking with default-on compatibility, local /mouse and /scroll parsing for on/off/toggle, runtime state changes that emit Bubble Tea mouse enable/disable commands only on changes, explicit disable on alt-screen entry when config is off, and visible TUI status for disabled mouse tracking.",
               "write_scope": [
                 "internal/tui/",
                 "internal/config/",

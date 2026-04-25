@@ -81,16 +81,16 @@ func (m Model) View() string {
 	var status string
 	if sidebarW > 0 {
 		status = muted.Render(fmt.Sprintf(
-			"phase: %s · model: %s · session: %s",
-			m.frame.Phase, m.frame.Model, shortSessionID(m.frame.SessionID),
+			"phase: %s · model: %s · session: %s · %s%s",
+			m.frame.Phase, m.frame.Model, shortSessionID(m.frame.SessionID), m.mouseStatus(), statusSuffix(m.statusMessage),
 		))
 	} else {
 		// Collapsed mode includes the telemetry in the status line.
 		t := m.frame.Telemetry
 		status = muted.Render(fmt.Sprintf(
-			"phase: %s · model: %s · tok/s: %.1f · lat: %dms · in/out: %d/%d",
+			"phase: %s · model: %s · tok/s: %.1f · lat: %dms · in/out: %d/%d · %s%s",
 			m.frame.Phase, m.frame.Model, t.TokensPerSec, t.LatencyMsLast,
-			t.TokensInTotal, t.TokensOutTotal,
+			t.TokensInTotal, t.TokensOutTotal, m.mouseStatus(), statusSuffix(m.statusMessage),
 		))
 	}
 
@@ -179,4 +179,11 @@ func shortSessionID(id string) string {
 		return id
 	}
 	return id[:8] + "…"
+}
+
+func statusSuffix(message string) string {
+	if message == "" {
+		return ""
+	}
+	return " · " + message
 }
