@@ -87,16 +87,19 @@ a:focus-visible,
   border-bottom: 1px solid var(--border);
 }
 .topbar-inner {
-  padding: 18px var(--pad);
+  /* Slightly tighter vertical padding (16px from 18) so the
+     top-bar reads as a thin frame instead of a band. */
+  padding: 16px var(--pad);
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   gap: 18px;
 }
 .brand {
   font-family: var(--font-body);
   font-weight: 700;
-  font-size: 20px;
+  font-size: 19px;
+  letter-spacing: -0.01em;
   color: var(--text);
   border: none;
 }
@@ -108,12 +111,15 @@ a:focus-visible,
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 18px;
-  align-items: center;
+  /* Tighter inter-item spacing so the three nav anchors read as
+     a single grouped sequence instead of floating apart. */
+  gap: 14px;
+  align-items: baseline;
 }
 .topnav a {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
   border: none;
@@ -153,10 +159,14 @@ a:focus-visible,
   position: relative;
   overflow: hidden;
 }
-/* Faint right-side grid overlay — identity texture without noise.
-   24px squares at 0.018 alpha, masked to fade in only on the right
-   half. On viewports narrower than the page max-width (880) the
-   mask still keeps the left text region clean. */
+/* Right-side grid overlay — reads as the "system layer" the
+   terminal-prompt signature lives on. Bumped to 0.05 alpha so the
+   structure is visible enough to feel intentional (a grid you
+   chose) rather than accidental film grain. Mask runs from full
+   transparent at 50% width to fully visible at 100%, which keeps
+   the left text region untouched and lets the right gutter carry
+   the identity texture. 32px squares give a slightly bigger
+   architectural feel than the previous 24px. */
 .hero::after {
   content: '';
   position: absolute;
@@ -164,11 +174,11 @@ a:focus-visible,
   pointer-events: none;
   z-index: 0;
   background-image:
-    linear-gradient(to right, rgba(238, 236, 229, 0.018) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(238, 236, 229, 0.018) 1px, transparent 1px);
-  background-size: 24px 24px;
-  -webkit-mask-image: linear-gradient(to right, transparent 55%, black 100%);
-          mask-image: linear-gradient(to right, transparent 55%, black 100%);
+    linear-gradient(to right, rgba(238, 236, 229, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(238, 236, 229, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: linear-gradient(to right, transparent 50%, black 100%);
+          mask-image: linear-gradient(to right, transparent 50%, black 100%);
 }
 .hero-inner {
   position: relative;
@@ -197,21 +207,28 @@ a:focus-visible,
   color: var(--text);
 }
 /* Terminal-prompt signature: mono "$" in accent color before the
-   serif headline. Smaller than the headline so it reads as a
-   prompt prefix, not a peer character. Tiny right margin gives
-   the headline its own measure. */
+   serif headline. Sized at 0.62em so it reads as a deliberate
+   prefix token (not a peer character, not a tiny dot lost against
+   the headline weight). 0.5em right margin + an explicit space
+   character in the HTML between </span> and the headline give a
+   wide visible gutter so "$ One" reads as two distinct things,
+   never "$One". Vertical-align lifts the prompt to sit roughly at
+   the headline's x-height instead of its baseline. */
 .hero-prompt {
   display: inline-block;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 0.55em;
+  font-size: 0.62em;
   color: var(--accent);
-  margin-right: 0.32em;
+  margin-right: 0.5em;
   letter-spacing: 0;
-  vertical-align: 0.18em;
+  vertical-align: 0.16em;
 }
 .hero-subhead {
-  margin: 0 0 16px;
+  /* Larger gap below subhead (28px) gives the early-stage block
+     air. Asymmetric rhythm: tight inside the subhead (4px between
+     lines 2&3), wider before the early-stage stamp. */
+  margin: 0 0 28px;
   max-width: 560px;
 }
 /* Three-tier descent: identity line in full text-color, the
@@ -224,6 +241,8 @@ a:focus-visible,
   line-height: 1.48;
   overflow-wrap: break-word;
 }
+.hero-subhead p:nth-child(2) { margin-bottom: 4px; }
+.hero-subhead p:nth-child(3) { margin-bottom: 0; }
 .hero-subhead p:nth-child(1) {
   color: var(--text);
   font-weight: 500;
@@ -232,9 +251,12 @@ a:focus-visible,
 .hero-subhead p:nth-child(3) { color: var(--muted); }
 /* "Early-stage." stamp reads as positioning identity (mono caps,
    accent color); the caveat body underneath stays muted. Two-line
-   stack so the stamp lands as a label, not a sentence opener. */
+   stack so the stamp lands as a label, not a sentence opener.
+   Tight bottom margin (16px) groups the stamp with the CTA row
+   directly below — they read as one composed unit, not two
+   stacked sections. */
 .hero-note {
-  margin: 24px 0 32px;
+  margin: 0 0 16px;
   max-width: 560px;
   border-left: 2px solid var(--accent);
   background: var(--bg-1);
@@ -257,9 +279,9 @@ a:focus-visible,
   color: var(--muted-strong);
 }
 .hero-ctas {
-  /* Extra breathing room above so the CTAs anchor the section
-     instead of feeling attached to the note above. */
-  margin-top: 12px;
+  /* No top margin — the early-stage note above sits 16px from us.
+     Together they read as one grouped composition: stamp ↓ CTAs. */
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -301,12 +323,17 @@ a:focus-visible,
   background: var(--accent-hover);
   color: var(--accent-ink);
 }
+/* VIEW SOURCE: secondary, not invisible. Keeps mute color but
+   stays clearly readable next to the dominant INSTALL button.
+   Subtle bottom-border so it reads as a link affordance even at
+   rest, then strengthens to accent on hover. */
 .btn-secondary {
   background: transparent;
-  color: var(--label);
+  color: var(--muted);
   border-color: transparent;
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  border-bottom: 1px solid var(--border-strong);
+  font-size: 11px;
+  letter-spacing: 0.16em;
   padding: 10px 2px;
   font-weight: 600;
 }
