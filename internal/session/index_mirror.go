@@ -191,7 +191,7 @@ func (m *SessionIndexMirror) StartRefresh(interval time.Duration, log *slog.Logg
 	r := &SessionIndexMirrorRefresher{
 		mirror: m,
 		ticker: time.NewTicker(interval),
-		stop:   make(chan struct{}),
+		stop:   make(chan struct{}, 1),
 		log:    log,
 	}
 	r.wg.Add(1)

@@ -37,12 +37,12 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 28/73 subphases shipped · 13 in progress · 32 planned
+**Overall:** 29/73 subphases shipped · 13 in progress · 31 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 11/19 subphases |
+| Phase 2 — The Gateway | 🔨 | 12/19 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 11/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
@@ -149,13 +149,13 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Typed result envelope
 - [x] Append-only run log
 
-### 2.E.1 — OS-AI Spine: Delegation Policy + Child Execution 🔨
+### 2.E.1 — OS-AI Spine: Delegation Policy + Child Execution ✅
 
 - [x] Runner-enforced tool allowlists + blocked-tool policy
 - [x] Tool-call audit in typed child results
 - [x] Real child Hermes stream loop
 - [x] GBrain minion-orchestrator routing policy
-- [ ] Durable subagent/job ledger
+- [x] Durable subagent/job ledger
 
 ### 2.E.2 — OS-AI Spine: Concurrent-Tool Cancellation ✅
 
@@ -284,29 +284,29 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Opt-in user-scope recall + source filters
 - [x] Interrupted-turn memory sync suppression
 - [x] Honcho-compatible scope/source tool schema
-- [ ] Honcho host integration compatibility fixtures
-- [ ] Cross-chat deny-path fixtures
+- [x] Honcho host integration compatibility fixtures
+- [x] Cross-chat deny-path fixtures
 - [ ] Cross-chat operator evidence
 
 ### 3.E.8 — Session Lineage + Cross-Source Search 🔨
 
 - [x] parent_session_id lineage for compression splits
-- [ ] Gateway resume follows compression continuation
+- [x] Gateway resume follows compression continuation
 - [x] Source-filtered session/message search core
 - [x] GONCHO user-scope search/context parameters
-- [ ] Lineage-aware source-filtered search hits
+- [x] Lineage-aware source-filtered search hits
 - [ ] Operator-auditable search evidence
 
-### 3.F — Goncho Honcho Memory Parity ⏳
+### 3.F — Goncho Honcho Memory Parity 🔨
 
-- [ ] Goncho context representation options
+- [x] Goncho context representation options
 - [ ] Goncho search filter grammar
 - [ ] Directional peer cards and representation scopes
 - [ ] Goncho queue status read model
 - [ ] Goncho summary context budget
 - [ ] Goncho dialectic chat contract
 - [ ] Goncho file upload import ingestion
-- [ ] Goncho topology design fixtures
+- [x] Goncho topology design fixtures
 - [ ] Goncho operator diagnostics contract
 - [ ] Goncho streaming chat persistence contract
 - [ ] Goncho configuration namespace

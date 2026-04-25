@@ -23,7 +23,7 @@ Before starting any packet, read:
 - `internal/goncho/types.go`
 - `internal/goncho/service.go`
 - `internal/goncho/sql.go`
-- `internal/tools/honcho_tools.go`
+- `internal/gonchotools/honcho_tools.go`
 - `internal/memory/schema.go`
 
 If the work touches generated roadmap pages or the site, also run:
@@ -51,8 +51,8 @@ Current Gormes files:
 
 - `internal/goncho/types.go`
 - `internal/goncho/service.go`
-- `internal/tools/honcho_tools.go`
-- `internal/tools/honcho_tools_test.go`
+- `internal/gonchotools/honcho_tools.go`
+- `internal/gonchotools/honcho_tools_test.go`
 
 Red tests:
 
@@ -61,7 +61,7 @@ Red tests:
   - `limit_to_session=true` does not widen `scope=user`;
   - unsupported representation-only fields return structured unavailable
     evidence instead of being silently ignored.
-- `internal/tools/honcho_tools_test.go`
+- `internal/gonchotools/honcho_tools_test.go`
   - `HonchoContextTool.Schema()` exposes optional `summary`, `tokens`,
     `peer_target`, `peer_perspective`, `search_query`, `limit_to_session`,
     `search_top_k`, `search_max_distance`, `include_most_frequent`, and
@@ -85,7 +85,7 @@ Do not implement:
 
 Validation:
 
-- `go test ./internal/goncho ./internal/tools -count=1`
+- `go test ./internal/goncho ./internal/gonchotools -count=1`
 - `go run ./cmd/autoloop progress validate`
 
 Commit message:
@@ -177,7 +177,7 @@ Current Gormes files:
 - `internal/goncho/sql.go`
 - `internal/goncho/service.go`
 - `internal/goncho/types.go`
-- `internal/tools/honcho_tools.go`
+- `internal/gonchotools/honcho_tools.go`
 
 Red tests:
 
@@ -204,7 +204,7 @@ Do not implement:
 
 Validation:
 
-- `go test ./internal/goncho ./internal/memory ./internal/tools -count=1`
+- `go test ./internal/goncho ./internal/memory ./internal/gonchotools -count=1`
 - `go run ./cmd/autoloop progress validate`
 
 Commit message:
@@ -237,7 +237,7 @@ Current Gormes files:
 - `internal/memory/schema.go`
 - `internal/goncho/service.go`
 - `internal/goncho/types.go`
-- `internal/tools/honcho_tools.go`
+- `internal/gonchotools/honcho_tools.go`
 
 Red tests:
 
@@ -266,7 +266,7 @@ Do not implement:
 
 Validation:
 
-- `go test ./internal/goncho ./internal/memory ./internal/tools -count=1`
+- `go test ./internal/goncho ./internal/memory ./internal/gonchotools -count=1`
 - `go run ./cmd/autoloop progress validate`
 
 Commit message:
@@ -361,8 +361,8 @@ Current Gormes files:
 
 - `internal/goncho/types.go`
 - `internal/goncho/service.go`
-- `internal/tools/honcho_tools.go`
-- `internal/tools/honcho_tools_test.go`
+- `internal/gonchotools/honcho_tools.go`
+- `internal/gonchotools/honcho_tools_test.go`
 
 Red tests:
 
@@ -374,7 +374,7 @@ Red tests:
   - `stream=true` returns structured unsupported evidence until streaming is
     implemented;
   - response shape is `{ "content": "..." }`.
-- `internal/tools/honcho_tools_test.go`
+- `internal/gonchotools/honcho_tools_test.go`
   - `honcho_chat` exists as a host-compatible alias while
     `honcho_reasoning` remains available.
 
@@ -393,7 +393,7 @@ Do not implement:
 
 Validation:
 
-- `go test ./internal/goncho ./internal/tools -count=1`
+- `go test ./internal/goncho ./internal/gonchotools -count=1`
 - `go run ./cmd/autoloop progress validate`
 
 Commit message:
@@ -498,7 +498,7 @@ Current Gormes files:
 - `internal/goncho/types.go`
 - `internal/goncho/service.go`
 - `internal/goncho/sql.go`
-- `internal/tools/honcho_tools.go`
+- `internal/gonchotools/honcho_tools.go`
 
 Red tests:
 
@@ -523,7 +523,7 @@ Do not implement:
 
 Validation:
 
-- `go test ./internal/goncho ./internal/tools -count=1`
+- `go test ./internal/goncho ./internal/gonchotools -count=1`
 - `go run ./cmd/autoloop progress validate`
 
 Commit message:
@@ -571,7 +571,7 @@ Implementation boundaries:
 
 Validation:
 
-- `go test ./internal/goncho ./internal/tools ./internal/memory -count=1`
+- `go test ./internal/goncho ./internal/gonchotools ./internal/memory -count=1`
 - `go run ./cmd/autoloop progress validate`
 
 Acceptance:
@@ -777,7 +777,7 @@ Current Gormes files:
 
 - `internal/goncho/types.go`
 - `internal/goncho/service.go`
-- `internal/tools/honcho_tools.go`
+- `internal/gonchotools/honcho_tools.go`
 - `internal/memory/`
 
 Red tests:
@@ -803,7 +803,7 @@ Do not implement:
 
 Validation:
 
-- `go test ./internal/goncho ./internal/memory ./internal/tools -count=1`
+- `go test ./internal/goncho ./internal/memory ./internal/gonchotools -count=1`
 - `go run ./cmd/autoloop progress validate`
 
 Commit message:

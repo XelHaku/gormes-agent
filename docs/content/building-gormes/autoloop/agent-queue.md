@@ -203,25 +203,24 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: BlueBubbles iMessage session-context prompt guidance
 - Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
 
-## 10. Goncho topology design fixtures
+## 10. Tool registry inventory + schema parity harness
 
-- Phase: 3 / 3.F
-- Owner: `memory`
-- Size: `small`
+- Phase: 5 / 5.A
+- Owner: `tools`
+- Size: `medium`
 - Status: `planned`
-- Priority: `P3`
-- Contract: Goncho workspace, peer, session, and observation defaults are fixture-locked before more memory behavior is added
-- Trust class: operator, system
-- Ready when: The current session directory, Goncho service types, and Honcho tool schemas are readable in the repo.
-- Not ready when: The slice changes persistence behavior or reasoning behavior before topology rules are proven.
-- Degraded mode: Unknown external participant identity falls back to a deterministic source-prefixed peer ID and records the fallback in evidence.
-- Fixture: `internal/goncho/topology_design_test.go`
-- Write scope: `internal/goncho/`, `internal/session/`, `internal/tools/`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/goncho ./internal/session ./internal/tools -count=1`
-- Done signal: Topology fixtures prove the default workspace, peer ID derivation, observation defaults, and session boundary choices expected by the operator playbook.
-- Acceptance: Default workspace is gormes unless explicit hard isolation is requested., Workspace-per-user is rejected in fixtures., Peer ID selection prefers internal/session.Metadata.UserID and falls back to source-prefixed external IDs., Deterministic assistants, transport bots, and import helpers default to observe_me=false., Conversation sessions follow real context boundaries such as thread, channel, repo, import batch, or delegated child run., Cross-peer observation is opt-in and cannot become a default side effect.
-- Source refs: ../honcho/docs/v3/documentation/core-concepts/design-patterns.mdx, ../honcho/docs/v3/documentation/features/storing-data.mdx, ../honcho/docs/v3/guides/integrations/openclaw.mdx, ../honcho/docs/v3/guides/integrations/claude-code.mdx, ../honcho/docs/v3/guides/integrations/paperclip.mdx, ../honcho/docs/v3/guides/integrations/sillytavern.mdx, docs/content/building-gormes/goncho_honcho_memory/05-operator-playbook.md, docs/content/building-gormes/goncho_honcho_memory/04-agent-work-packets.md, internal/session/directory.go, internal/goncho/types.go, internal/goncho/service.go, internal/tools/honcho_tools.go
-- Unblocks: Goncho context representation options, Directional peer cards and representation scopes, Goncho operator diagnostics contract
-- Why now: Unblocks Goncho context representation options, Directional peer cards and representation scopes, Goncho operator diagnostics contract.
+- Contract: Operation and tool descriptor parity before handler ports
+- Trust class: operator, gateway, child-agent, system
+- Ready when: Upstream tool descriptor inventory can be captured without porting handlers in the same slice.
+- Not ready when: Handler implementation starts before descriptor parity fixtures exist.
+- Degraded mode: Doctor reports disabled tools, missing dependencies, schema drift, and unavailable provider-specific paths.
+- Fixture: `internal/tools upstream schema parity manifest fixtures`
+- Write scope: `internal/tools/`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/tools -count=1`
+- Done signal: Tool descriptor parity fixtures capture names, schemas, trust classes, dependencies, and degraded status before handler ports.
+- Acceptance: Upstream tool names, toolsets, required env vars, schemas, result envelopes, trust classes, and degraded status are captured in fixtures., No handler port can mark complete until its descriptor parity row exists., Doctor can report missing dependencies or disabled provider-specific paths.
+- Source refs: docs/content/upstream-hermes/reference/tools-reference.md, docs/content/building-gormes/architecture_plan/phase-5-final-purge.md
+- Unblocks: Pure core tools first, Stateful tool migration queue, CLI command registry parity + active-turn busy policy
+- Why now: Unblocks Pure core tools first, Stateful tool migration queue, CLI command registry parity + active-turn busy policy.
 
 <!-- PROGRESS:END -->

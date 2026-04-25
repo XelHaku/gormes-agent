@@ -1,4 +1,4 @@
-package tools
+package gonchotools
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/goncho"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/memory"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/tools"
 )
 
 func TestHonchoTools_RegisterExpectedNames(t *testing.T) {
@@ -108,8 +109,8 @@ func TestHonchoProfileTool_UsesService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exec := NewInProcessToolExecutor(reg)
-	ch, err := exec.Execute(ctx, ToolRequest{
+	exec := tools.NewInProcessToolExecutor(reg)
+	ch, err := exec.Execute(ctx, tools.ToolRequest{
 		ToolName: "honcho_profile",
 		Input:    json.RawMessage(`{"peer":"telegram:6586915095"}`),
 	})
@@ -117,7 +118,7 @@ func TestHonchoProfileTool_UsesService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var outputs []ToolEvent
+	var outputs []tools.ToolEvent
 	for ev := range ch {
 		outputs = append(outputs, ev)
 	}
@@ -142,8 +143,8 @@ func TestHonchoReasoningTool_ReturnsDeterministicAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	exec := NewInProcessToolExecutor(reg)
-	ch, err := exec.Execute(ctx, ToolRequest{
+	exec := tools.NewInProcessToolExecutor(reg)
+	ch, err := exec.Execute(ctx, tools.ToolRequest{
 		ToolName: "honcho_reasoning",
 		Input: json.RawMessage(`{
 			"peer":"telegram:6586915095",
@@ -156,7 +157,7 @@ func TestHonchoReasoningTool_ReturnsDeterministicAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var outputs []ToolEvent
+	var outputs []tools.ToolEvent
 	for ev := range ch {
 		outputs = append(outputs, ev)
 	}
@@ -291,10 +292,10 @@ func seedScopedConclusions(t *testing.T, ctx context.Context, svc *goncho.Servic
 	}
 }
 
-func executeHonchoTool(t *testing.T, reg *Registry, toolName string, input json.RawMessage) json.RawMessage {
+func executeHonchoTool(t *testing.T, reg *tools.Registry, toolName string, input json.RawMessage) json.RawMessage {
 	t.Helper()
 
-	ch, err := NewInProcessToolExecutor(reg).Execute(context.Background(), ToolRequest{
+	ch, err := tools.NewInProcessToolExecutor(reg).Execute(context.Background(), tools.ToolRequest{
 		ToolName: toolName,
 		Input:    input,
 	})
@@ -302,7 +303,7 @@ func executeHonchoTool(t *testing.T, reg *Registry, toolName string, input json.
 		t.Fatal(err)
 	}
 
-	var outputs []ToolEvent
+	var outputs []tools.ToolEvent
 	for ev := range ch {
 		outputs = append(outputs, ev)
 	}
@@ -315,7 +316,7 @@ func executeHonchoTool(t *testing.T, reg *Registry, toolName string, input json.
 	return outputs[1].Output
 }
 
-func newTestHonchoRegistry(t *testing.T) (*Registry, *goncho.Service, func()) {
+func newTestHonchoRegistry(t *testing.T) (*tools.Registry, *goncho.Service, func()) {
 	t.Helper()
 
 	store, err := memory.OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
@@ -323,7 +324,7 @@ func newTestHonchoRegistry(t *testing.T) (*Registry, *goncho.Service, func()) {
 		t.Fatalf("OpenSqlite: %v", err)
 	}
 
-	reg := NewRegistry()
+	reg := tools.NewRegistry()
 	svc := goncho.NewService(store.DB(), goncho.Config{
 		WorkspaceID:    "default",
 		ObserverPeerID: "gormes",

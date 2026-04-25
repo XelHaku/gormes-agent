@@ -3,6 +3,8 @@ package kernel
 import (
 	"context"
 	"errors"
+	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -72,15 +74,13 @@ func TestKernel_ResetSession_IdleSucceeds(t *testing.T) {
 // ResetSession must return ErrResetDuringTurn. History is preserved
 // (the in-flight user turn is still present).
 func TestKernel_ResetSession_StreamingFails(t *testing.T) {
-	mc := hermes.NewMockClient()
-	// Long stream — enough tokens that we can observe PhaseStreaming before
-	// completion.
-	events := make([]hermes.Event, 0, 200)
-	for i := 0; i < 199; i++ {
-		events = append(events, hermes.Event{Kind: hermes.EventToken, Token: "t", TokensOut: i + 1})
+	releaseStream := make(chan struct{})
+	mc := &blockingResetClient{
+		stream: &blockingResetStream{
+			release:   releaseStream,
+			sessionID: "sess-busy",
+		},
 	}
-	events = append(events, hermes.Event{Kind: hermes.EventDone, FinishReason: "stop"})
-	mc.Script(events, "sess-busy")
 
 	k := New(Config{
 		Model:     "hermes-agent",
@@ -112,6 +112,7 @@ func TestKernel_ResetSession_StreamingFails(t *testing.T) {
 	if !errors.Is(err, ErrResetDuringTurn) {
 		t.Errorf("ResetSession during Streaming = %v, want ErrResetDuringTurn", err)
 	}
+	close(releaseStream)
 
 	// Drain remaining frames until turn completes; history must be preserved
 	// throughout (at least the user message).
@@ -122,4 +123,61 @@ func TestKernel_ResetSession_StreamingFails(t *testing.T) {
 		t.Errorf("post-failed-reset history shrank from %d to %d — reset should NOT mutate",
 			preResetHistoryLen, len(done.History))
 	}
+}
+
+type blockingResetClient struct {
+	stream *blockingResetStream
+}
+
+func (c *blockingResetClient) OpenStream(context.Context, hermes.ChatRequest) (hermes.Stream, error) {
+	return c.stream, nil
+}
+
+func (*blockingResetClient) OpenRunEvents(context.Context, string) (hermes.RunEventStream, error) {
+	return nil, hermes.ErrRunEventsNotSupported
+}
+
+func (*blockingResetClient) Health(context.Context) error { return nil }
+
+type blockingResetStream struct {
+	release   <-chan struct{}
+	sessionID string
+
+	mu     sync.Mutex
+	pos    int
+	closed bool
+}
+
+func (s *blockingResetStream) Recv(ctx context.Context) (hermes.Event, error) {
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		return hermes.Event{}, io.EOF
+	}
+	pos := s.pos
+	s.pos++
+	s.mu.Unlock()
+
+	switch pos {
+	case 0:
+		return hermes.Event{Kind: hermes.EventToken, Token: "t", TokensOut: 1}, nil
+	case 1:
+		select {
+		case <-s.release:
+			return hermes.Event{Kind: hermes.EventDone, FinishReason: "stop"}, nil
+		case <-ctx.Done():
+			return hermes.Event{}, ctx.Err()
+		}
+	default:
+		return hermes.Event{}, io.EOF
+	}
+}
+
+func (s *blockingResetStream) SessionID() string { return s.sessionID }
+
+func (s *blockingResetStream) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closed = true
+	return nil
 }

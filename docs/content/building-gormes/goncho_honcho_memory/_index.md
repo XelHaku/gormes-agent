@@ -887,7 +887,7 @@ This file is intentionally incomplete. When you pick it up:
 - Replication kit: [`01-prompts.md`](./01-prompts) for verbatim prompts and [`02-tool-schemas.md`](./02-tool-schemas) for verbatim Honcho agent tool schemas.
 - Docs study: [`03-honcho-docs-study.md`](./03-honcho-docs-study) maps Honcho v3 docs to Goncho planner rows.
 - Goncho service: `internal/goncho/service.go`, `types.go`, `sql.go`.
-- Tool layer: `internal/tools/honcho_tools.go`.
+- Tool layer: `internal/gonchotools/honcho_tools.go`.
 - Memory substrate: `internal/memory/` (full Phase 3 inventory in §12.1).
 - Design spec: `docs/superpowers/specs/2026-04-21-goncho-architecture-design.md`.
 - Phase 3 ledger: `docs/content/building-gormes/architecture_plan/phase-3-memory.md`.

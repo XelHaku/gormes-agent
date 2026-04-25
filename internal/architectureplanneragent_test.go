@@ -453,8 +453,9 @@ cat > "$final_file" <<'EOF'
 2) Feature/doc drift found
 3) Documentation updates applied
 4) Website updates applied
-5) Validation evidence
-6) Risks / follow-ups
+5) README + install.sh updates
+6) Validation evidence
+7) Risks / follow-ups
 EOF
 printf '{"type":"thread.started","thread_id":"thread-docs-123"}\n'
 `), 0o755)

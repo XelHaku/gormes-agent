@@ -1285,7 +1285,7 @@
                 "system"
               ],
               "degraded_mode": "Memory status and tool schema evidence show when user-scope or source-filtered recall is unavailable.",
-              "fixture": "internal/tools/honcho_tools_test.go",
+              "fixture": "internal/gonchotools/honcho_tools_test.go",
               "source_refs": [
                 "docs/content/upstream-hermes/gormes-takeaways.md",
                 "docs/content/building-gormes/architecture_plan/phase-3-memory.md",
@@ -1308,11 +1308,11 @@
               ],
               "note": "TDD landed: `honcho_search` and `honcho_context` keep their public Honcho-compatible names while their JSON Schemas now advertise optional `scope` and `sources` controls backed by the existing internal GONCHO params. Schema tests assert both fields are discoverable and not required, and executor round-trips without either field preserve same-chat default behavior. Deny-path fixtures and operator evidence remain separate 3.E.7 slices.",
               "write_scope": [
-                "internal/tools/",
+                "internal/gonchotools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/tools ./internal/goncho -count=1"
+                "go test ./internal/gonchotools ./internal/goncho -count=1"
               ],
               "done_signal": [
                 "Honcho-compatible tool schema tests prove scope and sources are optional, discoverable, and routed through existing GONCHO params."
@@ -1472,7 +1472,7 @@
               "name": "Gateway resume follows compression continuation",
               "status": "complete",
               "contract": "Gateway and CLI resume resolve a titled or root session to the newest live compression descendant before loading transcript history",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1605,7 +1605,7 @@
                 "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
                 "docs/content/building-gormes/goncho_honcho_memory/04-agent-work-packets.md",
                 "internal/goncho/types.go",
-                "internal/tools/honcho_tools.go"
+                "internal/gonchotools/honcho_tools.go"
               ],
               "ready_when": [
                 "honcho_context already accepts peer, query, max_tokens, session_key, scope, and sources through the Goncho service."
@@ -1626,11 +1626,11 @@
               "note": "TDD landed: ContextParams and the honcho_context schema expose optional peer_target, peer_perspective, limit_to_session, search_top_k, search_max_distance, include_most_frequent, and max_conclusions. Omitted fields preserve same-chat context defaults; limit_to_session=true fails closed without session_key and cannot widen through scope=user; unsupported directional and semantic representation options return structured unavailable evidence. Summaries, observations, and dialectic-backed retrieval remain separate slices.",
               "write_scope": [
                 "internal/goncho/",
-                "internal/tools/",
+                "internal/gonchotools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/goncho ./internal/tools -count=1"
+                "go test ./internal/goncho ./internal/gonchotools -count=1"
               ],
               "done_signal": [
                 "honcho_context schema and service fixtures prove Honcho v3 context options are discoverable, optional, and visibly degraded when not implemented."
@@ -1726,11 +1726,11 @@
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",
-                "internal/tools/",
+                "internal/gonchotools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/goncho ./internal/memory ./internal/tools -count=1"
+                "go test ./internal/goncho ./internal/memory ./internal/gonchotools -count=1"
               ],
               "done_signal": [
                 "Directional peer-card fixtures prove observer/observed isolation, max-card cap, and replacement semantics."
@@ -1826,11 +1826,11 @@
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",
-                "internal/tools/",
+                "internal/gonchotools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/goncho ./internal/memory ./internal/tools -count=1"
+                "go test ./internal/goncho ./internal/memory ./internal/gonchotools -count=1"
               ],
               "done_signal": [
                 "Summary context fixtures prove short/long cadence, token-budget allocation, summary=false behavior, and visible degradation when no summary can fit."
@@ -1862,7 +1862,7 @@
                 "docs/content/building-gormes/goncho_honcho_memory/02-tool-schemas.md",
                 "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
                 "docs/content/building-gormes/goncho_honcho_memory/04-agent-work-packets.md",
-                "internal/tools/honcho_tools.go",
+                "internal/gonchotools/honcho_tools.go",
                 "internal/goncho/service.go"
               ],
               "blocked_by": [
@@ -1884,11 +1884,11 @@
               "note": "Honcho docs expose peer.chat as the slow query-specific reasoning path; newer host integrations call this honcho_chat or chat. Gormes should add the alias and contract before porting the full dialectic tool loop.",
               "write_scope": [
                 "internal/goncho/",
-                "internal/tools/",
+                "internal/gonchotools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/goncho ./internal/tools -count=1"
+                "go test ./internal/goncho ./internal/gonchotools -count=1"
               ],
               "done_signal": [
                 "Chat contract tests prove request validation, default reasoning level, response shape, host-compatible tool alias, and explicit streaming degradation."
@@ -1977,7 +1977,7 @@
                 "internal/session/directory.go",
                 "internal/goncho/types.go",
                 "internal/goncho/service.go",
-                "internal/tools/honcho_tools.go"
+                "internal/gonchotools/honcho_tools.go"
               ],
               "blocked_by": [],
               "ready_when": [
@@ -2003,11 +2003,11 @@
               "write_scope": [
                 "internal/goncho/",
                 "internal/session/",
-                "internal/tools/",
+                "internal/gonchotools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/goncho ./internal/session ./internal/tools -count=1"
+                "go test ./internal/goncho ./internal/session ./internal/gonchotools -count=1"
               ],
               "done_signal": [
                 "Topology fixtures prove the default workspace, peer ID derivation, observation defaults, and session boundary choices expected by the operator playbook."
@@ -2097,7 +2097,7 @@
                 "docs/content/building-gormes/goncho_honcho_memory/04-agent-work-packets.md",
                 "internal/goncho/types.go",
                 "internal/goncho/service.go",
-                "internal/tools/honcho_tools.go",
+                "internal/gonchotools/honcho_tools.go",
                 "internal/memory/schema.go"
               ],
               "blocked_by": [
@@ -2123,12 +2123,12 @@
               "note": "Honcho docs make streaming a chat-response transport detail. Goncho should preserve memory quality by treating only completed assistant messages as durable facts.",
               "write_scope": [
                 "internal/goncho/",
-                "internal/tools/",
+                "internal/gonchotools/",
                 "internal/memory/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/goncho ./internal/tools ./internal/memory -count=1"
+                "go test ./internal/goncho ./internal/gonchotools ./internal/memory -count=1"
               ],
               "done_signal": [
                 "Streaming fixtures prove completed responses are persisted once and interrupted or partial chunks cannot pollute memory."

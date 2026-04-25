@@ -218,8 +218,8 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 		t.Fatalf("Phase 2.E.0 = %q, want complete", got)
 	}
 	runtimeNext := p.Phases["2"].Subphases["2.E.1"]
-	if got := runtimeNext.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.E.1 = %q, want in_progress", got)
+	if got := runtimeNext.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.E.1 = %q, want complete", got)
 	}
 	runtimeNextItems := itemStatusByName(runtimeNext.Items)
 	for name, want := range map[string]Status{
@@ -227,7 +227,7 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 		"Tool-call audit in typed child results":                StatusComplete,
 		"Real child Hermes stream loop":                         StatusComplete,
 		"GBrain minion-orchestrator routing policy":             StatusComplete,
-		"Durable subagent/job ledger":                           StatusPlanned,
+		"Durable subagent/job ledger":                           StatusComplete,
 	} {
 		if got := runtimeNextItems[name]; got != want {
 			t.Errorf("Phase 2.E.1 item %q = %q, want %q", name, got, want)
@@ -303,8 +303,8 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if e1.Priority != "P0" {
 		t.Fatalf("Phase 2.E.1 priority = %q, want P0", e1.Priority)
 	}
-	if got := e1.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.E.1 = %q, want in_progress", got)
+	if got := e1.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.E.1 = %q, want complete", got)
 	}
 	e1Items := itemsByName(e1.Items)
 	policy := e1Items["Runner-enforced tool allowlists + blocked-tool policy"]
@@ -339,11 +339,11 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.E.1 minion policy refs/unblocks = refs %v unblocks %v, want GBrain skill ref and durable ledger unblock", minionPolicy.SourceRefs, minionPolicy.Unblocks)
 	}
 	durableLedger := e1Items["Durable subagent/job ledger"]
-	if durableLedger.Status != StatusPlanned {
-		t.Fatalf("Phase 2.E.1 durable ledger status = %q, want planned", durableLedger.Status)
+	if durableLedger.Status != StatusComplete {
+		t.Fatalf("Phase 2.E.1 durable ledger status = %q, want complete", durableLedger.Status)
 	}
-	if durableLedger.ContractStatus != ContractStatusDraft || !containsString(durableLedger.BlockedBy, "GBrain minion-orchestrator routing policy") {
-		t.Fatalf("Phase 2.E.1 durable ledger metadata = contract_status %q blocked_by %v, want draft blocked by minion policy", durableLedger.ContractStatus, durableLedger.BlockedBy)
+	if durableLedger.ContractStatus != ContractStatusValidated || !strings.Contains(durableLedger.Note, "SQLite-first durable ledger") {
+		t.Fatalf("Phase 2.E.1 durable ledger metadata = contract_status %q note %q, want validated SQLite-first ledger", durableLedger.ContractStatus, durableLedger.Note)
 	}
 
 	whatsApp := p.Phases["2"].Subphases["2.B.4"]
@@ -979,8 +979,11 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 3.E.7 tool schema status = %q, want complete", toolSchema.Status)
 	}
 	denyFixtures := crossChatItems["Cross-chat deny-path fixtures"]
-	if denyFixtures.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.7 deny-path fixtures status = %q, want planned", denyFixtures.Status)
+	if denyFixtures.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.7 deny-path fixtures status = %q, want complete", denyFixtures.Status)
+	}
+	if denyFixtures.ContractStatus != ContractStatusValidated {
+		t.Fatalf("Phase 3.E.7 deny-path fixtures contract_status = %q, want validated", denyFixtures.ContractStatus)
 	}
 	operatorEvidence3E7 := crossChatItems["Cross-chat operator evidence"]
 	if operatorEvidence3E7.Status != StatusPlanned {
@@ -1012,9 +1015,13 @@ func TestLoad_RealFile_Phase3ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 3.E.8 priority = %q, want P4", lineage.Priority)
 	}
 	lineageItems := itemsByName(lineage.Items)
+	gatewayResume := lineageItems["Gateway resume follows compression continuation"]
+	if gatewayResume.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.8 gateway resume status = %q, want complete", gatewayResume.Status)
+	}
 	lineageHits := lineageItems["Lineage-aware source-filtered search hits"]
-	if lineageHits.Status != StatusPlanned {
-		t.Fatalf("Phase 3.E.8 lineage-aware search hits status = %q, want planned", lineageHits.Status)
+	if lineageHits.Status != StatusComplete {
+		t.Fatalf("Phase 3.E.8 lineage-aware search hits status = %q, want complete", lineageHits.Status)
 	}
 	operatorEvidence := lineageItems["Operator-auditable search evidence"]
 	if operatorEvidence.Status != StatusPlanned {

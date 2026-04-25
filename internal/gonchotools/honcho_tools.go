@@ -1,4 +1,4 @@
-package tools
+package gonchotools
 
 import (
 	"context"
@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/goncho"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/tools"
 )
 
 // RegisterHonchoTools adds the Honcho-compatible tool surface backed by the
 // in-binary Goncho service.
-func RegisterHonchoTools(reg *Registry, svc *goncho.Service) {
+func RegisterHonchoTools(reg *tools.Registry, svc *goncho.Service) {
 	if reg == nil {
 		panic("tools: nil registry")
 	}
