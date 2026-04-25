@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
 
 const defaultCodexResponsesInstructions = "You are Gormes."
+
+var codexResponsesToolCallLeakPattern = regexp.MustCompile(`(?i)(?:^|[\s>|])to=functions\.[A-Za-z_][\w.]*`)
 
 type codexResponsesPayload struct {
 	Model             string               `json:"model"`
@@ -93,6 +96,7 @@ type codexResponsesNormalized struct {
 	Events       []Event
 	Usage        codexResponsesUsage
 	FinishReason string
+	Diagnostics  []string
 }
 
 func buildCodexResponsesPayload(req ChatRequest) (codexResponsesPayload, error) {
@@ -169,16 +173,22 @@ func buildCodexResponsesPayload(req ChatRequest) (codexResponsesPayload, error) 
 }
 
 func normalizeCodexResponsesResponse(response codexResponsesResponse) (codexResponsesNormalized, error) {
+	return normalizeCodexResponsesResponseWithTools(response, nil)
+}
+
+func normalizeCodexResponsesResponseWithTools(response codexResponsesResponse, tools []ToolDescriptor) (codexResponsesNormalized, error) {
 	status := strings.ToLower(strings.TrimSpace(response.Status))
 	if status == "failed" || status == "cancelled" {
 		return codexResponsesNormalized{}, fmt.Errorf("codex responses status %q", response.Status)
 	}
 
 	output := response.Output
+	var diagnostics []string
 	if len(output) == 0 {
 		if strings.TrimSpace(response.OutputText) == "" {
 			return codexResponsesNormalized{}, errors.New("responses API returned no output items")
 		}
+		diagnostics = append(diagnostics, "repaired empty response.output from streamed output_text")
 		output = []codexResponsesOutputItem{{
 			Type:   "message",
 			Role:   "assistant",
@@ -235,12 +245,26 @@ func normalizeCodexResponsesResponse(response codexResponsesResponse) (codexResp
 				Name:      name,
 				Arguments: json.RawMessage(args),
 			})
+		default:
+			return codexResponsesNormalized{}, fmt.Errorf("unsupported Codex Responses output item %q", item.Type)
 		}
+	}
+	if len(toolCalls) > 0 && tools != nil {
+		repaired, err := RepairToolCalls(toolCalls, tools)
+		if err != nil {
+			return codexResponsesNormalized{}, err
+		}
+		toolCalls = repaired
 	}
 
 	content := strings.TrimSpace(strings.Join(textParts, "\n"))
 	if content == "" && strings.TrimSpace(response.OutputText) != "" {
 		content = strings.TrimSpace(response.OutputText)
+	}
+	if content != "" && len(toolCalls) == 0 && codexResponsesToolCallLeakPattern.MatchString(content) {
+		diagnostics = append(diagnostics, "rejected leaked tool-call text from assistant content")
+		content = ""
+		incomplete = true
 	}
 	if content != "" {
 		events = append(events, Event{Kind: EventToken, Token: content})
@@ -275,6 +299,7 @@ func normalizeCodexResponsesResponse(response codexResponsesResponse) (codexResp
 		Events:       events,
 		Usage:        response.Usage,
 		FinishReason: finishReason,
+		Diagnostics:  diagnostics,
 	}, nil
 }
 

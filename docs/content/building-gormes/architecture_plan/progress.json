@@ -2606,9 +2606,9 @@
             },
             {
               "name": "Codex stream repair + tool-call leak sanitizer",
-              "status": "planned",
+              "status": "complete",
               "contract": "Codex Responses streams repair empty output and reject leaked function-call text before parent history is updated",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -2636,7 +2636,7 @@
                 "Leaked to=functions.* text is rejected or repaired before it reaches parent history.",
                 "Tool-call arguments are sanitized to valid JSON without inventing missing required values."
               ],
-              "note": "Upstream Codex Responses support now includes repair paths for empty output, streaming tool-call argument issues, and tool-call text leakage. Keep these as a fixture-only provider slice after pure conversion, before live Codex routing.",
+              "note": "Complete: TDD added `internal/hermes/codex_stream_repair_test.go` and tightened the pure Codex Responses normalizer. Fixtures prove empty `response.output` with streamed `output_text` backfills final assistant content with repair diagnostics, leaked `to=functions.*` text is stripped and marked incomplete before parent history/event tokens are updated, descriptor-backed Codex function-call arguments are repaired to valid JSON, missing required arguments are rejected without invented values, and unsupported Responses output items fail loudly instead of being hidden by repair.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -2646,7 +2646,12 @@
               ],
               "done_signal": [
                 "Codex stream repair fixtures prove empty output, leaked tool-call text, and malformed arguments do not corrupt history."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T07:02:01Z",
+                "last_success": "2026-04-25T07:02:01Z"
+              }
             },
             {
               "name": "Cross-provider reasoning-tag sanitization",
