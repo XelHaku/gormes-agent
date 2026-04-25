@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,27 +24,43 @@ const (
 
 // Config wires the native API server HTTP surface.
 type Config struct {
-	APIKey       string
-	ModelName    string
-	MaxBodyBytes int64
-	Loop         TurnLoop
+	APIKey        string
+	ModelName     string
+	MaxBodyBytes  int64
+	Loop          TurnLoop
+	ResponseStore *ResponseStore
+	RunTTL        time.Duration
 }
 
 // Server exposes the OpenAI-compatible HTTP routes that can be mounted by the
 // gateway binary.
 type Server struct {
-	apiKey       string
-	modelName    string
-	maxBodyBytes int64
-	loop         TurnLoop
-	now          func() time.Time
-	mux          *http.ServeMux
+	apiKey                 string
+	modelName              string
+	maxBodyBytes           int64
+	loop                   TurnLoop
+	responseStore          *ResponseStore
+	runs                   *runRegistry
+	statusMu               sync.Mutex
+	previousResponseMisses int
+	now                    func() time.Time
+	mux                    *http.ServeMux
 }
 
 // ChatMessage is the normalized text shape passed from HTTP into gateway turns.
 type ChatMessage struct {
-	Role    string
-	Content string
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Name       string     `json:"name,omitempty"`
+}
+
+// ToolCall is the OpenAI function-call metadata preserved in response chains.
+type ToolCall struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 // TurnRequest is the chat-completions request after OpenAI message/content
@@ -70,6 +87,7 @@ type TurnResult struct {
 	SessionID    string
 	Usage        Usage
 	FinishReason string
+	Messages     []ChatMessage
 }
 
 // StreamCallbacks receives token deltas from a streaming native turn.
@@ -94,13 +112,23 @@ func NewServer(cfg Config) *Server {
 	if maxBody <= 0 {
 		maxBody = defaultMaxRequestBytes
 	}
+	responseStore := cfg.ResponseStore
+	if responseStore == nil {
+		responseStore = NewResponseStore(defaultMaxStoredResponses)
+	}
+	runTTL := cfg.RunTTL
+	if runTTL <= 0 {
+		runTTL = defaultRunStreamTTL
+	}
 	s := &Server{
-		apiKey:       cfg.APIKey,
-		modelName:    model,
-		maxBodyBytes: maxBody,
-		loop:         cfg.Loop,
-		now:          time.Now,
-		mux:          http.NewServeMux(),
+		apiKey:        cfg.APIKey,
+		modelName:     model,
+		maxBodyBytes:  maxBody,
+		loop:          cfg.Loop,
+		responseStore: responseStore,
+		runs:          newRunRegistry(runTTL, time.Now),
+		now:           time.Now,
+		mux:           http.NewServeMux(),
 	}
 	s.routes()
 	return s
@@ -116,6 +144,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/health", s.handleHealth)
 	s.mux.HandleFunc("/v1/models", s.handleModels)
 	s.mux.HandleFunc("/v1/chat/completions", s.handleChatCompletions)
+	s.mux.HandleFunc("/v1/responses", s.handleResponses)
+	s.mux.HandleFunc("/v1/responses/", s.handleResponseByID)
+	s.mux.HandleFunc("/v1/runs", s.handleRuns)
+	s.mux.HandleFunc("/v1/runs/", s.handleRunEvents)
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -132,8 +164,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":   "ok",
-		"platform": "gormes-agent",
+		"status":    "ok",
+		"platform":  "gormes-agent",
+		"responses": s.responseHealthStatus(),
+		"runs":      s.runHealthStatus(),
 	})
 }
 

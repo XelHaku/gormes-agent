@@ -96,7 +96,7 @@ func (l *KernelTurnLoop) run(ctx context.Context, req TurnRequest, onToken func(
 				return TurnResult{}, errors.New(f.LastError)
 			}
 			if f.Phase == kernel.PhaseIdle && len(f.History) > startHistoryLen {
-				return resultFromFrame(f, req), nil
+				return resultFromFrame(f, req, startHistoryLen), nil
 			}
 		}
 	}
@@ -123,7 +123,7 @@ func (l *KernelTurnLoop) rememberFrame(f kernel.RenderFrame) {
 	l.lastHistoryLen = len(f.History)
 }
 
-func resultFromFrame(f kernel.RenderFrame, req TurnRequest) TurnResult {
+func resultFromFrame(f kernel.RenderFrame, req TurnRequest, startHistoryLen int) TurnResult {
 	content := f.DraftText
 	for i := len(f.History) - 1; i >= 0; i-- {
 		if f.History[i].Role == "assistant" {
@@ -141,12 +141,40 @@ func resultFromFrame(f kernel.RenderFrame, req TurnRequest) TurnResult {
 		Content:      content,
 		SessionID:    sessionID,
 		FinishReason: "stop",
+		Messages:     newChatMessagesFromFrame(f, req, startHistoryLen),
 		Usage: Usage{
 			PromptTokens:     prompt,
 			CompletionTokens: completion,
 			TotalTokens:      prompt + completion,
 		},
 	}
+}
+
+func newChatMessagesFromFrame(f kernel.RenderFrame, req TurnRequest, startHistoryLen int) []ChatMessage {
+	if startHistoryLen < 0 || startHistoryLen > len(f.History) {
+		startHistoryLen = 0
+	}
+	messages := make([]ChatMessage, 0, len(f.History)-startHistoryLen)
+	for _, msg := range f.History[startHistoryLen:] {
+		converted := ChatMessage{
+			Role:       msg.Role,
+			Content:    msg.Content,
+			ToolCallID: msg.ToolCallID,
+			Name:       msg.Name,
+		}
+		for _, call := range msg.ToolCalls {
+			converted.ToolCalls = append(converted.ToolCalls, ToolCall{
+				ID:        call.ID,
+				Name:      call.Name,
+				Arguments: string(call.Arguments),
+			})
+		}
+		messages = append(messages, converted)
+	}
+	if len(messages) > 0 && messages[0].Role == "user" && messages[0].Content == req.UserMessage {
+		messages = messages[1:]
+	}
+	return messages
 }
 
 func draftDelta(previous, next string) string {
@@ -169,10 +197,17 @@ func buildKernelSessionContext(req TurnRequest) string {
 		for _, msg := range req.History {
 			role := strings.TrimSpace(msg.Role)
 			content := strings.TrimSpace(msg.Content)
-			if role == "" || content == "" {
+			if role == "" || (content == "" && len(msg.ToolCalls) == 0 && msg.ToolCallID == "") {
 				continue
 			}
-			lines = append(lines, role+": "+content)
+			line := role + ": " + content
+			for _, call := range msg.ToolCalls {
+				line += "\n" + "assistant tool_call " + call.ID + " " + call.Name + ": " + call.Arguments
+			}
+			if msg.ToolCallID != "" {
+				line += "\n" + "tool_result " + msg.ToolCallID + " " + msg.Name + ": " + content
+			}
+			lines = append(lines, line)
 		}
 		if len(lines) > 1 {
 			blocks = append(blocks, strings.Join(lines, "\n"))

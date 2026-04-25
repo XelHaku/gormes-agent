@@ -3895,7 +3895,7 @@
             },
             {
               "name": "Responses API store + run event stream",
-              "status": "planned",
+              "status": "completed",
               "contract": "Stateful OpenAI Responses and runs APIs over the same native session chain as chat completions",
               "contract_status": "draft",
               "slice_size": "medium",
@@ -3929,7 +3929,7 @@
                 "previous_response_id and conversation IDs reconstruct full history including tool calls/results.",
                 "/v1/runs and /v1/runs/{id}/events stream lifecycle events and sweep orphaned runs."
               ],
-              "note": "TDD: port ResponseStore as a bounded persistent read model, previous_response_id chaining, GET/DELETE /v1/responses, POST /v1/runs, GET /v1/runs/{run_id}/events SSE, and orphaned-run cleanup as fixtures before external OpenAI-compatible clients depend on stateful runs.",
+              "note": "Complete: TDD landed a bounded bbolt-backed ResponseStore with LRU eviction, GET/DELETE /v1/responses, previous_response_id and conversation-name chaining over native session IDs including tool calls/results, /v1/runs lifecycle SSE, orphaned-run sweep, and API health counters for store state, LRU evictions, orphan sweeps, and previous_response_id misses.",
               "write_scope": [
                 "internal/apiserver/",
                 "internal/session/",
@@ -3941,7 +3941,12 @@
               ],
               "done_signal": [
                 "Responses/runs fixtures prove bounded response storage, previous_response_id chaining, event streaming, and orphan cleanup over native session state."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T06:45:48Z",
+                "last_success": "2026-04-25T06:45:48Z"
+              }
             },
             {
               "name": "API server disconnect snapshot persistence",

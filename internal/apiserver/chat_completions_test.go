@@ -157,10 +157,10 @@ func TestChatCompletions_NormalizesContentPartsForGatewayUserMessage(t *testing.
 	if len(call.History) != 2 {
 		t.Fatalf("len(History) = %d, want 2", len(call.History))
 	}
-	if call.History[0] != (ChatMessage{Role: "user", Content: "first question"}) {
+	if call.History[0].Role != "user" || call.History[0].Content != "first question" {
 		t.Fatalf("History[0] = %+v", call.History[0])
 	}
-	if call.History[1] != (ChatMessage{Role: "assistant", Content: "first answer"}) {
+	if call.History[1].Role != "assistant" || call.History[1].Content != "first answer" {
 		t.Fatalf("History[1] = %+v", call.History[1])
 	}
 }
