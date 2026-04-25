@@ -3241,9 +3241,9 @@
             {
               "name": "Compression token-budget trigger + summary sizing",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Go context compression budget state recalculates threshold, tail, and summary token budgets whenever the active model context window changes",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -3277,7 +3277,7 @@
                 "Summary target ratio is clamped to the upstream 0.10-0.80 range and the threshold floor preserves MINIMUM_CONTEXT_LENGTH-equivalent behavior.",
                 "The focused test mirrors Hermes TestUpdateModelBudgets without wiring compression into the kernel or requiring provider credentials."
               ],
-              "note": "Upstream Hermes 5401a008 fixed ContextCompressor.update_model after tail_token_budget and max_summary_tokens stayed calibrated to the old model window during model switches. Gormes already has the status boundary and provider-cap resolver, but no native compressor budget state, so this row is the first pure 4.B budget slice before message pruning or summarization lands.",
+              "note": "Complete: TDD landed a pure internal/hermes ContextCompressorBudget helper mirroring upstream Hermes 5401a008 budget recalculation. Fixtures prove 200K initialization, 200K to 32K model-window updates, summary_target_ratio clamping, the 64K minimum-context threshold floor, max_summary_tokens sizing, and unavailable degraded status for unknown model windows without kernel wiring, provider credentials, summarizer calls, or message-history mutation.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -3296,6 +3296,11 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5401a008 agent/context_compressor.py",
                 "note": "Hermes defines the compressor budget behavior; Gormes must adapt it to Go-native ContextEngine budget/status code without importing Python runtime."
+              },
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T10:34:30Z",
+                "last_success": "2026-04-25T10:34:30Z"
               }
             },
             {
