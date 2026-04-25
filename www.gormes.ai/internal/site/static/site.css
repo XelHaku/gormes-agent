@@ -254,13 +254,15 @@ a:focus-visible,
 .hero-subhead p:nth-child(2) { color: var(--muted-strong); }
 .hero-subhead p:nth-child(3) { color: var(--muted); }
 /* "Early-stage." stamp sits between subhead and CTAs: claim →
-   qualifier → action. The qualifier reads before the user
-   commits to the action below. Margin lives at the bottom now
-   so the gap-to-CTA is owned by this block. */
+   qualifier → action. Wider gap below (32px) so the stamp and
+   the CTA pair don't visually merge into one block — the eye
+   reads them as two distinct elements. Border-left at lower
+   saturation so the accent rule signals without competing with
+   the $ prompt above and the INSTALL button below. */
 .hero-note {
-  margin: 0 0 24px;
+  margin: 0 0 32px;
   max-width: 560px;
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid rgba(240, 200, 75, 0.55);
   background: var(--bg-1);
   padding: 10px 16px 12px;
   display: flex;
@@ -281,13 +283,13 @@ a:focus-visible,
   color: var(--muted-strong);
 }
 .hero-ctas {
-  /* INSTALL + VIEW SOURCE form a tighter pair — narrower gap so
-     the secondary link reads as attached to the button, not a
+  /* INSTALL + VIEW SOURCE form a tight pair — 6px gap so the
+     secondary link reads as attached to the button, not a
      detached afterthought below it. */
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -313,9 +315,9 @@ a:focus-visible,
 .btn-primary {
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 13.5px;
+  font-size: 13px;
   letter-spacing: 0.10em;
-  padding: 14px 28px;
+  padding: 12px 24px;
   /* 1px inner highlight + 1px inner shadow gives the button a
      subtle embossed depth without the SaaS-y drop shadow. */
   box-shadow:
@@ -862,9 +864,17 @@ a:focus-visible,
     font-size: 16px;
   }
   .hero-note {
-    /* Tighter bottom gap on mobile so the qualifier sits closer to
-       the CTAs it precedes. */
-    margin-bottom: 18px;
+    /* Mobile gap below qualifier — 24px so the stamp doesn't
+       visually merge with the CTA pair below it on small screens.
+     */
+    margin-bottom: 24px;
+  }
+  /* Right-side hero grid hidden on mobile — there's no right
+     gutter at narrow widths for it to live in, so it would just
+     overlap the CTA buttons and add visual noise. The grid stays
+     on desktop where it has actual empty space to occupy. */
+  .hero::after {
+    display: none;
   }
   .install-inner,
   .why-inner,
