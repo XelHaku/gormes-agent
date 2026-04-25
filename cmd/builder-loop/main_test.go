@@ -96,6 +96,26 @@ func TestWriteDigestOutputRefusesClobber(t *testing.T) {
 	}
 }
 
+func TestClassifyExitCodes(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "parse", err: fmt.Errorf("%w: nope", errParse), want: exitParseError},
+		{name: "verify-failed", err: fmt.Errorf("wrap: %w", builderloop.ErrPostPromotionVerifyFailed), want: exitVerifyFailed},
+		{name: "deadline", err: context.DeadlineExceeded, want: exitBackendTimeout},
+		{name: "canceled", err: context.Canceled, want: exitBackendTimeout},
+		{name: "other", err: errors.New("something else"), want: exitInternal},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyExit(tc.err); got != tc.want {
+				t.Fatalf("classifyExit(%v) = %d, want %d", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestParseFormatDefaultsToText(t *testing.T) {
 	got, err := parseFormat(nil, "doctor")
 	if err != nil {

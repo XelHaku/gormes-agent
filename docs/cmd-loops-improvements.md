@@ -23,8 +23,8 @@ leverage.
 | 9 | Move `progress` and `repo` subcommands out of `builder-loop`         | done         |
 | 10 | Collapse `progress write` to a table-driven loop                    | done         |
 | 11 | Replace package-level test-seam globals with a `cliDeps` struct     | done         |
-| 12 | Structured exit codes                                                | partial      |
-| 13 | `--format json` for read-only commands                               | partial      |
+| 12 | Structured exit codes                                                | done         |
+| 13 | `--format json` for read-only commands                               | done         |
 | 14 | `--repo-root` / `REPO_ROOT` flag                                     | done         |
 | 15 | `digest --output` should refuse to clobber unless `--force`          | done         |
 
@@ -182,6 +182,20 @@ from "no candidates this cycle" (retry quickly) from "backend timeout"
 backend-timeout=20, verify-failed=30, internal=1) and `os.Exit` with the
 right value.
 
+**Status (2026-04-25).** Wired in both binaries. The classifyExit
+helper maps:
+- `errors.Is(err, errParse)` → 2 (parse / config)
+- `errors.Is(err, builderloop.ErrPostPromotionVerifyFailed)` → 30
+  (builder-loop only)
+- `errors.Is(err, context.DeadlineExceeded | context.Canceled)` → 20
+  (backend timeout / signal)
+- everything else → 1 (internal)
+
+The "no-work=10" code is intentionally not used: a 0-candidates run is
+a normal idle tick, not a failure. systemd `Restart=on-failure` would
+flap if 10 were emitted on every uneventful tick. Operators who want
+flap on idle can wrap with a script.
+
 ### 13. `--format json` for read-only commands
 
 `digest`, `audit`, `status`, `doctor`, and `progress validate` print human
@@ -191,13 +205,21 @@ prose. External tooling that wants this state currently parses
 **Fix.** Each command grows a `--format text|json` flag (default text).
 JSON output is documented and stable enough to script against.
 
-**Status (2026-04-25).** `progress validate`, `builder-loop doctor`, and
-`planner-loop doctor` now accept `--format json`. The remaining commands
-(`digest`, `audit`, `status`) still emit only prose because their
-underlying internal helpers return strings, not structured data. Wiring
-them requires either refactoring the internal helpers to return data
-structs (and the cmd serializes) or adding `*JSON` variants. Deferred
-until an external consumer actually needs them.
+**Status (2026-04-25).** All five commands (`progress validate`,
+`builder-loop doctor`, `planner-loop doctor`, `digest`, `audit`,
+`status`) now accept `--format text|json`.
+
+JSON shapes:
+- `progress validate`: `{"ok":true,"phases":N}`
+- `doctor` (both): `{"ok":true,"warnings":[...]}`
+- `digest`: `{"<event>":<count>,...}` — full event-count map from a new
+  `internal/builderloop.DigestLedgerCounts(path)` companion to the
+  text-emitting `DigestLedger`.
+- `audit`: `{"summary":"<text>"}` — the structured audit data lives in
+  the audit dir's `report.ndjson`/`report.csv` already, so the wrapper
+  exists primarily to give scripts a stable JSON object to parse.
+- `status`: `{"status":"<text>"}` — same rationale; structured planner
+  state lives in `planner_state.json`.
 
 ### 14. `--repo-root` / `REPO_ROOT` flag
 

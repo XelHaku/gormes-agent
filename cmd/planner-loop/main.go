@@ -42,7 +42,7 @@ const usage = "usage: planner-loop [--repo-root <path>] run [--dry-run] [--backe
 // subcommand prints the matching entry instead of the full top-level usage.
 var subUsage = map[string]string{
 	"run":             "usage: planner-loop run [--dry-run] [--backend codexu|claudeu] [--mode safe|full|unattended] [keyword ...]",
-	"status":          "usage: planner-loop status",
+	"status":          "usage: planner-loop status [--format text|json]",
 	"show-report":     "usage: planner-loop show-report",
 	"doctor":          "usage: planner-loop doctor",
 	"trigger":         "usage: planner-loop trigger <reason>",
@@ -57,6 +57,31 @@ var supportedPlannerBackends = []string{"codexu", "claudeu"}
 
 // errParse marks parser-level failures so main() can map them to exit code 2.
 var errParse = errors.New("parse error")
+
+// Exit codes (mirrors cmd/builder-loop):
+//
+//	2 — config / parse error
+//	20 — backend timeout (context deadline / cancel)
+//	1 — anything else (internal error)
+//
+// The planner does not have its own verify gate, so exit 30 is
+// builder-loop-only.
+const (
+	exitInternal       = 1
+	exitParseError     = 2
+	exitBackendTimeout = 20
+)
+
+func classifyExit(err error) int {
+	switch {
+	case errors.Is(err, errParse):
+		return exitParseError
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		return exitBackendTimeout
+	default:
+		return exitInternal
+	}
+}
 
 // wantsHelp returns true if any arg is --help or -h.
 func wantsHelp(args []string) bool {
@@ -86,10 +111,7 @@ func main() {
 	deps := defaultDeps()
 	if err := run(ctx, deps, os.Args[1:]); err != nil {
 		fmt.Fprintln(deps.stderr, err)
-		if errors.Is(err, errParse) {
-			os.Exit(2)
-		}
-		os.Exit(1)
+		os.Exit(classifyExit(err))
 	}
 }
 
@@ -129,11 +151,15 @@ func run(ctx context.Context, deps cliDeps, args []string) error {
 		if wantsHelp(args[1:]) {
 			return printHelp(deps, "status")
 		}
+		format, err := parseFormat(args[1:], "status")
+		if err != nil {
+			return err
+		}
 		cfg, err := plannerloop.ConfigFromEnv(root, plannerLookup(runOptions{}))
 		if err != nil {
 			return err
 		}
-		return printStatus(deps, cfg)
+		return printStatus(deps, cfg, format)
 	case "show-report":
 		if wantsHelp(args[1:]) {
 			return printHelp(deps, "show-report")
@@ -300,7 +326,7 @@ func printRunSummary(deps cliDeps, summary plannerloop.RunSummary, dryRun bool, 
 	return nil
 }
 
-func printStatus(deps cliDeps, cfg plannerloop.Config) error {
+func printStatus(deps cliDeps, cfg plannerloop.Config, format string) error {
 	out, err := plannerloop.RenderStatus(plannerloop.RenderStatusOptions{
 		StatePath:          filepath.Join(cfg.RunRoot, "planner_state.json"),
 		PlannerLedgerPath:  filepath.Join(cfg.RunRoot, "state", "runs.jsonl"),
@@ -310,6 +336,16 @@ func printStatus(deps cliDeps, cfg plannerloop.Config) error {
 	})
 	if err != nil {
 		return err
+	}
+	if format == "json" {
+		// RenderStatus returns a multi-line operator-facing block. The
+		// underlying structured data lives in planner_state.json (and the
+		// ledgers); JSON callers should read those directly. This wrapper
+		// gives them a stable schema (a single "status" string) so they
+		// can pipe through `jq` etc. for triage scripts.
+		return json.NewEncoder(deps.stdout).Encode(struct {
+			Status string `json:"status"`
+		}{Status: out})
 	}
 	_, err = io.WriteString(deps.stdout, out)
 	return err

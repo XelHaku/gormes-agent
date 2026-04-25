@@ -16,6 +16,13 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/internal/progress"
 )
 
+// ErrPostPromotionVerifyFailed marks a RunOnce error as caused by the
+// post-promotion verify gate failing (and exhausting any configured repair
+// attempts). cmd/ binaries use errors.Is against this sentinel to map the
+// outcome to a distinct exit code so systemd / CI can react differently
+// from a generic internal error.
+var ErrPostPromotionVerifyFailed = errors.New("post-promotion verify failed")
+
 type RunOptions struct {
 	Config Config
 	Runner Runner
@@ -364,7 +371,7 @@ func runPostPromotionGate(ctx context.Context, cfg Config, runner Runner, runID 
 			Status: "post_promotion_verify_failed",
 			Detail: truncateLedgerDetail(verifyErr.Error()),
 		})
-		return verifyErr
+		return errors.Join(ErrPostPromotionVerifyFailed, verifyErr)
 	}
 
 	lastErr := verifyErr
@@ -392,7 +399,7 @@ func runPostPromotionGate(ctx context.Context, cfg Config, runner Runner, runID 
 		Status: "post_promotion_verify_failed",
 		Detail: truncateLedgerDetail(lastErr.Error()),
 	})
-	return lastErr
+	return errors.Join(ErrPostPromotionVerifyFailed, lastErr)
 }
 
 // runPrePromotionGate orchestrates the pre-promotion verify-repair-verify

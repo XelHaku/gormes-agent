@@ -47,8 +47,8 @@ var subUsage = map[string]string{
 	"repo":                          "usage: builder-loop repo {benchmark record|readme update}",
 	"repo benchmark":                "usage: builder-loop repo benchmark record",
 	"repo readme":                   "usage: builder-loop repo readme update",
-	"audit":                         "usage: builder-loop audit",
-	"digest":                        "usage: builder-loop digest [--output <path>] [--force]",
+	"audit":                         "usage: builder-loop audit [--format text|json]",
+	"digest":                        "usage: builder-loop digest [--output <path>] [--force] [--format text|json]",
 	"doctor":                        "usage: builder-loop doctor [--format text|json]",
 	"progress validate":             "usage: builder-loop progress validate [--format text|json]",
 	"service":                       "usage: builder-loop service {install|install-audit|disable legacy-timers} [--force]",
@@ -65,6 +65,36 @@ var supportedBuilderBackends = []string{"codexu", "claudeu", "opencode"}
 
 // errParse marks parser-level failures so main() can map them to exit code 2.
 var errParse = errors.New("parse error")
+
+// Exit codes used by the binary. Operators (and systemd Restart= /
+// OnFailure= rules) can branch on these without parsing stderr.
+//
+//	2 — config / parse error: don't retry, fix the invocation
+//	20 — backend timeout (context deadline / cancel): retry with backoff
+//	30 — post-promotion verify gate failed: page operator
+//	1 — anything else (internal error)
+const (
+	exitInternal       = 1
+	exitParseError     = 2
+	exitBackendTimeout = 20
+	exitVerifyFailed   = 30
+)
+
+// classifyExit picks an exit code from err. The order matters: parse errors
+// take precedence over context-cancel because a malformed flag should still
+// exit 2 even if the surrounding context happens to have been canceled.
+func classifyExit(err error) int {
+	switch {
+	case errors.Is(err, errParse):
+		return exitParseError
+	case errors.Is(err, builderloop.ErrPostPromotionVerifyFailed):
+		return exitVerifyFailed
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		return exitBackendTimeout
+	default:
+		return exitInternal
+	}
+}
 
 // wantsHelp returns true if any arg is --help or -h. Subcommand handlers
 // short-circuit on this so help routing is consistent across the binary.
@@ -95,10 +125,7 @@ func main() {
 	deps := defaultDeps()
 	if err := run(ctx, deps, os.Args[1:]); err != nil {
 		fmt.Fprintln(deps.stderr, err)
-		if errors.Is(err, errParse) {
-			os.Exit(2)
-		}
-		os.Exit(1)
+		os.Exit(classifyExit(err))
 	}
 }
 
@@ -158,7 +185,19 @@ func run(ctx context.Context, deps cliDeps, args []string) error {
 		if err != nil {
 			return err
 		}
-		digest, err := builderloop.DigestLedger(filepath.Join(digestRunRoot(root), "state", "runs.jsonl"))
+		ledgerPath := filepath.Join(digestRunRoot(root), "state", "runs.jsonl")
+		if opts.format == "json" {
+			counts, err := builderloop.DigestLedgerCounts(ledgerPath)
+			if err != nil {
+				return err
+			}
+			if opts.outputPath != "" {
+				body, _ := json.Marshal(counts)
+				return writeDigestOutput(opts.outputPath, string(body)+"\n", opts.force)
+			}
+			return json.NewEncoder(deps.stdout).Encode(counts)
+		}
+		digest, err := builderloop.DigestLedger(ledgerPath)
 		if err != nil {
 			return err
 		}
@@ -171,8 +210,9 @@ func run(ctx context.Context, deps cliDeps, args []string) error {
 		if wantsHelp(args[1:]) {
 			return printHelp(deps, "audit")
 		}
-		if len(args) != 1 {
-			return fmt.Errorf("%w\n%s", errParse, subUsage["audit"])
+		format, err := parseFormat(args[1:], "audit")
+		if err != nil {
+			return err
 		}
 		auditDir, err := auditReportDir()
 		if err != nil {
@@ -184,6 +224,15 @@ func run(ctx context.Context, deps cliDeps, args []string) error {
 		})
 		if err != nil {
 			return err
+		}
+		if format == "json" {
+			// summary is a multi-line text block; the audit ledger itself
+			// (audit.AuditDir/report.ndjson) carries the structured line.
+			// Wrap the text so callers have a stable JSON object to parse
+			// while still reading the same content.
+			return json.NewEncoder(deps.stdout).Encode(struct {
+				Summary string `json:"summary"`
+			}{Summary: summary})
 		}
 		_, err = fmt.Fprint(deps.stdout, summary)
 		return err
@@ -305,10 +354,11 @@ func resolveRepoRoot(args []string) ([]string, string, error) {
 type digestOptions struct {
 	outputPath string
 	force      bool
+	format     string
 }
 
 func parseDigestOptions(args []string) (digestOptions, error) {
-	opts := digestOptions{}
+	opts := digestOptions{format: "text"}
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--output":
@@ -319,6 +369,18 @@ func parseDigestOptions(args []string) (digestOptions, error) {
 			i++
 		case "--force":
 			opts.force = true
+		case "--format":
+			if i+1 >= len(args) {
+				return digestOptions{}, fmt.Errorf("%w: --format requires a value\n%s", errParse, subUsage["digest"])
+			}
+			switch args[i+1] {
+			case "text", "json":
+				opts.format = args[i+1]
+			default:
+				return digestOptions{}, fmt.Errorf("%w: --format must be text or json (got %q)\n%s",
+					errParse, args[i+1], subUsage["digest"])
+			}
+			i++
 		default:
 			return digestOptions{}, fmt.Errorf("%w\n%s", errParse, usage)
 		}

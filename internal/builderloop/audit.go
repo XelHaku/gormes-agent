@@ -10,12 +10,25 @@ import (
 )
 
 func DigestLedger(path string) (string, error) {
+	counts, err := DigestLedgerCounts(path)
+	if err != nil {
+		return "", err
+	}
+	return formatDigest(counts), nil
+}
+
+// DigestLedgerCounts returns the per-event counts that DigestLedger
+// formats as text. Exposed so callers (notably cmd/builder-loop digest
+// --format json) can emit the structured shape directly without
+// re-parsing prose. A missing ledger file returns an empty map and nil
+// error to match DigestLedger.
+func DigestLedgerCounts(path string) (map[string]int, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return formatDigest(map[string]int{}), nil
+			return map[string]int{}, nil
 		}
-		return "", err
+		return nil, err
 	}
 	defer file.Close()
 
@@ -24,15 +37,14 @@ func DigestLedger(path string) (string, error) {
 	for scanner.Scan() {
 		var event LedgerEvent
 		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
-			return "", err
+			return nil, err
 		}
 		counts[event.Event]++
 	}
 	if err := scanner.Err(); err != nil {
-		return "", err
+		return nil, err
 	}
-
-	return formatDigest(counts), nil
+	return counts, nil
 }
 
 func formatDigest(counts map[string]int) string {
