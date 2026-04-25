@@ -1,0 +1,122 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "look up weather"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "text": "Checking the weather."
+        },
+        {
+          "reasoningContent": {
+            "reasoningText": {
+              "text": "Need current weather.",
+              "signature": "sig-bedrock"
+            }
+          }
+        },
+        {
+          "toolUse": {
+            "toolUseId": "toolu_weather",
+            "name": "get_weather",
+            "input": {
+              "location": "Monterrey",
+              "unit": "f"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "toolResult": {
+            "toolUseId": "toolu_weather",
+            "content": [
+              {
+                "text": "{\"temperature\":\"72F\",\"condition\":\"sunny\"}"
+              }
+            ]
+          }
+        },
+        {
+          "cachePoint": {
+            "type": "default"
+          }
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "text": " "
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": " "
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "text": "Follow ops policy."
+    },
+    {
+      "cachePoint": {
+        "type": "default",
+        "ttl": "1h"
+      }
+    }
+  ],
+  "inferenceConfig": {
+    "maxTokens": 2048,
+    "temperature": 0.35
+  },
+  "toolConfig": {
+    "tools": [
+      {
+        "toolSpec": {
+          "name": "get_weather",
+          "description": "Returns current weather.",
+          "inputSchema": {
+            "json": {
+              "type": "object",
+              "properties": {
+                "location": {
+                  "type": "string",
+                  "description": "City name"
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": [
+                    "c",
+                    "f"
+                  ]
+                }
+              },
+              "required": [
+                "location",
+                "unit"
+              ],
+              "additionalProperties": false
+            }
+          }
+        }
+      }
+    ]
+  }
+}

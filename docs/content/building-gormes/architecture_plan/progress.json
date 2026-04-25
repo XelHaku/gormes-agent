@@ -2370,9 +2370,9 @@
             },
             {
               "name": "Bedrock Converse payload mapping (no AWS SDK)",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure Bedrock Converse request mapping over the shared provider message/tool contract",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -2400,7 +2400,7 @@
                 "Tool definitions map to Bedrock toolSpec inputSchema without dropping required fields.",
                 "Golden request fixtures pin max_tokens, temperature, cache/reasoning passthrough, and empty-content placeholders."
               ],
-              "note": "TDD first slice: port Bedrock Converse request-payload shaping plus canonical Message->Bedrock tool-aware mapping with pure fixtures and no AWS SDK dependency. Land alongside a request-body golden file that pins role/tool-result block order, reasoning/cache-control passthrough, and max_tokens/temperature translation. Gates the next two slices.",
+              "note": "Complete: TDD added pure Bedrock Converse request-payload shaping in `internal/hermes` plus a request-body golden fixture. The mapper converts shared system/user/assistant/tool-result messages into Converse roles and content blocks, preserves assistant reasoning blocks and Bedrock cachePoint hints, maps tool definitions to `toolSpec.inputSchema.json` without dropping required fields, and pins `inferenceConfig.maxTokens`/`temperature` plus empty-content placeholders without importing AWS SDK clients or signing live requests. Bedrock remains unavailable until stream decoding and credential wiring land.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"

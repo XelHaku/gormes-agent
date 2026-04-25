@@ -37,12 +37,13 @@ type RunEventStream interface {
 }
 
 type ChatRequest struct {
-	Model     string
-	MaxTokens int
-	Messages  []Message
-	SessionID string
-	Stream    bool
-	Tools     []ToolDescriptor // omitempty at wire time via the Marshal path in http_client
+	Model       string
+	MaxTokens   int
+	Temperature *float64
+	Messages    []Message
+	SessionID   string
+	Stream      bool
+	Tools       []ToolDescriptor // omitempty at wire time via the Marshal path in http_client
 }
 
 // ToolDescriptor mirrors tools.ToolDescriptor so hermes stays
@@ -71,18 +72,28 @@ func (d ToolDescriptor) MarshalJSON() ([]byte, error) {
 }
 
 type Message struct {
-	Role         string        `json:"role"`
-	Content      string        `json:"content"`
-	CacheControl *CacheControl `json:"cache_control,omitempty"`
-	ToolCalls    []ToolCall    `json:"tool_calls,omitempty"`   // set only on assistant messages that requested tools
-	ToolCallID   string        `json:"tool_call_id,omitempty"` // set only on "tool" role messages replying to a call
-	Name         string        `json:"name,omitempty"`         // set only on "tool" role messages; echoes the tool name
+	Role         string            `json:"role"`
+	Content      string            `json:"content"`
+	CacheControl *CacheControl     `json:"cache_control,omitempty"`
+	Reasoning    *ReasoningContent `json:"reasoning,omitempty"`
+	ToolCalls    []ToolCall        `json:"tool_calls,omitempty"`   // set only on assistant messages that requested tools
+	ToolCallID   string            `json:"tool_call_id,omitempty"` // set only on "tool" role messages replying to a call
+	Name         string            `json:"name,omitempty"`         // set only on "tool" role messages; echoes the tool name
 }
 
 // CacheControl carries provider-specific prompt-caching hints on content
 // blocks. Providers that do not support cache markers ignore it.
 type CacheControl struct {
 	Type string `json:"type"`
+	TTL  string `json:"ttl,omitempty"`
+}
+
+// ReasoningContent carries provider-native reasoning echoes that must be
+// replayed alongside assistant turns for providers that require them.
+type ReasoningContent struct {
+	Text            string `json:"text,omitempty"`
+	Signature       string `json:"signature,omitempty"`
+	RedactedContent string `json:"redacted_content,omitempty"`
 }
 
 // ToolCall is one function-call request made by the LLM.
