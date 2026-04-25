@@ -74,6 +74,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		if _, err := autoloop.MergeOpenPullRequests(ctx, autoloop.PullRequestIntakeOptions{
 			Runner:   runner,
 			RepoRoot: cfg.RepoRoot,
+			RunRoot:  cfg.RunRoot,
 			RunID:    runID,
 		}); err != nil {
 			return RunSummary{}, err

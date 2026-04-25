@@ -149,7 +149,10 @@ func TestRunOnceMergesOpenPullRequestsBeforeSyncAndPlannerPrompt(t *testing.T) {
 	cfg.MergeOpenPullRequests = true
 	runner := &autoloop.FakeRunner{
 		Results: []autoloop.Result{
+			{Stdout: "git@github.com:TrebuchetDynamics/gormes-agent.git\n"},
 			{Stdout: `[{"number": 11, "title": "planner fix", "isDraft": false, "mergeStateStatus": "CLEAN", "headRefName": "planner/fix"}]`},
+			{},
+			{},
 			{},
 			{},
 			{Stdout: "Already up to date.\n"},
@@ -168,11 +171,13 @@ func TestRunOnceMergesOpenPullRequestsBeforeSyncAndPlannerPrompt(t *testing.T) {
 	}
 
 	wantPrefix := []autoloop.Command{
-		{Name: "gh", Args: []string{"pr", "list", "--state", "open", "--limit", "100", "--json", "number,title,isDraft,mergeStateStatus,headRefName,url"}, Dir: repoRoot},
-		{Name: "gh", Args: []string{"pr", "merge", "11", "--merge", "--delete-branch", "--admin"}, Dir: repoRoot},
-		{Name: "git", Args: []string{"pull", "--ff-only"}, Dir: repoRoot},
+		{Name: "git", Args: []string{"remote", "get-url", "origin"}, Dir: repoRoot},
+		{Name: "gh", Args: []string{"pr", "list", "--repo", "TrebuchetDynamics/gormes-agent", "--state", "open", "--limit", "100", "--json", "number,title,isDraft,mergeStateStatus,headRefName,url"}, Dir: repoRoot},
+		{Name: "gh", Args: []string{"pr", "merge", "11", "--repo", "TrebuchetDynamics/gormes-agent", "--merge", "--delete-branch", "--admin"}, Dir: repoRoot},
+		{Name: "git", Args: []string{"fetch", "origin", "main"}, Dir: repoRoot},
+		{Name: "git", Args: []string{"merge", "--ff-only", "FETCH_HEAD"}, Dir: repoRoot},
 	}
-	if got := runner.Commands[:3]; !reflect.DeepEqual(got, wantPrefix) {
+	if got := runner.Commands[:5]; !reflect.DeepEqual(got, wantPrefix) {
 		t.Fatalf("command prefix = %#v, want %#v", got, wantPrefix)
 	}
 }

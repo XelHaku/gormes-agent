@@ -86,6 +86,7 @@ func TestMergeOpenPullRequestsContinuesAfterMergeFailures(t *testing.T) {
 		{},
 		{Err: wantErr, Stderr: "merge conflicts"},
 		{},
+		{},
 	}}
 
 	summary, err := MergeOpenPullRequests(context.Background(), PullRequestIntakeOptions{

@@ -64,7 +64,9 @@ func TestRunOnceMergesOpenPullRequestsBeforeSelectingWork(t *testing.T) {
 	progressPath := writeProgressJSON(t, `{"phases": {}}`)
 	runRoot := t.TempDir()
 	runner := &FakeRunner{Results: []Result{
+		{Stdout: "git@github.com:TrebuchetDynamics/gormes-agent.git\n"},
 		{Stdout: `[{"number": 7, "title": "land worker", "isDraft": false, "mergeStateStatus": "CLEAN", "headRefName": "autoloop/run"}]`},
+		{},
 		{},
 		{},
 		{},
@@ -87,11 +89,14 @@ func TestRunOnceMergesOpenPullRequestsBeforeSelectingWork(t *testing.T) {
 		t.Fatalf("RunOnce() error = %v", err)
 	}
 
-	if got, want := runner.Commands[0], (Command{Name: "gh", Args: []string{"pr", "list", "--state", "open", "--limit", "100", "--json", "number,title,isDraft,mergeStateStatus,headRefName,url"}, Dir: repoRoot}); !reflect.DeepEqual(got, want) {
-		t.Fatalf("first command = %#v, want PR list command %#v", got, want)
+	if got, want := runner.Commands[0], (Command{Name: "git", Args: []string{"remote", "get-url", "origin"}, Dir: repoRoot}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("first command = %#v, want remote command %#v", got, want)
 	}
-	if got, want := runner.Commands[1], (Command{Name: "gh", Args: []string{"pr", "merge", "7", "--merge", "--delete-branch", "--admin"}, Dir: repoRoot}); !reflect.DeepEqual(got, want) {
-		t.Fatalf("second command = %#v, want PR merge command %#v", got, want)
+	if got, want := runner.Commands[1], (Command{Name: "gh", Args: []string{"pr", "list", "--repo", "TrebuchetDynamics/gormes-agent", "--state", "open", "--limit", "100", "--json", "number,title,isDraft,mergeStateStatus,headRefName,url"}, Dir: repoRoot}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("second command = %#v, want PR list command %#v", got, want)
+	}
+	if got, want := runner.Commands[2], (Command{Name: "gh", Args: []string{"pr", "merge", "7", "--repo", "TrebuchetDynamics/gormes-agent", "--merge", "--delete-branch", "--admin"}, Dir: repoRoot}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("third command = %#v, want PR merge command %#v", got, want)
 	}
 
 	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
