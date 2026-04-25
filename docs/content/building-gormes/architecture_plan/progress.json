@@ -3654,9 +3654,9 @@
             },
             {
               "name": "PTY bridge protocol adapter",
-              "status": "planned",
+              "status": "complete",
               "contract": "Dashboard/TUI PTY sessions expose bounded read, write, resize, close, and unavailable-state behavior through a testable adapter",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -3684,7 +3684,7 @@
                 "Writes and resize messages validate input before reaching the PTY.",
                 "Unsupported platforms return PtyUnavailable-style errors without starting a shell."
               ],
-              "note": "Upstream added `hermes_cli/pty_bridge.py` plus dashboard `/api/pty` wiring. Port the PTY adapter as a small protocol slice before any dashboard or remote TUI transport work consumes it.",
+              "note": "Complete: TDD landed internal/cli/pty_bridge_test.go plus a small internal/cli PTY adapter. Fixtures prove bounded read timeout/chunk behavior, write forwarding with pre-session validation, resize escape validation and winsize forwarding, idempotent close/child termination, and ErrPtyUnavailable degradation before spawn on unsupported platforms without dashboard, network, or live TUI dependencies.",
               "write_scope": [
                 "internal/cli/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
