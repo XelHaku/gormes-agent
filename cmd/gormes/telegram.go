@@ -115,11 +115,9 @@ func runTelegram(cmd *cobra.Command, _ []string) error {
 	defer cancel()
 
 	reg := buildDefaultRegistry(rootCtx, cfg.Delegation, cfg.SkillsRoot(), hc, cfg.Hermes.Model)
-	gonchotools.RegisterHonchoTools(reg, goncho.NewService(mstore.DB(), goncho.Config{
-		WorkspaceID:    "default",
-		ObserverPeerID: "gormes",
-		RecentMessages: 4,
-	}, slog.Default()))
+	gonchoCfg := cfg.Goncho.RuntimeConfig()
+	gonchoCfg.SessionDirectory = smap
+	gonchotools.RegisterHonchoTools(reg, goncho.NewService(mstore.DB(), gonchoCfg, slog.Default()))
 
 	tm := telemetry.New()
 	toolAudit := audit.NewJSONLWriter(config.ToolAuditLogPath())

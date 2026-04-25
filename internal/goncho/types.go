@@ -2,16 +2,94 @@ package goncho
 
 import (
 	"context"
+	"strings"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/session"
 )
 
 // Config controls the minimal Goncho service defaults for a runtime.
 type Config struct {
-	WorkspaceID      string
-	ObserverPeerID   string
-	RecentMessages   int
-	SessionDirectory SessionDirectory
+	Enabled                      bool
+	WorkspaceID                  string
+	ObserverPeerID               string
+	RecentMessages               int
+	MaxMessageSize               int
+	MaxFileSize                  int
+	GetContextMaxTokens          int
+	ReasoningEnabled             bool
+	PeerCardEnabled              bool
+	SummaryEnabled               bool
+	DreamEnabled                 bool
+	DeriverWorkers               int
+	RepresentationBatchMaxTokens int
+	DialecticDefaultLevel        DialecticLevel
+	SessionDirectory             SessionDirectory
+}
+
+type DialecticLevel string
+
+const (
+	DialecticLevelMinimal DialecticLevel = "minimal"
+	DialecticLevelLow     DialecticLevel = "low"
+	DialecticLevelMedium  DialecticLevel = "medium"
+	DialecticLevelHigh    DialecticLevel = "high"
+	DialecticLevelMax     DialecticLevel = "max"
+)
+
+const (
+	DefaultRecentMessages               = 4
+	DefaultMaxMessageSize               = 25_000
+	DefaultMaxFileSize                  = 5_242_880
+	DefaultGetContextMaxTokens          = 100_000
+	DefaultDeriverWorkers               = 1
+	DefaultRepresentationBatchMaxTokens = 1024
+)
+
+// Effective fills the Go-native Goncho defaults used when older callers still
+// construct Config directly instead of going through internal/config.
+func (c Config) Effective() Config {
+	out := c
+	out.Enabled = true
+	if strings.TrimSpace(out.WorkspaceID) == "" {
+		out.WorkspaceID = DefaultWorkspaceID
+	}
+	if strings.TrimSpace(out.ObserverPeerID) == "" {
+		out.ObserverPeerID = DefaultObserverPeerID
+	}
+	if out.RecentMessages <= 0 {
+		out.RecentMessages = DefaultRecentMessages
+	}
+	if out.MaxMessageSize <= 0 {
+		out.MaxMessageSize = DefaultMaxMessageSize
+	}
+	if out.MaxFileSize <= 0 {
+		out.MaxFileSize = DefaultMaxFileSize
+	}
+	if out.GetContextMaxTokens <= 0 {
+		out.GetContextMaxTokens = DefaultGetContextMaxTokens
+	}
+	out.ReasoningEnabled = true
+	out.PeerCardEnabled = true
+	out.SummaryEnabled = true
+	if out.DeriverWorkers <= 0 {
+		out.DeriverWorkers = DefaultDeriverWorkers
+	}
+	if out.RepresentationBatchMaxTokens <= 0 {
+		out.RepresentationBatchMaxTokens = DefaultRepresentationBatchMaxTokens
+	}
+	if !ValidDialecticLevel(string(out.DialecticDefaultLevel)) {
+		out.DialecticDefaultLevel = DialecticLevelLow
+	}
+	return out
+}
+
+func ValidDialecticLevel(level string) bool {
+	switch DialecticLevel(strings.ToLower(strings.TrimSpace(level))) {
+	case DialecticLevelMinimal, DialecticLevelLow, DialecticLevelMedium, DialecticLevelHigh, DialecticLevelMax:
+		return true
+	default:
+		return false
+	}
 }
 
 // SessionDirectory exposes the canonical user->session metadata seam needed

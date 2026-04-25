@@ -29,6 +29,7 @@ func NewService(db *sql.DB, cfg Config, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.Default()
 	}
+	cfg = cfg.Effective()
 	workspaceID := strings.TrimSpace(cfg.WorkspaceID)
 	if workspaceID == "" {
 		workspaceID = DefaultWorkspaceID
@@ -39,7 +40,7 @@ func NewService(db *sql.DB, cfg Config, log *slog.Logger) *Service {
 	}
 	recentLimit := cfg.RecentMessages
 	if recentLimit <= 0 {
-		recentLimit = 4
+		recentLimit = DefaultRecentMessages
 	}
 	return &Service{
 		db:          db,

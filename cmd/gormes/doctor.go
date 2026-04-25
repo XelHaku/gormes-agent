@@ -49,6 +49,7 @@ var doctorCmd = &cobra.Command{
 		reg := buildDefaultRegistry(context.Background(), cfg.Delegation, cfg.SkillsRoot(), nil, cfg.Hermes.Model)
 		result := doctor.CheckTools(reg)
 		fmt.Print(result.Format())
+		fmt.Print(doctorGonchoConfig(cfg).Format())
 
 		if cfg.Telegram.BotToken == "" && !cfg.Discord.Enabled() {
 			fmt.Println("[WARN] gateway: no channels configured ([telegram] or [discord])")
@@ -79,4 +80,46 @@ var doctorCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func doctorGonchoConfig(cfg config.Config) doctor.CheckResult {
+	g := cfg.Goncho
+	items := []doctor.ItemInfo{
+		{
+			Name:   "runtime",
+			Status: doctor.StatusPass,
+			Note: fmt.Sprintf("recent_messages=%d max_message_size=%d max_file_size=%d get_context_max_tokens=%d",
+				g.RecentMessages, g.MaxMessageSize, g.MaxFileSize, g.GetContextMaxTokens),
+		},
+		{
+			Name:   "features",
+			Status: doctor.StatusPass,
+			Note: fmt.Sprintf("reasoning_enabled=%t peer_card_enabled=%t summary_enabled=%t dream_enabled=%t",
+				g.ReasoningEnabled, g.PeerCardEnabled, g.SummaryEnabled, g.DreamEnabled),
+		},
+		{
+			Name:   "deriver",
+			Status: doctor.StatusPass,
+			Note: fmt.Sprintf("deriver_workers=%d representation_batch_max_tokens=%d",
+				g.DeriverWorkers, g.RepresentationBatchMaxTokens),
+		},
+		{
+			Name:   "dialectic",
+			Status: doctor.StatusPass,
+			Note:   fmt.Sprintf("dialectic_default_level=%s", g.DialecticDefaultLevel),
+		},
+	}
+	if !g.DreamEnabled {
+		items = append(items, doctor.ItemInfo{
+			Name:   "dream",
+			Status: doctor.StatusWarn,
+			Note:   "feature_disabled:dream dream_enabled=false reason=dream fixtures are not available yet",
+		})
+	}
+	return doctor.CheckResult{
+		Name:    "Goncho config",
+		Status:  doctor.StatusPass,
+		Summary: fmt.Sprintf("enabled=%t workspace=%s observer_peer=%s", g.Enabled, g.Workspace, g.ObserverPeer),
+		Items:   items,
+	}
 }

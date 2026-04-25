@@ -2137,9 +2137,9 @@
             {
               "name": "Goncho configuration namespace",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes owns a Go-native [goncho] configuration namespace that maps Honcho runtime limits and feature gates into existing config loading",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -2179,7 +2179,7 @@
                 "Invalid reasoning levels and negative limits fail config validation.",
                 "Doctor output includes the effective Goncho config with secrets redacted."
               ],
-              "note": "Honcho configuration docs are Python-service oriented. Gormes should map only the durable runtime semantics into its existing Go config path so operators do not run a shadow Honcho service to use Goncho.",
+              "note": "TDD landed: internal/config/goncho_config_test.go proves [goncho] defaults, GORMES_GONCHO_* overrides, invalid dialectic levels, negative limit validation, and mapping into goncho.Config; internal/goncho/config_test.go locks the Go-native runtime defaults and dialectic levels; cmd/gormes/goncho_doctor_test.go proves doctor visibility with secrets absent and dream feature-disabled evidence.",
               "write_scope": [
                 "internal/config/",
                 "internal/goncho/",
