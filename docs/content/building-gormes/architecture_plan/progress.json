@@ -892,9 +892,9 @@
             {
               "name": "Durable worker supervisor status seam",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes reports durable-worker liveness, restart intent, and degraded/no-worker modes before any external supervisor controls job execution",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -924,7 +924,7 @@
                 "Restart intent is represented as data/audit evidence, not an implicit process launch.",
                 "Existing delegate_task and live child-agent APIs remain Go-native and are not renamed to Minions."
               ],
-              "note": "GBrain v0.20.2 added a self-healing Minions supervisor. Gormes should first freeze the liveness/status seam over its durable ledger so later process management can be optional and auditable.",
+              "note": "Complete: TDD landed internal/subagent/durable_supervisor_status_test.go over the Go SQLite ledger. Durable status now distinguishes no-worker, healthy heartbeat, stale heartbeat, and supervisor-unavailable states, records restart intent as audit data, and doctor output surfaces worker liveness, supervisor availability, and restart-intent evidence without starting worker processes or renaming Go-native delegate_task APIs to Minions.",
               "write_scope": [
                 "internal/subagent/",
                 "internal/doctor/",

@@ -43,6 +43,19 @@ func TestCheckDurableLedgerReportsReplayAvailable(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
+	now := time.Now().UTC()
+	if err := ledger.RecordSupervisorStatus(context.Background(), subagent.DurableSupervisorReport{
+		Available:  true,
+		ReportedAt: now,
+	}); err != nil {
+		t.Fatalf("RecordSupervisorStatus: %v", err)
+	}
+	if err := ledger.RecordWorkerHeartbeat(context.Background(), subagent.DurableWorkerHeartbeat{
+		WorkerID:    "worker-a",
+		HeartbeatAt: now,
+	}); err != nil {
+		t.Fatalf("RecordWorkerHeartbeat: %v", err)
+	}
 	result := CheckDurableLedger(context.Background(), ledger, "")
 
 	if result.Status != StatusPass {
@@ -50,6 +63,117 @@ func TestCheckDurableLedgerReportsReplayAvailable(t *testing.T) {
 	}
 	if !strings.Contains(result.Summary, "restart/replay available") {
 		t.Fatalf("Summary = %q, want restart/replay available", result.Summary)
+	}
+}
+
+func TestCheckDurableLedgerReportsWorkerSupervisorDegradedModes(t *testing.T) {
+	ctx := context.Background()
+	ms, err := memory.OpenSqlite(filepath.Join(t.TempDir(), "ledger.db"), 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer ms.Close(ctx)
+	ledger, err := subagent.NewDurableLedger(ms.DB())
+	if err != nil {
+		t.Fatalf("NewDurableLedger: %v", err)
+	}
+
+	noWorker := CheckDurableLedger(ctx, ledger, "")
+	if noWorker.Status != StatusWarn {
+		t.Fatalf("no-worker status = %v, want WARN: %+v", noWorker.Status, noWorker)
+	}
+	for _, want := range []string{"worker=no-worker", "supervisor=supervisor-unavailable"} {
+		if !strings.Contains(noWorker.Summary, want) {
+			t.Fatalf("no-worker summary = %q, want %q", noWorker.Summary, want)
+		}
+	}
+
+	now := time.Now().UTC()
+	if err := ledger.RecordSupervisorStatus(ctx, subagent.DurableSupervisorReport{
+		Available:  true,
+		ReportedAt: now,
+	}); err != nil {
+		t.Fatalf("RecordSupervisorStatus available: %v", err)
+	}
+	if err := ledger.RecordWorkerHeartbeat(ctx, subagent.DurableWorkerHeartbeat{
+		WorkerID:    "worker-a",
+		HeartbeatAt: now.Add(-10 * time.Minute),
+	}); err != nil {
+		t.Fatalf("RecordWorkerHeartbeat stale: %v", err)
+	}
+	stale := CheckDurableLedger(ctx, ledger, "")
+	if stale.Status != StatusWarn {
+		t.Fatalf("stale status = %v, want WARN: %+v", stale.Status, stale)
+	}
+	if !strings.Contains(stale.Summary, "worker=stale-heartbeat") {
+		t.Fatalf("stale summary = %q, want worker=stale-heartbeat", stale.Summary)
+	}
+
+	if err := ledger.RecordWorkerHeartbeat(ctx, subagent.DurableWorkerHeartbeat{
+		WorkerID:    "worker-a",
+		HeartbeatAt: now,
+	}); err != nil {
+		t.Fatalf("RecordWorkerHeartbeat healthy: %v", err)
+	}
+	if err := ledger.RecordSupervisorStatus(ctx, subagent.DurableSupervisorReport{
+		Available:  false,
+		Reason:     "pid-file-unreadable",
+		ReportedAt: now.Add(time.Second),
+	}); err != nil {
+		t.Fatalf("RecordSupervisorStatus unavailable: %v", err)
+	}
+	unavailable := CheckDurableLedger(ctx, ledger, "")
+	if unavailable.Status != StatusWarn {
+		t.Fatalf("unavailable status = %v, want WARN: %+v", unavailable.Status, unavailable)
+	}
+	for _, want := range []string{"worker=healthy", "supervisor=supervisor-unavailable", "pid-file-unreadable"} {
+		if !strings.Contains(unavailable.Summary, want) {
+			t.Fatalf("unavailable summary = %q, want %q", unavailable.Summary, want)
+		}
+	}
+}
+
+func TestCheckDurableLedgerReportsRestartIntentAuditEvidence(t *testing.T) {
+	ctx := context.Background()
+	ms, err := memory.OpenSqlite(filepath.Join(t.TempDir(), "ledger.db"), 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer ms.Close(ctx)
+	ledger, err := subagent.NewDurableLedger(ms.DB())
+	if err != nil {
+		t.Fatalf("NewDurableLedger: %v", err)
+	}
+	now := time.Now().UTC()
+	if err := ledger.RecordSupervisorStatus(ctx, subagent.DurableSupervisorReport{
+		Available:  true,
+		ReportedAt: now,
+	}); err != nil {
+		t.Fatalf("RecordSupervisorStatus: %v", err)
+	}
+	if err := ledger.RecordWorkerHeartbeat(ctx, subagent.DurableWorkerHeartbeat{
+		WorkerID:    "worker-a",
+		HeartbeatAt: now,
+	}); err != nil {
+		t.Fatalf("RecordWorkerHeartbeat: %v", err)
+	}
+	if err := ledger.RecordWorkerRestartIntent(ctx, subagent.DurableWorkerRestartIntent{
+		WorkerID:     "worker-a",
+		Reason:       "operator-requested-restart",
+		RequestedAt:  now.Add(time.Second),
+		SupervisorID: "supervisor-a",
+	}); err != nil {
+		t.Fatalf("RecordWorkerRestartIntent: %v", err)
+	}
+
+	result := CheckDurableLedger(ctx, ledger, "")
+	if result.Status != StatusWarn {
+		t.Fatalf("Status = %v, want WARN for restart intent audit evidence: %+v", result.Status, result)
+	}
+	for _, want := range []string{"restart_intent=1", "operator-requested-restart"} {
+		if !strings.Contains(result.Summary, want) {
+			t.Fatalf("Summary = %q, want %q", result.Summary, want)
+		}
 	}
 }
 

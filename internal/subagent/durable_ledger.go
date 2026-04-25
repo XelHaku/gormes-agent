@@ -34,6 +34,23 @@ const (
 	DurableChildCancelled DurableChildOutcome = "cancelled"
 )
 
+const durableWorkerHeartbeatStaleAfter = 5 * time.Minute
+
+type DurableWorkerLiveness string
+
+const (
+	DurableWorkerNoWorker       DurableWorkerLiveness = "no-worker"
+	DurableWorkerHealthy        DurableWorkerLiveness = "healthy"
+	DurableWorkerStaleHeartbeat DurableWorkerLiveness = "stale-heartbeat"
+)
+
+type DurableSupervisorAvailability string
+
+const (
+	DurableSupervisorAvailable   DurableSupervisorAvailability = "available"
+	DurableSupervisorUnavailable DurableSupervisorAvailability = "supervisor-unavailable"
+)
+
 type DurableJobSubmission struct {
 	ID         string
 	Kind       WorkKind
@@ -100,6 +117,45 @@ type DurableChildEvent struct {
 	CreatedAt time.Time
 }
 
+type DurableWorkerHeartbeat struct {
+	WorkerID    string
+	HeartbeatAt time.Time
+}
+
+type DurableSupervisorReport struct {
+	Available  bool
+	Reason     string
+	ReportedAt time.Time
+}
+
+type DurableWorkerRestartIntent struct {
+	WorkerID     string
+	Reason       string
+	SupervisorID string
+	RequestedAt  time.Time
+}
+
+type DurableWorkerRestartStatus struct {
+	Requested    bool
+	WorkerID     string
+	Reason       string
+	SupervisorID string
+	RequestedAt  time.Time
+	AuditEvents  int
+}
+
+type DurableWorkerStatus struct {
+	Liveness             DurableWorkerLiveness
+	WorkerID             string
+	LastHeartbeat        time.Time
+	HeartbeatStaleAfter  time.Duration
+	DegradedReason       string
+	Supervisor           DurableSupervisorAvailability
+	SupervisorReason     string
+	SupervisorReportedAt time.Time
+	RestartIntent        DurableWorkerRestartStatus
+}
+
 type DurableLedgerStatus struct {
 	ReplayAvailable    bool
 	Total              int
@@ -114,6 +170,7 @@ type DurableLedgerStatus struct {
 	QueueFull          bool
 	MaxWaiting         int
 	CancelRequested    int
+	Worker             DurableWorkerStatus
 }
 
 type DurableLedger struct {
@@ -420,6 +477,94 @@ func (l *DurableLedger) ChildEvents(ctx context.Context, parentID string) ([]Dur
 	return out, rows.Err()
 }
 
+func (l *DurableLedger) RecordWorkerHeartbeat(ctx context.Context, heartbeat DurableWorkerHeartbeat) error {
+	if l == nil || l.db == nil {
+		return errors.New("subagent: durable ledger is nil")
+	}
+	workerID := strings.TrimSpace(heartbeat.WorkerID)
+	if workerID == "" {
+		return errors.New("subagent: durable worker id is empty")
+	}
+	heartbeatAt := heartbeat.HeartbeatAt
+	if heartbeatAt.IsZero() {
+		heartbeatAt = durableTime(durableNow())
+	}
+	now := durableNow()
+	_, err := l.db.ExecContext(ctx, `
+		INSERT INTO durable_worker_heartbeats
+			(worker_id, heartbeat_at, updated_at)
+		VALUES (?, ?, ?)
+		ON CONFLICT(worker_id) DO UPDATE SET
+			heartbeat_at = excluded.heartbeat_at,
+			updated_at = excluded.updated_at`,
+		workerID, heartbeatAt.UnixNano(), now)
+	if err != nil {
+		return fmt.Errorf("subagent: record durable worker heartbeat: %w", err)
+	}
+	return nil
+}
+
+func (l *DurableLedger) RecordSupervisorStatus(ctx context.Context, report DurableSupervisorReport) error {
+	if l == nil || l.db == nil {
+		return errors.New("subagent: durable ledger is nil")
+	}
+	reportedAt := report.ReportedAt
+	if reportedAt.IsZero() {
+		reportedAt = durableTime(durableNow())
+	}
+	available := 0
+	if report.Available {
+		available = 1
+	}
+	now := durableNow()
+	_, err := l.db.ExecContext(ctx, `
+		INSERT INTO durable_supervisor_status
+			(id, available, reason, reported_at, updated_at)
+		VALUES (1, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			available = excluded.available,
+			reason = excluded.reason,
+			reported_at = excluded.reported_at,
+			updated_at = excluded.updated_at`,
+		available, strings.TrimSpace(report.Reason), reportedAt.UnixNano(), now)
+	if err != nil {
+		return fmt.Errorf("subagent: record durable supervisor status: %w", err)
+	}
+	return nil
+}
+
+func (l *DurableLedger) RecordWorkerRestartIntent(ctx context.Context, intent DurableWorkerRestartIntent) error {
+	if l == nil || l.db == nil {
+		return errors.New("subagent: durable ledger is nil")
+	}
+	workerID := strings.TrimSpace(intent.WorkerID)
+	if workerID == "" {
+		return errors.New("subagent: durable worker id is empty")
+	}
+	requestedAt := intent.RequestedAt
+	if requestedAt.IsZero() {
+		requestedAt = durableTime(durableNow())
+	}
+	payload := map[string]string{
+		"worker_id":     workerID,
+		"reason":        strings.TrimSpace(intent.Reason),
+		"supervisor_id": strings.TrimSpace(intent.SupervisorID),
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = l.db.ExecContext(ctx, `
+		INSERT INTO durable_worker_events
+			(type, worker_id, supervisor_id, reason, payload_json, created_at)
+		VALUES ('restart_intent', ?, ?, ?, ?, ?)`,
+		workerID, payload["supervisor_id"], payload["reason"], string(raw), requestedAt.UnixNano())
+	if err != nil {
+		return fmt.Errorf("subagent: record durable worker restart intent: %w", err)
+	}
+	return nil
+}
+
 func (l *DurableLedger) Status(ctx context.Context) (DurableLedgerStatus, error) {
 	if l == nil || l.db == nil {
 		return DurableLedgerStatus{}, errors.New("subagent: durable ledger is nil")
@@ -475,7 +620,92 @@ func (l *DurableLedger) Status(ctx context.Context) (DurableLedgerStatus, error)
 		SELECT COUNT(*) FROM durable_jobs
 		WHERE cancel_requested = 1`).Scan(&st.CancelRequested)
 	st.QueueFull = st.MaxWaiting > 0 && st.Waiting >= st.MaxWaiting
+	if err := l.populateDurableWorkerStatus(ctx, &st); err != nil {
+		return st, err
+	}
 	return st, nil
+}
+
+func (l *DurableLedger) populateDurableWorkerStatus(ctx context.Context, st *DurableLedgerStatus) error {
+	worker := DurableWorkerStatus{
+		Liveness:            DurableWorkerNoWorker,
+		HeartbeatStaleAfter: durableWorkerHeartbeatStaleAfter,
+		DegradedReason:      string(DurableWorkerNoWorker),
+		Supervisor:          DurableSupervisorUnavailable,
+		SupervisorReason:    "no-supervisor-status",
+	}
+
+	var workerID string
+	var heartbeatAt int64
+	err := l.db.QueryRowContext(ctx, `
+		SELECT worker_id, heartbeat_at
+		FROM durable_worker_heartbeats
+		ORDER BY heartbeat_at DESC
+		LIMIT 1`).Scan(&workerID, &heartbeatAt)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("subagent: durable worker heartbeat status: %w", err)
+	}
+	if err == nil {
+		worker.WorkerID = workerID
+		worker.LastHeartbeat = durableTime(heartbeatAt)
+		if durableTime(durableNow()).Sub(worker.LastHeartbeat) > durableWorkerHeartbeatStaleAfter {
+			worker.Liveness = DurableWorkerStaleHeartbeat
+			worker.DegradedReason = string(DurableWorkerStaleHeartbeat)
+		} else {
+			worker.Liveness = DurableWorkerHealthy
+			worker.DegradedReason = ""
+		}
+	}
+
+	var available int
+	var supervisorReason string
+	var supervisorReportedAt int64
+	err = l.db.QueryRowContext(ctx, `
+		SELECT available, reason, reported_at
+		FROM durable_supervisor_status
+		WHERE id = 1`).Scan(&available, &supervisorReason, &supervisorReportedAt)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("subagent: durable supervisor status: %w", err)
+	}
+	if err == nil {
+		worker.SupervisorReportedAt = durableTime(supervisorReportedAt)
+		if available == 1 {
+			worker.Supervisor = DurableSupervisorAvailable
+			worker.SupervisorReason = strings.TrimSpace(supervisorReason)
+		} else {
+			worker.Supervisor = DurableSupervisorUnavailable
+			worker.SupervisorReason = strings.TrimSpace(supervisorReason)
+			if worker.SupervisorReason == "" {
+				worker.SupervisorReason = string(DurableSupervisorUnavailable)
+			}
+		}
+	}
+
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM durable_worker_events
+		WHERE type = 'restart_intent'`).Scan(&worker.RestartIntent.AuditEvents)
+	var restartWorkerID, restartReason, supervisorID string
+	var requestedAt int64
+	err = l.db.QueryRowContext(ctx, `
+		SELECT worker_id, reason, supervisor_id, created_at
+		FROM durable_worker_events
+		WHERE type = 'restart_intent'
+		ORDER BY id DESC
+		LIMIT 1`).Scan(&restartWorkerID, &restartReason, &supervisorID, &requestedAt)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("subagent: durable worker restart intent status: %w", err)
+	}
+	if err == nil {
+		worker.RestartIntent.Requested = true
+		worker.RestartIntent.WorkerID = restartWorkerID
+		worker.RestartIntent.Reason = restartReason
+		worker.RestartIntent.SupervisorID = supervisorID
+		worker.RestartIntent.RequestedAt = durableTime(requestedAt)
+	}
+
+	st.Worker = worker
+	return nil
 }
 
 func (l *DurableLedger) terminal(ctx context.Context, id, workerID string, status DurableJobStatus, result json.RawMessage, errorText string, outcome DurableChildOutcome) (DurableJob, bool, error) {
@@ -783,6 +1013,30 @@ CREATE TABLE IF NOT EXISTS durable_job_events (
 );
 CREATE INDEX IF NOT EXISTS idx_durable_job_events_job
 	ON durable_job_events(job_id, id);
+
+CREATE TABLE IF NOT EXISTS durable_worker_heartbeats (
+	worker_id    TEXT PRIMARY KEY,
+	heartbeat_at INTEGER NOT NULL,
+	updated_at   INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS durable_supervisor_status (
+	id          INTEGER PRIMARY KEY CHECK(id = 1),
+	available   INTEGER NOT NULL CHECK(available IN (0,1)),
+	reason      TEXT    NOT NULL DEFAULT '',
+	reported_at INTEGER NOT NULL,
+	updated_at  INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS durable_worker_events (
+	id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	type          TEXT    NOT NULL,
+	worker_id     TEXT    NOT NULL DEFAULT '',
+	supervisor_id TEXT    NOT NULL DEFAULT '',
+	reason        TEXT    NOT NULL DEFAULT '',
+	payload_json  TEXT    NOT NULL DEFAULT '{}',
+	created_at    INTEGER NOT NULL
+);
 `
 
 const durableLedgerPostMigrationSchema = `
@@ -790,6 +1044,10 @@ CREATE INDEX IF NOT EXISTS idx_durable_jobs_timeout
 	ON durable_jobs(status, timeout_at);
 CREATE INDEX IF NOT EXISTS idx_durable_job_events_type
 	ON durable_job_events(type, created_at);
+CREATE INDEX IF NOT EXISTS idx_durable_worker_heartbeats_seen
+	ON durable_worker_heartbeats(heartbeat_at);
+CREATE INDEX IF NOT EXISTS idx_durable_worker_events_type
+	ON durable_worker_events(type, created_at);
 `
 
 func durableLedgerMigrate(db *sql.DB) error {
