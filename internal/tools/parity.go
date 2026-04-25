@@ -25,6 +25,10 @@ const (
 	ToolParityIssueMissingDependency       ToolParityIssueKind = "missing_dependency"
 	ToolParityIssueSchemaDrift             ToolParityIssueKind = "schema_drift"
 	ToolParityIssueUnavailableProviderPath ToolParityIssueKind = "unavailable_provider_path"
+	ToolParityIssueStaleSourceCommit       ToolParityIssueKind = "stale_source_commit"
+	ToolParityIssueMissingToolParityRow    ToolParityIssueKind = "missing_tool_parity_row"
+	ToolParityIssueMissingSchemaProperty   ToolParityIssueKind = "missing_schema_property"
+	ToolParityIssueToolsetMismatch         ToolParityIssueKind = "toolset_mismatch"
 )
 
 // UpstreamToolParityManifest is the frozen donor descriptor inventory used to
@@ -39,25 +43,47 @@ type UpstreamToolParityManifest struct {
 
 // ToolParitySource records the donor files used to capture the fixture.
 type ToolParitySource struct {
-	Registry string `json:"registry"`
-	Toolsets string `json:"toolsets"`
+	Donor      string   `json:"donor"`
+	Commit     string   `json:"commit"`
+	Registry   string   `json:"registry"`
+	Toolsets   string   `json:"toolsets"`
+	InputFiles []string `json:"input_files"`
 }
 
 // UpstreamToolParityRow captures the model-visible descriptor plus the
 // operational metadata that must exist before porting a handler.
 type UpstreamToolParityRow struct {
-	Name            string                 `json:"name"`
-	Toolset         string                 `json:"toolset"`
-	SourceModule    string                 `json:"source_module"`
-	Description     string                 `json:"description"`
-	RequiredEnv     []string               `json:"required_env"`
-	RequiredEnvMode string                 `json:"required_env_mode"`
-	Dependencies    []string               `json:"dependencies"`
-	ProviderPaths   []ToolProviderPath     `json:"provider_paths"`
-	Schema          json.RawMessage        `json:"schema"`
-	ResultEnvelope  ToolResultEnvelope     `json:"result_envelope"`
-	TrustClasses    []string               `json:"trust_classes"`
-	DegradedStatus  ToolDegradedModeStatus `json:"degraded_status"`
+	Name               string                 `json:"name"`
+	Toolset            string                 `json:"toolset"`
+	SourceModule       string                 `json:"source_module"`
+	Description        string                 `json:"description"`
+	RequiredEnv        []string               `json:"required_env"`
+	RequiredEnvMode    string                 `json:"required_env_mode"`
+	Dependencies       []string               `json:"dependencies"`
+	ProviderPaths      []ToolProviderPath     `json:"provider_paths"`
+	Schema             json.RawMessage        `json:"schema"`
+	SchemaProvenance   ToolSchemaProvenance   `json:"schema_provenance"`
+	DescriptorMetadata ToolDescriptorMetadata `json:"descriptor_metadata"`
+	ResultEnvelope     ToolResultEnvelope     `json:"result_envelope"`
+	TrustClasses       []string               `json:"trust_classes"`
+	DegradedStatus     ToolDegradedModeStatus `json:"degraded_status"`
+}
+
+// ToolSchemaProvenance records dynamic schema replacement seams in the donor.
+type ToolSchemaProvenance struct {
+	Kind                 string   `json:"kind"`
+	StaticSchemaSource   string   `json:"static_schema_source"`
+	RuntimeSchemaSources []string `json:"runtime_schema_sources"`
+	CapabilityFilters    []string `json:"capability_filters"`
+	ConfigFilters        []string `json:"config_filters"`
+	UnavailableWhenEmpty bool     `json:"unavailable_when_empty"`
+}
+
+// ToolDescriptorMetadata captures descriptor-only parity notes that are not
+// part of OpenAI function schemas.
+type ToolDescriptorMetadata struct {
+	SchemaSource         string            `json:"schema_source"`
+	UpdateClearSemantics map[string]string `json:"update_clear_semantics"`
 }
 
 // ToolProviderPath captures optional provider-specific availability gates.
@@ -85,20 +111,35 @@ type ToolDegradedModeStatus struct {
 
 // UpstreamToolsetRow captures static and resolved donor toolset membership.
 type UpstreamToolsetRow struct {
-	Name          string   `json:"name"`
-	Description   string   `json:"description"`
-	DirectTools   []string `json:"direct_tools"`
-	Includes      []string `json:"includes"`
-	ResolvedTools []string `json:"resolved_tools"`
-	Source        string   `json:"source"`
+	Name                 string                   `json:"name"`
+	Description          string                   `json:"description"`
+	DirectTools          []string                 `json:"direct_tools"`
+	Includes             []string                 `json:"includes"`
+	ResolvedTools        []string                 `json:"resolved_tools"`
+	Source               string                   `json:"source"`
+	PlatformRestrictions ToolPlatformRestrictions `json:"platform_restrictions"`
+}
+
+// ToolPlatformRestrictions records platform-scoped toolset availability from
+// the donor CLI configuration tests.
+type ToolPlatformRestrictions struct {
+	AllowedPlatforms []string `json:"allowed_platforms"`
+	DefaultEnabled   *bool    `json:"default_enabled"`
+	Source           string   `json:"source"`
+	Notes            []string `json:"notes"`
 }
 
 // ToolParityDoctorOptions controls degraded-mode inventory checks.
 type ToolParityDoctorOptions struct {
-	Env                    map[string]string
-	DisabledTools          map[string]string
-	LocalSchemas           map[string]json.RawMessage
-	AvailableProviderPaths map[string]bool
+	Env                      map[string]string
+	DisabledTools            map[string]string
+	LocalSchemas             map[string]json.RawMessage
+	AvailableProviderPaths   map[string]bool
+	ExpectedSourceCommit     string
+	RequiredTools            []string
+	RequiredSchemaProperties map[string][]string
+	RequiredToolsetTools     map[string][]string
+	ForbiddenToolsetTools    map[string][]string
 }
 
 // ToolParityDoctorReport is the aggregate doctor output for descriptor parity.
@@ -169,6 +210,22 @@ func (r UpstreamToolParityRow) HasProviderPath(id string) bool {
 // unavailable provider-specific paths from the frozen descriptor inventory.
 func (m UpstreamToolParityManifest) Doctor(opts ToolParityDoctorOptions) ToolParityDoctorReport {
 	var issues []ToolParityIssue
+	if opts.ExpectedSourceCommit != "" && !strings.HasPrefix(m.Source.Commit, opts.ExpectedSourceCommit) {
+		issues = append(issues, ToolParityIssue{
+			Kind:   ToolParityIssueStaleSourceCommit,
+			Tool:   "manifest",
+			Detail: fmt.Sprintf("source commit = %q, want prefix %q", m.Source.Commit, opts.ExpectedSourceCommit),
+		})
+	}
+	for _, name := range opts.RequiredTools {
+		if _, ok := m.Tool(name); !ok {
+			issues = append(issues, ToolParityIssue{
+				Kind:   ToolParityIssueMissingToolParityRow,
+				Tool:   name,
+				Detail: "required upstream parity row is missing",
+			})
+		}
+	}
 	for _, row := range m.Tools {
 		if reason, disabled := opts.DisabledTools[row.Name]; disabled {
 			issues = append(issues, ToolParityIssue{
@@ -194,6 +251,16 @@ func (m UpstreamToolParityManifest) Doctor(opts ToolParityDoctorOptions) ToolPar
 				Detail:  "local schema differs from upstream parity fixture",
 			})
 		}
+		for _, property := range opts.RequiredSchemaProperties[row.Name] {
+			if !schemaHasProperty(row.Schema, property) {
+				issues = append(issues, ToolParityIssue{
+					Kind:    ToolParityIssueMissingSchemaProperty,
+					Tool:    row.Name,
+					Toolset: row.Toolset,
+					Detail:  "missing schema property: " + property,
+				})
+			}
+		}
 		for _, path := range row.ProviderPaths {
 			if path.ID == "" || opts.AvailableProviderPaths[path.ID] {
 				continue
@@ -207,6 +274,43 @@ func (m UpstreamToolParityManifest) Doctor(opts ToolParityDoctorOptions) ToolPar
 				Toolset: row.Toolset,
 				Detail:  path.ID + ": " + path.Description,
 			})
+		}
+	}
+	for toolsetName, requiredTools := range opts.RequiredToolsetTools {
+		toolset, ok := m.Toolset(toolsetName)
+		if !ok {
+			issues = append(issues, ToolParityIssue{
+				Kind:    ToolParityIssueToolsetMismatch,
+				Toolset: toolsetName,
+				Detail:  "required toolset row is missing",
+			})
+			continue
+		}
+		for _, required := range requiredTools {
+			if !stringSliceContains(toolset.ResolvedTools, required) {
+				issues = append(issues, ToolParityIssue{
+					Kind:    ToolParityIssueToolsetMismatch,
+					Tool:    required,
+					Toolset: toolsetName,
+					Detail:  "required tool missing from resolved toolset",
+				})
+			}
+		}
+	}
+	for toolsetName, forbiddenTools := range opts.ForbiddenToolsetTools {
+		toolset, ok := m.Toolset(toolsetName)
+		if !ok {
+			continue
+		}
+		for _, forbidden := range forbiddenTools {
+			if stringSliceContains(toolset.ResolvedTools, forbidden) {
+				issues = append(issues, ToolParityIssue{
+					Kind:    ToolParityIssueToolsetMismatch,
+					Tool:    forbidden,
+					Toolset: toolsetName,
+					Detail:  "forbidden tool present in resolved toolset",
+				})
+			}
 		}
 	}
 	sort.SliceStable(issues, func(i, j int) bool {
@@ -282,6 +386,28 @@ func sameJSON(a, b json.RawMessage) bool {
 		return false
 	}
 	return bytes.Equal(ca, cb)
+}
+
+func schemaHasProperty(raw json.RawMessage, property string) bool {
+	var schema struct {
+		Parameters struct {
+			Properties map[string]json.RawMessage `json:"properties"`
+		} `json:"parameters"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		return false
+	}
+	_, ok := schema.Parameters.Properties[property]
+	return ok
+}
+
+func stringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func canonicalJSON(raw json.RawMessage) ([]byte, error) {

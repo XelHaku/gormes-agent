@@ -1,6 +1,16 @@
 {
   "generated_at": "2026-04-25T00:00:00Z",
   "source": {
+    "commit": "b35d692f45d5f8c4d2ba567a64daa38ebba96a1a",
+    "donor": "hermes",
+    "input_files": [
+      "toolsets.py",
+      "model_tools.py",
+      "tools/discord_tool.py",
+      "tools/cronjob_tools.py",
+      "tests/tools/test_discord_tool.py",
+      "tests/hermes_cli/test_tools_config.py"
+    ],
     "registry": "tools/registry.py",
     "toolsets": "toolsets.py"
   },
@@ -1218,6 +1228,12 @@
       },
       "dependencies": [],
       "description": "Manage scheduled cron jobs with a single compressed tool.\n\nUse action='create' to schedule a new job from a prompt or one or more skills.\nUse action='list' to inspect jobs.\nUse action='update', 'pause', 'resume', 'remove', or 'run' to manage an existing job.\n\nTo stop a job the user no longer wants: first action='list' to find the job_id, then action='remove' with that job_id. Never guess job IDs \u2014 always list first.\n\nJobs run in a fresh session with no current-chat context, so prompts must be self-contained.\nIf skills are provided on create, the future cron run loads those skills in order, then follows the prompt as the task instruction.\nOn update, passing skills=[] clears attached skills.\n\nNOTE: The agent's final response is auto-delivered to the target. Put the primary\nuser-facing content in the final response. Cron jobs run autonomously with no user\npresent \u2014 they cannot ask questions or request clarification.\n\nImportant safety rule: cron-run sessions should not recursively schedule more cron jobs.",
+      "descriptor_metadata": {
+        "schema_source": "tools/cronjob_tools.py:CRONJOB_SCHEMA",
+        "update_clear_semantics": {
+          "context_from": "On update, pass an empty array to clear."
+        }
+      },
       "name": "cronjob",
       "provider_paths": [],
       "required_env": [],
@@ -1239,6 +1255,13 @@
             "action": {
               "description": "One of: create, list, update, pause, resume, remove, run",
               "type": "string"
+            },
+            "context_from": {
+              "description": "Optional job ID or list of job IDs whose most recent completed output is injected into the prompt as context before each run. Use this to chain cron jobs: job A collects data, job B processes it. Each entry must be a valid job ID (from cronjob action='list'). Note: injects the most recent completed output \u2014 does not wait for upstream jobs running in the same tick. On update, pass an empty array to clear.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             },
             "deliver": {
               "description": "Omit this parameter to auto-deliver back to the current chat and topic (recommended). Auto-detection preserves thread/topic context. Only set explicitly when the user asks to deliver somewhere OTHER than the current conversation. Values: 'origin' (same as omitting), 'local' (no delivery, save only), or platform:chat_id:thread_id for a specific destination. Examples: 'telegram:-1001234567890:17585', 'discord:#engineering', 'sms:+15551234567'. WARNING: 'platform:chat_id' without :thread_id loses topic targeting.",
@@ -1455,9 +1478,11 @@
           "unavailable_provider_path"
         ]
       },
-      "dependencies": [],
-      "description": "Query and manage a Discord server via the REST API.\n\nAvailable actions:\n  list_guilds()  \u2014 list servers the bot is in\n  server_info(guild_id)  \u2014 server details + member counts\n  list_channels(guild_id)  \u2014 all channels grouped by category\n  channel_info(channel_id)  \u2014 single channel details\n  list_roles(guild_id)  \u2014 roles sorted by position\n  member_info(guild_id, user_id)  \u2014 lookup a specific member\n  search_members(guild_id, query)  \u2014 find members by name prefix\n  fetch_messages(channel_id)  \u2014 recent messages; optional before/after snowflakes\n  list_pins(channel_id)  \u2014 pinned messages in a channel\n  pin_message(channel_id, message_id)  \u2014 pin a message\n  unpin_message(channel_id, message_id)  \u2014 unpin a message\n  create_thread(channel_id, name)  \u2014 create a public thread; optional message_id anchor\n  add_role(guild_id, user_id, role_id)  \u2014 assign a role\n  remove_role(guild_id, user_id, role_id)  \u2014 remove a role\n\nCall list_guilds first to discover guild_ids, then list_channels for channel_ids. Runtime errors will tell you if the bot lacks a specific per-guild permission (e.g. MANAGE_ROLES for add_role).",
-      "name": "discord_server",
+      "dependencies": [
+        "Discord REST API bot token via DISCORD_BOT_TOKEN"
+      ],
+      "description": "Read and participate in a Discord server.\n\nAvailable actions:\n  search_members(guild_id, query)  \u2014 find members by name prefix\n  fetch_messages(channel_id)  \u2014 recent messages; optional before/after snowflakes\n  create_thread(channel_id, name)  \u2014 create a public thread; optional message_id anchor\n\nUse the channel_id from the current conversation context. Use search_members to look up user IDs by name prefix.",
+      "name": "discord",
       "provider_paths": [],
       "required_env": [
         "DISCORD_BOT_TOKEN"
@@ -1473,8 +1498,134 @@
         ]
       },
       "schema": {
-        "description": "Query and manage a Discord server via the REST API.\n\nAvailable actions:\n  list_guilds()  \u2014 list servers the bot is in\n  server_info(guild_id)  \u2014 server details + member counts\n  list_channels(guild_id)  \u2014 all channels grouped by category\n  channel_info(channel_id)  \u2014 single channel details\n  list_roles(guild_id)  \u2014 roles sorted by position\n  member_info(guild_id, user_id)  \u2014 lookup a specific member\n  search_members(guild_id, query)  \u2014 find members by name prefix\n  fetch_messages(channel_id)  \u2014 recent messages; optional before/after snowflakes\n  list_pins(channel_id)  \u2014 pinned messages in a channel\n  pin_message(channel_id, message_id)  \u2014 pin a message\n  unpin_message(channel_id, message_id)  \u2014 unpin a message\n  create_thread(channel_id, name)  \u2014 create a public thread; optional message_id anchor\n  add_role(guild_id, user_id, role_id)  \u2014 assign a role\n  remove_role(guild_id, user_id, role_id)  \u2014 remove a role\n\nCall list_guilds first to discover guild_ids, then list_channels for channel_ids. Runtime errors will tell you if the bot lacks a specific per-guild permission (e.g. MANAGE_ROLES for add_role).",
-        "name": "discord_server",
+        "description": "Read and participate in a Discord server.\n\nAvailable actions:\n  search_members(guild_id, query)  \u2014 find members by name prefix\n  fetch_messages(channel_id)  \u2014 recent messages; optional before/after snowflakes\n  create_thread(channel_id, name)  \u2014 create a public thread; optional message_id anchor\n\nUse the channel_id from the current conversation context. Use search_members to look up user IDs by name prefix.",
+        "name": "discord",
+        "parameters": {
+          "properties": {
+            "action": {
+              "enum": [
+                "search_members",
+                "fetch_messages",
+                "create_thread"
+              ],
+              "type": "string"
+            },
+            "after": {
+              "description": "Snowflake ID for forward pagination (fetch_messages).",
+              "type": "string"
+            },
+            "auto_archive_duration": {
+              "description": "Thread archive duration in minutes (create_thread, default 1440).",
+              "enum": [
+                60,
+                1440,
+                4320,
+                10080
+              ],
+              "type": "integer"
+            },
+            "before": {
+              "description": "Snowflake ID for reverse pagination (fetch_messages).",
+              "type": "string"
+            },
+            "channel_id": {
+              "description": "Discord channel ID.",
+              "type": "string"
+            },
+            "guild_id": {
+              "description": "Discord server (guild) ID.",
+              "type": "string"
+            },
+            "limit": {
+              "description": "Max results (default 50). Applies to fetch_messages, search_members.",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "message_id": {
+              "description": "Discord message ID.",
+              "type": "string"
+            },
+            "name": {
+              "description": "New thread name (create_thread).",
+              "type": "string"
+            },
+            "query": {
+              "description": "Member name prefix to search for (search_members).",
+              "type": "string"
+            },
+            "role_id": {
+              "description": "Discord role ID.",
+              "type": "string"
+            },
+            "user_id": {
+              "description": "Discord user ID.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "type": "object"
+        }
+      },
+      "schema_provenance": {
+        "capability_filters": [
+          "Discord application privileged intents from GET /applications/@me"
+        ],
+        "config_filters": [
+          "discord.server_actions allowlist"
+        ],
+        "kind": "dynamic-runtime",
+        "runtime_schema_sources": [
+          "model_tools.py:get_tool_definitions",
+          "tools/discord_tool.py:get_dynamic_schema_core"
+        ],
+        "static_schema_source": "tools/discord_tool.py:_STATIC_CORE_SCHEMA",
+        "unavailable_when_empty": true
+      },
+      "source_module": "discord_tool.py",
+      "toolset": "discord",
+      "trust_classes": [
+        "operator",
+        "gateway",
+        "child-agent",
+        "system"
+      ]
+    },
+    {
+      "degraded_status": {
+        "status_field": "degraded_status",
+        "statuses": [
+          "available",
+          "disabled",
+          "missing_dependency",
+          "schema_drift",
+          "unavailable_provider_path"
+        ]
+      },
+      "dependencies": [
+        "Discord REST API bot token via DISCORD_BOT_TOKEN"
+      ],
+      "description": "Manage a Discord server via the REST API.\n\nAvailable actions:\n  list_guilds()  \u2014 list servers the bot is in\n  server_info(guild_id)  \u2014 server details + member counts\n  list_channels(guild_id)  \u2014 all channels grouped by category\n  channel_info(channel_id)  \u2014 single channel details\n  list_roles(guild_id)  \u2014 roles sorted by position\n  member_info(guild_id, user_id)  \u2014 lookup a specific member\n  list_pins(channel_id)  \u2014 pinned messages in a channel\n  pin_message(channel_id, message_id)  \u2014 pin a message\n  unpin_message(channel_id, message_id)  \u2014 unpin a message\n  add_role(guild_id, user_id, role_id)  \u2014 assign a role\n  remove_role(guild_id, user_id, role_id)  \u2014 remove a role\n\nCall list_guilds first to discover guild_ids, then list_channels for channel_ids. Runtime errors will tell you if the bot lacks a specific per-guild permission (e.g. MANAGE_ROLES for add_role).",
+      "name": "discord_admin",
+      "provider_paths": [],
+      "required_env": [
+        "DISCORD_BOT_TOKEN"
+      ],
+      "required_env_mode": "all",
+      "result_envelope": {
+        "encoding": "json-string",
+        "error_fields": [
+          "error"
+        ],
+        "success_fields": [
+          "success"
+        ]
+      },
+      "schema": {
+        "description": "Manage a Discord server via the REST API.\n\nAvailable actions:\n  list_guilds()  \u2014 list servers the bot is in\n  server_info(guild_id)  \u2014 server details + member counts\n  list_channels(guild_id)  \u2014 all channels grouped by category\n  channel_info(channel_id)  \u2014 single channel details\n  list_roles(guild_id)  \u2014 roles sorted by position\n  member_info(guild_id, user_id)  \u2014 lookup a specific member\n  list_pins(channel_id)  \u2014 pinned messages in a channel\n  pin_message(channel_id, message_id)  \u2014 pin a message\n  unpin_message(channel_id, message_id)  \u2014 unpin a message\n  add_role(guild_id, user_id, role_id)  \u2014 assign a role\n  remove_role(guild_id, user_id, role_id)  \u2014 remove a role\n\nCall list_guilds first to discover guild_ids, then list_channels for channel_ids. Runtime errors will tell you if the bot lacks a specific per-guild permission (e.g. MANAGE_ROLES for add_role).",
+        "name": "discord_admin",
         "parameters": {
           "properties": {
             "action": {
@@ -1485,12 +1636,9 @@
                 "channel_info",
                 "list_roles",
                 "member_info",
-                "search_members",
-                "fetch_messages",
                 "list_pins",
                 "pin_message",
                 "unpin_message",
-                "create_thread",
                 "add_role",
                 "remove_role"
               ],
@@ -1555,8 +1703,23 @@
           "type": "object"
         }
       },
+      "schema_provenance": {
+        "capability_filters": [
+          "Discord application privileged intents from GET /applications/@me"
+        ],
+        "config_filters": [
+          "discord.server_actions allowlist"
+        ],
+        "kind": "dynamic-runtime",
+        "runtime_schema_sources": [
+          "model_tools.py:get_tool_definitions",
+          "tools/discord_tool.py:get_dynamic_schema_admin"
+        ],
+        "static_schema_source": "tools/discord_tool.py:_STATIC_ADMIN_SCHEMA",
+        "unavailable_when_empty": true
+      },
       "source_module": "discord_tool.py",
-      "toolset": "discord",
+      "toolset": "discord_admin",
       "trust_classes": [
         "operator",
         "gateway",
@@ -4314,16 +4477,50 @@
       "source": "toolsets.py"
     },
     {
-      "description": "Registry-only upstream toolset discord",
+      "description": "Discord read and participate tools (fetch messages, search members, create threads)",
       "direct_tools": [
-        "discord_server"
+        "discord"
       ],
       "includes": [],
       "name": "discord",
+      "platform_restrictions": {
+        "allowed_platforms": [
+          "discord"
+        ],
+        "default_enabled": false,
+        "notes": [
+          "Default-off even on the Discord platform; user must opt in via hermes tools.",
+          "Hidden from CLI, Telegram, Slack, WhatsApp, and Signal platform toolset pickers."
+        ],
+        "source": "tests/hermes_cli/test_tools_config.py"
+      },
       "resolved_tools": [
-        "discord_server"
+        "discord"
       ],
-      "source": "tools/registry.py"
+      "source": "toolsets.py"
+    },
+    {
+      "description": "Discord server management (list channels/roles, pin messages, assign roles)",
+      "direct_tools": [
+        "discord_admin"
+      ],
+      "includes": [],
+      "name": "discord_admin",
+      "platform_restrictions": {
+        "allowed_platforms": [
+          "discord"
+        ],
+        "default_enabled": false,
+        "notes": [
+          "Default-off even on the Discord platform; user must opt in via hermes tools.",
+          "Hidden from CLI, Telegram, Slack, WhatsApp, and Signal platform toolset pickers."
+        ],
+        "source": "tests/hermes_cli/test_tools_config.py"
+      },
+      "resolved_tools": [
+        "discord_admin"
+      ],
+      "source": "toolsets.py"
     },
     {
       "description": "Read Feishu/Lark document content",
@@ -4332,6 +4529,16 @@
       ],
       "includes": [],
       "name": "feishu_doc",
+      "platform_restrictions": {
+        "allowed_platforms": [
+          "feishu"
+        ],
+        "default_enabled": true,
+        "notes": [
+          "Included by default for the Feishu platform and hidden from generic/non-Feishu platforms."
+        ],
+        "source": "tests/hermes_cli/test_tools_config.py"
+      },
       "resolved_tools": [
         "feishu_doc_read"
       ],
@@ -4347,6 +4554,16 @@
       ],
       "includes": [],
       "name": "feishu_drive",
+      "platform_restrictions": {
+        "allowed_platforms": [
+          "feishu"
+        ],
+        "default_enabled": true,
+        "notes": [
+          "Included by default for the Feishu platform and hidden from generic/non-Feishu platforms."
+        ],
+        "source": "tests/hermes_cli/test_tools_config.py"
+      },
       "resolved_tools": [
         "feishu_drive_add_comment",
         "feishu_drive_list_comment_replies",
@@ -4906,7 +5123,8 @@
         "ha_get_state",
         "ha_list_services",
         "ha_call_service",
-        "discord_server"
+        "discord",
+        "discord_admin"
       ],
       "includes": [],
       "name": "hermes-discord",
@@ -4926,7 +5144,8 @@
         "clarify",
         "cronjob",
         "delegate_task",
-        "discord_server",
+        "discord",
+        "discord_admin",
         "execute_code",
         "ha_call_service",
         "ha_get_state",
@@ -5079,7 +5298,12 @@
         "ha_list_entities",
         "ha_get_state",
         "ha_list_services",
-        "ha_call_service"
+        "ha_call_service",
+        "feishu_doc_read",
+        "feishu_drive_list_comments",
+        "feishu_drive_list_comment_replies",
+        "feishu_drive_reply_comment",
+        "feishu_drive_add_comment"
       ],
       "includes": [],
       "name": "hermes-feishu",
@@ -5100,6 +5324,11 @@
         "cronjob",
         "delegate_task",
         "execute_code",
+        "feishu_doc_read",
+        "feishu_drive_add_comment",
+        "feishu_drive_list_comment_replies",
+        "feishu_drive_list_comments",
+        "feishu_drive_reply_comment",
         "ha_call_service",
         "ha_get_state",
         "ha_list_entities",
@@ -5165,8 +5394,14 @@
         "clarify",
         "cronjob",
         "delegate_task",
-        "discord_server",
+        "discord",
+        "discord_admin",
         "execute_code",
+        "feishu_doc_read",
+        "feishu_drive_add_comment",
+        "feishu_drive_list_comment_replies",
+        "feishu_drive_list_comments",
+        "feishu_drive_reply_comment",
         "ha_call_service",
         "ha_get_state",
         "ha_list_entities",

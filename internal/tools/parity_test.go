@@ -12,7 +12,7 @@ func TestUpstreamToolParityManifestCapturesRegistryInventory(t *testing.T) {
 		t.Fatalf("LoadUpstreamToolParityManifest: %v", err)
 	}
 
-	if got, want := len(manifest.Tools), 55; got != want {
+	if got, want := len(manifest.Tools), 56; got != want {
 		t.Fatalf("tool rows = %d, want %d", got, want)
 	}
 	if got, want := manifest.Source.Registry, "tools/registry.py"; got != want {
@@ -26,7 +26,8 @@ func TestUpstreamToolParityManifestCapturesRegistryInventory(t *testing.T) {
 		"browser_cdp",
 		"browser_dialog",
 		"browser_navigate",
-		"discord_server",
+		"discord",
+		"discord_admin",
 		"execute_code",
 		"image_generate",
 		"mixture_of_agents",
@@ -89,13 +90,17 @@ func TestUpstreamToolParityManifestCapturesRegistryInventory(t *testing.T) {
 	}
 	assertContains(t, cli.ResolvedTools, "browser_cdp")
 	assertContains(t, cli.ResolvedTools, "send_message")
+	assertNotContains(t, cli.ResolvedTools, "discord")
+	assertNotContains(t, cli.ResolvedTools, "discord_admin")
 
 	gateway, ok := manifest.Toolset("hermes-gateway")
 	if !ok {
 		t.Fatal("missing hermes-gateway toolset parity row")
 	}
 	assertContains(t, gateway.Includes, "hermes-discord")
-	assertContains(t, gateway.ResolvedTools, "discord_server")
+	assertContains(t, gateway.ResolvedTools, "discord")
+	assertContains(t, gateway.ResolvedTools, "discord_admin")
+	assertNotContains(t, gateway.ResolvedTools, "discord_server")
 }
 
 func TestToolParityDoctorReportsDisabledDependenciesSchemaDriftAndProviderPaths(t *testing.T) {
@@ -118,6 +123,32 @@ func TestToolParityDoctorReportsDisabledDependenciesSchemaDriftAndProviderPaths(
 	assertIssue(t, report, ToolParityIssueMissingDependency, "web_search")
 	assertIssue(t, report, ToolParityIssueSchemaDrift, "web_search")
 	assertIssue(t, report, ToolParityIssueUnavailableProviderPath, "browser_cdp")
+}
+
+func TestToolParityDoctorReportsB35D692FManifestDrift(t *testing.T) {
+	manifest, err := LoadUpstreamToolParityManifest()
+	if err != nil {
+		t.Fatalf("LoadUpstreamToolParityManifest: %v", err)
+	}
+
+	report := manifest.Doctor(ToolParityDoctorOptions{
+		ExpectedSourceCommit: "55-tool-stale",
+		RequiredTools:        []string{"discord", "discord_admin", "discord_server"},
+		RequiredSchemaProperties: map[string][]string{
+			"cronjob": {"context_from", "missing_context_from"},
+		},
+		RequiredToolsetTools: map[string][]string{
+			"hermes-discord": {"discord", "discord_admin", "discord_server"},
+		},
+		ForbiddenToolsetTools: map[string][]string{
+			"hermes-cli": {"discord"},
+		},
+	})
+
+	assertIssue(t, report, ToolParityIssueStaleSourceCommit, "manifest")
+	assertIssue(t, report, ToolParityIssueMissingToolParityRow, "discord_server")
+	assertIssue(t, report, ToolParityIssueMissingSchemaProperty, "cronjob")
+	assertIssue(t, report, ToolParityIssueToolsetMismatch, "discord_server")
 }
 
 func TestHandlerPortRequiresParityRow(t *testing.T) {

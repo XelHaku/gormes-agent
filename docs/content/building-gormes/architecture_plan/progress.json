@@ -4454,9 +4454,9 @@
             {
               "name": "Tool parity manifest refresh for Hermes b35d692f",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Embedded upstream tool parity fixtures reflect Hermes b35d692f tool names, toolsets, schemas, and platform restrictions before handler rows rely on them",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -4495,7 +4495,7 @@
                 "Cronjob schema includes context_from with update-clear semantics in descriptor metadata.",
                 "Toolset rows capture Feishu document/drive additions and Discord-only platform restrictions without adding those tools to generic core toolsets."
               ],
-              "note": "Current Gormes manifest still reflects the older Discord server tool shape. Refresh the descriptor fixture first so handler and CLI rows can consume exact donor names without rediscovering Python.",
+              "note": "Complete: TDD refreshed the embedded tool parity manifest for Hermes b35d692f without porting handlers. The fixture now records Hermes donor metadata and generator inputs, replaces legacy discord_server with split discord / discord_admin rows plus dynamic-schema provenance, adds cronjob context_from schema and update-clear descriptor metadata, and updates Discord/Feishu platform toolsets while keeping platform-only tools out of generic core toolsets. The parity doctor can now report stale donor commits, missing required parity rows, missing schema properties, and toolset mismatches before runtime ports begin.",
               "write_scope": [
                 "internal/tools/testdata/upstream_tool_parity_manifest.json",
                 "internal/tools/",
@@ -4509,6 +4509,11 @@
               "done_signal": [
                 "Tool parity tests prove the embedded manifest reflects Hermes b35d692f Discord, cron, Feishu, and platform-toolset schema drift before handlers port."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T12:56:32Z",
+                "last_success": "2026-04-25T12:56:32Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:b35d692f toolsets.py",
