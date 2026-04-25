@@ -48,6 +48,24 @@ Rows in quarantined_rows[] are top priority for repair. For each one:
   quarantine will not auto-clear and autoloop will keep skipping the row.
 `
 
+// selfEvaluationClause is appended to every planner prompt as a SOFT rule.
+// It tells the planner how to read the "Previous Reshape Outcomes" data
+// section that follows: UNSTUCK rows confirm a working approach, STILL
+// FAILING rows have resisted reshape and likely need a different
+// decomposition or escalation, NO ATTEMPTS YET rows are inconclusive.
+// The clause is unconditional (matches the HARD/SOFT clause pattern); the
+// data section appears only when bundle.PreviousReshapes is non-empty.
+const selfEvaluationClause = `
+SELF-EVALUATION (SOFT RULE)
+
+The "Previous Reshape Outcomes" section reports what autoloop did with rows
+you reshaped in past runs. Use this signal:
+  - UNSTUCK rows confirm your previous approach worked
+  - STILL FAILING rows have resisted reshape — try a different decomposition,
+    escalate to "needs_human" via PlannerVerdict (L5), or tighten ready_when
+  - NO ATTEMPTS YET rows may be legitimately blocked
+`
+
 // topicalClauseTemplate is appended to the planner prompt when the run was
 // invoked with positional keyword arguments (L6 topical focus mode). The
 // upstream context (Quarantined Rows, Previous Reshapes, Implementation

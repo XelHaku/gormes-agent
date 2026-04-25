@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -52,6 +53,13 @@ type Config struct {
 	// MergeOpenPullRequests controls whether planner cycles merge all
 	// non-draft open pull requests before collecting context.
 	MergeOpenPullRequests bool
+	// EvaluationWindow is the lookback for L4 self-evaluation. The planner
+	// correlates row reshapes recorded in its own ledger within this window
+	// against autoloop's ledger to determine whether previous reshapes
+	// unstuck the row, are still failing, or haven't been retried yet.
+	// Sourced from PLANNER_EVALUATION_WINDOW (Go time.ParseDuration syntax,
+	// e.g. "168h" for seven days); default DefaultEvaluationWindow (7 days).
+	EvaluationWindow time.Duration
 }
 
 func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
@@ -79,6 +87,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		PlannerTriggersPath:    filepath.Join(repoRoot, ".codex", "architecture-planner", "triggers.jsonl"),
 		MaxRetries:             DefaultMaxRetries,
 		MergeOpenPullRequests:  true,
+		EvaluationWindow:       DefaultEvaluationWindow,
 	}
 
 	if value := env["PROGRESS_JSON"]; value != "" {
@@ -149,6 +158,16 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 			return Config{}, fmt.Errorf("MERGE_OPEN_PULL_REQUESTS: %w", err)
 		}
 		cfg.MergeOpenPullRequests = b
+	}
+	if value := env["PLANNER_EVALUATION_WINDOW"]; value != "" {
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("PLANNER_EVALUATION_WINDOW must be a Go duration (e.g. \"168h\"): %w", err)
+		}
+		if d <= 0 {
+			return Config{}, fmt.Errorf("PLANNER_EVALUATION_WINDOW must be positive")
+		}
+		cfg.EvaluationWindow = d
 	}
 
 	// TriggersCursorPath derives from the (possibly env-overridden) RunRoot
