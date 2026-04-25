@@ -26,13 +26,25 @@ type ProviderTemperatureRetryStatus struct {
 	Reason   string
 }
 
+// ProviderUnsupportedParameterRetryStatus records the last supported reactive
+// retry where an OpenAI-compatible provider rejected a request parameter.
+type ProviderUnsupportedParameterRetryStatus struct {
+	Attempts    int
+	Parameter   string
+	Replacement string
+	Stripped    bool
+	Model       string
+	Reason      string
+}
+
 // ProviderStatus is the provider-owned status snapshot the kernel can attach
 // to render frames without knowing adapter-specific behavior.
 type ProviderStatus struct {
-	Provider         string
-	Runtime          string
-	Capabilities     ProviderCapabilities
-	TemperatureRetry ProviderTemperatureRetryStatus
+	Provider                  string
+	Runtime                   string
+	Capabilities              ProviderCapabilities
+	TemperatureRetry          ProviderTemperatureRetryStatus
+	UnsupportedParameterRetry ProviderUnsupportedParameterRetryStatus
 }
 
 type providerStatusReporter interface {

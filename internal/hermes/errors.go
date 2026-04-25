@@ -246,35 +246,43 @@ func isContextCode(code string) bool {
 }
 
 func isUnsupportedTemperatureError(err error) bool {
-	if err == nil {
+	return isUnsupportedParameterError(err, "temperature")
+}
+
+func isUnsupportedParameterError(err error, param string) bool {
+	param = strings.ToLower(strings.TrimSpace(param))
+	if err == nil || param == "" {
 		return false
 	}
 	var httpErr *HTTPError
 	if errors.As(err, &httpErr) {
 		_, combined, code := providerHTTPErrorText(httpErr)
-		return isUnsupportedTemperatureSignal(combined, code)
+		return isUnsupportedParameterSignal(combined, code, param)
 	}
-	return isUnsupportedTemperatureSignal(strings.ToLower(err.Error()), "")
+	return isUnsupportedParameterSignal(strings.ToLower(err.Error()), "", param)
 }
 
-var unsupportedTemperaturePatterns = []string{
+var unsupportedParameterPatterns = []string{
 	"unsupported parameter",
 	"unsupported_parameter",
 	"not supported",
 	"does not support",
 	"unknown parameter",
 	"unrecognized request argument",
+	"unrecognized parameter",
+	"invalid parameter",
 }
 
-func isUnsupportedTemperatureSignal(combined, code string) bool {
+func isUnsupportedParameterSignal(combined, code, param string) bool {
 	combined = strings.ToLower(combined)
-	if !strings.Contains(combined, "temperature") {
+	param = strings.ToLower(strings.TrimSpace(param))
+	if param == "" || !strings.Contains(combined, param) {
 		return false
 	}
 	if isUnsupportedParameterCode(code) {
 		return true
 	}
-	return containsAny(combined, unsupportedTemperaturePatterns)
+	return containsAny(combined, unsupportedParameterPatterns)
 }
 
 func isUnsupportedParameterCode(code string) bool {
