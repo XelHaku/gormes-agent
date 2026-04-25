@@ -1,0 +1,287 @@
+package apiserver
+
+import (
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+)
+
+const (
+	dashboardDefaultSessionLimit = 20
+	dashboardMaxSessionLimit     = 100
+)
+
+// DashboardModelProvider is the model-picker provider shape consumed by the
+// dashboard without importing Hermes' React runtime.
+type DashboardModelProvider struct {
+	Name        string   `json:"name"`
+	Slug        string   `json:"slug"`
+	Models      []string `json:"models,omitempty"`
+	TotalModels int      `json:"total_models,omitempty"`
+	IsCurrent   bool     `json:"is_current,omitempty"`
+	Warning     string   `json:"warning,omitempty"`
+}
+
+// DashboardOAuthStatus mirrors the dashboard's disconnected/connected status
+// without owning provider-specific OAuth flows.
+type DashboardOAuthStatus struct {
+	LoggedIn        bool   `json:"logged_in"`
+	Source          string `json:"source,omitempty"`
+	SourceLabel     string `json:"source_label,omitempty"`
+	TokenPreview    string `json:"token_preview,omitempty"`
+	ExpiresAt       string `json:"expires_at,omitempty"`
+	HasRefreshToken bool   `json:"has_refresh_token,omitempty"`
+	LastRefresh     string `json:"last_refresh,omitempty"`
+	Error           string `json:"error,omitempty"`
+}
+
+// DashboardOAuthProvider describes an OAuth-capable provider and its current
+// status as a read-only dashboard contract.
+type DashboardOAuthProvider struct {
+	ID         string               `json:"id"`
+	Name       string               `json:"name"`
+	Flow       string               `json:"flow"`
+	CLICommand string               `json:"cli_command"`
+	DocsURL    string               `json:"docs_url"`
+	Status     DashboardOAuthStatus `json:"status"`
+}
+
+// DashboardSessionInfo is the native session summary shape used by the
+// dashboard's session list.
+type DashboardSessionInfo struct {
+	ID            string  `json:"id"`
+	Source        *string `json:"source"`
+	Model         *string `json:"model"`
+	Title         *string `json:"title"`
+	StartedAt     int64   `json:"started_at"`
+	EndedAt       *int64  `json:"ended_at"`
+	LastActive    int64   `json:"last_active"`
+	IsActive      bool    `json:"is_active"`
+	MessageCount  int     `json:"message_count"`
+	ToolCallCount int     `json:"tool_call_count"`
+	InputTokens   int     `json:"input_tokens"`
+	OutputTokens  int     `json:"output_tokens"`
+	Preview       *string `json:"preview"`
+}
+
+type dashboardPanelStatus struct {
+	State     string   `json:"state"`
+	Reason    string   `json:"reason,omitempty"`
+	Endpoints []string `json:"endpoints,omitempty"`
+}
+
+func (s *Server) handleDashboardStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
+		return
+	}
+	activeSessions := 0
+	if sessions, total, err := s.responseStore.ListSessions(dashboardMaxSessionLimit, 0, s.now()); err == nil {
+		activeSessions = total
+		for _, session := range sessions {
+			if !session.IsActive {
+				activeSessions--
+			}
+		}
+		if activeSessions < 0 {
+			activeSessions = 0
+		}
+	}
+
+	panels := map[string]dashboardPanelStatus{
+		"chat":          enabledPanel("/v1/chat/completions"),
+		"responses":     enabledPanel("/v1/responses", "/v1/runs", "/v1/runs/{run_id}/events"),
+		"sessions":      enabledPanel("/api/sessions", "/api/sessions/{session_id}"),
+		"models":        enabledPanel("/v1/models", "/api/model/info", "/api/model/options"),
+		"oauth":         enabledPanel("/api/providers/oauth"),
+		"tool_progress": enabledPanel("/v1/runs/{run_id}/events"),
+		"plugins":       disabledPanel("dashboard plugin runtime is not configured in the native API server"),
+	}
+	if s.loop == nil {
+		panels["chat"] = disabledPanel("native turn loop is not configured")
+		panels["responses"] = disabledPanel("native turn loop is not configured")
+		panels["tool_progress"] = disabledPanel("native turn loop is not configured")
+	}
+	if len(s.oauthProviders) == 0 {
+		panels["oauth"] = disabledPanel("no OAuth providers are configured")
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"active_sessions": activeSessions,
+		"version":         "gormes-agent",
+		"platform":        "gormes-agent",
+		"model":           s.modelName,
+		"provider":        s.providerName,
+		"panels":          panels,
+		"upstream_react_runtime": map[string]any{
+			"state":    "absent",
+			"required": false,
+		},
+		"responses": s.responseHealthStatus(),
+		"runs":      s.runHealthStatus(),
+	})
+}
+
+func (s *Server) handleDashboardModelInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"model":                    s.modelName,
+		"provider":                 s.providerName,
+		"auto_context_length":      0,
+		"config_context_length":    0,
+		"effective_context_length": 0,
+		"capabilities":             map[string]any{"supports_tools": true},
+	})
+}
+
+func (s *Server) handleDashboardModelOptions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
+		return
+	}
+	if !s.authorized(r) {
+		writeOpenAIError(w, http.StatusUnauthorized, "Invalid API key", "invalid_request_error", "", "invalid_api_key")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"model":     s.modelName,
+		"provider":  s.providerName,
+		"providers": s.dashboardModelProviders(),
+	})
+}
+
+func (s *Server) handleDashboardOAuthProviders(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
+		return
+	}
+	if !s.authorized(r) {
+		writeOpenAIError(w, http.StatusUnauthorized, "Invalid API key", "invalid_request_error", "", "invalid_api_key")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"providers": cloneDashboardOAuthProviders(s.oauthProviders)})
+}
+
+func (s *Server) handleDashboardPlugins(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, []any{})
+}
+
+func (s *Server) handleDashboardSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
+		return
+	}
+	if !s.authorized(r) {
+		writeOpenAIError(w, http.StatusUnauthorized, "Invalid API key", "invalid_request_error", "", "invalid_api_key")
+		return
+	}
+	limit := parseDashboardInt(r.URL.Query().Get("limit"), dashboardDefaultSessionLimit, 1, dashboardMaxSessionLimit)
+	offset := parseDashboardInt(r.URL.Query().Get("offset"), 0, 0, 1_000_000)
+	sessions, total, err := s.responseStore.ListSessions(limit, offset, s.now())
+	if err != nil {
+		writeOpenAIError(w, http.StatusInternalServerError, "Internal server error: "+err.Error(), "server_error", "", "session_store_failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"sessions": sessions,
+		"total":    total,
+		"limit":    limit,
+		"offset":   offset,
+	})
+}
+
+func (s *Server) handleDashboardSessionByID(w http.ResponseWriter, r *http.Request) {
+	if !s.authorized(r) {
+		writeOpenAIError(w, http.StatusUnauthorized, "Invalid API key", "invalid_request_error", "", "invalid_api_key")
+		return
+	}
+	sessionID := strings.TrimPrefix(r.URL.Path, "/api/sessions/")
+	if decoded, err := url.PathUnescape(sessionID); err == nil {
+		sessionID = decoded
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" || strings.Contains(sessionID, "/") {
+		writeOpenAIError(w, http.StatusNotFound, "Session not found", "invalid_request_error", "", "session_not_found")
+		return
+	}
+	switch r.Method {
+	case http.MethodDelete:
+		deleted, err := s.responseStore.DeleteSession(sessionID)
+		if err != nil {
+			writeOpenAIError(w, http.StatusInternalServerError, "Internal server error: "+err.Error(), "server_error", "", "session_store_failed")
+			return
+		}
+		if !deleted {
+			writeOpenAIError(w, http.StatusNotFound, "Session not found: "+sessionID, "invalid_request_error", "", "session_not_found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "session_id": sessionID})
+	default:
+		writeOpenAIError(w, http.StatusMethodNotAllowed, "Method not allowed", "invalid_request_error", "", "method_not_allowed")
+	}
+}
+
+func (s *Server) dashboardModelProviders() []DashboardModelProvider {
+	providers := cloneDashboardModelProviders(s.modelProviders)
+	if len(providers) == 0 {
+		providers = []DashboardModelProvider{{
+			Name:        "Native Gormes",
+			Slug:        s.providerName,
+			Models:      []string{s.modelName},
+			TotalModels: 1,
+			IsCurrent:   true,
+		}}
+	}
+	for i := range providers {
+		providers[i].Models = append([]string(nil), providers[i].Models...)
+		if providers[i].TotalModels == 0 {
+			providers[i].TotalModels = len(providers[i].Models)
+		}
+		if providers[i].Slug == s.providerName {
+			providers[i].IsCurrent = true
+		}
+	}
+	return providers
+}
+
+func enabledPanel(endpoints ...string) dashboardPanelStatus {
+	return dashboardPanelStatus{State: "enabled", Endpoints: append([]string(nil), endpoints...)}
+}
+
+func disabledPanel(reason string) dashboardPanelStatus {
+	return dashboardPanelStatus{State: "disabled", Reason: reason}
+}
+
+func parseDashboardInt(raw string, fallback, min, max int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return fallback
+	}
+	if n < min {
+		return min
+	}
+	if n > max {
+		return max
+	}
+	return n
+}
+
+func cloneDashboardModelProviders(in []DashboardModelProvider) []DashboardModelProvider {
+	out := append([]DashboardModelProvider(nil), in...)
+	for i := range out {
+		out[i].Models = append([]string(nil), out[i].Models...)
+	}
+	return out
+}
+
+func cloneDashboardOAuthProviders(in []DashboardOAuthProvider) []DashboardOAuthProvider {
+	return append([]DashboardOAuthProvider(nil), in...)
+}

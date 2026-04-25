@@ -4062,9 +4062,9 @@
             },
             {
               "name": "Dashboard API client contract",
-              "status": "planned",
+              "status": "complete",
               "contract": "Dashboard-facing API helpers consume native chat, Responses, model, provider, OAuth, session, and tool-progress endpoints without importing the upstream React app",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -4094,7 +4094,7 @@
                 "Missing optional providers or plugins render disabled/degraded states.",
                 "The Go runtime remains independent of upstream React/Vite assets."
               ],
-              "note": "Hermes' React dashboard grew substantially in this upstream sync. Gormes should treat it as API-contract inventory, not a Node runtime dependency: freeze dashboard-facing endpoints and degraded states before deciding on any Go-native dashboard UI.",
+              "note": "Complete: TDD landed native dashboard contract fixtures and Go-only API helpers for chat send/stream, Responses-backed session list/delete, model picker options, OAuth status, run-event tool progress, and disabled/degraded panel status without importing upstream React/Vite assets.",
               "write_scope": [
                 "internal/apiserver/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -4104,7 +4104,12 @@
               ],
               "done_signal": [
                 "Dashboard contract fixtures prove native API helpers cover chat, sessions, models, OAuth, and tool progress without upstream React runtime dependencies."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T07:06:04Z",
+                "last_success": "2026-04-25T07:06:04Z"
+              }
             },
             {
               "name": "Dashboard PTY chat sidecar contract",

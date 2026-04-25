@@ -33,6 +33,9 @@ type runEvent struct {
 	RunID     string        `json:"run_id"`
 	Timestamp int64         `json:"timestamp"`
 	Delta     string        `json:"delta,omitempty"`
+	Name      string        `json:"name,omitempty"`
+	Preview   string        `json:"preview,omitempty"`
+	Status    string        `json:"status,omitempty"`
 	Output    string        `json:"output,omitempty"`
 	Usage     ResponseUsage `json:"usage,omitempty"`
 	Error     string        `json:"error,omitempty"`
@@ -199,6 +202,17 @@ func (s *Server) runAsyncTurn(runID string, turnReq TurnRequest) {
 	result, err := s.loop.StreamTurn(context.Background(), turnReq, StreamCallbacks{
 		OnToken: func(token string) error {
 			s.runs.publish(runID, runEvent{Event: "message.delta", RunID: runID, Timestamp: s.now().Unix(), Delta: token})
+			return nil
+		},
+		OnToolProgress: func(progress ToolProgressEvent) error {
+			s.runs.publish(runID, runEvent{
+				Event:     "tool.progress",
+				RunID:     runID,
+				Timestamp: s.now().Unix(),
+				Name:      progress.Name,
+				Preview:   progress.Preview,
+				Status:    progress.Status,
+			})
 			return nil
 		},
 	})

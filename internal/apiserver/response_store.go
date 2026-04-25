@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -270,6 +271,126 @@ func (s *ResponseStore) deleteBolt(responseID string) (bool, error) {
 	return deleted, err
 }
 
+func (s *ResponseStore) ListSessions(limit, offset int, now time.Time) ([]DashboardSessionInfo, int, error) {
+	if s == nil {
+		return nil, 0, nil
+	}
+	if limit <= 0 {
+		limit = dashboardDefaultSessionLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	records, err := s.allStoredResponses()
+	if err != nil {
+		return nil, 0, err
+	}
+	sessions := dashboardSessionsFromResponses(records, now)
+	total := len(sessions)
+	if offset >= total {
+		return []DashboardSessionInfo{}, total, nil
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return append([]DashboardSessionInfo(nil), sessions[offset:end]...), total, nil
+}
+
+func (s *ResponseStore) allStoredResponses() ([]StoredResponse, error) {
+	if s == nil {
+		return nil, nil
+	}
+	if s.db != nil {
+		var out []StoredResponse
+		err := s.db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte(responseStoreBucketName))
+			if b == nil {
+				return errors.New("api response store: response bucket missing")
+			}
+			return b.ForEach(func(_, v []byte) error {
+				var rec responseStoreRecord
+				if err := json.Unmarshal(v, &rec); err != nil {
+					return fmt.Errorf("api response store: decode response for sessions: %w", err)
+				}
+				out = append(out, rec.Data)
+				return nil
+			})
+		})
+		return out, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]StoredResponse, 0, len(s.mem))
+	for _, rec := range s.mem {
+		out = append(out, rec.Data)
+	}
+	return out, nil
+}
+
+func (s *ResponseStore) DeleteSession(sessionID string) (bool, error) {
+	if s == nil {
+		return false, nil
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return false, nil
+	}
+	if s.db != nil {
+		return s.deleteSessionBolt(sessionID)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	deleted := false
+	for responseID, rec := range s.mem {
+		if rec.Data.SessionID != sessionID {
+			continue
+		}
+		delete(s.mem, responseID)
+		s.removeConversationPointersLocked(responseID)
+		deleted = true
+	}
+	return deleted, nil
+}
+
+func (s *ResponseStore) deleteSessionBolt(sessionID string) (bool, error) {
+	var deleted bool
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(responseStoreBucketName))
+		cb := tx.Bucket([]byte(conversationBucketName))
+		if b == nil || cb == nil {
+			return errors.New("api response store: buckets missing")
+		}
+		var responseIDs [][]byte
+		if err := b.ForEach(func(k, v []byte) error {
+			var rec responseStoreRecord
+			if err := json.Unmarshal(v, &rec); err != nil {
+				return fmt.Errorf("api response store: decode response during session delete: %w", err)
+			}
+			if rec.Data.SessionID == sessionID {
+				responseIDs = append(responseIDs, append([]byte(nil), k...))
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		for _, responseID := range responseIDs {
+			if err := b.Delete(responseID); err != nil {
+				return err
+			}
+			if err := deleteConversationPointers(cb, string(responseID)); err != nil {
+				return err
+			}
+		}
+		deleted = len(responseIDs) > 0
+		return nil
+	})
+	return deleted, err
+}
+
 func (s *ResponseStore) GetConversation(name string) (string, bool, error) {
 	if s == nil {
 		return "", false, nil
@@ -448,4 +569,116 @@ func deleteConversationPointers(b *bolt.Bucket, responseID string) error {
 		}
 	}
 	return nil
+}
+
+func dashboardSessionsFromResponses(records []StoredResponse, now time.Time) []DashboardSessionInfo {
+	type accumulator struct {
+		info DashboardSessionInfo
+	}
+	bySession := make(map[string]*accumulator)
+	source := "api"
+	for _, rec := range records {
+		sessionID := strings.TrimSpace(rec.SessionID)
+		if sessionID == "" {
+			continue
+		}
+		acc := bySession[sessionID]
+		if acc == nil {
+			acc = &accumulator{
+				info: DashboardSessionInfo{
+					ID:        sessionID,
+					Source:    stringPtr(source),
+					StartedAt: rec.Response.CreatedAt,
+				},
+			}
+			bySession[sessionID] = acc
+		}
+		if rec.Response.CreatedAt > 0 && (acc.info.StartedAt == 0 || rec.Response.CreatedAt < acc.info.StartedAt) {
+			acc.info.StartedAt = rec.Response.CreatedAt
+		}
+		if rec.Response.CreatedAt > acc.info.LastActive {
+			acc.info.LastActive = rec.Response.CreatedAt
+		}
+		if rec.Response.Model != "" {
+			acc.info.Model = stringPtr(rec.Response.Model)
+		}
+		acc.info.InputTokens += rec.Response.Usage.InputTokens
+		acc.info.OutputTokens += rec.Response.Usage.OutputTokens
+		acc.info.MessageCount += len(rec.ConversationHistory)
+		acc.info.ToolCallCount += countDashboardToolCalls(rec)
+		if acc.info.Title == nil {
+			if title := firstDashboardUserText(rec.ConversationHistory); title != "" {
+				acc.info.Title = stringPtr(dashboardSnippet(title, 80))
+			}
+		}
+		if preview := dashboardResponsePreview(rec.Response); preview != "" {
+			acc.info.Preview = stringPtr(dashboardSnippet(preview, 160))
+		}
+	}
+	out := make([]DashboardSessionInfo, 0, len(bySession))
+	for _, acc := range bySession {
+		if acc.info.MessageCount == 0 && acc.info.Preview != nil {
+			acc.info.MessageCount = 1
+		}
+		acc.info.IsActive = acc.info.LastActive > 0 && now.Unix()-acc.info.LastActive < 300
+		out = append(out, acc.info)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].LastActive != out[j].LastActive {
+			return out[i].LastActive > out[j].LastActive
+		}
+		return out[i].ID < out[j].ID
+	})
+	return out
+}
+
+func countDashboardToolCalls(rec StoredResponse) int {
+	total := 0
+	for _, msg := range rec.ConversationHistory {
+		total += len(msg.ToolCalls)
+		if msg.Role == "tool" || msg.ToolCallID != "" {
+			total++
+		}
+	}
+	for _, item := range rec.Response.Output {
+		if item.Type == "function_call" || item.Type == "function_call_output" {
+			total++
+		}
+	}
+	return total
+}
+
+func firstDashboardUserText(messages []ChatMessage) string {
+	for _, msg := range messages {
+		if msg.Role == "user" && strings.TrimSpace(msg.Content) != "" {
+			return strings.TrimSpace(msg.Content)
+		}
+	}
+	return ""
+}
+
+func dashboardResponsePreview(response ResponseObject) string {
+	for i := len(response.Output) - 1; i >= 0; i-- {
+		item := response.Output[i]
+		for j := len(item.Content) - 1; j >= 0; j-- {
+			if text := strings.TrimSpace(item.Content[j].Text); text != "" {
+				return text
+			}
+		}
+		if text := strings.TrimSpace(item.Output); text != "" {
+			return text
+		}
+	}
+	return ""
+}
+
+func dashboardSnippet(s string, max int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	if max <= 3 {
+		return s[:max]
+	}
+	return s[:max-3] + "..."
 }

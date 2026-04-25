@@ -24,12 +24,15 @@ const (
 
 // Config wires the native API server HTTP surface.
 type Config struct {
-	APIKey        string
-	ModelName     string
-	MaxBodyBytes  int64
-	Loop          TurnLoop
-	ResponseStore *ResponseStore
-	RunTTL        time.Duration
+	APIKey         string
+	ModelName      string
+	ProviderName   string
+	MaxBodyBytes   int64
+	Loop           TurnLoop
+	ResponseStore  *ResponseStore
+	RunTTL         time.Duration
+	ModelProviders []DashboardModelProvider
+	OAuthProviders []DashboardOAuthProvider
 }
 
 // Server exposes the OpenAI-compatible HTTP routes that can be mounted by the
@@ -37,10 +40,13 @@ type Config struct {
 type Server struct {
 	apiKey                 string
 	modelName              string
+	providerName           string
 	maxBodyBytes           int64
 	loop                   TurnLoop
 	responseStore          *ResponseStore
 	runs                   *runRegistry
+	modelProviders         []DashboardModelProvider
+	oauthProviders         []DashboardOAuthProvider
 	statusMu               sync.Mutex
 	previousResponseMisses int
 	now                    func() time.Time
@@ -92,7 +98,16 @@ type TurnResult struct {
 
 // StreamCallbacks receives token deltas from a streaming native turn.
 type StreamCallbacks struct {
-	OnToken func(string) error
+	OnToken        func(string) error
+	OnToolProgress func(ToolProgressEvent) error
+}
+
+// ToolProgressEvent is the dashboard-facing progress item emitted by native
+// run streams for long-running tool activity.
+type ToolProgressEvent struct {
+	Name    string `json:"name,omitempty"`
+	Preview string `json:"preview,omitempty"`
+	Status  string `json:"status,omitempty"`
 }
 
 // TurnLoop is the minimal adapter seam between HTTP and the native Gormes turn
@@ -108,6 +123,10 @@ func NewServer(cfg Config) *Server {
 	if model == "" {
 		model = defaultModelName
 	}
+	provider := strings.TrimSpace(cfg.ProviderName)
+	if provider == "" {
+		provider = "native"
+	}
 	maxBody := cfg.MaxBodyBytes
 	if maxBody <= 0 {
 		maxBody = defaultMaxRequestBytes
@@ -121,14 +140,17 @@ func NewServer(cfg Config) *Server {
 		runTTL = defaultRunStreamTTL
 	}
 	s := &Server{
-		apiKey:        cfg.APIKey,
-		modelName:     model,
-		maxBodyBytes:  maxBody,
-		loop:          cfg.Loop,
-		responseStore: responseStore,
-		runs:          newRunRegistry(runTTL, time.Now),
-		now:           time.Now,
-		mux:           http.NewServeMux(),
+		apiKey:         cfg.APIKey,
+		modelName:      model,
+		providerName:   provider,
+		maxBodyBytes:   maxBody,
+		loop:           cfg.Loop,
+		responseStore:  responseStore,
+		runs:           newRunRegistry(runTTL, time.Now),
+		modelProviders: cloneDashboardModelProviders(cfg.ModelProviders),
+		oauthProviders: cloneDashboardOAuthProviders(cfg.OAuthProviders),
+		now:            time.Now,
+		mux:            http.NewServeMux(),
 	}
 	s.routes()
 	return s
@@ -148,6 +170,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/responses/", s.handleResponseByID)
 	s.mux.HandleFunc("/v1/runs", s.handleRuns)
 	s.mux.HandleFunc("/v1/runs/", s.handleRunEvents)
+	s.mux.HandleFunc("/api/status", s.handleDashboardStatus)
+	s.mux.HandleFunc("/api/model/info", s.handleDashboardModelInfo)
+	s.mux.HandleFunc("/api/model/options", s.handleDashboardModelOptions)
+	s.mux.HandleFunc("/api/providers/oauth", s.handleDashboardOAuthProviders)
+	s.mux.HandleFunc("/api/dashboard/plugins", s.handleDashboardPlugins)
+	s.mux.HandleFunc("/api/sessions", s.handleDashboardSessions)
+	s.mux.HandleFunc("/api/sessions/", s.handleDashboardSessionByID)
 }
 
 func securityHeaders(next http.Handler) http.Handler {
