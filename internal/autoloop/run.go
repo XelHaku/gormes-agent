@@ -70,10 +70,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		}
 		if opts.Config.MergeOpenPullRequests {
 			if _, err := MergeOpenPullRequests(ctx, PullRequestIntakeOptions{
-				Runner:   runner,
-				RepoRoot: opts.Config.RepoRoot,
-				RunRoot:  opts.Config.RunRoot,
-				RunID:    runID,
+				Runner:         runner,
+				RepoRoot:       opts.Config.RepoRoot,
+				RunRoot:        opts.Config.RunRoot,
+				RunID:          runID,
+				ConflictAction: opts.Config.PRConflictAction,
 			}); err != nil {
 				return RunSummary{}, err
 			}
@@ -405,6 +406,14 @@ func runPostPromotionVerification(ctx context.Context, cfg Config, runner Runner
 		return err
 	}
 
+	// Run ALL verify commands and collect failures, even if an early one
+	// fails. The repair agent benefits from a complete failure picture
+	// (e.g. both `go test` and `go vet` errors) rather than discovering
+	// one issue at a time across multiple repair cycles.
+	var (
+		commandErrs    []error
+		failureDetails []string
+	)
 	for i, shellCommand := range cfg.PostPromotionVerifyCommands {
 		result := runner.Run(ctx, Command{
 			Name: "sh",
@@ -412,17 +421,25 @@ func runPostPromotionVerification(ctx context.Context, cfg Config, runner Runner
 			Dir:  cfg.RepoRoot,
 			Env:  postPromotionCommandEnv(cfg),
 		})
-		if result.Err != nil {
-			err := postPromotionCommandError("verification", shellCommand, result)
-			ledgerErr := appendRunLedgerEvent(cfg, LedgerEvent{
-				TS:     time.Now().UTC(),
-				RunID:  runID,
-				Event:  "post_promotion_verify_failed",
-				Status: "failed",
-				Detail: truncateLedgerDetail(fmt.Sprintf("attempt=%d command=%d/%d %q: %s", attempt, i+1, len(cfg.PostPromotionVerifyCommands), shellCommand, commandFailureDetail(result))),
-			})
-			return errors.Join(err, ledgerErr)
+		if result.Err == nil {
+			continue
 		}
+		commandErrs = append(commandErrs, postPromotionCommandError("verification", shellCommand, result))
+		failureDetails = append(failureDetails,
+			fmt.Sprintf("command=%d/%d %q:\n%s", i+1, len(cfg.PostPromotionVerifyCommands), shellCommand, commandFailureDetail(result)),
+		)
+	}
+	if len(commandErrs) > 0 {
+		ledgerErr := appendRunLedgerEvent(cfg, LedgerEvent{
+			TS:     time.Now().UTC(),
+			RunID:  runID,
+			Event:  "post_promotion_verify_failed",
+			Status: "failed",
+			Detail: truncateLedgerDetail(fmt.Sprintf("attempt=%d failed=%d/%d\n\n%s",
+				attempt, len(commandErrs), len(cfg.PostPromotionVerifyCommands),
+				strings.Join(failureDetails, "\n\n---\n\n"))),
+		})
+		return errors.Join(append(commandErrs, ledgerErr)...)
 	}
 
 	if err := ensureNoMergeConflicts(cfg.RepoRoot); err != nil {
@@ -571,7 +588,29 @@ func truncateLedgerDetail(value string) string {
 	if len(value) <= maxDetail {
 		return value
 	}
-	return value[:maxDetail] + "..."
+	// Preserve the TAIL of the value: the actual failure summary in
+	// `go test ./...` output (--- FAIL, FAIL package, exit status) and the
+	// last test that broke live near the end of stdout, while the prefix is
+	// long lists of passing packages. A head-truncated detail strips
+	// exactly the diagnostic information and leaves the operator staring
+	// at "ok    package/foo 0.04s ... ok    package/bar 0.05s ...".
+	//
+	// Truncate at a line boundary inside the tail so we don't cut a log
+	// line in half. Keep a small head context too (so the operator can see
+	// the run signature) separated by an explicit elision marker.
+	const headBudget = 200
+	tailBudget := maxDetail - headBudget - len("...[N bytes elided]...\n\n")
+	if tailBudget <= 0 {
+		return "..." + value[len(value)-maxDetail:]
+	}
+	head := value[:headBudget]
+	tail := value[len(value)-tailBudget:]
+	if idx := strings.IndexByte(tail, '\n'); idx >= 0 && idx < len(tail)-1 {
+		// Trim the partial first line of the tail so logs read cleanly.
+		tail = tail[idx+1:]
+	}
+	elided := len(value) - headBudget - len(tail)
+	return fmt.Sprintf("%s\n...[%d bytes elided]...\n\n%s", head, elided, tail)
 }
 
 // recordWorkerOutcome translates a finishWorker result into accumulator +
