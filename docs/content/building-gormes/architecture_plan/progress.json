@@ -198,261 +198,6 @@
               ]
             }
           ]
-        },
-        "3.F": {
-          "name": "Goncho Honcho Memory Parity",
-          "priority": "P3",
-          "items": [
-            {
-              "name": "Goncho context representation options",
-              "priority": "P3",
-              "status": "planned",
-              "contract": "honcho_context exposes the Honcho v3 session.context representation controls while preserving current same-chat defaults",
-              "contract_status": "draft",
-              "slice_size": "small",
-              "execution_owner": "memory",
-              "trust_class": [
-                "operator",
-                "system"
-              ],
-              "degraded_mode": "Unsupported representation options return structured unavailable evidence instead of being silently ignored.",
-              "fixture": "internal/goncho/context_options_test.go",
-              "source_refs": [
-                "../honcho/docs/v3/documentation/features/get-context.mdx",
-                "../honcho/docs/v3/documentation/features/advanced/representation-scopes.mdx",
-                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
-                "internal/goncho/types.go",
-                "internal/tools/honcho_tools.go"
-              ],
-              "blocked_by": [
-                "Honcho-compatible scope/source tool schema"
-              ],
-              "ready_when": [
-                "honcho_context already accepts peer, query, max_tokens, session_key, scope, and sources through the Goncho service."
-              ],
-              "not_ready_when": [
-                "The slice attempts to implement summaries, observations, or dialectic reasoning in the same change."
-              ],
-              "unblocks": [
-                "Goncho summary context budget",
-                "Directional peer cards and representation scopes"
-              ],
-              "acceptance": [
-                "ContextParams and the honcho_context JSON Schema expose optional peer_target, peer_perspective, limit_to_session, search_top_k, search_max_distance, include_most_frequent, and max_conclusions fields.",
-                "Omitted fields preserve current same-chat context behavior.",
-                "limit_to_session=true cannot widen recall through scope=user.",
-                "Fields that need the future observation table report explicit unsupported evidence."
-              ],
-              "note": "Docs study landed from Honcho v3 get-context and representation-scopes docs. This is the smallest public-edge slice before full SDK context parity: add typed option fields and schema visibility, but do not claim that summary, observation, or dialectic-backed representation retrieval is complete.",
-              "write_scope": [
-                "internal/goncho/",
-                "internal/tools/",
-                "docs/content/building-gormes/architecture_plan/progress.json"
-              ],
-              "test_commands": [
-                "go test ./internal/goncho ./internal/tools -count=1"
-              ],
-              "done_signal": [
-                "honcho_context schema and service fixtures prove Honcho v3 context options are discoverable, optional, and visibly degraded when not implemented."
-              ]
-            },
-            {
-              "name": "Goncho search filter grammar",
-              "priority": "P4",
-              "status": "planned",
-              "contract": "Goncho search accepts a typed subset of Honcho v3 filters and rejects unsupported filter operators visibly",
-              "contract_status": "draft",
-              "slice_size": "medium",
-              "execution_owner": "memory",
-              "trust_class": [
-                "operator",
-                "system"
-              ],
-              "degraded_mode": "Unknown filters, unsupported operators, or metadata paths return a structured unsupported-filter error instead of widening search.",
-              "fixture": "internal/goncho/filter_grammar_test.go",
-              "source_refs": [
-                "../honcho/docs/v3/documentation/features/advanced/search.mdx",
-                "../honcho/docs/v3/documentation/features/advanced/using-filters.mdx",
-                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
-                "internal/memory/session_catalog.go",
-                "internal/goncho/types.go"
-              ],
-              "blocked_by": [
-                "Cross-chat deny-path fixtures"
-              ],
-              "ready_when": [
-                "Same-chat and user-scope deny paths are fixture-locked so filter failures cannot accidentally widen recall."
-              ],
-              "not_ready_when": [
-                "The slice adds an HTTP surface or full SDK compatibility before the internal filter AST is tested."
-              ],
-              "acceptance": [
-                "Filter AST fixtures cover AND, OR, NOT, gt, gte, lt, lte, ne, in, contains, icontains, metadata, and wildcard parsing.",
-                "The first executable implementation supports a documented subset and returns unsupported-filter evidence for the rest.",
-                "Limit defaults to 10 and clamps to the Honcho-documented maximum of 100."
-              ],
-              "note": "Honcho docs expose a richer filter grammar than current Goncho sources[]. Port this as an internal AST and evidence contract before adding public HTTP search parity.",
-              "write_scope": [
-                "internal/goncho/",
-                "internal/memory/",
-                "docs/content/building-gormes/architecture_plan/progress.json"
-              ],
-              "test_commands": [
-                "go test ./internal/goncho ./internal/memory -count=1"
-              ],
-              "done_signal": [
-                "Filter grammar tests prove unsupported Honcho filters fail closed and supported filters keep workspace/user/session boundaries intact."
-              ]
-            },
-            {
-              "name": "Directional peer cards and representation scopes",
-              "priority": "P3",
-              "status": "planned",
-              "contract": "Peer cards and stored representations are keyed by workspace, observer, and observed peer instead of a flat workspace/peer pair",
-              "contract_status": "draft",
-              "slice_size": "medium",
-              "execution_owner": "memory",
-              "trust_class": [
-                "operator",
-                "system"
-              ],
-              "degraded_mode": "When directional representation is unavailable, the service reports that only the default gormes observer view was used.",
-              "fixture": "internal/goncho/directional_peer_card_test.go",
-              "source_refs": [
-                "../honcho/docs/v3/documentation/features/advanced/representation-scopes.mdx",
-                "../honcho/docs/v3/documentation/features/advanced/peer-card.mdx",
-                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
-                "internal/memory/schema.go",
-                "internal/goncho/sql.go"
-              ],
-              "blocked_by": [
-                "Goncho context representation options"
-              ],
-              "ready_when": [
-                "Context options expose observer/target fields and current peer-card replacement behavior is fixture-locked."
-              ],
-              "not_ready_when": [
-                "The slice tries to port observe_others scheduling before the storage key and card semantics are stable."
-              ],
-              "acceptance": [
-                "Peer cards enforce Honcho's max-40-facts cap.",
-                "Manual set_card behavior replaces the full card instead of merging.",
-                "Directional target cards are stored independently from default self cards.",
-                "Late-join non-retroactive reasoning remains documented as unsupported until the deriver queue exists."
-              ],
-              "note": "Honcho docs make directional cards and representations a public concept. Goncho has an observer default but still stores cards as workspace+peer only; this row adds the storage and tool-edge semantics without implementing observe_others task scheduling.",
-              "write_scope": [
-                "internal/goncho/",
-                "internal/memory/",
-                "internal/tools/",
-                "docs/content/building-gormes/architecture_plan/progress.json"
-              ],
-              "test_commands": [
-                "go test ./internal/goncho ./internal/memory ./internal/tools -count=1"
-              ],
-              "done_signal": [
-                "Directional peer-card fixtures prove observer/observed isolation, max-card cap, and replacement semantics."
-              ]
-            },
-            {
-              "name": "Goncho queue status read model",
-              "priority": "P3",
-              "status": "planned",
-              "contract": "Gormes exposes Honcho-style representation, summary, and dream work-unit queue status as observability, not synchronization",
-              "contract_status": "draft",
-              "slice_size": "small",
-              "execution_owner": "memory",
-              "trust_class": [
-                "operator",
-                "system"
-              ],
-              "degraded_mode": "If no Goncho task queue exists yet, memory status reports zero tracked Goncho work units plus the existing extractor queue status.",
-              "fixture": "internal/goncho/queue_status_test.go",
-              "source_refs": [
-                "../honcho/docs/v3/documentation/features/advanced/queue-status.mdx",
-                "../honcho/docs/v3/documentation/core-concepts/reasoning.mdx",
-                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
-                "internal/memory/status.go"
-              ],
-              "blocked_by": [
-                "Directional peer cards and representation scopes"
-              ],
-              "ready_when": [
-                "At least one Goncho-owned task type or a zero-state read model is available to report deterministically."
-              ],
-              "not_ready_when": [
-                "The slice waits for the queue to drain or treats queue empty as an application synchronization condition."
-              ],
-              "acceptance": [
-                "Status fields include completed_work_units, in_progress_work_units, pending_work_units, total_work_units, and optional per-session details.",
-                "Only representation, summary, and dream task types count toward Honcho-style queue status.",
-                "Docs and CLI output state that queue status is for observability and debugging, not waiting for completion."
-              ],
-              "note": "Honcho docs explicitly warn not to wait for an empty queue. Goncho should expose this as operator evidence alongside existing memory status without making queue drain part of turn correctness.",
-              "write_scope": [
-                "internal/goncho/",
-                "internal/memory/",
-                "cmd/gormes/",
-                "docs/content/building-gormes/architecture_plan/progress.json"
-              ],
-              "test_commands": [
-                "go test ./cmd/gormes ./internal/goncho ./internal/memory -count=1"
-              ],
-              "done_signal": [
-                "Queue status fixtures prove Honcho-style counts and document that queue empty is not a synchronization contract."
-              ]
-            },
-            {
-              "name": "Goncho summary context budget",
-              "priority": "P3",
-              "status": "planned",
-              "contract": "Session summaries use Honcho's short/long cadence and 40/60 context budget without double-billing last-N-turn recall",
-              "contract_status": "draft",
-              "slice_size": "medium",
-              "execution_owner": "memory",
-              "trust_class": [
-                "operator",
-                "system"
-              ],
-              "degraded_mode": "When summaries are unavailable or too large for the token budget, context returns recent messages plus explicit summary_absent evidence.",
-              "fixture": "internal/goncho/summary_context_test.go",
-              "source_refs": [
-                "../honcho/docs/v3/documentation/features/advanced/summarizer.mdx",
-                "../honcho/docs/v3/documentation/features/get-context.mdx",
-                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
-                "internal/goncho/service.go",
-                "internal/memory/schema.go"
-              ],
-              "blocked_by": [
-                "Goncho context representation options"
-              ],
-              "ready_when": [
-                "Context options are schema-visible and the memory store can add a session_summaries table via migration."
-              ],
-              "not_ready_when": [
-                "The slice rewrites RecallProvider.GetContext or merges summaries into the existing memory-context fence instead of adding a separate Goncho context component."
-              ],
-              "acceptance": [
-                "Schema stores one short and one long summary slot per session with last-covered message and token count.",
-                "Short summaries trigger every 20 messages and long summaries every 60 messages by default.",
-                "Service.Context allocates 40 percent of the token budget to summary and 60 percent to recent messages when summary=true.",
-                "summary=false fills the budget with recent messages only."
-              ],
-              "note": "Honcho docs clarify that summaries are recursive compression slots, not the same thing as last-N-turn recall. Port this after context options so tool callers can request or disable the summary component explicitly.",
-              "write_scope": [
-                "internal/goncho/",
-                "internal/memory/",
-                "internal/tools/",
-                "docs/content/building-gormes/architecture_plan/progress.json"
-              ],
-              "test_commands": [
-                "go test ./internal/goncho ./internal/memory ./internal/tools -count=1"
-              ],
-              "done_signal": [
-                "Summary context fixtures prove short/long cadence, token-budget allocation, summary=false behavior, and visible degradation when no summary can fit."
-              ]
-            }
-          ]
         }
       }
     },
@@ -967,11 +712,11 @@
           "name": "OS-AI Spine: Concurrent-Tool Cancellation",
           "priority": "P1",
           "items": [
-              {
-                "name": "Interrupt propagation to concurrent-tool workers",
-                "status": "complete",
-                "note": "TDD landed: executeToolCalls now fans tool_calls out through a shared cancellable context while the kernel continues servicing cancel/reset/submit events, returns the coherent {\"error\":\"tool execution cancelled\"} envelope for cancelled workers, and stops the turn without a follow-up model call. Fixture tests cover one interrupt cancelling every in-flight worker, execute_code sidecar cancellation, delegated subagent child cancellation, and LocalCodeSandbox interrupted status."
-              }
+            {
+              "name": "Interrupt propagation to concurrent-tool workers",
+              "status": "complete",
+              "note": "TDD landed: executeToolCalls now fans tool_calls out through a shared cancellable context while the kernel continues servicing cancel/reset/submit events, returns the coherent {\"error\":\"tool execution cancelled\"} envelope for cancelled workers, and stops the turn without a follow-up model call. Fixture tests cover one interrupt cancelling every in-flight worker, execute_code sidecar cancellation, delegated subagent child cancellation, and LocalCodeSandbox interrupted status."
+            }
           ]
         },
         "2.F.1": {
@@ -1839,6 +1584,261 @@
               "name": "Operator-auditable search evidence",
               "status": "planned",
               "note": "TDD: add CLI or mirror evidence that shows source filters, user scope, and lineage metadata for session/message search so operators can audit why a cross-source hit appeared."
+            }
+          ]
+        },
+        "3.F": {
+          "name": "Goncho Honcho Memory Parity",
+          "priority": "P3",
+          "items": [
+            {
+              "name": "Goncho context representation options",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "honcho_context exposes the Honcho v3 session.context representation controls while preserving current same-chat defaults",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "memory",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Unsupported representation options return structured unavailable evidence instead of being silently ignored.",
+              "fixture": "internal/goncho/context_options_test.go",
+              "source_refs": [
+                "../honcho/docs/v3/documentation/features/get-context.mdx",
+                "../honcho/docs/v3/documentation/features/advanced/representation-scopes.mdx",
+                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
+                "internal/goncho/types.go",
+                "internal/tools/honcho_tools.go"
+              ],
+              "blocked_by": [
+                "Honcho-compatible scope/source tool schema"
+              ],
+              "ready_when": [
+                "honcho_context already accepts peer, query, max_tokens, session_key, scope, and sources through the Goncho service."
+              ],
+              "not_ready_when": [
+                "The slice attempts to implement summaries, observations, or dialectic reasoning in the same change."
+              ],
+              "unblocks": [
+                "Goncho summary context budget",
+                "Directional peer cards and representation scopes"
+              ],
+              "acceptance": [
+                "ContextParams and the honcho_context JSON Schema expose optional peer_target, peer_perspective, limit_to_session, search_top_k, search_max_distance, include_most_frequent, and max_conclusions fields.",
+                "Omitted fields preserve current same-chat context behavior.",
+                "limit_to_session=true cannot widen recall through scope=user.",
+                "Fields that need the future observation table report explicit unsupported evidence."
+              ],
+              "note": "Docs study landed from Honcho v3 get-context and representation-scopes docs. This is the smallest public-edge slice before full SDK context parity: add typed option fields and schema visibility, but do not claim that summary, observation, or dialectic-backed representation retrieval is complete.",
+              "write_scope": [
+                "internal/goncho/",
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/goncho ./internal/tools -count=1"
+              ],
+              "done_signal": [
+                "honcho_context schema and service fixtures prove Honcho v3 context options are discoverable, optional, and visibly degraded when not implemented."
+              ]
+            },
+            {
+              "name": "Goncho search filter grammar",
+              "priority": "P4",
+              "status": "planned",
+              "contract": "Goncho search accepts a typed subset of Honcho v3 filters and rejects unsupported filter operators visibly",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "memory",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Unknown filters, unsupported operators, or metadata paths return a structured unsupported-filter error instead of widening search.",
+              "fixture": "internal/goncho/filter_grammar_test.go",
+              "source_refs": [
+                "../honcho/docs/v3/documentation/features/advanced/search.mdx",
+                "../honcho/docs/v3/documentation/features/advanced/using-filters.mdx",
+                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
+                "internal/memory/session_catalog.go",
+                "internal/goncho/types.go"
+              ],
+              "blocked_by": [
+                "Cross-chat deny-path fixtures"
+              ],
+              "ready_when": [
+                "Same-chat and user-scope deny paths are fixture-locked so filter failures cannot accidentally widen recall."
+              ],
+              "not_ready_when": [
+                "The slice adds an HTTP surface or full SDK compatibility before the internal filter AST is tested."
+              ],
+              "acceptance": [
+                "Filter AST fixtures cover AND, OR, NOT, gt, gte, lt, lte, ne, in, contains, icontains, metadata, and wildcard parsing.",
+                "The first executable implementation supports a documented subset and returns unsupported-filter evidence for the rest.",
+                "Limit defaults to 10 and clamps to the Honcho-documented maximum of 100."
+              ],
+              "note": "Honcho docs expose a richer filter grammar than current Goncho sources[]. Port this as an internal AST and evidence contract before adding public HTTP search parity.",
+              "write_scope": [
+                "internal/goncho/",
+                "internal/memory/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/goncho ./internal/memory -count=1"
+              ],
+              "done_signal": [
+                "Filter grammar tests prove unsupported Honcho filters fail closed and supported filters keep workspace/user/session boundaries intact."
+              ]
+            },
+            {
+              "name": "Directional peer cards and representation scopes",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Peer cards and stored representations are keyed by workspace, observer, and observed peer instead of a flat workspace/peer pair",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "memory",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "When directional representation is unavailable, the service reports that only the default gormes observer view was used.",
+              "fixture": "internal/goncho/directional_peer_card_test.go",
+              "source_refs": [
+                "../honcho/docs/v3/documentation/features/advanced/representation-scopes.mdx",
+                "../honcho/docs/v3/documentation/features/advanced/peer-card.mdx",
+                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
+                "internal/memory/schema.go",
+                "internal/goncho/sql.go"
+              ],
+              "blocked_by": [
+                "Goncho context representation options"
+              ],
+              "ready_when": [
+                "Context options expose observer/target fields and current peer-card replacement behavior is fixture-locked."
+              ],
+              "not_ready_when": [
+                "The slice tries to port observe_others scheduling before the storage key and card semantics are stable."
+              ],
+              "acceptance": [
+                "Peer cards enforce Honcho's max-40-facts cap.",
+                "Manual set_card behavior replaces the full card instead of merging.",
+                "Directional target cards are stored independently from default self cards.",
+                "Late-join non-retroactive reasoning remains documented as unsupported until the deriver queue exists."
+              ],
+              "note": "Honcho docs make directional cards and representations a public concept. Goncho has an observer default but still stores cards as workspace+peer only; this row adds the storage and tool-edge semantics without implementing observe_others task scheduling.",
+              "write_scope": [
+                "internal/goncho/",
+                "internal/memory/",
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/goncho ./internal/memory ./internal/tools -count=1"
+              ],
+              "done_signal": [
+                "Directional peer-card fixtures prove observer/observed isolation, max-card cap, and replacement semantics."
+              ]
+            },
+            {
+              "name": "Goncho queue status read model",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Gormes exposes Honcho-style representation, summary, and dream work-unit queue status as observability, not synchronization",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "memory",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "If no Goncho task queue exists yet, memory status reports zero tracked Goncho work units plus the existing extractor queue status.",
+              "fixture": "internal/goncho/queue_status_test.go",
+              "source_refs": [
+                "../honcho/docs/v3/documentation/features/advanced/queue-status.mdx",
+                "../honcho/docs/v3/documentation/core-concepts/reasoning.mdx",
+                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
+                "internal/memory/status.go"
+              ],
+              "blocked_by": [
+                "Directional peer cards and representation scopes"
+              ],
+              "ready_when": [
+                "At least one Goncho-owned task type or a zero-state read model is available to report deterministically."
+              ],
+              "not_ready_when": [
+                "The slice waits for the queue to drain or treats queue empty as an application synchronization condition."
+              ],
+              "acceptance": [
+                "Status fields include completed_work_units, in_progress_work_units, pending_work_units, total_work_units, and optional per-session details.",
+                "Only representation, summary, and dream task types count toward Honcho-style queue status.",
+                "Docs and CLI output state that queue status is for observability and debugging, not waiting for completion."
+              ],
+              "note": "Honcho docs explicitly warn not to wait for an empty queue. Goncho should expose this as operator evidence alongside existing memory status without making queue drain part of turn correctness.",
+              "write_scope": [
+                "internal/goncho/",
+                "internal/memory/",
+                "cmd/gormes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes ./internal/goncho ./internal/memory -count=1"
+              ],
+              "done_signal": [
+                "Queue status fixtures prove Honcho-style counts and document that queue empty is not a synchronization contract."
+              ]
+            },
+            {
+              "name": "Goncho summary context budget",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Session summaries use Honcho's short/long cadence and 40/60 context budget without double-billing last-N-turn recall",
+              "contract_status": "draft",
+              "slice_size": "medium",
+              "execution_owner": "memory",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "When summaries are unavailable or too large for the token budget, context returns recent messages plus explicit summary_absent evidence.",
+              "fixture": "internal/goncho/summary_context_test.go",
+              "source_refs": [
+                "../honcho/docs/v3/documentation/features/advanced/summarizer.mdx",
+                "../honcho/docs/v3/documentation/features/get-context.mdx",
+                "docs/content/building-gormes/goncho_honcho_memory/03-honcho-docs-study.md",
+                "internal/goncho/service.go",
+                "internal/memory/schema.go"
+              ],
+              "blocked_by": [
+                "Goncho context representation options"
+              ],
+              "ready_when": [
+                "Context options are schema-visible and the memory store can add a session_summaries table via migration."
+              ],
+              "not_ready_when": [
+                "The slice rewrites RecallProvider.GetContext or merges summaries into the existing memory-context fence instead of adding a separate Goncho context component."
+              ],
+              "acceptance": [
+                "Schema stores one short and one long summary slot per session with last-covered message and token count.",
+                "Short summaries trigger every 20 messages and long summaries every 60 messages by default.",
+                "Service.Context allocates 40 percent of the token budget to summary and 60 percent to recent messages when summary=true.",
+                "summary=false fills the budget with recent messages only."
+              ],
+              "note": "Honcho docs clarify that summaries are recursive compression slots, not the same thing as last-N-turn recall. Port this after context options so tool callers can request or disable the summary component explicitly.",
+              "write_scope": [
+                "internal/goncho/",
+                "internal/memory/",
+                "internal/tools/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/goncho ./internal/memory ./internal/tools -count=1"
+              ],
+              "done_signal": [
+                "Summary context fixtures prove short/long cadence, token-budget allocation, summary=false behavior, and visible degradation when no summary can fit."
+              ]
             }
           ]
         }
