@@ -3812,9 +3812,9 @@
             {
               "name": "Aux compression headroom for system and tool schemas",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Compression feasibility lowers the raw-message threshold below the auxiliary model context window by reserving deterministic system-prompt, tool-schema, flush-instruction, and safety headroom",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -3839,10 +3839,6 @@
               "not_ready_when": [
                 "The slice mutates message history, calls a summarizer, changes model routing, or subtracts a hard-coded 12000 tokens without accounting for tool descriptors."
               ],
-              "blocked_by": [
-                "Compression token-budget trigger + summary sizing",
-                "Provider-enforced context-length resolver"
-              ],
               "unblocks": [
                 "Tool-result pruning + protected head/tail summary",
                 "Manual compression feedback + context references"
@@ -3853,7 +3849,7 @@
                 "When overhead would drop below the 64000-token floor, threshold_tokens clamps to the floor and reports headroom_clamped evidence.",
                 "The focused test mirrors Hermes test_auto_lowered_threshold_reserves_headroom_for_tools_and_system and test_headroom_floors_at_minimum_context without provider credentials or kernel history mutation."
               ],
-              "note": "Hermes f92006ce/6e561ffa changed compression feasibility so auxiliary-context auto-lowering reserves system prompt and tool-schema headroom. Gormes already has the pure budget helper, but it still lacks the request-headroom slice that prevents compression/flush calls from overflowing when many tools are enabled.",
+              "note": "Complete: internal/hermes/context_compressor_headroom_test.go covers the auxiliary-bound threshold path with synthetic tool descriptors and the minimum-floor path. ContextCompressorBudget now estimates provider-visible tool descriptor overhead, reserves that plus 12000 fixed system/flush/safety tokens, lowers threshold_tokens below the auxiliary context when needed, and reports headroom_clamped evidence without provider calls or history mutation.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/tools/",
