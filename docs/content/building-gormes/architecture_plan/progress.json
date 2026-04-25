@@ -988,9 +988,9 @@
                 "Durable lifecycle fixtures prove pause/resume state transitions, trust denial, and doctor/status counts over the Go SQLite ledger."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T09:50:15Z",
-                "last_success": "2026-04-25T09:50:15Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T09:54:25Z",
+                "last_success": "2026-04-25T09:54:25Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1736,6 +1736,11 @@
               "done_signal": [
                 "SillyTavern mapping fixtures prove persona/session/group-chat decisions and enrichment-mode degradation while external tools keep honcho_* names."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T09:54:25Z",
+                "last_success": "2026-04-25T09:54:25Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "honcho:e659b6b docs/v3/guides/integrations/sillytavern.mdx",
@@ -4014,6 +4019,11 @@
               "done_signal": [
                 "Plugin manifest fixtures prove metadata parsing, version/capability validation, disabled inventory, and no implicit runtime code execution."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T09:54:25Z",
+                "last_success": "2026-04-25T09:54:25Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T09:23:21Z"
