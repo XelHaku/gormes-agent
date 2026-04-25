@@ -102,7 +102,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Slack Socket Mode adapter
 - [x] Thread routing + coalesced reply flow
-- [ ] Slack CommandRegistry parser wiring
+- [x] Slack CommandRegistry parser wiring
 - [ ] Slack gateway.Channel adapter shim
 - [ ] Slack config + cmd/gormes gateway registration
 
@@ -358,7 +358,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] ContextEngine interface + status tool contract
 - [x] Compression token-budget trigger + summary sizing
 - [x] Aux compression headroom for system and tool schemas
-- [ ] Aux compression provider-aware context cap
+- [x] Aux compression provider-aware context cap
 - [ ] Tool-result pruning + protected head/tail summary
 - [ ] Manual compression feedback + context references
 
@@ -419,7 +419,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Discord tool split + platform-scoped toolsets
 - [ ] Pure core tools first
 - [ ] Stateful tool migration queue
-- [ ] Terminal process watch notification throttle contract
+- [x] Terminal process watch notification throttle contract
 
 ### 5.B — Sandboxing Backends ⏳
 
@@ -468,7 +468,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Plugin SDK
 - [x] Dashboard theme/plugin extension status contract
-- [ ] Dashboard page-scoped plugin slot inventory
+- [x] Dashboard page-scoped plugin slot inventory
 - [ ] Third-party extensions
 - [x] First-party Spotify plugin fixture
 

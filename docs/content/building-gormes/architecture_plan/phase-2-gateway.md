@@ -16,7 +16,7 @@ weight: 30
 | Phase 2.A — Tool Registry | ✅ complete | P0 | In-process Go tool registry, streamed `tool_calls` accumulation, kernel tool loop, and doctor verification |
 | Phase 2.B.1 — Telegram Scout | ✅ complete | P1 | Telegram adapter over the existing kernel, long-poll ingress, edit coalescing at the messaging edge |
 | Phase 2.B.2 — Gateway Chassis + Discord | ✅ complete | P1 | Shared gateway manager, Telegram migrated onto the chassis, `gormes gateway` multi-channel entrypoint, and Discord as the second real adapter |
-| Phase 2.B.3 — Slack on Shared Chassis | 🔨 in progress | P1 | `internal/slack` has a Socket Mode bot, threaded reply flow, and placeholder updates; the remaining work is now split into CommandRegistry parser wiring, a `gateway.Channel` shim, then config/doctor/`cmd/gormes gateway` registration |
+| Phase 2.B.3 — Slack on Shared Chassis | 🔨 in progress | P1 | `internal/slack` has a Socket Mode bot, threaded reply flow, placeholder updates, and shared CommandRegistry parser wiring; the remaining work is now split into a `gateway.Channel` shim, then config/doctor/`cmd/gormes gateway` registration |
 | Phase 2.B.4 — WhatsApp Adapter | ✅ complete | P1 | Transport-neutral runtime selection, ingress normalization, command passthrough, identity/self-chat guards, outbound pairing gates, raw peer mapping, and bounded reconnect/send retry contracts are fixture-locked in `internal/channels/whatsapp`; live bridge/native transport startup and QR UX belong in new follow-up rows rather than the closed 2.B.4 umbrella |
 | Phase 2.B.5 — Session Context + Delivery Routing | 🔨 in progress | P1 | Session-store handle resolution, baseline SessionContext prompt injection, typed `--deliver` parsing, and deterministic gateway stream fan-out now live together in `internal/gateway`; BlueBubbles/iMessage prompt guidance and non-editable progress/commentary fallback fixtures remain narrow follow-up slices |
 | Phase 2.B.10 — WeChat Adapter | ✅ complete | P1 | WeCom/WeiXin shared-bot ingress, reply-path contracts, WebSocket/callback bootstrap, credential validation, and outbound push/reply lifecycle seams are landed |
@@ -29,7 +29,7 @@ weight: 30
 | **Phase 2.G — OS-AI Spine: Skills Runtime** | ✅ complete | **P0** | Static skills runtime and the first reviewed learning-loop proof are in-tree: validated `SKILL.md` parsing, active-store snapshots, deterministic selection + prompt rendering, kernel injection, append-only usage logging, delegated candidate drafting into the inactive store, and explicit promotion into the active store. |
 | Phase 2.F.1 — Slash Command Registry + Gateway Dispatch | ✅ complete | P1 | Canonical command registry now drives gateway parsing, help text, Telegram menus, and Slack subcommand exposure from one shared source of truth |
 | Phase 2.F.2 — Hook Registry + BOOT.md | ✅ complete | P2 | Shared gateway lifecycle hooks, live `HOOK.yaml` command loading, and the built-in `BOOT.md` startup hook with non-blocking failure semantics are landed |
-| Phase 2.F.3 — Restart / Pairing / Status | 🔨 in progress | P2 | Graceful shutdown drain is landed in `internal/gateway`; next slices are adapter startup cleanup, active-turn follow-up/late-arrival drain policy, drain-timeout resume recovery, pairing persistence, pairing approval/rate-limit semantics, unauthorized-DM pairing responses, a read-only status command, runtime-status JSON/PID validation, token-scoped credential locks, `/restart` takeover markers, then channel lifecycle writers |
+| Phase 2.F.3 — Restart / Pairing / Status | 🔨 in progress | P2 | Graceful shutdown drain, adapter startup cleanup, active-turn follow-up queuing, pairing persistence/approval, unauthorized-DM responses, and channel lifecycle status writes are landed. The executable order is now drain-timeout `resume_pending` recovery plus read-only `gormes gateway status`, then runtime-status PID validation, token-scoped credential locks, and `/restart` takeover markers |
 | Phase 2.F.4 — Home Channel + Operator Surfaces | ⏳ planned | P3 | Home-channel rules, notify-to routing, manager remember-source, channel-directory persistence/lookup, refresh/stale-target invalidation, mirror surfaces, and sticker-cache equivalents |
 | Phase 2.F.5 — Gateway Mid-Run Steering + Active-Turn Policy | ⏳ planned | P2 | `/steer` CommandDef + queue fallback, mid-run steer injection between tool calls, and a gateway-handled slash-command bypass of the active-session guard; depends on 2.E.2 concurrent-tool cancellation for safe mid-run fan-out |
 
@@ -81,16 +81,16 @@ for cron/subagent replay without importing the whole Minions queue.
 
 Phase 2 is no longer just "ship more adapters." The backlog is now dominated by cross-cutting contracts that future adapters depend on. The execution order is:
 
-1. **P1 — 2.B.3 Slack CommandRegistry parser wiring**
-   Keep this first and narrow: Slack ingress should call `gateway.ParseInboundText` and shared registry helpers before any `gateway.Channel` shim or config registration hides command divergences.
-2. **P1 — 2.B.3 Slack gateway.Channel shim**
-   Adapt the existing Socket Mode bot to the `gateway.Channel`/`Manager` lifecycle after parser behavior is green; only then add config loading, doctor checks, and `cmd/gormes gateway` registration.
-3. **P2 — 2.F.3 pairing read model + approval semantics**
-   Port the XDG-backed `pairing.json` read model first, then freeze code generation, expiry, max-pending, failed-attempt lockout, rate-limit behavior, and unauthorized-DM response semantics from upstream `gateway/pairing.py` plus the latest gateway tests before any adapter issues codes.
-4. **P2 — 2.F.3 startup/drain correctness before richer lifecycle UX**
-   Freeze adapter startup failure cleanup first, then define active-turn follow-up queue/late-arrival behavior and drain-timeout `resume_pending` recovery. These are upstream race fixes from `gateway/platforms/base.py` and `gateway/run.py`; keeping them separate prevents the status/pairing work from hiding concurrency regressions.
-5. **P2 — 2.F.3 status readout + runtime convergence**
-   Add `gormes gateway status` as a read-only view over configured channels plus pairing/runtime state, port runtime-status JSON/PID validation, then add token-scoped credential locks and `/restart` takeover/dedup markers before threading live lifecycle updates into that model.
+1. **P1 — 2.B.3 Slack gateway.Channel shim**
+   The parser row is complete: Slack message ingress calls `gateway.ParseInboundText`, help renders `gateway.GatewayHelpLines`, and slash-command envelopes are forwarded as shared parser text. Next, adapt the existing Socket Mode bot to the `gateway.Channel`/`Manager` lifecycle without changing config registration.
+2. **P2 — 2.F.3 drain-timeout `resume_pending` recovery**
+   Freeze the restart/shutdown drain-timeout read model as a fake-clock gateway/session fixture before richer restart UX. Only in-flight sessions get `resume_pending`; hard suspended or stuck states must override it.
+3. **P2 — 2.F.3 read-only `gormes gateway status`**
+   Add the command as a pure view over configured channels, pairing status, and runtime status. The command must not open Telegram, Discord, Slack, memory, provider, or session-map clients.
+4. **P2 — 2.F.3 runtime convergence after status readout**
+   After the status command lands, port runtime-status JSON/PID validation, then token-scoped credential locks, then `/restart` takeover/dedup markers. This keeps status rendering, stale-process detection, credential locks, and service restart semantics from colliding.
+5. **P2 — 2.B.3 Slack config + cmd/gormes registration**
+   Register Slack in `cmd/gormes gateway` only after the Channel shim is green; config and doctor/status tests should use fake Slack clients and keep Telegram/Discord-only startup unchanged.
 6. **P3 — 2.B.11 Discord SessionSource metadata**
    Port Hermes `b35d692f` source fields (`guild_id`, `parent_chat_id`, `message_id`) through `InboundEvent`, `SessionSource`, and session-context rendering before media polish or Discord tool/admin rows rely on current-server/current-message IDs. This is source metadata only; keep send behavior and REST/tool handlers out of the slice.
 7. **P3 — 2.F.4 Home Channel + Operator Surfaces**

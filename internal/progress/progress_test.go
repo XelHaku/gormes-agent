@@ -259,13 +259,21 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 	for name, want := range map[string]Status{
 		"Slack Socket Mode adapter":                      StatusComplete,
 		"Thread routing + coalesced reply flow":          StatusComplete,
-		"Slack CommandRegistry parser wiring":            StatusPlanned,
+		"Slack CommandRegistry parser wiring":            StatusComplete,
 		"Slack gateway.Channel adapter shim":             StatusPlanned,
 		"Slack config + cmd/gormes gateway registration": StatusPlanned,
 	} {
 		if got := slackItems[name]; got != want {
 			t.Errorf("Phase 2.B.3 item %q = %q, want %q", name, got, want)
 		}
+	}
+	slackContracts := itemsByName(slack.Items)
+	parser := slackContracts["Slack CommandRegistry parser wiring"]
+	if parser.ContractStatus != ContractStatusValidated {
+		t.Fatalf("Slack parser contract status = %q, want validated", parser.ContractStatus)
+	}
+	if !strings.Contains(parser.Note, "gateway.ParseInboundText") || !strings.Contains(parser.Note, "GatewayHelpLines") {
+		t.Fatalf("Slack parser note = %q, want shared parser/help evidence", parser.Note)
 	}
 
 	skills := p.Phases["2"].Subphases["2.G"]
@@ -727,8 +735,12 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if statusReadout.Status != StatusPlanned {
 		t.Fatalf("Phase 2.F.3 gateway status readout status = %q, want planned", statusReadout.Status)
 	}
-	if !strings.Contains(statusReadout.Note, "gormes gateway status") || !strings.Contains(statusReadout.Note, "configured channels") {
-		t.Fatalf("Phase 2.F.3 gateway status readout note = %q, want command/configured-channels detail", statusReadout.Note)
+	if statusReadout.ContractStatus != ContractStatusFixtureReady {
+		t.Fatalf("Phase 2.F.3 gateway status readout contract status = %q, want fixture_ready", statusReadout.ContractStatus)
+	}
+	if !strings.Contains(statusReadout.Contract, "gormes gateway status") ||
+		!strings.Contains(strings.Join(statusReadout.Acceptance, "\n"), "configured channels") {
+		t.Fatalf("Phase 2.F.3 gateway status readout contract/acceptance = %q / %v, want command/configured-channels detail", statusReadout.Contract, statusReadout.Acceptance)
 	}
 	statusJSON := lifecycleItems["Runtime status JSON + PID/process validation"]
 	if statusJSON.Status != StatusPlanned {
@@ -738,15 +750,23 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if tokenLocks.Status != StatusPlanned {
 		t.Fatalf("Phase 2.F.3 token-scoped locks status = %q, want planned", tokenLocks.Status)
 	}
-	if !strings.Contains(tokenLocks.Note, "acquire_scoped_lock") || !strings.Contains(tokenLocks.Note, "credential hash") {
-		t.Fatalf("Phase 2.F.3 token-scoped locks note = %q, want upstream lock/credential-hash detail", tokenLocks.Note)
+	if tokenLocks.ContractStatus != ContractStatusDraft {
+		t.Fatalf("Phase 2.F.3 token-scoped locks contract status = %q, want draft", tokenLocks.ContractStatus)
+	}
+	if !strings.Contains(tokenLocks.Contract, "credential hash") ||
+		!containsString(tokenLocks.SourceRefs, "../hermes-agent/gateway/status.py@d635e2df") {
+		t.Fatalf("Phase 2.F.3 token-scoped locks contract/source_refs = %q / %v, want credential-hash upstream status detail", tokenLocks.Contract, tokenLocks.SourceRefs)
 	}
 	restartMarkers := lifecycleItems["Gateway /restart command + takeover markers"]
 	if restartMarkers.Status != StatusPlanned {
 		t.Fatalf("Phase 2.F.3 restart markers status = %q, want planned", restartMarkers.Status)
 	}
-	if !strings.Contains(restartMarkers.Note, "/restart") || !strings.Contains(restartMarkers.Note, "takeover-marker") {
-		t.Fatalf("Phase 2.F.3 restart markers note = %q, want restart/takeover-marker detail", restartMarkers.Note)
+	if restartMarkers.ContractStatus != ContractStatusDraft {
+		t.Fatalf("Phase 2.F.3 restart markers contract status = %q, want draft", restartMarkers.ContractStatus)
+	}
+	if !strings.Contains(restartMarkers.Contract, "/restart") ||
+		!strings.Contains(strings.Join(restartMarkers.Acceptance, "\n"), "takeover marker") {
+		t.Fatalf("Phase 2.F.3 restart markers contract/acceptance = %q / %v, want restart/takeover-marker detail", restartMarkers.Contract, restartMarkers.Acceptance)
 	}
 	lifecycleWriters := lifecycleItems["Channel lifecycle writers into status model"]
 	if lifecycleWriters.Status != StatusComplete {

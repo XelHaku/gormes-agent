@@ -446,30 +446,180 @@
             },
             {
               "name": "Slack CommandRegistry parser wiring",
-              "status": "planned",
-              "note": "TDD: route Slack slash/message command ingress through gateway.ParseInboundText and the shared CommandRegistry, with adapter-local affordances kept behind Slack-specific tests."
+              "status": "complete",
+              "contract": "Slack message and slash-command ingress routes through the shared gateway CommandRegistry instead of maintaining adapter-local slash parsing",
+              "contract_status": "validated",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator"
+              ],
+              "degraded_mode": "Unknown Slack slash commands return the shared gateway unknown-command behavior while recognized help/new/stop commands keep Slack-specific ack and thread reply semantics.",
+              "fixture": "internal/slack/bot_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/commands.py@d635e2df",
+                "../hermes-agent/gateway/platforms/slack.py@d635e2df",
+                "internal/gateway/commands.go",
+                "internal/slack/bot.go",
+                "internal/slack/real_client.go"
+              ],
+              "ready_when": [
+                "Slack Socket Mode adapter and thread/coalescing tests are already complete, and gateway.ParseInboundText plus SlackSubcommandMap are available locally."
+              ],
+              "not_ready_when": [
+                "The slice rewrites Slack onto gateway.Manager, changes Slack config loading, or registers Slack in cmd/gormes gateway instead of only proving shared parser usage."
+              ],
+              "unblocks": [
+                "Slack gateway.Channel adapter shim"
+              ],
+              "acceptance": [
+                "Slack message events call gateway.ParseInboundText for /help, /new, /stop, unknown slash commands, and plain text submits.",
+                "Slack slash-command envelopes are retained for bot-level Ack and forwarded as the slash text consumed by the shared parser.",
+                "Slack help output is rendered from gateway.GatewayHelpLines so registry changes affect Telegram, Slack, and gateway help consistently."
+              ],
+              "note": "Implementation already landed before this planner pass: internal/slack.Bot.handleEvent calls gateway.ParseInboundText, slackHelpText renders gateway.GatewayHelpLines, internal/slack/real_client.go forwards Slack slash commands as shared parser text, and internal/slack/bot_test.go covers registry-driven message commands plus slash-command forwarding.",
+              "write_scope": [
+                "internal/slack/",
+                "internal/gateway/commands.go",
+                "internal/gateway/commands_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/slack -run 'TestBot_MessageCommandsUseSharedGatewayRegistry|TestRealClient_HandleSlashCommand_ForwardsGatewayCommandEvent' -count=1",
+                "go test ./internal/gateway -run 'TestParseInboundText|TestSlackSubcommandMap' -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Focused Slack and gateway command tests prove Slack ingress consumes the shared registry for message and slash-command paths."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T15:16:17Z"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:d635e2df hermes_cli/commands.py",
+                "note": "Hermes defines the shared command-registry lesson; Gormes implements it through internal/gateway/commands.go and the Slack adapter."
+              }
             },
             {
               "name": "Slack gateway.Channel adapter shim",
               "status": "planned",
+              "contract": "Slack Socket Mode can run under the shared gateway.Manager through a narrow gateway.Channel shim without replacing the existing Slack client or reply fixtures",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator"
+              ],
+              "degraded_mode": "If the shim cannot start or send, gateway status reports Slack channel startup/send degradation while the standalone Slack bot tests remain unchanged.",
+              "fixture": "internal/slack/channel_shim_test.go",
+              "source_refs": [
+                "internal/gateway/channel.go",
+                "internal/gateway/manager.go",
+                "internal/slack/bot.go",
+                "internal/slack/client.go",
+                "internal/slack/bot_test.go"
+              ],
               "ready_when": [
-                "Slack ingress uses gateway.ParseInboundText and shared CommandRegistry fixtures are green"
+                "Slack CommandRegistry parser wiring is validated and internal/slack.Bot still owns Socket Mode acking, thread routing, placeholders, and coalesced replies."
               ],
-              "blocked_by": [
-                "Slack CommandRegistry parser wiring"
+              "not_ready_when": [
+                "The slice changes config loading, doctor output, cmd/gormes gateway registration, or live Slack OAuth/token discovery instead of only adding the Channel shim and fake-client fixtures."
               ],
-              "note": "TDD: adapt internal/slack onto the gateway.Channel interface and Manager lifecycle without rewriting the existing Socket Mode client or coalesced reply tests."
+              "unblocks": [
+                "Slack config + cmd/gormes gateway registration"
+              ],
+              "acceptance": [
+                "A Slack channel wrapper implements gateway.Channel Name, Run, and Send against the existing internal/slack Client seam.",
+                "Run translates Slack Event values into gateway.InboundEvent with platform=slack, chat_id=channel_id, optional thread_id, user_id, message_id/timestamp, and normalized text kind from gateway.ParseInboundText.",
+                "Send posts plain text to the correct Slack channel/thread and returns the Slack timestamp as msgID without opening a real Slack connection in tests.",
+                "Existing internal/slack bot/coalescing tests stay green, proving the shim did not rewrite the current standalone behavior."
+              ],
+              "note": "TDD: adapt internal/slack onto the gateway.Channel interface and Manager lifecycle without rewriting the existing Socket Mode client or coalesced reply tests.",
+              "write_scope": [
+                "internal/slack/",
+                "internal/gateway/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/slack -run 'TestSlackChannel|TestBot_MessageCommandsUseSharedGatewayRegistry' -count=1",
+                "go test ./internal/slack ./internal/gateway -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Slack Channel shim tests prove gateway.Manager can consume Slack ingress/send through gateway.Channel while legacy Socket Mode adapter tests remain green."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T15:16:17Z"
+              },
+              "provenance": {
+                "origin_type": "gormes",
+                "note": "The gateway.Channel shared chassis is a Gormes-owned adapter boundary; upstream Hermes informs behavior but has no exact Go shim analog."
+              }
             },
             {
               "name": "Slack config + cmd/gormes gateway registration",
               "status": "planned",
+              "contract": "Slack config and cmd/gormes gateway registration use the shared gateway.Manager lifecycle after the Slack Channel shim is fixture-locked",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway"
+              ],
+              "degraded_mode": "gormes gateway and doctor report missing Slack bot/app tokens, disabled Slack config, or Slack startup failure without affecting Telegram or Discord registration.",
+              "fixture": "cmd/gormes/gateway_slack_test.go",
+              "source_refs": [
+                "cmd/gormes/gateway.go",
+                "internal/config/config.go",
+                "internal/slack/client.go",
+                "internal/slack/real_client.go",
+                "internal/gateway/manager.go"
+              ],
               "ready_when": [
-                "Slack gateway.Channel adapter shim runs through the shared Manager lifecycle in tests"
+                "Slack gateway.Channel adapter shim runs through the shared Manager lifecycle in tests."
+              ],
+              "not_ready_when": [
+                "The slice edits Slack parser/coalescing behavior, opens a real Slack Socket Mode connection in unit tests, or changes Telegram/Discord registration semantics."
               ],
               "blocked_by": [
                 "Slack gateway.Channel adapter shim"
               ],
-              "note": "TDD: add Slack config loading, doctor coverage, and cmd/gormes gateway registration only after the Channel shim is green; current evidence shows only Telegram and Discord are registered there."
+              "acceptance": [
+                "Config supports Slack bot token, app token, allowed channel, first-run discovery, and coalesce settings through the existing config loader.",
+                "cmd/gormes gateway registers Slack only when Slack is explicitly enabled and never requires Slack credentials for Telegram/Discord-only runs.",
+                "Doctor/status output distinguishes Slack disabled, missing-token, startup-failed, and running states.",
+                "Unit tests use fake Slack clients and do not contact Slack."
+              ],
+              "note": "TDD: add Slack config loading, doctor coverage, and cmd/gormes gateway registration only after the Channel shim is green; current evidence shows only Telegram and Discord are registered there.",
+              "write_scope": [
+                "cmd/gormes/",
+                "internal/config/",
+                "internal/slack/",
+                "internal/doctor/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes ./internal/config ./internal/slack ./internal/doctor -run 'Test.*Slack' -count=1",
+                "go test ./cmd/gormes ./internal/config ./internal/slack ./internal/doctor -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Gateway registration tests prove Slack can be enabled through config and status/doctor output without requiring live Slack credentials."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T15:16:17Z"
+              },
+              "provenance": {
+                "origin_type": "gormes",
+                "note": "Config and cmd/gormes registration are Gormes-owned public surfaces built on the local shared gateway chassis."
+              }
             }
           ]
         },
@@ -1349,8 +1499,65 @@
             },
             {
               "name": "Drain-timeout resume_pending recovery",
+              "priority": "P2",
               "status": "planned",
-              "note": "TDD: add a session read-model flag for restart/shutdown drain timeouts that preserves the session_id and injects a reason-aware resume note on the next turn, while marking only agents still running at timeout and letting hard suspended/stuck-loop state override resume_pending."
+              "contract": "Gateway restart/shutdown drain timeouts preserve resumable session identity and inject a reason-aware resume note on the next turn without overriding hard-stuck or suspended state",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator"
+              ],
+              "degraded_mode": "Gateway status reports resume_pending, drain_timeout, and non-resumable stuck/suspended evidence instead of silently dropping in-flight session context.",
+              "fixture": "internal/gateway/resume_pending_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/run.py@d635e2df",
+                "../hermes-agent/gateway/platforms/base.py@d635e2df",
+                "internal/gateway/manager.go",
+                "internal/gateway/manager_test.go",
+                "internal/gateway/resume_continuation_test.go",
+                "internal/session/directory.go"
+              ],
+              "ready_when": [
+                "Graceful restart drain + managed shutdown and Active-turn follow-up queue + late-arrival drain policy are complete on main.",
+                "The slice can be tested with a fake manager/session read model and a fake clock; no live Telegram, Discord, Slack, or provider process is required."
+              ],
+              "not_ready_when": [
+                "The slice changes pairing approval, gateway status CLI rendering, token locks, or service-manager restart behavior instead of only freezing drain-timeout resume metadata."
+              ],
+              "unblocks": [
+                "Gateway /restart command + takeover markers"
+              ],
+              "acceptance": [
+                "A drain timeout marks only sessions whose agent turn is still running at timeout as resume_pending with session_id, source, drain reason, and timestamp.",
+                "The next EventSubmit for the same session prepends one reason-aware resume note and clears resume_pending after the handoff is accepted.",
+                "Hard suspended, cancelled, or stuck-loop state takes precedence over resume_pending and emits explicit non-resumable evidence.",
+                "Late-arrival queued follow-ups keep FIFO ordering and do not create a second resume note."
+              ],
+              "note": "TDD: add the smallest gateway/session read-model fixture for drain-timeout resume_pending. Keep restart service control, PID validation, token locks, and status command output out of this slice.",
+              "write_scope": [
+                "internal/gateway/",
+                "internal/session/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run 'Test.*ResumePending|Test.*Drain' -count=1",
+                "go test ./internal/gateway ./internal/session -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Resume-pending fixtures prove drain-timeout sessions retain identity, inject exactly one restart note, and lose to hard non-resumable states."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T15:16:17Z"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:d635e2df gateway/run.py",
+                "note": "Hermes defines the restart/drain recovery behavior; Gormes adapts it to the shared Go gateway manager and session read model."
+              }
             },
             {
               "name": "Pairing read-model schema + atomic persistence",
@@ -1408,7 +1615,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-25T11:39:48Z"
+                "last_reshape": "2026-04-25T11:39:48Z",
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1478,7 +1686,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-25T11:39:48Z"
+                "last_reshape": "2026-04-25T11:39:48Z",
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1541,7 +1750,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-25T11:39:48Z"
+                "last_reshape": "2026-04-25T11:39:48Z",
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1551,23 +1761,257 @@
             },
             {
               "name": "`gormes gateway status` read-only command",
+              "priority": "P2",
               "status": "planned",
-              "note": "TDD: add a read-only `gormes gateway status` surface over the shared pairing/runtime model so operators can inspect configured channels plus paired/unpaired state without starting transports."
+              "contract": "A read-only `gormes gateway status` command renders configured channels, pairing state, and runtime lifecycle from stores without starting transports or agent sessions",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator"
+              ],
+              "degraded_mode": "The command reports no-channel, missing/corrupt pairing state, missing runtime state, and failed channel lifecycle evidence without opening Telegram, Discord, Slack, memory, or provider clients.",
+              "fixture": "cmd/gormes/gateway_status_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/status.py@d635e2df",
+                "cmd/gormes/gateway.go",
+                "internal/gateway/status.go",
+                "internal/gateway/pairing_store.go",
+                "internal/config/config.go",
+                "internal/gateway/manager_status_test.go"
+              ],
+              "ready_when": [
+                "Pairing read-model schema + atomic persistence, Pairing approval + rate-limit semantics, Unauthorized DM pairing response contract, and Channel lifecycle writers into status model are complete on main.",
+                "No `cmd/gormes/gateway_status.go` or `internal/gateway/statusview.go` exists on main yet, so this slice must start with failing command/render tests."
+              ],
+              "not_ready_when": [
+                "The slice starts gateway transports, opens the memory store, performs provider calls, changes pairing approval policy, or implements PID/process validation in the same change."
+              ],
+              "unblocks": [
+                "Runtime status JSON + PID/process validation",
+                "Gateway /restart command + takeover markers"
+              ],
+              "acceptance": [
+                "A pure renderer over configured channels, PairingStatus, and RuntimeStatus emits deterministic channel ordering and stable paired/unpaired/lifecycle text.",
+                "`gormes gateway status` succeeds with no configured channels by returning a visible no-channel status instead of the runtime command's startup error.",
+                "Configured Telegram/Discord/Slack rows can render running, stopped, failed, paired, pending, approved, and degraded pairing evidence from fake stores.",
+                "Focused command tests prove status execution does not construct real channel clients, session maps, memory stores, providers, or gateway.Manager."
+              ],
+              "note": "A previous worker produced an unpromoted branch for this row, but current main lacks the files. Keep the row planned and fixture-ready until cmd/gormes/gateway_status.go and a pure status renderer are present on main.",
+              "write_scope": [
+                "cmd/gormes/",
+                "internal/gateway/",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes -run TestGatewayStatusCommand -count=1",
+                "go test ./internal/gateway -run TestRenderStatusSummary -count=1",
+                "go test ./cmd/gormes ./internal/gateway ./internal/config -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Gateway status command and pure renderer tests prove configured channel, pairing, and runtime status can be inspected without starting transports."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T15:16:17Z"
+              },
+              "provenance": {
+                "origin_type": "gormes",
+                "note": "The command is a Gormes-owned operator surface over Go-native pairing/runtime stores; upstream gateway/status.py only informs the read-model shape."
+              }
             },
             {
               "name": "Runtime status JSON + PID/process validation",
+              "priority": "P2",
               "status": "planned",
-              "note": "TDD: port the upstream gateway_state.json/PID-file read model with stale PID cleanup and process identity checks before wiring live channel state."
+              "contract": "Gateway runtime status validates PID/start-time identity and stale-process cleanup before callers trust gateway_state.json as the live lifecycle read model",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Runtime status distinguishes missing state, stale PID, pid-reused mismatch, stopped process, and permission-denied process checks instead of claiming a gateway is live from old JSON.",
+              "fixture": "internal/gateway/runtime_status_pid_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/status.py@d635e2df",
+                "internal/gateway/status.go",
+                "internal/gateway/status_test.go",
+                "cmd/gormes/gateway.go"
+              ],
+              "ready_when": [
+                "`gormes gateway status` read-only command has established the operator-facing status view and can consume PID validation evidence.",
+                "The slice can use a fake process table and temp gateway_state.json/PID paths; no live system process control is required."
+              ],
+              "not_ready_when": [
+                "The slice invokes real kill/systemctl/sc.exe, adds token-scoped locks, changes channel lifecycle write semantics, or edits pairing approval behavior."
+              ],
+              "blocked_by": [
+                "`gormes gateway status` read-only command"
+              ],
+              "unblocks": [
+                "Token-scoped gateway locks",
+                "Gateway /restart command + takeover markers"
+              ],
+              "acceptance": [
+                "RuntimeStatusStore writes PID, start_time, generation, and command identity fields atomically with lifecycle updates.",
+                "Read/validation fixtures classify missing PID file, stale stopped PID, reused PID with mismatched start time, permission-denied process lookup, and live matching process.",
+                "Stale state cleanup preserves last_error evidence while refusing to mark channels running.",
+                "The status renderer can display the validation result without starting or stopping any service."
+              ],
+              "note": "TDD: port only the runtime-status/PID identity contract after the read-only status command lands, so stale-process handling does not collide with CLI rendering or token lock work.",
+              "write_scope": [
+                "internal/gateway/status.go",
+                "internal/gateway/status_test.go",
+                "internal/gateway/runtime_status_pid_test.go",
+                "cmd/gormes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run 'TestRuntimeStatus.*PID|TestRuntimeStatusStore' -count=1",
+                "go test ./cmd/gormes ./internal/gateway -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "PID validation fixtures prove gateway_state.json cannot report a stale, stopped, or pid-reused process as running."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T15:16:17Z"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:d635e2df gateway/status.py",
+                "note": "Hermes defines stale PID and process identity behavior; Gormes owns the Go RuntimeStatusStore and fake process-table tests."
+              }
             },
             {
               "name": "Token-scoped gateway locks",
+              "priority": "P2",
               "status": "planned",
-              "note": "TDD: port upstream `gateway/status.py` acquire_scoped_lock/release_scoped_lock behavior into an XDG state lock directory keyed by platform credential hash, with stale PID/start-time cleanup, stopped-process detection, and release-on-shutdown coverage before multi-profile adapters share credentials."
+              "contract": "Gateway credential locks are scoped by platform and credential hash so multiple profiles cannot run the same token while unrelated tokens remain independent",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Gateway startup/status reports lock-held, stale-lock-cleared, credential-hash-mismatch, and lock-release-failed evidence without deleting unrelated platform locks.",
+              "fixture": "internal/gateway/token_lock_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/status.py@d635e2df",
+                "internal/gateway/status.go",
+                "internal/config/config.go"
+              ],
+              "ready_when": [
+                "Runtime status JSON + PID/process validation can identify stale or live processes without invoking live service managers."
+              ],
+              "not_ready_when": [
+                "The slice changes pairing state, gateway status CLI layout, service restart behavior, or stores raw tokens in lock filenames/logs."
+              ],
+              "blocked_by": [
+                "Runtime status JSON + PID/process validation"
+              ],
+              "unblocks": [
+                "Gateway /restart command + takeover markers",
+                "Slack config + cmd/gormes gateway registration"
+              ],
+              "acceptance": [
+                "Lock paths are under the Gormes XDG state root and include platform plus a non-reversible credential hash, never raw token material.",
+                "A second process with the same platform/hash is rejected while a different hash or platform can acquire its own lock.",
+                "Stale stopped-process locks are cleared only after PID/start-time validation proves the owner is gone.",
+                "Release-on-shutdown removes only the current process lock and reports release failures without masking the gateway exit reason."
+              ],
+              "note": "TDD: keep token-scoped locks behind PID validation so stale-lock cleanup cannot guess from PID files alone.",
+              "write_scope": [
+                "internal/gateway/",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run TestTokenScopedGatewayLock -count=1",
+                "go test ./internal/gateway ./internal/config -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Token-lock fixtures prove same-token exclusion, different-token independence, stale cleanup, and safe release without exposing raw credential material."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T15:16:17Z"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:d635e2df gateway/status.py",
+                "note": "Hermes defines token-scoped lock semantics; Gormes maps them into XDG state and Go fake-process fixtures."
+              }
             },
             {
               "name": "Gateway /restart command + takeover markers",
+              "priority": "P2",
               "status": "planned",
-              "note": "TDD: add a registry-backed gateway /restart path with restart notify/dedup markers, service-manager restart exit semantics, and planned --replace takeover-marker handling so redelivered Telegram restart updates cannot loop a fresh process."
+              "contract": "Gateway /restart uses registry-owned active-turn policy, deduped takeover markers, and service-manager exit semantics without looping redelivered platform updates",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Gateway command/status reports restart_requested, takeover_marker_seen, duplicate_restart_suppressed, service_manager_unavailable, and restart_timeout evidence.",
+              "fixture": "internal/gateway/restart_command_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/run.py@d635e2df",
+                "../hermes-agent/gateway/status.py@d635e2df",
+                "internal/gateway/commands.go",
+                "internal/gateway/manager.go",
+                "cmd/gormes/gateway.go"
+              ],
+              "ready_when": [
+                "Drain-timeout resume_pending recovery, Runtime status JSON + PID/process validation, and Token-scoped gateway locks are validated on main."
+              ],
+              "not_ready_when": [
+                "The slice opens real service managers in unit tests, changes pairing approval, or implements service update active polling from Phase 5.O in the same change."
+              ],
+              "blocked_by": [
+                "Drain-timeout resume_pending recovery",
+                "Runtime status JSON + PID/process validation",
+                "Token-scoped gateway locks"
+              ],
+              "acceptance": [
+                "CommandRegistry includes /restart with a gateway-safe active-turn policy that rejects or queues according to the frozen command semantics.",
+                "A restart request writes a takeover marker containing source platform, chat/thread, update/message ID, generation, and timestamp before returning the service-manager exit code.",
+                "Redelivered platform events with the same marker are suppressed once and report duplicate_restart_suppressed instead of starting a loop.",
+                "--replace/takeover startup consumes the marker, sends at most one restart notification, and clears or expires the marker under fake-clock tests."
+              ],
+              "note": "TDD: keep /restart after resume, PID validation, and token locks so restart can report exact takeover status without widening service-manager update logic.",
+              "write_scope": [
+                "internal/gateway/",
+                "cmd/gormes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run TestGatewayRestartCommand -count=1",
+                "go test ./cmd/gormes ./internal/gateway -count=1",
+                "go run ./cmd/autoloop progress validate"
+              ],
+              "done_signal": [
+                "Restart-command fixtures prove registry policy, takeover marker write/read/expiry, duplicate suppression, and service-manager exit semantics without live service control."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T15:16:17Z"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:d635e2df gateway/run.py",
+                "note": "Hermes defines restart/takeover behavior; Gormes keeps the first implementation fake-service-manager and marker-store driven."
+              }
             },
             {
               "name": "Channel lifecycle writers into status model",
@@ -3877,9 +4321,9 @@
             {
               "name": "Aux compression provider-aware context cap",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Auxiliary compression feasibility resolves the auxiliary model context window with the active provider identity before applying headroom and threshold budgets",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -3918,7 +4362,7 @@
                 "ContextCompressorBudget receives the provider-resolved AuxiliaryContextLength and lowers threshold_tokens below 272000 after tool-schema plus 12000 fixed headroom.",
                 "Status evidence exposes the context source or lookup error so operators can distinguish provider-cap budgeting from models.dev fallback."
               ],
-              "note": "Hermes d635e2df fixed compression feasibility by passing self.provider into get_model_context_length; without that provider identity Codex OAuth can budget against the raw 1050000 OpenAI window instead of the 272000 provider cap. Gormes already has provider-cap resolution and headroom math, but needs a focused auxiliary-compression fixture proving those two pieces are connected before live compression wiring lands.",
+              "note": "Complete: internal/hermes/context_compressor_provider_cap_test.go proves the auxiliary compression budget path forwards provider identity into ModelContextResolver before headroom math. The fixture uses fake resolver inputs for openai-codex/gpt-5.5 raw 1050000 versus provider cap 272000, confirms openai and missing-provider paths do not borrow the Codex cap, and exposes auxiliary_context_source / auxiliary_context_lookup_error evidence while ContextCompressorBudget lowers threshold_tokens below the provider cap after tool-schema plus 12000 fixed headroom.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -3931,6 +4375,11 @@
               "done_signal": [
                 "Provider-cap compression fixtures prove the auxiliary feasibility path forwards provider identity, uses the 272000 Codex cap, and reports fallback/source evidence without live provider calls."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T15:02:14Z",
+                "last_success": "2026-04-25T15:02:14Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:d635e2df run_agent.py",
@@ -4812,9 +5261,9 @@
             {
               "name": "Terminal process watch notification throttle contract",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Terminal/process tools rate-limit watch-pattern notifications, suppress matches after process exit, and make notify_on_complete mutually exclusive with watch_patterns before any live process runner is exposed",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -4852,7 +5301,7 @@
                 "After three consecutive strike windows the session disables watch_patterns, promotes to notify_on_complete semantics, and emits one watch_disabled summary.",
                 "Matches arriving after session.exited are ignored, and a global fake-registry breaker suppresses more than 15 watch events in 10 seconds across sessions with trip/release summary evidence."
               ],
-              "note": "Hermes 97d54f0e hardened terminal watch-pattern notifications after agents combined notify_on_complete with noisy watch_patterns and flooded delayed completion queues. Gormes does not yet have a live terminal/process tool, so keep this as a pure policy fixture before the stateful process tool port starts.",
+              "note": "Complete: TDD landed internal/tools/process_notifications_test.go and a pure fake-clock process notification policy. The fixture proves notify_on_complete/watch_patterns mutual exclusion with operator evidence, per-session 1/15s watch throttling, three-strike watch disablement with notify_on_complete promotion, suppress-after-exit behavior, and global overflow trip/release summaries without spawning processes.",
               "write_scope": [
                 "internal/tools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -4865,6 +5314,11 @@
               "done_signal": [
                 "Process-notification fixtures prove mutual exclusion, per-session 1/15s throttling, three-strike promotion, suppress-after-exit, and global overflow trip/release behavior without spawning processes."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T15:02:14Z",
+                "last_success": "2026-04-25T15:02:14Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:97d54f0e tools/process_registry.py",
@@ -5199,9 +5653,9 @@
             {
               "name": "Dashboard page-scoped plugin slot inventory",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Dashboard plugin metadata preserves Hermes page-scoped slot names with colons and exposes them through the native disabled plugin inventory without claiming React/Vite runtime support",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -5236,7 +5690,7 @@
                 "The fixture documents the Hermes known page-scoped slot catalogue as metadata only, without adding an allowlist that would reject future slot names.",
                 "Empty or unknown slot names remain inert metadata and do not create executable backend routes."
               ],
-              "note": "Hermes af22421e/cf2fabc4 added page-scoped dashboard slots such as sessions:top and chat:bottom. Gormes already treats dashboard slots as metadata while the native React/Vite runtime is absent, but needs a focused fixture so colons are not mangled and public status stays honest.",
+              "note": "Complete: TDD landed focused page-scoped dashboard slot fixtures. Synthetic dashboard/manifest.json metadata now proves colon-bearing Hermes page-scoped slot names round-trip unchanged through internal/plugins LoadDir and /api/dashboard/plugins while runtime.react_vite_runtime remains absent. Empty and future slot names stay inert metadata and do not create executable backend route rows.",
               "write_scope": [
                 "internal/plugins/",
                 "internal/apiserver/",
@@ -5250,6 +5704,11 @@
               "done_signal": [
                 "Page-scoped slot fixtures prove colon-bearing Hermes slot names round-trip through plugin manifests and disabled dashboard inventory without enabling a React/Vite runtime."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T15:02:14Z",
+                "last_success": "2026-04-25T15:02:14Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:af22421e web/src/plugins/slots.ts",

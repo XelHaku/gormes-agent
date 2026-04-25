@@ -13,9 +13,9 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `b35d692f`
+- Upstream commit: `d635e2df`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `d26a7a85`
+- Gormes commit: `ded2c478`
 - Date: 2026-04-25
 
 ## High-Level Shape
@@ -195,7 +195,7 @@ conversational, blank-line-separated replies. Gormes should keep this as
 capability-based gateway behavior plus a BlueBubbles formatter fixture, not a
 special-case branch in the kernel.
 
-Latest upstream sync delta (2026-04-25): upstream commit `b35d692f` adds five
+Recent upstream sync delta (2026-04-25): upstream commit `b35d692f` adds five
 planner-relevant contracts:
 
 - auxiliary LLM calls retry once without `temperature` when a provider rejects
@@ -214,6 +214,24 @@ planner-relevant contracts:
 Gormes tracks these as small rows: 4.H unsupported-temperature retry, 5.N
 `context_from`, 2.B.11 Discord source metadata, 5.A/5.O toolset rows, and 5.P
 installer policy.
+
+Latest upstream sync delta (2026-04-25): commits `6e561ffa`, `97d54f0e`,
+`af22421e`, `cf2fabc4`, and `d635e2df` add planner-relevant contracts already
+tracked in progress.json:
+
+- update/service restart verification now polls active status instead of doing
+  a one-shot sleep check;
+- terminal process watch-pattern notifications now need throttling, post-exit
+  suppression, and notify-on-complete promotion;
+- dashboard page-scoped plugin slots should be preserved as metadata/API
+  contracts without importing the upstream React runtime;
+- auxiliary compression feasibility must pass provider identity into context
+  length resolution so Codex uses the provider cap before headroom math.
+
+Gormes tracks these as small rows in 5.O service restart polling, 5.A terminal
+notification throttling, 5.I dashboard slot inventory, and 4.B provider-aware
+auxiliary compression. The 4.B provider-cap slice is complete on main; the
+remaining rows stay fixture-first until their local substrates exist.
 
 Previous context sync delta (2026-04-25): upstream commit `5401a008` changed
 `agent/context_compressor.py` so `ContextCompressor.update_model()` recalculates
