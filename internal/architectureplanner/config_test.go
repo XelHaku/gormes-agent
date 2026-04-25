@@ -82,6 +82,43 @@ func TestConfigFromEnvRejectsEmptyRepoRoot(t *testing.T) {
 	}
 }
 
+func TestConfigFromEnv_MaxRetriesDefaultAndOverride(t *testing.T) {
+	root := filepath.Join("tmp", "repo")
+
+	// Default: MaxRetries = DefaultMaxRetries (2).
+	cfg, err := ConfigFromEnv(root, map[string]string{})
+	if err != nil {
+		t.Fatalf("ConfigFromEnv() error = %v", err)
+	}
+	if cfg.MaxRetries != DefaultMaxRetries {
+		t.Fatalf("MaxRetries default = %d, want %d", cfg.MaxRetries, DefaultMaxRetries)
+	}
+
+	// Env override accepted; 0 disables retries (pre-L3 behavior).
+	cfg, err = ConfigFromEnv(root, map[string]string{"PLANNER_MAX_RETRIES": "0"})
+	if err != nil {
+		t.Fatalf("ConfigFromEnv() override 0 error = %v", err)
+	}
+	if cfg.MaxRetries != 0 {
+		t.Fatalf("MaxRetries = %d, want 0", cfg.MaxRetries)
+	}
+	cfg, err = ConfigFromEnv(root, map[string]string{"PLANNER_MAX_RETRIES": "5"})
+	if err != nil {
+		t.Fatalf("ConfigFromEnv() override 5 error = %v", err)
+	}
+	if cfg.MaxRetries != 5 {
+		t.Fatalf("MaxRetries = %d, want 5", cfg.MaxRetries)
+	}
+
+	// Negative and non-integer rejected.
+	if _, err := ConfigFromEnv(root, map[string]string{"PLANNER_MAX_RETRIES": "-1"}); err == nil {
+		t.Fatal("expected error for negative MaxRetries")
+	}
+	if _, err := ConfigFromEnv(root, map[string]string{"PLANNER_MAX_RETRIES": "abc"}); err == nil {
+		t.Fatal("expected error for non-integer MaxRetries")
+	}
+}
+
 func TestConfigFromEnv_PlannerTriggersPathDefaultAndOverride(t *testing.T) {
 	root := filepath.Join("tmp", "repo")
 

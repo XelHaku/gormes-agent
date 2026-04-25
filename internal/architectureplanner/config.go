@@ -40,6 +40,14 @@ type Config struct {
 	// other planner state files under RunRoot/state so a single RUN_ROOT
 	// override moves the cursor along with everything else.
 	TriggersCursorPath string
+	// MaxRetries caps how many follow-up LLM calls the planner issues
+	// after validateHealthPreservation rejects an initial regen. The
+	// retry feedback names the dropped rows and references the HARD rule
+	// so the same LLM session can self-correct. Backend failures are
+	// NEVER retried (only validation rejections). Sourced from
+	// PLANNER_MAX_RETRIES; default DefaultMaxRetries (2). Set to 0 to
+	// disable retries (pre-L3 single-attempt behavior).
+	MaxRetries int
 }
 
 func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
@@ -65,6 +73,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		SyncRepos:              true,
 		PlannerQuarantineLimit: 5,
 		PlannerTriggersPath:    filepath.Join(repoRoot, ".codex", "architecture-planner", "triggers.jsonl"),
+		MaxRetries:             DefaultMaxRetries,
 	}
 
 	if value := env["PROGRESS_JSON"]; value != "" {
@@ -118,6 +127,16 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 	}
 	if value := env["PLANNER_TRIGGERS_PATH"]; value != "" {
 		cfg.PlannerTriggersPath = value
+	}
+	if value := env["PLANNER_MAX_RETRIES"]; value != "" {
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("PLANNER_MAX_RETRIES must be an integer: %w", err)
+		}
+		if n < 0 {
+			return Config{}, fmt.Errorf("PLANNER_MAX_RETRIES must be non-negative")
+		}
+		cfg.MaxRetries = n
 	}
 
 	// TriggersCursorPath derives from the (possibly env-overridden) RunRoot

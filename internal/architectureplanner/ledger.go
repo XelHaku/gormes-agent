@@ -24,7 +24,14 @@ type LedgerEvent struct {
 	AfterStats    ProgressStats `json:"after_stats,omitempty"`
 	RowsChanged   []RowChange   `json:"rows_changed,omitempty"`
 	RetryAttempt  int           `json:"retry_attempt,omitempty"`
-	Keywords      []string      `json:"keywords,omitempty"` // L6 topical focus
+	// Attempts records every LLM call lifecycle within this RunOnce
+	// invocation. Populated by the L3 retry-with-feedback loop so
+	// operators can audit which attempt failed and which rows were
+	// dropped at each step. The final entry's Index matches RetryAttempt.
+	// Empty for runs that never reached the LLM (dry-run, sync-only,
+	// pre-L3 single-attempt code paths kept for backward compatibility).
+	Attempts []retryAttempt `json:"attempts,omitempty"`
+	Keywords []string       `json:"keywords,omitempty"` // L6 topical focus
 }
 
 // RowChange records one mutation to a progress.json row in a planner run.
