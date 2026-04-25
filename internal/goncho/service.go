@@ -208,19 +208,38 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (SearchResult
 	if peer == "" {
 		return SearchResultSet{}, fmt.Errorf("goncho: peer is required")
 	}
-	results, err := findConclusions(ctx, s.db, s.workspaceID, s.observer, peer, params.Query, params.SessionKey, 12)
+	compiled, err := parseAndCompileSearchFilter(params.Filters, peer)
 	if err != nil {
 		return SearchResultSet{}, err
 	}
-	if len(results) == 0 && strings.TrimSpace(params.Query) != "" {
-		results, err = findConclusions(ctx, s.db, s.workspaceID, s.observer, peer, "", params.SessionKey, 12)
+	sources, denySources := mergeSearchSources(params.Sources, compiled.Sources)
+	if denySources || compiled.DenyAll || filterValuesDenyAll(compiled.SessionIDs) {
+		return SearchResultSet{
+			WorkspaceID: s.workspaceID,
+			Peer:        peer,
+			Query:       params.Query,
+			Results:     []SearchHit{},
+		}, nil
+	}
+	compiled.Sources = sources
+	limit := normalizeSearchLimit(params.Limit)
+
+	var results []SearchHit
+	if len(compiled.Sources) == 0 || filterHasWildcard(compiled.Sources) {
+		results, err = findConclusions(ctx, s.db, s.workspaceID, s.observer, peer, params.Query, params.SessionKey, compiled, limit)
 		if err != nil {
 			return SearchResultSet{}, err
+		}
+		if len(results) == 0 && strings.TrimSpace(params.Query) != "" {
+			results, err = findConclusions(ctx, s.db, s.workspaceID, s.observer, peer, "", params.SessionKey, compiled, limit)
+			if err != nil {
+				return SearchResultSet{}, err
+			}
 		}
 	}
 
 	if len(results) == 0 {
-		fallback, err := s.searchTurnFallback(ctx, params)
+		fallback, err := s.searchTurnFallback(ctx, params, compiled, limit)
 		if err != nil {
 			return SearchResultSet{}, err
 		}
@@ -602,7 +621,7 @@ func makeIdempotencyKey(workspaceID, observer, peer, sessionKey, conclusion stri
 	return hex.EncodeToString(sum[:])
 }
 
-func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams) ([]SearchHit, error) {
+func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams, compiled compiledSearchFilter, limit int) ([]SearchHit, error) {
 	if strings.EqualFold(strings.TrimSpace(params.Scope), "user") && s.sessions != nil {
 		userID := strings.TrimSpace(params.Peer)
 		metas, err := s.sessions.ListMetadataByUserID(ctx, userID)
@@ -611,13 +630,14 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams) (
 		}
 		hits, err := memory.SearchMessages(ctx, s.db, metas, memory.SearchFilter{
 			UserID:           userID,
-			Sources:          params.Sources,
+			Sources:          compiled.Sources,
+			SessionIDs:       compiled.SessionIDs,
 			Query:            params.Query,
 			CurrentSessionID: params.SessionKey,
 			CurrentChatKey:   params.SessionKey,
-		}, 6)
+		}, limit)
 		if errors.Is(err, memory.ErrUserScopeDenied) {
-			return findTurns(ctx, s.db, params.Query, params.SessionKey, 6)
+			return findTurns(ctx, s.db, params.Query, params.SessionKey, compiled, limit)
 		}
 		if err != nil {
 			return nil, err
@@ -637,7 +657,7 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams) (
 	if strings.TrimSpace(params.SessionKey) == "" {
 		return nil, nil
 	}
-	return findTurns(ctx, s.db, params.Query, params.SessionKey, 6)
+	return findTurns(ctx, s.db, params.Query, params.SessionKey, compiled, limit)
 }
 
 func limitHitsByTokens(hits []SearchHit, maxTokens int) []SearchHit {

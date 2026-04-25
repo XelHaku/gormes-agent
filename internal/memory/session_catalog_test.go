@@ -70,6 +70,51 @@ func TestSessionCatalog_SearchMessagesFiltersBySource(t *testing.T) {
 	}
 }
 
+func TestSessionCatalog_SearchMessagesFiltersBySessionAndSource(t *testing.T) {
+	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer func() {
+		if err := store.Close(context.Background()); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	now := time.Now().Unix()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id)
+		 VALUES
+		 ('sess-telegram', 'user', 'Atlas Telegram note.', ?, 'telegram:42'),
+		 ('sess-discord', 'user', 'Atlas Discord note.', ?, 'discord:chan-9'),
+		 ('sess-slack', 'user', 'Atlas Slack note.', ?, 'slack:C123')`,
+		now-30, now-20, now-10,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	hits, err := SearchMessages(ctx, store.DB(), []session.Metadata{
+		{SessionID: "sess-telegram", Source: "telegram", ChatID: "42", UserID: "user-juan"},
+		{SessionID: "sess-discord", Source: "discord", ChatID: "chan-9", UserID: "user-juan"},
+		{SessionID: "sess-slack", Source: "slack", ChatID: "C123", UserID: "user-juan"},
+	}, SearchFilter{
+		UserID:     "user-juan",
+		Query:      "Atlas",
+		Sources:    []string{"discord", "slack"},
+		SessionIDs: []string{"sess-discord"},
+	}, 10)
+	if err != nil {
+		t.Fatalf("SearchMessages: %v", err)
+	}
+	if len(hits) != 1 {
+		t.Fatalf("SearchMessages len = %d, want 1: %+v", len(hits), hits)
+	}
+	if hits[0].SessionID != "sess-discord" || hits[0].Source != "discord" {
+		t.Fatalf("SearchMessages hit = %+v, want discord/sess-discord", hits[0])
+	}
+}
+
 func TestSessionCatalog_SearchMessagesSkipsInterruptedSyncRows(t *testing.T) {
 	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
 	if err != nil {
@@ -133,6 +178,43 @@ func TestSessionCatalog_SearchMessagesUnknownCurrentBindingDeniesUserScope(t *te
 	}, SearchFilter{
 		UserID:         "user-juan",
 		Query:          "Atlas",
+		CurrentChatKey: "discord:chan-9",
+	}, 10)
+	if !errors.Is(err, ErrUserScopeDenied) {
+		t.Fatalf("SearchMessages err = %v, want ErrUserScopeDenied", err)
+	}
+}
+
+func TestSessionCatalog_SearchMessagesSessionFilterCannotBypassCurrentBindingDeny(t *testing.T) {
+	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer func() {
+		if err := store.Close(context.Background()); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	now := time.Now().Unix()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id)
+		 VALUES
+		 ('sess-telegram', 'user', 'Atlas remote user note', ?, 'telegram:42'),
+		 ('sess-current', 'user', 'Atlas current other-user note', ?, 'discord:chan-9')`,
+		now-20, now-10,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = SearchMessages(ctx, store.DB(), []session.Metadata{
+		{SessionID: "sess-current", Source: "discord", ChatID: "chan-9", UserID: "user-maria"},
+		{SessionID: "sess-telegram", Source: "telegram", ChatID: "42", UserID: "user-juan"},
+	}, SearchFilter{
+		UserID:         "user-juan",
+		Query:          "Atlas",
+		SessionIDs:     []string{"sess-telegram"},
 		CurrentChatKey: "discord:chan-9",
 	}, 10)
 	if !errors.Is(err, ErrUserScopeDenied) {

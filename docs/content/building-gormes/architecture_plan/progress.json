@@ -1639,9 +1639,9 @@
             {
               "name": "Goncho search filter grammar",
               "priority": "P4",
-              "status": "planned",
+              "status": "complete",
               "contract": "Goncho search accepts a typed subset of Honcho v3 filters and rejects unsupported filter operators visibly",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -1672,7 +1672,7 @@
                 "The first executable implementation supports a documented subset and returns unsupported-filter evidence for the rest.",
                 "Limit defaults to 10 and clamps to the Honcho-documented maximum of 100."
               ],
-              "note": "Honcho docs expose a richer filter grammar than current Goncho sources[]. Port this as an internal AST and evidence contract before adding public HTTP search parity.",
+              "note": "TDD landed: Goncho SearchParams now accept Honcho-shaped filters and limit, parse an internal AST for AND, OR, NOT, gt, gte, lt, lte, ne, in, contains, icontains, metadata paths, and wildcard values, then compile only the current enforceable subset. session_id, source, and peer_id equality/in/wildcard filters narrow search; metadata, content, created_at, OR, NOT, unknown fields, and unknown operators return structured unsupported-filter errors instead of being ignored. Same-chat source/session deny paths and user-scope session/source filters are fixture-locked, and search limit defaults to 10 with a maximum of 100.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",

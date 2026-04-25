@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -217,7 +218,7 @@ func deleteConclusion(ctx context.Context, db *sql.DB, workspaceID, observer, pe
 	return affected > 0, nil
 }
 
-func findConclusions(ctx context.Context, db *sql.DB, workspaceID, observer, peer, query, sessionKey string, limit int) ([]SearchHit, error) {
+func findConclusions(ctx context.Context, db *sql.DB, workspaceID, observer, peer, query, sessionKey string, filter compiledSearchFilter, limit int) ([]SearchHit, error) {
 	base := `
 		SELECT id, content, COALESCE(session_key, '')
 		FROM goncho_conclusions
@@ -227,6 +228,12 @@ func findConclusions(ctx context.Context, db *sql.DB, workspaceID, observer, pee
 	if trimmed := strings.TrimSpace(sessionKey); trimmed != "" {
 		base += ` AND (session_key = ? OR session_key IS NULL)`
 		args = append(args, trimmed)
+	}
+	if len(filter.SessionIDs) > 0 && !filterHasWildcard(filter.SessionIDs) {
+		base += ` AND `
+		var b strings.Builder
+		appendInClause(&b, "session_key", filter.SessionIDs, &args)
+		base += b.String()
 	}
 	if trimmed := strings.TrimSpace(query); trimmed != "" {
 		base += ` AND content LIKE ?`
@@ -256,8 +263,11 @@ func findConclusions(ctx context.Context, db *sql.DB, workspaceID, observer, pee
 	return hits, nil
 }
 
-func findTurns(ctx context.Context, db *sql.DB, query, sessionKey string, limit int) ([]SearchHit, error) {
+func findTurns(ctx context.Context, db *sql.DB, query, sessionKey string, filter compiledSearchFilter, limit int) ([]SearchHit, error) {
 	if strings.TrimSpace(sessionKey) == "" {
+		return nil, nil
+	}
+	if !sessionKeyMatchesSources(sessionKey, filter.Sources) {
 		return nil, nil
 	}
 
@@ -268,6 +278,12 @@ func findTurns(ctx context.Context, db *sql.DB, query, sessionKey string, limit 
 		  AND memory_sync_status = 'ready'
 	`
 	args := []any{sessionKey, sessionKey}
+	if len(filter.SessionIDs) > 0 && !filterHasWildcard(filter.SessionIDs) {
+		base += ` AND `
+		var b strings.Builder
+		appendInClause(&b, "session_id", filter.SessionIDs, &args)
+		base += b.String()
+	}
 	if trimmed := strings.TrimSpace(query); trimmed != "" {
 		base += ` AND content LIKE ?`
 		args = append(args, "%"+trimmed+"%")
@@ -419,4 +435,28 @@ func nullIfBlank(value string) any {
 		return nil
 	}
 	return value
+}
+
+func appendInClause(b *strings.Builder, column string, values []string, args *[]any) {
+	b.WriteString(column)
+	b.WriteString(` IN (`)
+	for i, value := range values {
+		if i > 0 {
+			b.WriteString(`,`)
+		}
+		b.WriteString(`?`)
+		*args = append(*args, value)
+	}
+	b.WriteString(`)`)
+}
+
+func sessionKeyMatchesSources(sessionKey string, sources []string) bool {
+	if len(sources) == 0 || filterHasWildcard(sources) {
+		return true
+	}
+	source, _, ok := strings.Cut(strings.TrimSpace(sessionKey), ":")
+	if !ok {
+		return false
+	}
+	return slices.Contains(sources, strings.ToLower(strings.TrimSpace(source)))
 }

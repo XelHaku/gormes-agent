@@ -18,6 +18,7 @@ var ErrUserScopeDenied = errors.New("memory: user scope denied")
 type SearchFilter struct {
 	UserID           string
 	Sources          []string
+	SessionIDs       []string
 	Query            string
 	CurrentSessionID string
 	CurrentChatKey   string
@@ -145,6 +146,7 @@ func selectMetadata(metas []session.Metadata, filter SearchFilter) ([]session.Me
 	currentBindingMatched := !requireCurrentBinding
 
 	allowedSources := normalizeSources(filter.Sources)
+	allowedSessions := normalizeSessionIDs(filter.SessionIDs)
 	selected := make([]session.Metadata, 0, len(metas))
 	for _, meta := range metas {
 		metaUserID := strings.TrimSpace(meta.UserID)
@@ -158,6 +160,9 @@ func selectMetadata(metas []session.Metadata, filter SearchFilter) ([]session.Me
 			continue
 		}
 		if len(allowedSources) > 0 && !slices.Contains(allowedSources, strings.ToLower(strings.TrimSpace(meta.Source))) {
+			continue
+		}
+		if len(allowedSessions) > 0 && !slices.Contains(allowedSessions, strings.TrimSpace(meta.SessionID)) {
 			continue
 		}
 		selected = append(selected, meta)
@@ -186,6 +191,26 @@ func normalizeSources(sources []string) []string {
 			continue
 		}
 		out = append(out, src)
+	}
+	return out
+}
+
+func normalizeSessionIDs(sessionIDs []string) []string {
+	if len(sessionIDs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(sessionIDs))
+	for _, sessionID := range sessionIDs {
+		sessionID = strings.TrimSpace(sessionID)
+		if sessionID == "" {
+			continue
+		}
+		if sessionID == "*" {
+			return nil
+		}
+		if !slices.Contains(out, sessionID) {
+			out = append(out, sessionID)
+		}
 	}
 	return out
 }

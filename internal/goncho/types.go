@@ -127,12 +127,14 @@ type ConcludeResult struct {
 
 // SearchParams controls retrieval for honcho_search.
 type SearchParams struct {
-	Peer       string   `json:"peer"`
-	Query      string   `json:"query"`
-	MaxTokens  int      `json:"max_tokens,omitempty"`
-	SessionKey string   `json:"session_key,omitempty"`
-	Scope      string   `json:"scope,omitempty"`
-	Sources    []string `json:"sources,omitempty"`
+	Peer       string         `json:"peer"`
+	Query      string         `json:"query"`
+	MaxTokens  int            `json:"max_tokens,omitempty"`
+	SessionKey string         `json:"session_key,omitempty"`
+	Scope      string         `json:"scope,omitempty"`
+	Sources    []string       `json:"sources,omitempty"`
+	Filters    map[string]any `json:"filters,omitempty"`
+	Limit      int            `json:"limit,omitempty"`
 }
 
 // SearchHit is one result entry returned by search.
