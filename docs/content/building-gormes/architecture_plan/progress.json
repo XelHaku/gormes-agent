@@ -2040,6 +2040,11 @@
               "done_signal": [
                 "Restart-command fixtures prove registry policy, takeover marker write/read/expiry, duplicate suppression, and service-manager exit semantics without live service control."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T15:16:17Z",
@@ -2101,6 +2106,11 @@
               "done_signal": [
                 "Session metadata fixtures prove legacy memory_flushed records migrate to expiry_finalized and new writes contain no hidden memory-flush fields."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 gateway/session.py",
@@ -4160,6 +4170,11 @@
               "done_signal": [
                 "Codex Responses role-content fixtures prove assistant list-content replay uses output_text while user list-content remains input_text."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 agent/codex_responses_adapter.py",
@@ -5418,6 +5433,11 @@
               "done_signal": [
                 "Kernel interrupt retry fixtures prove cancel-before-retry, context-cancel-during-backoff, no-cancel retry recovery, and interrupted memory-sync suppression."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:7c17accb run_agent.py",
@@ -6633,6 +6653,11 @@
               "done_signal": [
                 "Oneshot output fixtures prove one fake kernel turn, stdout-only final content, stderr-only setup failures, and no TUI/gateway/provider startup."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 hermes_cli/oneshot.py",
@@ -6883,6 +6908,11 @@
               "done_signal": [
                 "RestartSec parser fixtures prove bounded duration parsing, default/malformed evidence, and no live service-manager dependency."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 hermes_cli/main.py",
