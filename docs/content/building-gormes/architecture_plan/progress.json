@@ -4165,7 +4165,7 @@
               "name": "TUI mouse tracking config + slash toggle",
               "status": "complete",
               "contract": "Mouse/wheel tracking is config-backed, runtime-toggleable, and emits terminal enable/disable state without restarting the TUI",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [

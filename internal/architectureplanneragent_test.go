@@ -242,6 +242,7 @@ exit 0
 		"GO_LOG=" + goLogPath,
 		"GH_LOG=" + ghLogPath,
 		"SYSTEMCTL_LOG=" + systemctlLogPath,
+		"MERGE_OPEN_PULL_REQUESTS=1",
 		"HOME=" + homeDir,
 		"XDG_CONFIG_HOME=" + xdgConfigHome,
 	}, "bash", "scripts/"+architecturePlannerTasksManagerScript)
