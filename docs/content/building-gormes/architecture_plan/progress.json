@@ -477,7 +477,12 @@
               ],
               "done_signal": [
                 "WhatsApp reconnect fixtures prove bounded retry, retry exhaustion degradation, and no duplicate terminal sends."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T09:22:51Z",
+                "last_success": "2026-04-25T09:22:51Z"
+              }
             }
           ]
         },
@@ -935,7 +940,12 @@
               ],
               "done_signal": [
                 "Durable supervisor status fixtures prove worker liveness/degraded modes without starting external worker processes."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T09:22:51Z",
+                "last_success": "2026-04-25T09:22:51Z"
+              }
             }
           ]
         },
