@@ -13,54 +13,62 @@ const (
 )
 
 type ContextCompressorBudgetConfig struct {
-	Model                  string
-	ContextLength          int
-	ThresholdPercent       float64
-	SummaryTargetRatio     float64
-	AuxiliaryContextLength int
-	ToolDescriptors        []ToolDescriptor
+	Model                       string
+	ContextLength               int
+	ThresholdPercent            float64
+	SummaryTargetRatio          float64
+	AuxiliaryContextLength      int
+	AuxiliaryContextSource      ModelContextSource
+	AuxiliaryContextLookupError string
+	ToolDescriptors             []ToolDescriptor
 }
 
 type ContextCompressorBudgetStatus struct {
-	State                  string  `json:"state"`
-	Model                  string  `json:"model,omitempty"`
-	ContextLength          int     `json:"context_length,omitempty"`
-	AuxiliaryContextLength int     `json:"auxiliary_context_length,omitempty"`
-	ThresholdPercent       float64 `json:"threshold_percent"`
-	ThresholdTokens        int     `json:"threshold_tokens,omitempty"`
-	RawThresholdTokens     int     `json:"raw_threshold_tokens,omitempty"`
-	SummaryTargetRatio     float64 `json:"summary_target_ratio"`
-	TailTokenBudget        int     `json:"tail_token_budget,omitempty"`
-	MaxSummaryTokens       int     `json:"max_summary_tokens,omitempty"`
-	ToolSchemaTokens       int     `json:"tool_schema_tokens,omitempty"`
-	RequestHeadroomTokens  int     `json:"request_headroom_tokens,omitempty"`
-	HeadroomClamped        bool    `json:"headroom_clamped,omitempty"`
+	State                       string             `json:"state"`
+	Model                       string             `json:"model,omitempty"`
+	ContextLength               int                `json:"context_length,omitempty"`
+	AuxiliaryContextLength      int                `json:"auxiliary_context_length,omitempty"`
+	AuxiliaryContextSource      ModelContextSource `json:"auxiliary_context_source,omitempty"`
+	AuxiliaryContextLookupError string             `json:"auxiliary_context_lookup_error,omitempty"`
+	ThresholdPercent            float64            `json:"threshold_percent"`
+	ThresholdTokens             int                `json:"threshold_tokens,omitempty"`
+	RawThresholdTokens          int                `json:"raw_threshold_tokens,omitempty"`
+	SummaryTargetRatio          float64            `json:"summary_target_ratio"`
+	TailTokenBudget             int                `json:"tail_token_budget,omitempty"`
+	MaxSummaryTokens            int                `json:"max_summary_tokens,omitempty"`
+	ToolSchemaTokens            int                `json:"tool_schema_tokens,omitempty"`
+	RequestHeadroomTokens       int                `json:"request_headroom_tokens,omitempty"`
+	HeadroomClamped             bool               `json:"headroom_clamped,omitempty"`
 }
 
 type ContextCompressorBudget struct {
-	model                  string
-	contextLength          int
-	auxiliaryContextLength int
-	thresholdPercent       float64
-	summaryTargetRatio     float64
-	toolDescriptors        []ToolDescriptor
-	thresholdTokens        int
-	rawThresholdTokens     int
-	tailTokenBudget        int
-	maxSummaryTokens       int
-	toolSchemaTokens       int
-	requestHeadroomTokens  int
-	headroomClamped        bool
+	model                       string
+	contextLength               int
+	auxiliaryContextLength      int
+	auxiliaryContextSource      ModelContextSource
+	auxiliaryContextLookupError string
+	thresholdPercent            float64
+	summaryTargetRatio          float64
+	toolDescriptors             []ToolDescriptor
+	thresholdTokens             int
+	rawThresholdTokens          int
+	tailTokenBudget             int
+	maxSummaryTokens            int
+	toolSchemaTokens            int
+	requestHeadroomTokens       int
+	headroomClamped             bool
 }
 
 func NewContextCompressorBudget(config ContextCompressorBudgetConfig) *ContextCompressorBudget {
 	budget := &ContextCompressorBudget{
-		model:                  config.Model,
-		contextLength:          config.ContextLength,
-		auxiliaryContextLength: config.AuxiliaryContextLength,
-		thresholdPercent:       normalizeContextCompressorThresholdPercent(config.ThresholdPercent),
-		summaryTargetRatio:     normalizeContextCompressorSummaryTargetRatio(config.SummaryTargetRatio),
-		toolDescriptors:        cloneToolDescriptors(config.ToolDescriptors),
+		model:                       config.Model,
+		contextLength:               config.ContextLength,
+		auxiliaryContextLength:      config.AuxiliaryContextLength,
+		auxiliaryContextSource:      config.AuxiliaryContextSource,
+		auxiliaryContextLookupError: config.AuxiliaryContextLookupError,
+		thresholdPercent:            normalizeContextCompressorThresholdPercent(config.ThresholdPercent),
+		summaryTargetRatio:          normalizeContextCompressorSummaryTargetRatio(config.SummaryTargetRatio),
+		toolDescriptors:             cloneToolDescriptors(config.ToolDescriptors),
 	}
 	budget.recalculate()
 	return budget
@@ -80,6 +88,10 @@ func (b *ContextCompressorBudget) UpdateModelContext(update ContextModelContext)
 	if update.AuxiliaryContextLength > 0 {
 		b.auxiliaryContextLength = update.AuxiliaryContextLength
 	}
+	if update.AuxiliaryContextSource != "" {
+		b.auxiliaryContextSource = update.AuxiliaryContextSource
+	}
+	b.auxiliaryContextLookupError = update.AuxiliaryContextLookupError
 	if update.ToolDescriptors != nil {
 		b.toolDescriptors = cloneToolDescriptors(update.ToolDescriptors)
 	}
@@ -99,28 +111,32 @@ func (b *ContextCompressorBudget) UpdateModelContext(update ContextModelContext)
 func (b *ContextCompressorBudget) Status() ContextCompressorBudgetStatus {
 	if b.contextLength <= 0 {
 		return ContextCompressorBudgetStatus{
-			State:                  "unavailable",
-			Model:                  b.model,
-			AuxiliaryContextLength: b.auxiliaryContextLength,
-			ThresholdPercent:       b.thresholdPercent,
-			SummaryTargetRatio:     b.summaryTargetRatio,
-			ToolSchemaTokens:       b.toolSchemaTokens,
+			State:                       "unavailable",
+			Model:                       b.model,
+			AuxiliaryContextLength:      b.auxiliaryContextLength,
+			AuxiliaryContextSource:      b.auxiliaryContextSource,
+			AuxiliaryContextLookupError: b.auxiliaryContextLookupError,
+			ThresholdPercent:            b.thresholdPercent,
+			SummaryTargetRatio:          b.summaryTargetRatio,
+			ToolSchemaTokens:            b.toolSchemaTokens,
 		}
 	}
 	return ContextCompressorBudgetStatus{
-		State:                  "ready",
-		Model:                  b.model,
-		ContextLength:          b.contextLength,
-		AuxiliaryContextLength: b.auxiliaryContextLength,
-		ThresholdPercent:       b.thresholdPercent,
-		ThresholdTokens:        b.thresholdTokens,
-		RawThresholdTokens:     b.rawThresholdTokens,
-		SummaryTargetRatio:     b.summaryTargetRatio,
-		TailTokenBudget:        b.tailTokenBudget,
-		MaxSummaryTokens:       b.maxSummaryTokens,
-		ToolSchemaTokens:       b.toolSchemaTokens,
-		RequestHeadroomTokens:  b.requestHeadroomTokens,
-		HeadroomClamped:        b.headroomClamped,
+		State:                       "ready",
+		Model:                       b.model,
+		ContextLength:               b.contextLength,
+		AuxiliaryContextLength:      b.auxiliaryContextLength,
+		AuxiliaryContextSource:      b.auxiliaryContextSource,
+		AuxiliaryContextLookupError: b.auxiliaryContextLookupError,
+		ThresholdPercent:            b.thresholdPercent,
+		ThresholdTokens:             b.thresholdTokens,
+		RawThresholdTokens:          b.rawThresholdTokens,
+		SummaryTargetRatio:          b.summaryTargetRatio,
+		TailTokenBudget:             b.tailTokenBudget,
+		MaxSummaryTokens:            b.maxSummaryTokens,
+		ToolSchemaTokens:            b.toolSchemaTokens,
+		RequestHeadroomTokens:       b.requestHeadroomTokens,
+		HeadroomClamped:             b.headroomClamped,
 	}
 }
 

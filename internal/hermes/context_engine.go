@@ -39,14 +39,16 @@ type ContextUsage struct {
 }
 
 type ContextModelContext struct {
-	Model                  string
-	ContextLength          int
-	ThresholdPercent       float64
-	ThresholdTokens        int
-	AuxiliaryContextLength int
-	ToolDescriptors        []ToolDescriptor
-	BaseURL                string
-	Provider               string
+	Model                       string
+	ContextLength               int
+	ThresholdPercent            float64
+	ThresholdTokens             int
+	AuxiliaryContextLength      int
+	AuxiliaryContextSource      ModelContextSource
+	AuxiliaryContextLookupError string
+	ToolDescriptors             []ToolDescriptor
+	BaseURL                     string
+	Provider                    string
 }
 
 type CompressionRequest struct {

@@ -3877,9 +3877,9 @@
             {
               "name": "Aux compression provider-aware context cap",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Auxiliary compression feasibility resolves the auxiliary model context window with the active provider identity before applying headroom and threshold budgets",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -3918,7 +3918,7 @@
                 "ContextCompressorBudget receives the provider-resolved AuxiliaryContextLength and lowers threshold_tokens below 272000 after tool-schema plus 12000 fixed headroom.",
                 "Status evidence exposes the context source or lookup error so operators can distinguish provider-cap budgeting from models.dev fallback."
               ],
-              "note": "Hermes d635e2df fixed compression feasibility by passing self.provider into get_model_context_length; without that provider identity Codex OAuth can budget against the raw 1050000 OpenAI window instead of the 272000 provider cap. Gormes already has provider-cap resolution and headroom math, but needs a focused auxiliary-compression fixture proving those two pieces are connected before live compression wiring lands.",
+              "note": "Complete: internal/hermes/context_compressor_provider_cap_test.go proves the auxiliary compression budget path forwards provider identity into ModelContextResolver before headroom math. The fixture uses fake resolver inputs for openai-codex/gpt-5.5 raw 1050000 versus provider cap 272000, confirms openai and missing-provider paths do not borrow the Codex cap, and exposes auxiliary_context_source / auxiliary_context_lookup_error evidence while ContextCompressorBudget lowers threshold_tokens below the provider cap after tool-schema plus 12000 fixed headroom.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -3931,6 +3931,11 @@
               "done_signal": [
                 "Provider-cap compression fixtures prove the auxiliary feasibility path forwards provider identity, uses the 272000 Codex cap, and reports fallback/source evidence without live provider calls."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T14:59:08Z",
+                "last_success": "2026-04-25T14:59:08Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:d635e2df run_agent.py",
