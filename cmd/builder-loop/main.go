@@ -523,6 +523,13 @@ func runAutoloop(ctx context.Context, deps cliDeps, cfg builderloop.Config, dryR
 	}
 
 	fmt.Fprintf(deps.stdout, "candidates: %d\nselected: %d\n", summary.Candidates, len(summary.Selected))
+	if summary.MaxPhaseFiltered > 0 {
+		fmt.Fprintf(deps.stdout, "max_phase_filtered: %d\nnext_max_phase: %d\nhint: rerun with MAX_PHASE=%d to include the next queued phase\n",
+			summary.MaxPhaseFiltered,
+			summary.NextFilteredMaxPhase,
+			summary.NextFilteredMaxPhase,
+		)
+	}
 	for _, candidate := range summary.Selected {
 		fmt.Fprintf(deps.stdout, "- %s/%s %s [%s] owner=%s size=%s reason=%s\n",
 			candidate.PhaseID,
@@ -573,6 +580,14 @@ func doctor(deps cliDeps, cfg builderloop.Config, format string) error {
 	if msg := driftWarning("builder-loop", ledgerPath, "health_updated", time.Hour); msg != "" {
 		warnings = append(warnings, msg)
 	}
+	staleClaims, err := staleWorkerClaimWarnings(ledgerPath, time.Now(), time.Hour)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			warnings = append(warnings, fmt.Sprintf("doctor: warning: builder-loop ledger unreadable at %s: %v", ledgerPath, err))
+		}
+	} else {
+		warnings = append(warnings, staleClaims...)
+	}
 	if format == "json" {
 		return json.NewEncoder(deps.stdout).Encode(struct {
 			OK       bool     `json:"ok"`
@@ -582,7 +597,7 @@ func doctor(deps cliDeps, cfg builderloop.Config, format string) error {
 	for _, w := range warnings {
 		fmt.Fprintln(deps.stdout, w)
 	}
-	_, err := fmt.Fprintln(deps.stdout, "doctor: ok")
+	_, err = fmt.Fprintln(deps.stdout, "doctor: ok")
 	return err
 }
 
@@ -620,6 +635,76 @@ func driftWarning(loop, path, eventName string, threshold time.Duration) string 
 		return fmt.Sprintf("doctor: warning: %s last %s was %s ago (>%s); loop may be stalled", loop, eventName, age.Truncate(time.Second), threshold)
 	}
 	return ""
+}
+
+type openWorkerClaim struct {
+	event builderloop.LedgerEvent
+}
+
+func staleWorkerClaimWarnings(path string, now time.Time, threshold time.Duration) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	open := make(map[string]openWorkerClaim)
+	var order []string
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var ev builderloop.LedgerEvent
+		if err := json.Unmarshal(line, &ev); err != nil {
+			continue
+		}
+		key := workerClaimKey(ev)
+		if key == "" {
+			continue
+		}
+		switch ev.Event {
+		case "worker_claimed":
+			if _, ok := open[key]; !ok {
+				order = append(order, key)
+			}
+			open[key] = openWorkerClaim{event: ev}
+		case "worker_success", "worker_failed", "worker_promotion_failed", "candidate_skipped":
+			delete(open, key)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	var warnings []string
+	for _, key := range order {
+		claim, ok := open[key]
+		if !ok {
+			continue
+		}
+		age := now.Sub(claim.event.TS)
+		if age <= threshold {
+			continue
+		}
+		warnings = append(warnings, fmt.Sprintf("doctor: warning: builder-loop worker claim stale for %s: run=%s worker=%d task=%s branch=%s",
+			age.Truncate(time.Second),
+			claim.event.RunID,
+			claim.event.Worker,
+			claim.event.Task,
+			claim.event.Branch,
+		))
+	}
+	return warnings, nil
+}
+
+func workerClaimKey(ev builderloop.LedgerEvent) string {
+	if ev.RunID == "" || ev.Worker == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s\x00%d\x00%s\x00%s", ev.RunID, ev.Worker, ev.Task, ev.Branch)
 }
 
 // latestLedgerEventTime scans the JSONL ledger at path and returns the

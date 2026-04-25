@@ -175,6 +175,72 @@ func TestLatestLedgerEventTimeMissingFile(t *testing.T) {
 	}
 }
 
+func TestStaleWorkerClaimWarningsFindsUnfinishedClaim(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runs.jsonl")
+	now := time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC)
+	if err := builderloop.AppendLedgerEvent(path, builderloop.LedgerEvent{
+		TS:     now.Add(-2 * time.Hour),
+		RunID:  "run-1",
+		Event:  "worker_claimed",
+		Worker: 1,
+		Task:   "5/5.Q/Native TUI bundle independence check",
+		Branch: "builder-loop/run-1/w1/native-tui",
+		Status: "claimed",
+	}); err != nil {
+		t.Fatalf("AppendLedgerEvent() error = %v", err)
+	}
+
+	warnings, err := staleWorkerClaimWarnings(path, now, time.Hour)
+	if err != nil {
+		t.Fatalf("staleWorkerClaimWarnings() error = %v", err)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("warnings = %#v, want one stale claim warning", warnings)
+	}
+	for _, want := range []string{
+		"doctor: warning: builder-loop worker claim stale for 2h0m0s",
+		"run=run-1",
+		"worker=1",
+		"task=5/5.Q/Native TUI bundle independence check",
+		"branch=builder-loop/run-1/w1/native-tui",
+	} {
+		if !strings.Contains(warnings[0], want) {
+			t.Fatalf("warning = %q, want %q", warnings[0], want)
+		}
+	}
+}
+
+func TestStaleWorkerClaimWarningsIgnoresFinishedClaim(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runs.jsonl")
+	now := time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC)
+	claim := builderloop.LedgerEvent{
+		TS:     now.Add(-2 * time.Hour),
+		RunID:  "run-1",
+		Event:  "worker_claimed",
+		Worker: 1,
+		Task:   "task",
+		Branch: "branch",
+		Status: "claimed",
+	}
+	if err := builderloop.AppendLedgerEvent(path, claim); err != nil {
+		t.Fatalf("AppendLedgerEvent(claim) error = %v", err)
+	}
+	claim.TS = now.Add(-90 * time.Minute)
+	claim.Event = "worker_failed"
+	claim.Status = "backend_failed"
+	if err := builderloop.AppendLedgerEvent(path, claim); err != nil {
+		t.Fatalf("AppendLedgerEvent(worker_failed) error = %v", err)
+	}
+
+	warnings, err := staleWorkerClaimWarnings(path, now, time.Hour)
+	if err != nil {
+		t.Fatalf("staleWorkerClaimWarnings() error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %#v, want none for finished claim", warnings)
+	}
+}
+
 func TestDriftWarningStaleEvent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "runs.jsonl")
@@ -418,6 +484,124 @@ func TestRunCommandDryRunPrintsSummary(t *testing.T) {
 		"owner=orchestrator",
 		"size=small",
 		"reason=P0 handoff",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want %q", output, want)
+		}
+	}
+}
+
+func TestRunCommandDryRunExplainsMaxPhaseFilteredQueue(t *testing.T) {
+	repoRoot := t.TempDir()
+	progressPath := filepath.Join(repoRoot, "progress.json")
+	if err := os.WriteFile(progressPath, []byte(`{
+		"phases": {
+			"5": {
+				"subphases": {
+					"5.Q": {
+						"items": [
+							{
+								"item_name": "phase 5 candidate",
+								"status": "planned",
+								"contract": "phase 5 contract",
+								"contract_status": "draft",
+								"slice_size": "small",
+								"execution_owner": "gateway",
+								"ready_when": ["fixture exists"],
+								"write_scope": ["internal/tui/"],
+								"test_commands": ["go test ./internal/tui -count=1"],
+								"done_signal": ["fixture proves behavior"]
+							}
+						]
+					}
+				}
+			}
+		}
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("PROGRESS_JSON", progressPath)
+	t.Setenv("RUN_ROOT", filepath.Join(repoRoot, "runs"))
+	t.Setenv("BACKEND", "opencode")
+	t.Setenv("MODE", "safe")
+	t.Setenv("MAX_AGENTS", "1")
+	t.Setenv("MAX_PHASE", "3")
+
+	var stdout bytes.Buffer
+	deps := defaultDeps()
+	deps.stdout = &stdout
+	withTempCwd(t, repoRoot)
+
+	if err := run(context.Background(), deps, []string{"run", "--dry-run"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"candidates: 0",
+		"selected: 0",
+		"max_phase_filtered: 1",
+		"next_max_phase: 5",
+		"hint: rerun with MAX_PHASE=5 to include the next queued phase",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want %q", output, want)
+		}
+	}
+}
+
+func TestRunCommandDryRunDefaultIncludesPhaseFourQueue(t *testing.T) {
+	repoRoot := t.TempDir()
+	progressPath := filepath.Join(repoRoot, "progress.json")
+	if err := os.WriteFile(progressPath, []byte(`{
+		"phases": {
+			"4": {
+				"subphases": {
+					"4.A": {
+						"items": [
+							{
+								"item_name": "phase 4 candidate",
+								"status": "planned",
+								"contract": "phase 4 contract",
+								"contract_status": "draft",
+								"slice_size": "small",
+								"execution_owner": "provider",
+								"ready_when": ["fixture exists"],
+								"write_scope": ["internal/provider/"],
+								"test_commands": ["go test ./internal/provider -count=1"],
+								"done_signal": ["fixture proves behavior"]
+							}
+						]
+					}
+				}
+			}
+		}
+	}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("PROGRESS_JSON", progressPath)
+	t.Setenv("RUN_ROOT", filepath.Join(repoRoot, "runs"))
+	t.Setenv("BACKEND", "opencode")
+	t.Setenv("MODE", "safe")
+	t.Setenv("MAX_AGENTS", "1")
+	t.Setenv("MAX_PHASE", "")
+
+	var stdout bytes.Buffer
+	deps := defaultDeps()
+	deps.stdout = &stdout
+	withTempCwd(t, repoRoot)
+
+	if err := run(context.Background(), deps, []string{"run", "--dry-run"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"candidates: 1",
+		"selected: 1",
+		"phase 4 candidate",
+		"owner=provider",
+		"size=small",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("stdout = %q, want %q", output, want)

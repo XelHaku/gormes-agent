@@ -18,6 +18,17 @@ import (
 func defaultPlannerLoopRunRoot(repoRoot string) string {
 	canonical := filepath.Join(repoRoot, ".codex", "planner-loop")
 	legacy := filepath.Join(repoRoot, ".codex", "architecture-planner")
+
+	// Prefer the canonical root only once it has real planner run state.
+	// Trigger ledgers may be created under the canonical path before a
+	// migration is complete; those should not strand existing reports,
+	// cursors, and state under the legacy architecture-planner root.
+	if plannerRunRootHasState(canonical) {
+		return canonical
+	}
+	if plannerRunRootHasState(legacy) {
+		return legacy
+	}
 	if _, err := os.Stat(canonical); err == nil {
 		return canonical
 	}
@@ -25,6 +36,21 @@ func defaultPlannerLoopRunRoot(repoRoot string) string {
 		return legacy
 	}
 	return canonical
+}
+
+func plannerRunRootHasState(path string) bool {
+	for _, rel := range []string{
+		"planner_state.json",
+		"context.json",
+		"latest_prompt.txt",
+		filepath.Join("state", "runs.jsonl"),
+	} {
+		info, err := os.Stat(filepath.Join(path, rel))
+		if err == nil && !info.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 // defaultBuilderLoopRunRootFromPlanner mirrors builderloop's default but is

@@ -264,12 +264,21 @@ func phaseAboveMax(phaseID string, maxPhase int) bool {
 		return false
 	}
 
-	phaseNum, err := strconv.Atoi(strings.TrimSpace(phaseID))
-	if err != nil {
+	phaseNum, ok := phaseNumber(phaseID)
+	if !ok {
 		return false
 	}
 
 	return phaseNum > maxPhase
+}
+
+func phaseNumber(phaseID string) (int, bool) {
+	phaseNum, err := strconv.Atoi(strings.TrimSpace(phaseID))
+	if err != nil {
+		return 0, false
+	}
+
+	return phaseNum, true
 }
 
 func phasePaused(phaseID string) bool {

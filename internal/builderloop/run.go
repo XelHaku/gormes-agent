@@ -31,9 +31,11 @@ type RunOptions struct {
 }
 
 type RunSummary struct {
-	Candidates int
-	Selected   []Candidate
-	RunID      string
+	Candidates           int
+	Selected             []Candidate
+	RunID                string
+	MaxPhaseFiltered     int
+	NextFilteredMaxPhase int
 }
 
 type workerRun struct {
@@ -105,6 +107,19 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		Candidates: len(candidates),
 		Selected:   append([]Candidate(nil), selected...),
 		RunID:      runID,
+	}
+	if opts.Config.MaxPhase > 0 {
+		count, next, err := maxPhaseFilteredSummary(opts.Config.ProgressJSON, CandidateOptions{
+			ActiveFirst:        true,
+			PriorityBoost:      opts.Config.PriorityBoost,
+			IncludeQuarantined: opts.Config.IncludeQuarantined,
+			IncludeNeedsHuman:  opts.Config.IncludeNeedsHuman,
+		}, opts.Config.MaxPhase)
+		if err != nil {
+			return RunSummary{}, err
+		}
+		summary.MaxPhaseFiltered = count
+		summary.NextFilteredMaxPhase = next
 	}
 	if opts.DryRun {
 		return summary, nil
@@ -350,6 +365,28 @@ func runIDFromTime(t time.Time) string {
 		return runID
 	}
 	return fmt.Sprintf("%s-%09d", runID, t.Nanosecond())
+}
+
+func maxPhaseFilteredSummary(path string, opts CandidateOptions, maxPhase int) (count int, nextMaxPhase int, err error) {
+	if maxPhase < 1 {
+		return 0, 0, nil
+	}
+	opts.MaxPhase = 0
+	candidates, err := NormalizeCandidates(path, opts)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, candidate := range candidates {
+		phase, ok := phaseNumber(candidate.PhaseID)
+		if !ok || phase <= maxPhase {
+			continue
+		}
+		count++
+		if nextMaxPhase == 0 || phase < nextMaxPhase {
+			nextMaxPhase = phase
+		}
+	}
+	return count, nextMaxPhase, nil
 }
 
 func runPostPromotionGate(ctx context.Context, cfg Config, runner Runner, runID string, promotedWork bool) error {

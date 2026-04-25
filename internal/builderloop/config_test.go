@@ -41,8 +41,8 @@ func TestConfigFromEnvDefaultsToRepoRootPaths(t *testing.T) {
 		t.Fatalf("MaxAgents = %d, want %d", cfg.MaxAgents, 4)
 	}
 
-	if cfg.MaxPhase != 3 {
-		t.Fatalf("MaxPhase = %d, want %d", cfg.MaxPhase, 3)
+	if cfg.MaxPhase != 4 {
+		t.Fatalf("MaxPhase = %d, want %d", cfg.MaxPhase, 4)
 	}
 
 	wantPriorityBoost := []string{"2.B.3", "2.B.4", "2.B.10", "2.B.11"}

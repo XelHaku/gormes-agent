@@ -13,10 +13,19 @@ Go-native `gormes-agent`.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/gbrain`
-- Upstream commit: `11abb24ddd2209f8622870c2e48dc9ef050ad749`
+- Upstream commit: `f718c59`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `8c173263eb7e13b7acd4c0e2145ede19e7a0a3f2`
-- Date: 2026-04-24
+- Gormes commit: `1747b964`
+- Date: 2026-04-25
+
+## 2026-04-25 Drift Check
+
+GBrain `f718c59` ships Code Cathedral II: tree-sitter-backed code chunking,
+qualified symbols, call-graph edges, parent-scope chunks, two-pass retrieval,
+and explicit `reindex-code` backfill tooling. Gormes should treat this as donor
+evidence for explainable retrieval, not as a dependency to embed. The roadmap
+now tracks a small Phase 6.D row that defines optional code-context evidence
+for skill retrieval before any Go-native code indexer is designed.
 
 ## Documents
 
@@ -34,4 +43,3 @@ contract-first operations, a brain-first agent loop, fat procedural skills, and
 a durable job ledger for deterministic work. Gormes should keep the single Go
 binary and typed tool contracts, then borrow those ideas in a smaller,
 auditable, SQLite-first shape.
-

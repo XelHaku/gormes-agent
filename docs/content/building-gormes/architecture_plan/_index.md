@@ -337,6 +337,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Provider interface + stream fixture harness
 - [x] Tool-call normalization + continuation contract
 - [x] DeepSeek/Kimi reasoning_content echo for tool-call replay
+- [ ] DeepSeek/Kimi cross-provider reasoning isolation
 - [x] Anthropic
 - [ ] Bedrock
 - [x] Bedrock Converse payload mapping (no AWS SDK)
@@ -463,7 +464,9 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.G — MCP Integration ⏳
 
 - [ ] MCP client
-- [ ] OAuth flows
+- [ ] MCP server config/env resolver
+- [ ] MCP fake-server discovery + tool schema normalization
+- [ ] MCP OAuth state store + noninteractive auth errors
 - [ ] Managed tool gateway bridge
 
 ### 5.H — ACP Integration ⏳
@@ -514,19 +517,24 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] 49-file CLI tree port
 - [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
+- [ ] CLI banner/output formatting helpers
+- [ ] CLI tips/dump/webhook deterministic helpers
 - [x] PTY bridge protocol adapter
 - [ ] CLI command registry parity + active-turn busy policy
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
+- [ ] CLI profile path and active-profile store
 - [x] Top-level oneshot flag and model/provider resolver
 - [x] Oneshot final-output writer boundary
 - [x] Oneshot noninteractive safety and clarify policy
 - [x] Platform toolset config persistence + MCP sentinel
 - [x] Effective toolset picker dedupes bundled plugin keys
 - [ ] Gateway, platform, webhook, and cron management CLI
+- [ ] Gateway management CLI read-model closeout
 - [x] Service RestartSec parser helper
 - [x] Service restart active-status poller
 - [ ] Diagnostics, backup, logs, and status CLI
+- [ ] CLI log snapshot reader
 
 ### 5.P — Docker / Packaging ⏳
 
@@ -540,8 +548,12 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.Q — API Server + TUI Gateway Streaming 🔨
 
 - [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
+- [ ] TUI gateway progress/completion helpers
+- [ ] TUI gateway image/personality/platform-event helpers
 - [x] TUI mouse tracking config + slash toggle
 - [ ] Native TUI bundle independence check
+- [ ] TUI launch model override + static alias resolver
+- [ ] Native TUI terminal-selection divergence contract
 - [ ] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
 - [x] Responses API store + run event stream
@@ -577,6 +589,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 6.D — Skill Retrieval + Matching ⏳
 
 - [ ] Hybrid lexical + semantic lookup
+- [ ] Code Cathedral II code-context retrieval fixtures
 
 ### 6.E — Feedback Loop ⏳
 

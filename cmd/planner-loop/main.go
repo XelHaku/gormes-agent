@@ -502,7 +502,7 @@ func doctor(deps cliDeps, cfg plannerloop.Config, format string) error {
 	var warnings []string
 	plannerLedger := filepath.Join(cfg.RunRoot, "state", "runs.jsonl")
 	threshold := plannerDriftThreshold()
-	if msg := driftWarning("planner", plannerLedger, "health_updated", threshold); msg != "" {
+	if msg := plannerDriftWarning(plannerLedger, threshold); msg != "" {
 		warnings = append(warnings, msg)
 	}
 	builderLedger := filepath.Join(cfg.AutoloopRunRoot, "state", "runs.jsonl")
@@ -561,6 +561,65 @@ func plannerDriftThreshold() time.Duration {
 		return defaultThreshold
 	}
 	return 2 * d
+}
+
+func plannerDriftWarning(path string, threshold time.Duration) string {
+	latest, err := latestPlannerRunTime(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ""
+		}
+		return fmt.Sprintf("doctor: warning: planner ledger unreadable at %s: %v", path, err)
+	}
+	if latest.IsZero() {
+		return fmt.Sprintf("doctor: warning: planner ledger %s has no completed planner runs yet", path)
+	}
+	age := time.Since(latest)
+	if age > threshold {
+		return fmt.Sprintf("doctor: warning: planner last run was %s ago (>%s); loop may be stalled", age.Truncate(time.Second), threshold)
+	}
+	return ""
+}
+
+func latestPlannerRunTime(path string) (time.Time, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer f.Close()
+
+	var latest time.Time
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var ev struct {
+			TS     time.Time `json:"ts"`
+			Status string    `json:"status"`
+		}
+		if err := json.Unmarshal(line, &ev); err != nil {
+			continue
+		}
+		if plannerFinalStatus(ev.Status) && ev.TS.After(latest) {
+			latest = ev.TS
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return time.Time{}, err
+	}
+	return latest, nil
+}
+
+func plannerFinalStatus(status string) bool {
+	switch status {
+	case "ok", "validation_rejected", "backend_failed", "no_changes", "needs_human_set":
+		return true
+	default:
+		return false
+	}
 }
 
 // triggerPathWritable verifies the parent of path exists (creating it if

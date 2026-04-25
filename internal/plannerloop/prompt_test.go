@@ -34,6 +34,19 @@ func TestBuildPrompt_IncludesHealthClauses(t *testing.T) {
 	}
 }
 
+func TestBuildPrompt_IncludesRuntimeSourceBoundary(t *testing.T) {
+	prompt := BuildPrompt(ContextBundle{}, nil)
+	for _, want := range []string{
+		"RUNTIME SOURCE BOUNDARY (HARD RULE)",
+		"Do not edit repo-root cmd/**/*.go or internal/**/*.go",
+		"add or refine progress.json rows instead",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("prompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
 func TestBuildPrompt_NoQuarantinedRowsOmitsCallToAction(t *testing.T) {
 	bundle := ContextBundle{}
 	prompt := BuildPrompt(bundle, nil)

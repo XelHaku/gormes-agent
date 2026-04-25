@@ -1,6 +1,8 @@
 # ── Build outputs (Makefile writes to bin/) ──────────
 bin/
 /gormes
+/builder-loop
+/planner-loop
 
 # ── Go binaries for other platforms ──────────────────
 *.exe

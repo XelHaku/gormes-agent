@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/cmdrunner"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/plannerloop"
@@ -93,6 +94,56 @@ func TestRunStatusAndShowReportUseConfiguredRunRoot(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "# Architecture Planner Loop Run") {
 		t.Fatalf("show-report output missing report:\n%s", stdout.String())
+	}
+}
+
+func TestDoctorUsesPlannerRunStatusForPlannerDrift(t *testing.T) {
+	repoRoot := writeCommandFixture(t)
+	runRoot := filepath.Join(repoRoot, ".codex", "planner")
+	builderRoot := filepath.Join(repoRoot, ".codex", "builder-loop")
+	t.Setenv("RUN_ROOT", runRoot)
+	t.Setenv("BUILDER_LOOP_RUN_ROOT", builderRoot)
+	writeCommandFile(t, filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"), `{
+  "meta": {
+    "version": "2.0",
+    "last_updated": "2026-04-25",
+    "links": {
+      "github_readme": "https://example.test/readme",
+      "landing_page": "https://example.test",
+      "docs_site": "https://example.test/docs",
+      "source_code": "https://example.test/src"
+    }
+  },
+  "phases": {
+    "1": {
+      "name": "Phase 1 Test",
+      "deliverable": "test deliverable",
+      "subphases": {
+        "1.A": {
+          "name": "First subphase",
+          "items": [{"name": "item one", "status": "planned"}]
+        }
+      }
+    }
+  }
+}`)
+	withWorkingDir(t, repoRoot)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	writeCommandFile(t, filepath.Join(runRoot, "state", "runs.jsonl"), `{"ts":"`+now+`","run_id":"run-1","backend":"codexu","mode":"safe","status":"ok"}`+"\n")
+	writeCommandFile(t, filepath.Join(builderRoot, "state", "runs.jsonl"), `{"ts":"`+now+`","event":"health_updated"}`+"\n")
+
+	var stdout bytes.Buffer
+	deps := defaultDeps()
+	deps.stdout = &stdout
+	if err := run(context.Background(), deps, []string{"doctor"}); err != nil {
+		t.Fatalf("doctor error = %v", err)
+	}
+	if strings.Contains(stdout.String(), "planner ledger") {
+		t.Fatalf("doctor emitted planner ledger warning for final run status:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "doctor: ok") {
+		t.Fatalf("doctor output missing ok:\n%s", stdout.String())
 	}
 }
 
