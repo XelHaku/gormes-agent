@@ -813,15 +813,29 @@ a:focus-visible,
 }
 
 @media (max-width: 640px) {
+  /* Topbar collapses to a single row on mobile: brand on the left,
+     three nav anchors on the right. With only 3 short uppercase
+     mono items (Install / Roadmap / GitHub), they fit comfortably
+     next to "Gormes" even at 320px viewport. Removes ~30px of
+     vertical space the previous wrap row consumed. */
   .topbar-inner {
-    flex-wrap: wrap;
-    align-items: flex-start;
-    padding: 14px var(--pad);
+    flex-wrap: nowrap;
+    align-items: baseline;
+    padding: 10px var(--pad);
+    gap: 14px;
   }
   .topnav {
-    width: 100%;
-    justify-content: flex-start;
-    gap: 14px;
+    width: auto;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .topnav a {
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+  }
+  .brand {
+    font-size: 17px;
   }
   /* Mobile hero — tightened so headline + subhead + early-stage
      stamp + CTAs all fit above the fold on 360x800 phones. The
@@ -831,17 +845,15 @@ a:focus-visible,
      the headline larger on mobile than the desktop cap, which
      was the root cause of the v10 fold regression). */
   .hero-inner {
-    /* Topbar-to-headline stack tightened on mobile: 28px above the
-       kicker (was 44) so the topnav, kicker, and headline sit as
-       one compact unit instead of stretching to fill the upper
-       viewport. */
-    padding: 28px var(--pad) 32px;
+    /* Mobile top stack compacted to one tight unit: 20px above the
+       kicker (was 28→44 in earlier passes). Combined with the
+       single-row topbar above and a 6px kicker→headline gap below,
+       the entire topbar→kicker→headline cluster occupies ~80px
+       instead of ~140px. */
+    padding: 20px var(--pad) 32px;
   }
   .kicker {
-    /* Tighter gap to headline on mobile only — 10px (was 18) so
-       the kicker reads as a label attached to the title, not a
-       separate paragraph above it. */
-    margin-bottom: 10px;
+    margin-bottom: 6px;
   }
   .hero-title {
     margin-bottom: 14px;
