@@ -435,9 +435,9 @@
             },
             {
               "name": "WhatsApp reconnect backoff + send retry policy",
-              "status": "planned",
+              "status": "complete",
               "contract": "WhatsApp send failures use bounded reconnect/backoff semantics without duplicating terminal replies or hiding unresolved runtime state",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -466,7 +466,7 @@
                 "Reconnect exhaustion emits one visible terminal/degraded result, not duplicate sends.",
                 "Successful reconnect retries preserve the original raw peer and reply metadata."
               ],
-              "note": "TDD: after send gating lands, add fake-clock reconnect/retry fixtures that prove bounded retries and single terminal output without binding a real WhatsApp bridge or native client.",
+              "note": "Complete: TDD landed internal/channels/whatsapp/reconnect_contract_test.go with a fake-clock retry policy over the transport-neutral WhatsApp Bot. Fixtures prove bounded reconnect backoff, reconnect-pending/exhausted outbound status with the original normalized/raw target and send error, preservation of raw peer plus reply metadata across successful retries, and no synthetic duplicate terminal send on exhaustion.",
               "write_scope": [
                 "internal/channels/whatsapp/",
                 "internal/gateway/",
