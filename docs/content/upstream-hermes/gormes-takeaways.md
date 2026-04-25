@@ -209,6 +209,13 @@ Gormes should prove compatibility with behavior, not file structure.
 
 ## Latest Sync Lessons
 
+The 2026-04-25 upstream sync adds a narrow ContextCompressor regression:
+
+- `ContextCompressor.update_model()` must recalculate `threshold_tokens`,
+  `tail_token_budget`, and `max_summary_tokens` when a model switch changes
+  the context window. Gormes should port this as pure 4.B budget/status logic
+  before any message pruning, LLM summarization, or kernel mutation lands.
+
 The 2026-04-24 upstream sync adds several contract slices, not new monoliths:
 
 - Interrupted or cancelled turns must not flush partial observations into GONCHO or external Honcho-compatible memory.

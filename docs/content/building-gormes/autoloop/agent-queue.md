@@ -43,4 +43,25 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: BlueBubbles iMessage session-context prompt guidance
 - Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
 
+## 2. Compression token-budget trigger + summary sizing
+
+- Phase: 4 / 4.B
+- Owner: `provider`
+- Size: `small`
+- Status: `planned`
+- Priority: `P1`
+- Contract: Go context compression budget state recalculates threshold, tail, and summary token budgets whenever the active model context window changes
+- Trust class: operator, system
+- Ready when: ContextEngine interface + status tool contract is validated on main., Provider-enforced context-length resolver is validated on main., The implementation can be tested as pure internal/hermes budget logic with no live provider call.
+- Not ready when: The slice mutates kernel message history, calls a summarizer LLM, ports context references, or changes provider routing instead of only implementing compressor budget/status behavior.
+- Degraded mode: Context status reports compression disabled or unavailable instead of using stale budget values from a previous model window.
+- Fixture: `internal/hermes/context_compressor_budget_test.go`
+- Write scope: `internal/hermes/`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -count=1`
+- Done signal: internal/hermes/context_compressor_budget_test.go proves initialization and UpdateModelContext-style model switches recalculate threshold, tail, and max-summary budgets from the active context window.
+- Acceptance: Initializing the budget helper for a 200000-token context with threshold_percent=0.50 and summary_target_ratio=0.20 reports threshold_tokens=100000, tail_token_budget=20000, and max_summary_tokens=min(context_length*0.05, 12000)., Updating the active model context from 200000 tokens to 32000 tokens recalculates threshold_tokens, tail_token_budget, and max_summary_tokens from the new context length instead of preserving old budgets., Summary target ratio is clamped to the upstream 0.10-0.80 range and the threshold floor preserves MINIMUM_CONTEXT_LENGTH-equivalent behavior., The focused test mirrors Hermes TestUpdateModelBudgets without wiring compression into the kernel or requiring provider credentials.
+- Source refs: ../hermes-agent/agent/context_compressor.py@5401a008, ../hermes-agent/tests/agent/test_context_compressor.py@5401a008, docs/content/upstream-hermes/developer-guide/context-compression-and-caching.md, internal/hermes/context_engine.go, internal/hermes/model_context_resolver.go
+- Unblocks: Tool-result pruning + protected head/tail summary, Manual compression feedback + context references
+- Why now: Unblocks Tool-result pruning + protected head/tail summary, Manual compression feedback + context references.
+
 <!-- PROGRESS:END -->

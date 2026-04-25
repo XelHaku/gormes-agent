@@ -376,7 +376,8 @@
               "note": "Closeout: this umbrella was split into `WhatsApp outbound pairing gate + raw peer mapping` and `WhatsApp reconnect backoff + send retry policy`, and both split rows are validated complete with internal/channels/whatsapp send and reconnect fixtures. Do not reuse this row for future runtime work; add a new small row for any remaining WhatsApp drift.",
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-25T09:23:21Z"
+                "last_reshape": "2026-04-25T09:23:21Z",
+                "last_outcome": "no_attempts_yet"
               }
             },
             {
@@ -1855,7 +1856,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-25T09:23:21Z"
+                "last_reshape": "2026-04-25T09:23:21Z",
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -3238,8 +3240,63 @@
             },
             {
               "name": "Compression token-budget trigger + summary sizing",
+              "priority": "P1",
               "status": "planned",
-              "note": "TDD: port threshold calculation, context-length probing, summary token sizing, and ineffective-compression cooldown from `agent/context_compressor.py` with fixed token-count fixtures."
+              "contract": "Go context compression budget state recalculates threshold, tail, and summary token budgets whenever the active model context window changes",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Context status reports compression disabled or unavailable instead of using stale budget values from a previous model window.",
+              "fixture": "internal/hermes/context_compressor_budget_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/context_compressor.py@5401a008",
+                "../hermes-agent/tests/agent/test_context_compressor.py@5401a008",
+                "docs/content/upstream-hermes/developer-guide/context-compression-and-caching.md",
+                "internal/hermes/context_engine.go",
+                "internal/hermes/model_context_resolver.go"
+              ],
+              "ready_when": [
+                "ContextEngine interface + status tool contract is validated on main.",
+                "Provider-enforced context-length resolver is validated on main.",
+                "The implementation can be tested as pure internal/hermes budget logic with no live provider call."
+              ],
+              "not_ready_when": [
+                "The slice mutates kernel message history, calls a summarizer LLM, ports context references, or changes provider routing instead of only implementing compressor budget/status behavior."
+              ],
+              "unblocks": [
+                "Tool-result pruning + protected head/tail summary",
+                "Manual compression feedback + context references"
+              ],
+              "acceptance": [
+                "Initializing the budget helper for a 200000-token context with threshold_percent=0.50 and summary_target_ratio=0.20 reports threshold_tokens=100000, tail_token_budget=20000, and max_summary_tokens=min(context_length*0.05, 12000).",
+                "Updating the active model context from 200000 tokens to 32000 tokens recalculates threshold_tokens, tail_token_budget, and max_summary_tokens from the new context length instead of preserving old budgets.",
+                "Summary target ratio is clamped to the upstream 0.10-0.80 range and the threshold floor preserves MINIMUM_CONTEXT_LENGTH-equivalent behavior.",
+                "The focused test mirrors Hermes TestUpdateModelBudgets without wiring compression into the kernel or requiring provider credentials."
+              ],
+              "note": "Upstream Hermes 5401a008 fixed ContextCompressor.update_model after tail_token_budget and max_summary_tokens stayed calibrated to the old model window during model switches. Gormes already has the status boundary and provider-cap resolver, but no native compressor budget state, so this row is the first pure 4.B budget slice before message pruning or summarization lands.",
+              "write_scope": [
+                "internal/hermes/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -count=1"
+              ],
+              "done_signal": [
+                "internal/hermes/context_compressor_budget_test.go proves initialization and UpdateModelContext-style model switches recalculate threshold, tail, and max-summary budgets from the active context window."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-25T10:20:06Z"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:5401a008 agent/context_compressor.py",
+                "note": "Hermes defines the compressor budget behavior; Gormes must adapt it to Go-native ContextEngine budget/status code without importing Python runtime."
+              }
             },
             {
               "name": "Tool-result pruning + protected head/tail summary",
@@ -3251,7 +3308,12 @@
               "status": "planned",
               "note": "TDD: port `manual_compression_feedback.py` and `context_references.py` as separate read/write contracts so user-visible compression feedback and reference handles are testable without a provider call."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-25T10:23:07Z",
+            "origin_decision": "Hermes 5401a008 changed ContextCompressor.update_model to recalculate tail and max-summary budgets on model switches. Gormes has the Go ContextEngine status boundary and provider-cap resolver but no native compressor budget state, so compressor behavior remains upstream-led until the budget, pruning, and feedback slices land."
+          }
         },
         "4.C": {
           "name": "Native Prompt Builder",
@@ -4033,7 +4095,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-25T09:23:21Z"
+                "last_reshape": "2026-04-25T09:23:21Z",
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
