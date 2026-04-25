@@ -462,7 +462,7 @@ func BuildWorkerPromptWithBranch(candidate Candidate, branch string) string {
 		prompt.WriteString("\nWorker branch:\n")
 		fmt.Fprintf(&prompt, "- You are isolated on git branch %s.\n", branch)
 		prompt.WriteString("- After tests pass, stage and commit your changes on this branch (`git add -A && git commit -m \"...\"`).\n")
-		prompt.WriteString("- Leave the working tree clean when possible. If uncommitted changes remain, autoloop will checkpoint them before promotion.\n")
+		prompt.WriteString("- Leave the working tree clean. Autoloop refuses dirty worker output so scope leaks are visible instead of silently promoted.\n")
 		prompt.WriteString("- Do not switch branches, rebase, or push yourself.\n")
 	}
 
