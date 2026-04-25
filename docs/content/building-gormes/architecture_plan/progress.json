@@ -1488,9 +1488,9 @@
             },
             {
               "name": "Unauthorized DM pairing response contract",
-              "status": "planned",
+              "status": "complete",
               "contract": "Unknown direct-message users receive the configured deny, pair, or ignore response without leaking authorized-session state",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1513,16 +1513,13 @@
               "not_ready_when": [
                 "The slice changes code generation, reads live platform SDKs, or starts agent sessions for unknown direct-message users."
               ],
-              "blocked_by": [
-                "Pairing approval + rate-limit semantics"
-              ],
               "acceptance": [
                 "Configured deny mode sends a deterministic denial without creating a session.",
                 "Configured pair mode sends one bounded pairing prompt and records pending state.",
                 "Configured ignore mode produces no platform reply and no agent run.",
                 "Group/channel unauthorized messages stay silent unless a future platform-specific row explicitly opts into group pairing."
               ],
-              "note": "TDD-ready after pairing approval lands: keep this as a shared gateway policy slice over fake channels and the Go pairing store. Do not edit adapter transports or widen pairing prompts into groups.",
+              "note": "TDD landed: internal/gateway.HandleUnauthorizedDM now freezes the shared unknown-DM policy over fake channels and PairingStore: deny mode sends a deterministic public denial and records allowlist-denied evidence, pair mode emits one bounded approval prompt while pending/rate-limited state stays in pairing.json, ignore mode stays silent, and group/channel unauthorized messages do not reply or start agent sessions.",
               "write_scope": [
                 "internal/gateway/authorization.go",
                 "internal/gateway/unauthorized_dm_test.go",
@@ -1536,6 +1533,16 @@
               ],
               "done_signal": [
                 "Unauthorized-DM fixtures prove deny, pair, and ignore modes never start an agent session for unknown users."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T13:16:16Z",
+                "last_success": "2026-04-25T13:16:16Z"
+              },
+              "completed_files": [
+                "internal/gateway/authorization.go",
+                "internal/gateway/unauthorized_dm_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "planner_verdict": {
                 "reshape_count": 1,
