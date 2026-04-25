@@ -27,6 +27,11 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 		"Rerun the installer to update the managed Gormes checkout.",
 		"Why Hermes breaks in production — and how Gormes fixes it.",
 		"What works today, and what&#39;s still being wired up.",
+		// Favicons + social-card meta tags rendered in <head>.
+		`href="/static/favicon.ico"`,
+		`href="/static/apple-touch-icon.png"`,
+		`property="og:image" content="https://gormes.ai/static/social-card.png"`,
+		`name="twitter:card" content="summary_large_image"`,
 		// Structural roadmap checks — no exact counts or item names,
 		// those come from progress.json and must not be locked in here.
 		"roadmap-status-progress",
@@ -92,6 +97,28 @@ func TestExportDir_WritesStaticSite(t *testing.T) {
 	}
 	if !strings.Contains(string(css), "--bg-0") {
 		t.Fatalf("site.css missing --bg-0 design token")
+	}
+
+	// Favicon set + OG social card must land in dist/static/. Guarding
+	// against regressions in the embed list — if a new icon is added it
+	// has to flow through ExportDir too.
+	for _, asset := range []string{
+		"favicon.ico",
+		"favicon-16x16.png",
+		"favicon-32x32.png",
+		"apple-touch-icon.png",
+		"android-chrome-192x192.png",
+		"android-chrome-512x512.png",
+		"social-card.png",
+	} {
+		path := filepath.Join(root, "static", asset)
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("static export missing %s: %v", asset, err)
+		}
+		if info.Size() == 0 {
+			t.Fatalf("static export %s is empty", asset)
+		}
 	}
 
 	installBody, err := os.ReadFile(filepath.Join(root, "install.sh"))

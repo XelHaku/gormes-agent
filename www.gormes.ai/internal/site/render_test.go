@@ -74,6 +74,21 @@ func TestRenderIndex_RendersRedesignedLanding(t *testing.T) {
 		`<a href="https://docs.gormes.ai/">docs.gormes.ai →</a>`,
 		// CSS link
 		`href="/static/site.css"`,
+		// Favicons — full set wired into <head>.
+		`href="/static/favicon.ico"`,
+		`href="/static/favicon-16x16.png"`,
+		`href="/static/favicon-32x32.png"`,
+		`href="/static/apple-touch-icon.png"`,
+		// Open Graph + Twitter cards. Asserts the property/name keys
+		// and the canonical URL/image so social previews stay healthy.
+		`property="og:type" content="website"`,
+		`property="og:site_name" content="Gormes"`,
+		`property="og:url" content="https://gormes.ai/"`,
+		`property="og:image" content="https://gormes.ai/static/social-card.png"`,
+		`property="og:image:width" content="1200"`,
+		`property="og:image:height" content="630"`,
+		`name="twitter:card" content="summary_large_image"`,
+		`name="twitter:image" content="https://gormes.ai/static/social-card.png"`,
 	}
 	rejects := []string{
 		"Run Hermes Through a Go Operator Console.",

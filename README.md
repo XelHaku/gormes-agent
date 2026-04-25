@@ -47,9 +47,7 @@ and reapplied. No Python, no virtualenv, no dependency drift.
 
 ## What Gormes Is
 
-Gormes is a Go-native rewrite of [Hermes Agent](https://github.com/NousResearch/hermes-agent)'s runtime infrastructure. It started as an independent Go port of Hermes's architecture (with upstream Git history preserved for attribution) and is being rebuilt around a single static binary and Gormes-native runtime boundaries.
-
-Gormes began as an independent Go port/rework of ideas and architecture from Hermes-Agent, with upstream Git history preserved for attribution.
+Gormes is a Go-native rewrite of [Hermes Agent](https://github.com/NousResearch/hermes-agent)'s runtime infrastructure. It started as an independent Go port of ideas and architecture from Hermes-Agent, with upstream Git history preserved for attribution, and is being rebuilt around a single static binary and Gormes-native runtime boundaries.
 
 **Gormes solves an operations problem, not an AI problem.** The thesis isn't "smarter agents." It's agents that survive deployment, don't crash mid-stream, and don't break when a Python dependency drifts on a host you SSH into six months from now.
 
