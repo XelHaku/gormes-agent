@@ -28,6 +28,7 @@ type ContextBundle struct {
 	SourceRoots             []SourceRoot            `json:"source_roots"`
 	SyncResults             []RepoSyncResult        `json:"sync_results,omitempty"`
 	ImplementationInventory ImplementationInventory `json:"implementation_inventory"`
+	AutoloopAudit           AutoloopAudit           `json:"autoloop_audit"`
 }
 
 type ProgressInfo struct {
@@ -71,6 +72,11 @@ func CollectContext(cfg Config, now time.Time) (ContextBundle, error) {
 		return ContextBundle{}, err
 	}
 
+	audit, err := SummarizeAutoloopAudit(autoloopLedgerPath(cfg), 7*24*time.Hour, now)
+	if err != nil {
+		return ContextBundle{}, err
+	}
+
 	return ContextBundle{
 		GeneratedUTC:            now.UTC().Format(time.RFC3339),
 		RepoRoot:                cfg.RepoRoot,
@@ -78,7 +84,15 @@ func CollectContext(cfg Config, now time.Time) (ContextBundle, error) {
 		ProgressStats:           progressInfo,
 		SourceRoots:             roots,
 		ImplementationInventory: inventory,
+		AutoloopAudit:           audit,
 	}, nil
+}
+
+func autoloopLedgerPath(cfg Config) string {
+	if cfg.AutoloopRunRoot == "" {
+		return ""
+	}
+	return filepath.Join(cfg.AutoloopRunRoot, "state", "runs.jsonl")
 }
 
 func writeContext(path string, bundle ContextBundle) error {

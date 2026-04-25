@@ -22,6 +22,9 @@ func TestConfigFromEnvDefaultsToArchitecturePlannerPaths(t *testing.T) {
 	if cfg.RunRoot != filepath.Join(root, ".codex", "architecture-planner") {
 		t.Fatalf("RunRoot = %q", cfg.RunRoot)
 	}
+	if cfg.AutoloopRunRoot != filepath.Join(root, ".codex", "orchestrator") {
+		t.Fatalf("AutoloopRunRoot = %q", cfg.AutoloopRunRoot)
+	}
 	if cfg.Backend != "codexu" {
 		t.Fatalf("Backend = %q, want codexu", cfg.Backend)
 	}
@@ -34,13 +37,14 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 	root := filepath.Join("tmp", "repo")
 
 	cfg, err := ConfigFromEnv(root, map[string]string{
-		"PROGRESS_JSON": "/tmp/progress.json",
-		"RUN_ROOT":      "/tmp/planner",
-		"BACKEND":       "claudeu",
-		"MODE":          "full",
-		"HERMES_DIR":    "/tmp/hermes",
-		"GBRAIN_DIR":    "/tmp/gbrain",
-		"HONCHO_DIR":    "/tmp/honcho",
+		"PROGRESS_JSON":     "/tmp/progress.json",
+		"RUN_ROOT":          "/tmp/planner",
+		"AUTOLOOP_RUN_ROOT": "/tmp/autoloop",
+		"BACKEND":           "claudeu",
+		"MODE":              "full",
+		"HERMES_DIR":        "/tmp/hermes",
+		"GBRAIN_DIR":        "/tmp/gbrain",
+		"HONCHO_DIR":        "/tmp/honcho",
 	})
 	if err != nil {
 		t.Fatalf("ConfigFromEnv() error = %v", err)
@@ -51,6 +55,9 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 	}
 	if cfg.RunRoot != "/tmp/planner" {
 		t.Fatalf("RunRoot = %q", cfg.RunRoot)
+	}
+	if cfg.AutoloopRunRoot != "/tmp/autoloop" {
+		t.Fatalf("AutoloopRunRoot = %q", cfg.AutoloopRunRoot)
 	}
 	if cfg.Backend != "claudeu" {
 		t.Fatalf("Backend = %q", cfg.Backend)

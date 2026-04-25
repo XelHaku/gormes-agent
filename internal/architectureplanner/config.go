@@ -6,19 +6,20 @@ import (
 )
 
 type Config struct {
-	RepoRoot      string
-	ProgressJSON  string
-	RunRoot       string
-	Backend       string
-	Mode          string
-	HermesDir     string
-	GBrainDir     string
-	HonchoDir     string
-	HermesRepoURL string
-	GBrainRepoURL string
-	HonchoRepoURL string
-	Validate      bool
-	SyncRepos     bool
+	RepoRoot        string
+	ProgressJSON    string
+	RunRoot         string
+	AutoloopRunRoot string
+	Backend         string
+	Mode            string
+	HermesDir       string
+	GBrainDir       string
+	HonchoDir       string
+	HermesRepoURL   string
+	GBrainRepoURL   string
+	HonchoRepoURL   string
+	Validate        bool
+	SyncRepos       bool
 }
 
 func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
@@ -28,19 +29,20 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 
 	parent := filepath.Dir(repoRoot)
 	cfg := Config{
-		RepoRoot:      repoRoot,
-		ProgressJSON:  filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"),
-		RunRoot:       filepath.Join(repoRoot, ".codex", "architecture-planner"),
-		Backend:       "codexu",
-		Mode:          "safe",
-		HermesDir:     filepath.Join(parent, "hermes-agent"),
-		GBrainDir:     filepath.Join(parent, "gbrain"),
-		HonchoDir:     filepath.Join(parent, "honcho"),
-		HermesRepoURL: "https://github.com/NousResearch/hermes-agent.git",
-		GBrainRepoURL: "https://github.com/garrytan/gbrain.git",
-		HonchoRepoURL: "https://github.com/plastic-labs/honcho",
-		Validate:      true,
-		SyncRepos:     true,
+		RepoRoot:        repoRoot,
+		ProgressJSON:    filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"),
+		RunRoot:         filepath.Join(repoRoot, ".codex", "architecture-planner"),
+		AutoloopRunRoot: filepath.Join(repoRoot, ".codex", "orchestrator"),
+		Backend:         "codexu",
+		Mode:            "safe",
+		HermesDir:       filepath.Join(parent, "hermes-agent"),
+		GBrainDir:       filepath.Join(parent, "gbrain"),
+		HonchoDir:       filepath.Join(parent, "honcho"),
+		HermesRepoURL:   "https://github.com/NousResearch/hermes-agent.git",
+		GBrainRepoURL:   "https://github.com/garrytan/gbrain.git",
+		HonchoRepoURL:   "https://github.com/plastic-labs/honcho",
+		Validate:        true,
+		SyncRepos:       true,
 	}
 
 	if value := env["PROGRESS_JSON"]; value != "" {
@@ -48,6 +50,9 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 	}
 	if value := env["RUN_ROOT"]; value != "" {
 		cfg.RunRoot = value
+	}
+	if value := env["AUTOLOOP_RUN_ROOT"]; value != "" {
+		cfg.AutoloopRunRoot = value
 	}
 	if value := env["BACKEND"]; value != "" {
 		cfg.Backend = value
