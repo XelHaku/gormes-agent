@@ -2101,6 +2101,11 @@
               "done_signal": [
                 "Session metadata fixtures prove legacy memory_flushed records migrate to expiry_finalized and new writes contain no hidden memory-flush fields."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 gateway/session.py",
@@ -2110,9 +2115,9 @@
             {
               "name": "Session expiry hook cleanup retry evidence",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway expiry finalization invokes hook and cached-agent cleanup exactly once per expired session, with bounded retry/give-up evidence and no memory flush task",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -2143,7 +2148,7 @@
                 "Transient finalize failures retry for three fake-clock attempts and then mark gave-up evidence so the gateway cannot spin forever.",
                 "Resume/switch-session fixtures prove no memory flush task or Goncho/Honcho extractor is started before switching sessions."
               ],
-              "note": "Second half of the expiry split. Keep hook cleanup retry policy separate from metadata migration so autoloop workers can land one fake-clock fixture set at a time.",
+              "note": "Complete: TDD landed a gateway session-expiry finalization sweep with fakeable scanner/finalizer seams, one-shot successful on_session_finalize-style hooks plus cached-agent cleanup, persisted expiry_finalized metadata across reload, three-attempt retry/give-up evidence in metadata and runtime status, and submit fixtures proving no memory flush, Goncho, or Honcho work is launched on resumed finalized sessions.",
               "write_scope": [
                 "internal/gateway/",
                 "internal/session/",
@@ -4160,6 +4165,11 @@
               "done_signal": [
                 "Codex Responses role-content fixtures prove assistant list-content replay uses output_text while user list-content remains input_text."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 agent/codex_responses_adapter.py",
@@ -5418,6 +5428,11 @@
               "done_signal": [
                 "Kernel interrupt retry fixtures prove cancel-before-retry, context-cancel-during-backoff, no-cancel retry recovery, and interrupted memory-sync suppression."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:7c17accb run_agent.py",
@@ -6633,6 +6648,11 @@
               "done_signal": [
                 "Oneshot output fixtures prove one fake kernel turn, stdout-only final content, stderr-only setup failures, and no TUI/gateway/provider startup."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 hermes_cli/oneshot.py",
@@ -6642,9 +6662,9 @@
             {
               "name": "Oneshot noninteractive safety and clarify policy",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "One-shot mode resolves clarify-style prompts and dangerous-command/hook approvals deterministically without hanging or silently widening Gormes safety defaults",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -6677,7 +6697,7 @@
                 "Any bypass flag or future approval mode is fixture-locked as operator-local only and is never enabled for gateway or child-agent trust classes.",
                 "The existing final-output fixtures remain green so safety evidence does not leak into stdout."
               ],
-              "note": "Second half of oneshot execution. Keep policy decisions out of the stdout boundary slice so workers do not mix CLI output plumbing with tool-safety semantics.",
+              "note": "Complete: TDD landed cmd/gormes/oneshot_safety_test.go plus a kernel-level oneshot ToolSafety policy. Fake-provider fixtures prove clarify calls return deterministic noninteractive clarify_unavailable tool results, dangerous execute_code approval requests are blocked before fake tool execution with dangerous_command_blocked audit evidence, approval-bypass policy is operator-local only, and existing final-output fixtures keep safety evidence out of stdout.",
               "write_scope": [
                 "cmd/gormes/main.go",
                 "cmd/gormes/oneshot_safety_test.go",
@@ -6694,6 +6714,11 @@
               "done_signal": [
                 "Oneshot safety fixtures prove clarify/noninteractive behavior, dangerous-command audit evidence, trust-class boundaries, and no stdout contamination."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T18:05:57Z",
+                "last_success": "2026-04-25T18:05:57Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 hermes_cli/oneshot.py",
@@ -6883,6 +6908,11 @@
               "done_signal": [
                 "RestartSec parser fixtures prove bounded duration parsing, default/malformed evidence, and no live service-manager dependency."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:55:55Z",
+                "last_success": "2026-04-25T17:55:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:648b8991 hermes_cli/main.py",
@@ -6892,9 +6922,9 @@
             {
               "name": "Service restart active-status poller",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Update and service-management flows poll fake active status through the RestartSec cooldown window before reporting restarted, timeout, or crashed evidence",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -6926,7 +6956,7 @@
                 "Fixtures distinguish active-after-delay, active-after-RestartSec, timeout, missing service manager, malformed RestartUSec fallback, and crashed-after-restart outcomes with operator-readable evidence.",
                 "Tests run without live systemd, Windows service control, root privileges, or network access."
               ],
-              "note": "Second half of the restart-polling split. Keep the fake-runner polling state machine independent from parser and installer policy work.",
+              "note": "Complete: TDD added a pure internal/cli active-status poller with injected fake runner and fake clock. Fixtures cover hard-restart 10s polling, RestartSec-aware max(10s, parsed delay + 10s) cooldown polling at 500ms intervals, timeout evidence, service-manager unavailable evidence, malformed RestartUSec fallback, and crashed-after-restart retry evidence without live systemctl/sc.exe, installer layout changes, gateway restart semantics, setup/auth ports, root privileges, or network access.",
               "write_scope": [
                 "internal/cli/service_restart.go",
                 "internal/cli/service_restart_poll_test.go",

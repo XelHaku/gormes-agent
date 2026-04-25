@@ -37,12 +37,12 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 35/74 subphases shipped · 15 in progress · 24 planned
+**Overall:** 36/74 subphases shipped · 14 in progress · 24 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 15/20 subphases |
+| Phase 2 — The Gateway | 🔨 | 16/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
@@ -185,7 +185,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Hook manifest discovery + handler loading
 - [x] Built-in BOOT.md startup hook
 
-### 2.F.3 — Restart / Pairing / Status 🔨
+### 2.F.3 — Restart / Pairing / Status ✅
 
 - [x] Graceful restart drain + managed shutdown
 - [x] Adapter startup failure cleanup contract
@@ -199,7 +199,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Token-scoped gateway locks
 - [x] Gateway /restart command + takeover markers
 - [x] Session expiry finalized-flag migration
-- [ ] Session expiry hook cleanup retry evidence
+- [x] Session expiry hook cleanup retry evidence
 - [x] Channel lifecycle writers into status model
 
 ### 2.F.4 — Home Channel + Operator Surfaces ⏳
@@ -520,12 +520,12 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Config, profile, auth, and setup command surfaces
 - [x] Top-level oneshot flag and model/provider resolver
 - [x] Oneshot final-output writer boundary
-- [ ] Oneshot noninteractive safety and clarify policy
+- [x] Oneshot noninteractive safety and clarify policy
 - [x] Platform toolset config persistence + MCP sentinel
 - [x] Effective toolset picker dedupes bundled plugin keys
 - [ ] Gateway, platform, webhook, and cron management CLI
 - [x] Service RestartSec parser helper
-- [ ] Service restart active-status poller
+- [x] Service restart active-status poller
 - [ ] Diagnostics, backup, logs, and status CLI
 
 ### 5.P — Docker / Packaging ⏳

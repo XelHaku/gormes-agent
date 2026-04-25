@@ -534,8 +534,8 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	if lifecycle.Priority != "P2" {
 		t.Fatalf("Phase 2.F.3 priority = %q, want P2", lifecycle.Priority)
 	}
-	if got := lifecycle.DerivedStatus(); got != StatusInProgress {
-		t.Fatalf("Phase 2.F.3 = %q, want in_progress", got)
+	if got := lifecycle.DerivedStatus(); got != StatusComplete {
+		t.Fatalf("Phase 2.F.3 = %q, want complete", got)
 	}
 	lifecycleItems := itemsByName(lifecycle.Items)
 	drain := lifecycleItems["Graceful restart drain + managed shutdown"]
@@ -788,6 +788,18 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	}
 	if restartMarkers.Health != nil && restartMarkers.Health.LastSuccess != "" {
 		t.Fatalf("Phase 2.F.3 restart markers health.LastSuccess = %q, want empty until full-suite gate passes", restartMarkers.Health.LastSuccess)
+	}
+	expiryHooks := lifecycleItems["Session expiry hook cleanup retry evidence"]
+	if expiryHooks.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 expiry hook cleanup status = %q, want complete", expiryHooks.Status)
+	}
+	if expiryHooks.ContractStatus != ContractStatusValidated {
+		t.Fatalf("Phase 2.F.3 expiry hook cleanup contract status = %q, want validated", expiryHooks.ContractStatus)
+	}
+	if !strings.Contains(expiryHooks.Note, "session-expiry finalization sweep") ||
+		!strings.Contains(expiryHooks.Note, "three-attempt retry/give-up evidence") ||
+		!strings.Contains(expiryHooks.Note, "no memory flush") {
+		t.Fatalf("Phase 2.F.3 expiry hook cleanup note = %q, want finalized retry/no-memory-flush evidence", expiryHooks.Note)
 	}
 	lifecycleWriters := lifecycleItems["Channel lifecycle writers into status model"]
 	if lifecycleWriters.Status != StatusComplete {

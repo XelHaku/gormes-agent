@@ -29,7 +29,7 @@ weight: 30
 | **Phase 2.G — OS-AI Spine: Skills Runtime** | ✅ complete | **P0** | Static skills runtime and the first reviewed learning-loop proof are in-tree: validated `SKILL.md` parsing, active-store snapshots, deterministic selection + prompt rendering, kernel injection, append-only usage logging, delegated candidate drafting into the inactive store, and explicit promotion into the active store. |
 | Phase 2.F.1 — Slash Command Registry + Gateway Dispatch | ✅ complete | P1 | Canonical command registry now drives gateway parsing, help text, Telegram menus, and Slack subcommand exposure from one shared source of truth |
 | Phase 2.F.2 — Hook Registry + BOOT.md | ✅ complete | P2 | Shared gateway lifecycle hooks, live `HOOK.yaml` command loading, and the built-in `BOOT.md` startup hook with non-blocking failure semantics are landed |
-| Phase 2.F.3 — Restart / Pairing / Status | 🔨 in progress | P2 | Graceful shutdown drain, adapter startup cleanup, active-turn follow-up queuing, pairing persistence/approval, unauthorized-DM responses, and channel lifecycle status writes are landed. The executable order is now drain-timeout `resume_pending` recovery plus read-only `gormes gateway status`, then runtime-status PID validation, token-scoped credential locks, and `/restart` takeover markers |
+| Phase 2.F.3 — Restart / Pairing / Status | ✅ complete | P2 | Graceful shutdown drain, adapter startup cleanup, active-turn follow-up queuing, drain-timeout `resume_pending` recovery, pairing persistence/approval, unauthorized-DM responses, read-only `gormes gateway status`, runtime-status PID validation, token-scoped credential locks, `/restart` takeover markers, session-expiry finalization evidence, and channel lifecycle status writes are landed |
 | Phase 2.F.4 — Home Channel + Operator Surfaces | ⏳ planned | P3 | Home-channel rules, notify-to routing, manager remember-source, channel-directory persistence/lookup, refresh/stale-target invalidation, mirror surfaces, and sticker-cache equivalents |
 | Phase 2.F.5 — Gateway Mid-Run Steering + Active-Turn Policy | ⏳ planned | P2 | `/steer` CommandDef + queue fallback, mid-run steer injection between tool calls, and a gateway-handled slash-command bypass of the active-session guard; depends on 2.E.2 concurrent-tool cancellation for safe mid-run fan-out |
 
@@ -79,28 +79,22 @@ for cron/subagent replay without importing the whole Minions queue.
 
 ## TDD Priority Queue
 
-Phase 2 is no longer just "ship more adapters." The backlog is now dominated by cross-cutting contracts that future adapters depend on. The execution order is:
+Phase 2 is no longer just "ship more adapters." The remaining backlog is dominated by cross-cutting contracts that future adapters depend on. The execution order is:
 
 1. **P1 — 2.B.3 Slack gateway.Channel shim**
    The parser row is complete: Slack message ingress calls `gateway.ParseInboundText`, help renders `gateway.GatewayHelpLines`, and slash-command envelopes are forwarded as shared parser text. Next, adapt the existing Socket Mode bot to the `gateway.Channel`/`Manager` lifecycle without changing config registration.
-2. **P2 — 2.F.3 drain-timeout `resume_pending` recovery**
-   Freeze the restart/shutdown drain-timeout read model as a fake-clock gateway/session fixture before richer restart UX. Only in-flight sessions get `resume_pending`; hard suspended or stuck states must override it.
-3. **P2 — 2.F.3 read-only `gormes gateway status`**
-   Add the command as a pure view over configured channels, pairing status, and runtime status. The command must not open Telegram, Discord, Slack, memory, provider, or session-map clients.
-4. **P2 — 2.F.3 runtime convergence after status readout**
-   After the status command lands, port runtime-status JSON/PID validation, then token-scoped credential locks, then `/restart` takeover/dedup markers. This keeps status rendering, stale-process detection, credential locks, and service restart semantics from colliding.
-5. **P2 — 2.B.3 Slack config + cmd/gormes registration**
+2. **P2 — 2.B.3 Slack config + cmd/gormes registration**
    Register Slack in `cmd/gormes gateway` only after the Channel shim is green; config and doctor/status tests should use fake Slack clients and keep Telegram/Discord-only startup unchanged.
-6. **P3 — 2.B.11 Discord SessionSource metadata**
+3. **P3 — 2.B.11 Discord SessionSource metadata**
    Port Hermes `b35d692f` source fields (`guild_id`, `parent_chat_id`, `message_id`) through `InboundEvent`, `SessionSource`, and session-context rendering before media polish or Discord tool/admin rows rely on current-server/current-message IDs. This is source metadata only; keep send behavior and REST/tool handlers out of the slice.
-7. **P3 — 2.F.4 Home Channel + Operator Surfaces**
+4. **P3 — 2.F.4 Home Channel + Operator Surfaces**
    Keep this decomposed: home-channel ownership rules, notify-to delivery routing, manager remember-source, channel-directory persistence/lookup, refresh/stale-target invalidation, then mirror/sticker-cache surfaces.
-8. **P1 — closed 2.B.4 WhatsApp contract closeout**
+5. **P1 — closed 2.B.4 WhatsApp contract closeout**
    `NormalizeInbound`, `DecideRuntime`, identity/self-chat guards, outbound pairing gates, raw peer mapping, and reconnect/send retry contracts are landed. Do not reopen the umbrella row for live bridge/native startup or QR UX; add a new small Phase 7/backlog row with explicit transport scope if upstream drift requires it.
-9. **P7 — paused channel backlog**
+6. **P7 — paused channel backlog**
    Signal, Email/SMS, Matrix/Mattermost, Webhook, BlueBubbles/HomeAssistant, Feishu, DingTalk, and QQ stay in Phase 7 until Telegram, Discord, Slack, WhatsApp, and WeChat are stable. Keep the backlog split into platform seams before client/bootstrap code: Signal transport, Matrix/Mattermost bot seams and clients, Feishu transport plus Drive-comment rules/replies, DingTalk real SDK binding, and QQ transport/bootstrap.
 
-The subagent runtime, shared gateway chassis, reviewed procedural skill runtime, session-context routing, and registry-backed slash command layer now exist as stable substrates. The next leverage move is freezing the operator/runtime read models and closing the priority channel set before widening adapter-specific runtime slices.
+The subagent runtime, shared gateway chassis, reviewed procedural skill runtime, session-context routing, registry-backed slash command layer, and operator/runtime read models now exist as stable substrates. The next leverage move is closing the priority channel set and the home/operator surfaces before widening adapter-specific runtime slices.
 
 ## Operator Automation Notes
 
