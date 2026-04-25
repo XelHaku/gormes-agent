@@ -260,7 +260,7 @@ func TestLoad_RealFile_Phase2Ledger(t *testing.T) {
 		"Slack Socket Mode adapter":                      StatusComplete,
 		"Thread routing + coalesced reply flow":          StatusComplete,
 		"Slack CommandRegistry parser wiring":            StatusComplete,
-		"Slack gateway.Channel adapter shim":             StatusPlanned,
+		"Slack gateway.Channel adapter shim":             StatusComplete,
 		"Slack config + cmd/gormes gateway registration": StatusPlanned,
 	} {
 		if got := slackItems[name]; got != want {
@@ -732,11 +732,11 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 		t.Fatalf("Phase 2.F.3 pairing approval note = %q, want PairingStore/rate-limit/lockout detail", approval.Note)
 	}
 	statusReadout := lifecycleItems["`gormes gateway status` read-only command"]
-	if statusReadout.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 gateway status readout status = %q, want planned", statusReadout.Status)
+	if statusReadout.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 gateway status readout status = %q, want complete", statusReadout.Status)
 	}
-	if statusReadout.ContractStatus != ContractStatusFixtureReady {
-		t.Fatalf("Phase 2.F.3 gateway status readout contract status = %q, want fixture_ready", statusReadout.ContractStatus)
+	if statusReadout.ContractStatus != ContractStatusValidated {
+		t.Fatalf("Phase 2.F.3 gateway status readout contract status = %q, want validated", statusReadout.ContractStatus)
 	}
 	if !strings.Contains(statusReadout.Contract, "gormes gateway status") ||
 		!strings.Contains(strings.Join(statusReadout.Acceptance, "\n"), "configured channels") {

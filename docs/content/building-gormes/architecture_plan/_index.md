@@ -103,7 +103,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Slack Socket Mode adapter
 - [x] Thread routing + coalesced reply flow
 - [x] Slack CommandRegistry parser wiring
-- [ ] Slack gateway.Channel adapter shim
+- [x] Slack gateway.Channel adapter shim
 - [ ] Slack config + cmd/gormes gateway registration
 
 ### 2.B.4 — WhatsApp Adapter ✅
@@ -190,11 +190,11 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Graceful restart drain + managed shutdown
 - [x] Adapter startup failure cleanup contract
 - [x] Active-turn follow-up queue + late-arrival drain policy
-- [ ] Drain-timeout resume_pending recovery
+- [x] Drain-timeout resume_pending recovery
 - [x] Pairing read-model schema + atomic persistence
 - [x] Pairing approval + rate-limit semantics
 - [x] Unauthorized DM pairing response contract
-- [ ] `gormes gateway status` read-only command
+- [x] `gormes gateway status` read-only command
 - [ ] Runtime status JSON + PID/process validation
 - [ ] Token-scoped gateway locks
 - [ ] Gateway /restart command + takeover markers

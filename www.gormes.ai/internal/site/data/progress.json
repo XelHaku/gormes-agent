@@ -505,9 +505,9 @@
             },
             {
               "name": "Slack gateway.Channel adapter shim",
-              "status": "planned",
+              "status": "complete",
               "contract": "Slack Socket Mode can run under the shared gateway.Manager through a narrow gateway.Channel shim without replacing the existing Slack client or reply fixtures",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -538,7 +538,7 @@
                 "Send posts plain text to the correct Slack channel/thread and returns the Slack timestamp as msgID without opening a real Slack connection in tests.",
                 "Existing internal/slack bot/coalescing tests stay green, proving the shim did not rewrite the current standalone behavior."
               ],
-              "note": "TDD: adapt internal/slack onto the gateway.Channel interface and Manager lifecycle without rewriting the existing Socket Mode client or coalesced reply tests.",
+              "note": "TDD landed: internal/slack.Channel implements gateway.Channel on the existing Slack Client seam, translates Slack events into gateway.InboundEvent for Manager ingress, posts sends through Slack channel/thread timestamps, and preserves standalone Slack bot parser/coalescing behavior.",
               "write_scope": [
                 "internal/slack/",
                 "internal/gateway/",
@@ -1500,9 +1500,9 @@
             {
               "name": "Drain-timeout resume_pending recovery",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway restart/shutdown drain timeouts preserve resumable session identity and inject a reason-aware resume note on the next turn without overriding hard-stuck or suspended state",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1535,7 +1535,7 @@
                 "Hard suspended, cancelled, or stuck-loop state takes precedence over resume_pending and emits explicit non-resumable evidence.",
                 "Late-arrival queued follow-ups keep FIFO ordering and do not create a second resume note."
               ],
-              "note": "TDD: add the smallest gateway/session read-model fixture for drain-timeout resume_pending. Keep restart service control, PID validation, token locks, and status command output out of this slice.",
+              "note": "TDD landed: drain-timeout resume_pending fixtures preserve the running session identity with source/reason/timestamp evidence, inject exactly one restart/shutdown-aware resume note on the next accepted turn, clear the marker after handoff, preserve queued follow-up FIFO order, and let suspended/cancelled/stuck-loop non-resumable evidence override resume recovery without touching restart service control, PID validation, token locks, or status CLI rendering.",
               "write_scope": [
                 "internal/gateway/",
                 "internal/session/",
@@ -1762,9 +1762,9 @@
             {
               "name": "`gormes gateway status` read-only command",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "A read-only `gormes gateway status` command renders configured channels, pairing state, and runtime lifecycle from stores without starting transports or agent sessions",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1797,7 +1797,7 @@
                 "Configured Telegram/Discord/Slack rows can render running, stopped, failed, paired, pending, approved, and degraded pairing evidence from fake stores.",
                 "Focused command tests prove status execution does not construct real channel clients, session maps, memory stores, providers, or gateway.Manager."
               ],
-              "note": "A previous worker produced an unpromoted branch for this row, but current main lacks the files. Keep the row planned and fixture-ready until cmd/gormes/gateway_status.go and a pure status renderer are present on main.",
+              "note": "TDD landed: cmd/gormes gateway status now renders configured gateway channels through a pure internal/gateway status view over PairingStatus and RuntimeStatus snapshots, reports no-channel and missing runtime/pairing evidence without falling through to gateway startup, and command tests prove bogus Telegram/Discord credentials do not construct transports, session maps, memory stores, providers, or gateway.Manager.",
               "write_scope": [
                 "cmd/gormes/",
                 "internal/gateway/",
