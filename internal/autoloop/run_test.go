@@ -12,13 +12,13 @@ func TestDryRunSelectsCandidatesWithoutRunningBackend(t *testing.T) {
 	progressPath := writeProgressJSON(t, `{
 		"phases": {
 			"12": {
-				"subphases": {
+					"subphases": {
 					"12.A": {
-						"items": [
-							{"item_name": "planned run candidate", "status": "planned"}
-						]
+							"items": [
+								{"item_name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
+							]
+						}
 					}
-				}
 			}
 		}
 	}`)
@@ -40,7 +40,7 @@ func TestDryRunSelectsCandidatesWithoutRunningBackend(t *testing.T) {
 	}
 
 	wantSelected := []Candidate{
-		{PhaseID: "12", SubphaseID: "12.A", ItemName: "planned run candidate", Status: "planned"},
+		{PhaseID: "12", SubphaseID: "12.A", ItemName: "planned run candidate", Status: "planned", Contract: "run contract", ContractStatus: "draft"},
 	}
 	if summary.Candidates != 1 {
 		t.Fatalf("Candidates = %d, want 1", summary.Candidates)
@@ -57,22 +57,22 @@ func TestDryRunSkipsCandidatesAboveConfiguredMaxPhase(t *testing.T) {
 	progressPath := writeProgressJSON(t, `{
 		"phases": {
 			"3": {
-				"subphases": {
+					"subphases": {
 					"3.E": {
-						"items": [
-							{"item_name": "phase 3 candidate", "status": "planned"}
-						]
+							"items": [
+								{"item_name": "phase 3 candidate", "status": "planned", "contract": "phase 3 contract", "contract_status": "draft"}
+							]
+						}
 					}
-				}
 			},
 			"4": {
-				"subphases": {
+					"subphases": {
 					"4.A": {
-						"items": [
-							{"item_name": "phase 4 active candidate", "status": "in_progress"}
-						]
+							"items": [
+								{"item_name": "phase 4 active candidate", "status": "in_progress", "contract": "phase 4 contract"}
+							]
+						}
 					}
-				}
 			}
 		}
 	}`)
@@ -93,7 +93,7 @@ func TestDryRunSkipsCandidatesAboveConfiguredMaxPhase(t *testing.T) {
 	}
 
 	wantSelected := []Candidate{
-		{PhaseID: "3", SubphaseID: "3.E", ItemName: "phase 3 candidate", Status: "planned"},
+		{PhaseID: "3", SubphaseID: "3.E", ItemName: "phase 3 candidate", Status: "planned", Contract: "phase 3 contract", ContractStatus: "draft"},
 	}
 	if summary.Candidates != 1 {
 		t.Fatalf("Candidates = %d, want 1", summary.Candidates)
@@ -109,12 +109,12 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 			"12": {
 				"subphases": {
 					"12.A": {
-						"items": [
-							{"item_name": "active candidate", "status": "in_progress"},
-							{"item_name": "planned candidate", "status": "planned"},
-							{"item_name": "deferred candidate", "status": "deferred"}
-						]
-					}
+							"items": [
+								{"item_name": "active candidate", "status": "in_progress", "contract": "active contract"},
+								{"item_name": "planned candidate", "status": "planned", "contract": "planned contract", "contract_status": "draft"},
+								{"item_name": "deferred candidate", "status": "deferred"}
+							]
+						}
 				}
 			}
 		}
@@ -138,8 +138,8 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 		t.Fatalf("RunOnce() error = %v", err)
 	}
 
-	if summary.Candidates != 3 {
-		t.Fatalf("Candidates = %d, want 3", summary.Candidates)
+	if summary.Candidates != 2 {
+		t.Fatalf("Candidates = %d, want 2", summary.Candidates)
 	}
 	if got, want := len(summary.Selected), 2; got != want {
 		t.Fatalf("Selected length = %d, want %d", got, want)
@@ -153,16 +153,19 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 				SubphaseID: "12.A",
 				ItemName:   "active candidate",
 				Status:     "in_progress",
+				Contract:   "active contract",
 			})},
 			Dir: repoRoot,
 		},
 		{
 			Name: "opencode",
 			Args: []string{"run", "--no-interactive", BuildWorkerPrompt(Candidate{
-				PhaseID:    "12",
-				SubphaseID: "12.A",
-				ItemName:   "planned candidate",
-				Status:     "planned",
+				PhaseID:        "12",
+				SubphaseID:     "12.A",
+				ItemName:       "planned candidate",
+				Status:         "planned",
+				Contract:       "planned contract",
+				ContractStatus: "draft",
 			})},
 			Dir: repoRoot,
 		},
@@ -315,11 +318,11 @@ func TestRunOnceReturnsBackendRunnerError(t *testing.T) {
 			"12": {
 				"subphases": {
 					"12.A": {
-						"items": [
-							{"item_name": "planned run candidate", "status": "planned"}
-						]
+							"items": [
+								{"item_name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
+							]
+						}
 					}
-				}
 			}
 		}
 	}`)
@@ -349,11 +352,11 @@ func TestRunOnceIncludesBackendStderrInError(t *testing.T) {
 			"12": {
 				"subphases": {
 					"12.A": {
-						"items": [
-							{"item_name": "planned run candidate", "status": "planned"}
-						]
+							"items": [
+								{"item_name": "planned run candidate", "status": "planned", "contract": "run contract", "contract_status": "draft"}
+							]
+						}
 					}
-				}
 			}
 		}
 	}`)

@@ -28,7 +28,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		Backend:      "codexu",
 		Mode:         "safe",
 		MaxAgents:    4,
-		MaxPhase:     3,
+		MaxPhase:     0,
 	}
 
 	if value := env["PROGRESS_JSON"]; value != "" {
@@ -58,8 +58,8 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		if err != nil {
 			return Config{}, fmt.Errorf("MAX_PHASE must be an integer: %w", err)
 		}
-		if maxPhase < 1 {
-			return Config{}, fmt.Errorf("MAX_PHASE must be at least 1")
+		if maxPhase < 0 {
+			return Config{}, fmt.Errorf("MAX_PHASE must be non-negative")
 		}
 		cfg.MaxPhase = maxPhase
 	}

@@ -39,8 +39,8 @@ func TestConfigFromEnvDefaultsToRepoRootPaths(t *testing.T) {
 		t.Fatalf("MaxAgents = %d, want %d", cfg.MaxAgents, 4)
 	}
 
-	if cfg.MaxPhase != 3 {
-		t.Fatalf("MaxPhase = %d, want %d", cfg.MaxPhase, 3)
+	if cfg.MaxPhase != 0 {
+		t.Fatalf("MaxPhase = %d, want %d", cfg.MaxPhase, 0)
 	}
 }
 
@@ -103,9 +103,14 @@ func TestConfigFromEnvRejectsInvalidMaxPhase(t *testing.T) {
 	}
 }
 
-func TestConfigFromEnvRejectsZeroMaxPhase(t *testing.T) {
-	if _, err := ConfigFromEnv("repo", map[string]string{"MAX_PHASE": "0"}); err == nil {
-		t.Fatal("ConfigFromEnv() error = nil, want error")
+func TestConfigFromEnvAllowsZeroMaxPhaseAsUnbounded(t *testing.T) {
+	cfg, err := ConfigFromEnv("repo", map[string]string{"MAX_PHASE": "0"})
+	if err != nil {
+		t.Fatalf("ConfigFromEnv() error = %v", err)
+	}
+
+	if cfg.MaxPhase != 0 {
+		t.Fatalf("MaxPhase = %d, want 0", cfg.MaxPhase)
 	}
 }
 

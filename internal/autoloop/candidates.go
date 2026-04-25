@@ -123,6 +123,9 @@ func NormalizeCandidates(path string, opts CandidateOptions) ([]Candidate, error
 					DoneSignal:     trimStringSlice(item.DoneSignal),
 					Note:           strings.TrimSpace(item.Note),
 				}
+				if !agentQueueCandidate(candidate) {
+					continue
+				}
 				seenKey := candidateSortKey(candidate)
 				if _, ok := seen[seenKey]; ok {
 					continue
@@ -334,6 +337,10 @@ func candidateBucket(candidate Candidate) int {
 	default:
 		return candidateBucketOther
 	}
+}
+
+func agentQueueCandidate(candidate Candidate) bool {
+	return strings.TrimSpace(candidate.Contract) != "" && candidateBucket(candidate) <= candidateBucketDraft
 }
 
 func candidateSortKey(candidate Candidate) string {

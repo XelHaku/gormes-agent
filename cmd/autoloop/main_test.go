@@ -114,11 +114,11 @@ func TestRunCommandBackendFlagSetsBackend(t *testing.T) {
 			"12": {
 				"subphases": {
 					"12.A": {
-						"items": [
-							{"item_name": "backend flag candidate", "status": "planned"}
-						]
+							"items": [
+								{"item_name": "backend flag candidate", "status": "planned", "contract": "backend flag contract", "contract_status": "draft"}
+							]
+						}
 					}
-				}
 			}
 		}
 	}`), 0o600); err != nil {
