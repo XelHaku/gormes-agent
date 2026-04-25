@@ -37,12 +37,12 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 30/73 subphases shipped · 18 in progress · 25 planned
+**Overall:** 30/74 subphases shipped · 18 in progress · 26 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 12/19 subphases |
+| Phase 2 — The Gateway | 🔨 | 12/20 subphases |
 | Phase 3 — The Black Box (Memory) | 🔨 | 12/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
@@ -109,6 +109,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] WhatsApp identity resolution + self-chat guard
 - [x] Inbound normalization + command passthrough
 - [ ] Pairing, reconnect, and send contract
+- [ ] WhatsApp outbound pairing gate + raw peer mapping
+- [ ] WhatsApp reconnect backoff + send retry policy
 
 ### 2.B.5 — Session Context + Delivery Routing 🔨
 
@@ -160,6 +162,11 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 2.E.2 — OS-AI Spine: Concurrent-Tool Cancellation ✅
 
 - [x] Interrupt propagation to concurrent-tool workers
+
+### 2.E.3 — OS-AI Spine: Durable Job Resilience ⏳
+
+- [ ] Durable job backpressure + timeout audit
+- [ ] Durable worker supervisor status seam
 
 ### 2.F.1 — Slash Command Registry + Gateway Dispatch ✅
 
@@ -319,7 +326,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Provider interface + stream fixture harness
 - [x] Tool-call normalization + continuation contract
-- [ ] DeepSeek/Kimi reasoning_content echo for tool-call replay
+- [x] DeepSeek/Kimi reasoning_content echo for tool-call replay
 - [x] Anthropic
 - [ ] Bedrock
 - [x] Bedrock Converse payload mapping (no AWS SDK)
@@ -330,11 +337,11 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] OpenRouter
 - [ ] Google Code Assist
 - [ ] Codex
-- [ ] Codex Responses pure conversion harness
+- [x] Codex Responses pure conversion harness
 - [ ] Codex OAuth state + stale-token relogin
-- [ ] Codex stream repair + tool-call leak sanitizer
+- [x] Codex stream repair + tool-call leak sanitizer
 - [ ] Cross-provider reasoning-tag sanitization
-- [ ] Tool-call argument repair + schema sanitizer
+- [x] Tool-call argument repair + schema sanitizer
 
 ### 4.B — Context Engine + Compression 🔨
 
@@ -357,8 +364,8 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Model metadata registry + context limits
 - [x] Provider-enforced context-length resolver
-- [ ] Model pricing/capability registry fixtures
-- [ ] Routing policy and fallback selector
+- [x] Model pricing/capability registry fixtures
+- [x] Routing policy and fallback selector
 - [ ] Per-turn model selection
 
 ### 4.E — Trajectory + Insights ⏳
@@ -445,6 +452,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.I — Plugins Architecture ⏳
 
 - [ ] Plugin SDK
+- [ ] Dashboard theme/plugin extension status contract
 - [ ] Third-party extensions
 - [ ] First-party Spotify plugin fixture
 
@@ -453,6 +461,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Dangerous action gating
 - [ ] Dangerous-command detector + blocked-result schema
 - [ ] Approval mode config normalization
+- [ ] Subagent dangerous-command non-interactive approval policy
 - [ ] Cron dangerous-command approval mode
 - [ ] Tirith, path, URL, and website policy integration
 
@@ -500,12 +509,13 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.Q — API Server + TUI Gateway Streaming 🔨
 
 - [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
+- [ ] TUI mouse tracking config + slash toggle
 - [ ] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
-- [ ] Responses API store + run event stream
-- [ ] API server disconnect snapshot persistence
-- [ ] Gateway proxy mode forwarding contract
-- [ ] Dashboard API client contract
+- [x] Responses API store + run event stream
+- [x] API server disconnect snapshot persistence
+- [x] Gateway proxy mode forwarding contract
+- [x] Dashboard API client contract
 - [ ] Dashboard PTY chat sidecar contract
 - [ ] API server health + cron admin endpoints
 
@@ -565,6 +575,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Matrix shared-chassis bot seam
 - [ ] Mattermost shared-chassis bot seam
 - [ ] Matrix real client/bootstrap layer
+- [ ] Matrix E2EE device-id crypto-store binding
 - [ ] Mattermost REST/WS bootstrap layer
 
 ### 7.D — Webhook + Trigger Ingress ✅

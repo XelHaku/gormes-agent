@@ -53,7 +53,7 @@ For Gormes, this page should be read as more than a feature list. It is the upst
 - **[RL Training](../rl-training)** — Generate trajectory data from agent sessions for reinforcement learning and model fine-tuning.
 - **[Nous Tool Gateway](../tool-gateway)** — Route selected tool traffic through the Nous subscription gateway instead of direct third-party API keys.
 - **[Web Dashboard](../web-dashboard)** — Local browser UI for configuration, keys, sessions, logs, analytics, cron jobs, and skills.
-- **[Dashboard Plugins](../dashboard-plugins)** — Extend the web dashboard with custom tabs, JavaScript bundles, and optional backend endpoints.
+- **[Extending the Dashboard](../extending-the-dashboard)** — Extend the web dashboard with themes, custom tabs, shell slots, JavaScript bundles, and optional backend endpoints.
 
 ## Customization
 
@@ -94,7 +94,7 @@ The table below is the exhaustive upstream feature surface documented under `use
 | [RL Training](../rl-training) | Environments, batch runs, and trajectory capture produce training and eval data | Treat this as a data pipeline, not just a docs feature |
 | [Nous Tool Gateway](../tool-gateway) | Tool runtimes optionally route through a subscription-backed proxy gateway | Preserve the per-tool routing switch if the business model matters |
 | [Web Dashboard](../web-dashboard) | Local FastAPI plus frontend dashboard edits config, keys, sessions, cron, and analytics | Port only after the underlying state surfaces are stable in Go |
-| [Dashboard Plugins](../dashboard-plugins) | Dashboard plugin SDK loads JS tabs and optional backend routes from plugin dirs | Keep dashboard extensibility if the web UI remains a product surface |
+| [Extending the Dashboard](../extending-the-dashboard) | Dashboard theme loader and plugin SDK load YAML themes, JS tabs, shell slots, page overrides, static assets, and optional backend routes | Keep dashboard extensibility if the web UI remains a product surface |
 | [Personality & SOUL.md](../personality) | `SOUL.md` and preset personas are injected at the top of the system prompt | Preserve identity precedence in prompt assembly |
 | [Skins & Themes](../skins) | CLI skin engine changes rendering data without changing agent behavior | Port as presentation-layer config, not part of cognition |
 | [Plugins](../plugins) | Plugin manager discovers filesystem and entry-point plugins for tools, hooks, memory, and context engines | Keep extension boundaries small and explicit so third parties can port cleanly |

@@ -159,7 +159,8 @@ func DefaultPage() LandingPage {
 		RoadmapHeadline: "What works today, and what's still being wired up.",
 		RoadmapCurrentFocus: []string{
 			"Gateway stability",
-			"Memory system",
+			"Memory system (Goncho/Honcho)",
+			"Subagent safety and native dashboard contracts",
 		},
 		RoadmapNextMilestone:  "Full Go-native runtime, no Hermes",
 		RoadmapDetailsSummary: "View full phase-by-phase checklist",

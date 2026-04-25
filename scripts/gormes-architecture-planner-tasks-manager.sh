@@ -119,6 +119,9 @@ MAIN_BRANCH="${MAIN_BRANCH:-main}"
 REMOTE_NAME="${REMOTE_NAME:-origin}"
 COMMIT_INTERVAL="${COMMIT_INTERVAL:-1}"
 JSON_LOG="${JSON_LOG:-}"
+MERGE_OPEN_PULL_REQUESTS="${MERGE_OPEN_PULL_REQUESTS:-1}"
+PR_INTAKE_REMOTE="${PR_INTAKE_REMOTE:-$REMOTE_NAME}"
+PR_INTAKE_BASE_BRANCH="${PR_INTAKE_BASE_BRANCH:-$MAIN_BRANCH}"
 
 mkdir -p "$PLANNER_ROOT" "$LOG_DIR"
 
@@ -330,6 +333,169 @@ smart_commit() {
   commit_changes "$commit_msg"
 }
 
+parse_bool_enabled() {
+  local value="${1:-}"
+  local name="${2:-boolean}"
+  local normalized
+  normalized="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  case "$normalized" in
+    1|true|yes|on)
+      return 0
+      ;;
+    0|false|no|off|"")
+      return 1
+      ;;
+    *)
+      fail "$name must be 1/0/true/false/yes/no/on/off"
+      ;;
+  esac
+}
+
+parse_pr_repo() {
+  local raw="$1"
+  local host path rest
+
+  raw="${raw//$'\r'/}"
+  raw="${raw//$'\n'/}"
+  raw="${raw%.git}"
+
+  case "$raw" in
+    git@*:*)
+      rest="${raw#git@}"
+      host="${rest%%:*}"
+      path="${rest#*:}"
+      ;;
+    ssh://*/*|https://*/*|http://*/*)
+      rest="${raw#*://}"
+      host="${rest%%/*}"
+      path="${rest#*/}"
+      host="${host#*@}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  path="${path#/}"
+  path="${path%.git}"
+  [[ -n "$path" ]] || return 1
+
+  if [[ -z "$host" || "$host" == "github.com" ]]; then
+    printf '%s\n' "$path"
+  else
+    printf '%s/%s\n' "$host" "$path"
+  fi
+}
+
+ensure_pr_intake_worktree_ready() {
+  if git -C "$REPO_ROOT" rev-parse --verify MERGE_HEAD >/dev/null 2>&1; then
+    fail "PR intake cannot run with a merge in progress"
+  fi
+  if git -C "$REPO_ROOT" rev-parse --verify REBASE_HEAD >/dev/null 2>&1; then
+    fail "PR intake cannot run with a rebase in progress"
+  fi
+
+  local dirty
+  dirty="$(git -C "$REPO_ROOT" status --porcelain -- . ':(exclude).codex' ':(exclude).codex/**')"
+  if [[ -z "$dirty" ]]; then
+    return 0
+  fi
+
+  if [[ "$AUTO_COMMIT" == "1" ]]; then
+    commit_changes "planner: checkpoint before PR intake"
+    return 0
+  fi
+
+  fail "PR intake requires a clean worktree. Commit/stash local edits, set AUTO_COMMIT=1, or set MERGE_OPEN_PULL_REQUESTS=0."
+}
+
+sync_merged_pull_requests() {
+  local fetch_output ff_output merge_output
+
+  if ! fetch_output="$(git -C "$REPO_ROOT" fetch "$PR_INTAKE_REMOTE" "$PR_INTAKE_BASE_BRANCH" 2>&1)"; then
+    fail "PR intake sync fetch failed: $fetch_output"
+  fi
+
+  if ff_output="$(git -C "$REPO_ROOT" merge --ff-only FETCH_HEAD 2>&1)"; then
+    log "PR intake sync: fast-forward"
+    [[ -n "$ff_output" ]] && log_debug "$ff_output"
+    return 0
+  fi
+
+  if merge_output="$(git -C "$REPO_ROOT" merge --no-edit FETCH_HEAD 2>&1)"; then
+    log "PR intake sync: merge"
+    [[ -n "$merge_output" ]] && log_debug "$merge_output"
+    return 0
+  fi
+
+  git -C "$REPO_ROOT" merge --abort >/dev/null 2>&1 || true
+  fail "PR intake sync merge failed: $merge_output"
+}
+
+merge_open_pull_requests() {
+  if ! parse_bool_enabled "$MERGE_OPEN_PULL_REQUESTS" "MERGE_OPEN_PULL_REQUESTS"; then
+    log "PR intake: disabled"
+    return 0
+  fi
+
+  if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+    log "PR intake: skipped outside a git repository"
+    return 0
+  fi
+
+  require_cmd gh
+  ensure_pr_intake_worktree_ready
+
+  local remote_url repo prs_json listed skipped merged failed
+  remote_url="$(git -C "$REPO_ROOT" remote get-url "$PR_INTAKE_REMOTE" 2>/dev/null || true)"
+  repo="$(parse_pr_repo "$remote_url" || true)"
+
+  local list_args=(pr list)
+  if [[ -n "$repo" ]]; then
+    list_args+=(--repo "$repo")
+  fi
+  list_args+=(--state open --limit 100 --json number,title,isDraft,mergeStateStatus,headRefName,url)
+
+  log "PR intake: listing open pull requests"
+  if ! prs_json="$(gh "${list_args[@]}" 2>&1)"; then
+    fail "PR intake list failed: $prs_json"
+  fi
+
+  listed="$(jq -r 'length' <<<"$prs_json")"
+  skipped="$(jq -r '[.[] | select(.isDraft // false)] | length' <<<"$prs_json")"
+  merged=0
+  failed=0
+
+  local pr_number merge_output
+  local merge_numbers=()
+  while IFS= read -r pr_number; do
+    [[ -n "$pr_number" ]] && merge_numbers+=("$pr_number")
+  done < <(jq -r 'map(select((.isDraft // false) | not) | .number) | sort | .[]' <<<"$prs_json")
+
+  for pr_number in "${merge_numbers[@]}"; do
+    local merge_args=(pr merge "$pr_number")
+    if [[ -n "$repo" ]]; then
+      merge_args+=(--repo "$repo")
+    fi
+    merge_args+=(--merge --delete-branch --admin)
+
+    if merge_output="$(gh "${merge_args[@]}" 2>&1)"; then
+      merged=$((merged + 1))
+      log "PR intake: merged #$pr_number"
+      [[ -n "$merge_output" ]] && log_debug "$merge_output"
+    else
+      failed=$((failed + 1))
+      log_warn "PR intake: merge failed for #$pr_number: $merge_output"
+    fi
+  done
+
+  if [[ "$merged" -gt 0 ]]; then
+    sync_merged_pull_requests
+  fi
+
+  log "PR intake complete: listed=$listed merged=$merged failed=$failed skipped=$skipped"
+}
+
 usage() {
   cat <<EOF
 Usage:
@@ -363,6 +529,9 @@ Environment:
   MAIN_BRANCH               Target branch for commits (default: main)
   REMOTE_NAME               Git remote name (default: origin)
   JSON_LOG                  Path to JSON log file for structured logging
+  MERGE_OPEN_PULL_REQUESTS  Merge ready GitHub PRs before planner context (default: 1)
+  PR_INTAKE_REMOTE          Remote used for PR-intake sync (default: REMOTE_NAME)
+  PR_INTAKE_BASE_BRANCH     Base branch fetched after PR merges (default: MAIN_BRANCH)
 
 Examples:
   VERBOSE=1 ./gormes-architecture-planner-tasks-manager.sh
@@ -1070,6 +1239,9 @@ cmd_doctor() {
   require_cmd git
   require_cmd codexu
   require_cmd go
+  if parse_bool_enabled "$MERGE_OPEN_PULL_REQUESTS" "MERGE_OPEN_PULL_REQUESTS"; then
+    require_cmd gh
+  fi
   require_dir "$REPO_ROOT"
   require_dir "$ARCH_PLAN_DIR"
   require_file "$PROGRESS_JSON"
@@ -1116,6 +1288,10 @@ cmd_run() {
   UPSTREAM_COMMIT="$(git_field "$UPSTREAM_HERMES_DIR" commit)"
   UPSTREAM_BRANCH="$(git_field "$UPSTREAM_HERMES_DIR" branch)"
   LOCAL_GIT_ROOT="$(git_field "$REPO_ROOT" root)"
+  LOCAL_COMMIT="$(git_field "$REPO_ROOT" commit)"
+  LOCAL_BRANCH="$(git_field "$REPO_ROOT" branch)"
+
+  merge_open_pull_requests
   LOCAL_COMMIT="$(git_field "$REPO_ROOT" commit)"
   LOCAL_BRANCH="$(git_field "$REPO_ROOT" branch)"
 

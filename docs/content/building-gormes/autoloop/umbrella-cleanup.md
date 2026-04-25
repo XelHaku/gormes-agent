@@ -14,6 +14,7 @@ and acceptance checks before assigning them to an implementation agent.
 <!-- PROGRESS:START kind=umbrella-cleanup -->
 | Phase | Umbrella row | Owner | Not ready when | Split into |
 |---|---|---|---|---|
+| 2 / 2.B.4 | Pairing, reconnect, and send contract | `gateway` | A worker tries to land pairing state, raw peer send mapping, reconnect backoff, and retry semantics in one patch. | - |
 | 4 / 4.A | Codex | `provider` | The row is assigned as one large Codex provider implementation instead of the Responses conversion, auth, and stream-repair slices below. | Codex Responses pure conversion harness, Codex OAuth state + stale-token relogin, Codex stream repair + tool-call leak sanitizer |
 | 4 / 4.B | Long session management | `provider` | The row is assigned as one implementation task instead of being split through context engine, token-budget, reference, and compression slices. | ContextEngine interface + status tool contract, Compression token-budget trigger + summary sizing, Manual compression feedback + context references |
 | 4 / 4.D | Model metadata registry + context limits | `provider` | The row is assigned as one metadata/routing implementation instead of the resolver, pricing/capability, and selector slices below. | Provider-enforced context-length resolver, Model pricing/capability registry fixtures, Routing policy and fallback selector |

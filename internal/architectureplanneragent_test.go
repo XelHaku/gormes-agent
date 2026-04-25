@@ -123,6 +123,11 @@ func TestArchitecturePlannerAgentRunsCodexuAndInstallsPeriodicTimer(t *testing.T
 	runPlannerTestCommand(t, parentRepo, "git", "config", "user.email", "test@example.com")
 	runPlannerTestCommand(t, parentRepo, "git", "add", ".")
 	runPlannerTestCommand(t, parentRepo, "git", "commit", "-m", "init")
+	runPlannerTestCommand(t, parentRepo, "git", "branch", "-M", "main")
+	originRepo := filepath.Join(tmpRoot, "origin.git")
+	runPlannerTestCommand(t, tmpRoot, "git", "init", "--bare", originRepo)
+	runPlannerTestCommand(t, parentRepo, "git", "remote", "add", "origin", originRepo)
+	runPlannerTestCommand(t, parentRepo, "git", "push", "-u", "origin", "main")
 
 	binDir := filepath.Join(tmpRoot, "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
@@ -132,6 +137,12 @@ func TestArchitecturePlannerAgentRunsCodexuAndInstallsPeriodicTimer(t *testing.T
 	writePlannerTestFile(t, filepath.Join(binDir, "codexu"), []byte(`#!/usr/bin/env bash
 set -euo pipefail
 log_file="${CODEXU_LOG:?}"
+if [[ -n "${GH_LOG:-}" ]]; then
+  if [[ ! -f "$GH_LOG" ]] || ! grep -q "pr list" "$GH_LOG"; then
+    echo "missing pre-planning PR intake" >&2
+    exit 1
+  fi
+fi
 printf '%q ' "$@" >> "$log_file"
 printf '\n' >> "$log_file"
 final_file=""
@@ -166,6 +177,30 @@ EOF
 printf '{"type":"thread.started","thread_id":"thread-123"}\n'
 `), 0o755)
 
+	writePlannerTestFile(t, filepath.Join(binDir, "gh"), []byte(`#!/usr/bin/env bash
+set -euo pipefail
+log_file="${GH_LOG:?}"
+printf '%q ' "$@" >> "$log_file"
+printf '\n' >> "$log_file"
+case "$*" in
+  pr\ list*)
+    cat <<'EOF'
+[
+  {"number": 7, "title": "later", "isDraft": false, "mergeStateStatus": "CLEAN", "headRefName": "feature/later"},
+  {"number": 4, "title": "earlier", "isDraft": false, "mergeStateStatus": "DIRTY", "headRefName": "feature/earlier"},
+  {"number": 5, "title": "draft", "isDraft": true, "mergeStateStatus": "CLEAN", "headRefName": "feature/draft"}
+]
+EOF
+    ;;
+  pr\ merge\ 4*|pr\ merge\ 7*)
+    ;;
+  *)
+    echo "unexpected gh invocation: $*" >&2
+    exit 1
+    ;;
+esac
+`), 0o755)
+
 	writePlannerTestFile(t, filepath.Join(binDir, "go"), []byte(`#!/usr/bin/env bash
 set -euo pipefail
 log_file="${GO_LOG:?}"
@@ -190,6 +225,7 @@ exit 0
 
 	logPath := filepath.Join(tmpRoot, "codexu.log")
 	goLogPath := filepath.Join(tmpRoot, "go.log")
+	ghLogPath := filepath.Join(tmpRoot, "gh.log")
 	systemctlLogPath := filepath.Join(tmpRoot, "systemctl.log")
 	xdgConfigHome := filepath.Join(tmpRoot, "xdg")
 	homeDir := filepath.Join(tmpRoot, "home")
@@ -204,6 +240,7 @@ exit 0
 		"PATH=" + binDir + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"CODEXU_LOG=" + logPath,
 		"GO_LOG=" + goLogPath,
+		"GH_LOG=" + ghLogPath,
 		"SYSTEMCTL_LOG=" + systemctlLogPath,
 		"HOME=" + homeDir,
 		"XDG_CONFIG_HOME=" + xdgConfigHome,
@@ -238,6 +275,21 @@ exit 0
 	}
 	if !strings.Contains(string(out), "Periodic schedule: systemd") {
 		t.Fatalf("output missing periodic schedule line:\n%s", string(out))
+	}
+
+	ghLogData, err := os.ReadFile(ghLogPath)
+	if err != nil {
+		t.Fatalf("read gh log: %v", err)
+	}
+	ghLog := string(ghLogData)
+	for _, want := range []string{
+		"pr list",
+		"pr merge 4",
+		"pr merge 7",
+	} {
+		if !strings.Contains(ghLog, want) {
+			t.Fatalf("gh log missing %q:\n%s", want, ghLog)
+		}
 	}
 
 	rawCodexuLog, err := os.ReadFile(logPath)
