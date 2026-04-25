@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,15 +12,17 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/builderloop"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/cmdrunner"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/progress"
 )
 
 var commandStdout io.Writer = os.Stdout
 var serviceRunner cmdrunner.Runner = cmdrunner.ExecRunner{}
 
-const usage = "usage: builder-loop [--repo-root <path>] run [--dry-run] [--backend codexu|claudeu|opencode] | progress validate | progress write | repo benchmark record | repo readme update | audit | digest [--output <path>] [--force] | service install | service install-audit | service disable legacy-timers"
+const usage = "usage: builder-loop [--repo-root <path>] run [--dry-run] [--backend codexu|claudeu|opencode] | progress validate | progress write | repo benchmark record | repo readme update | audit | digest [--output <path>] [--force] | doctor | service install | service install-audit | service disable legacy-timers"
 
 // subUsage maps each subcommand to its own help text. --help/-h on a
 // subcommand prints the matching entry instead of the giant top-level usage,
@@ -34,6 +38,7 @@ var subUsage = map[string]string{
 	"repo readme":                    "usage: builder-loop repo readme update",
 	"audit":                          "usage: builder-loop audit",
 	"digest":                         "usage: builder-loop digest [--output <path>] [--force]",
+	"doctor":                         "usage: builder-loop doctor",
 	"service":                        "usage: builder-loop service {install|install-audit|disable legacy-timers} [--force]",
 	"service install":                "usage: builder-loop service install [--force]",
 	"service install-audit":          "usage: builder-loop service install-audit [--force]",
@@ -169,6 +174,18 @@ func run(ctx context.Context, args []string) error {
 		}
 		_, err = fmt.Fprint(commandStdout, summary)
 		return err
+	case args[0] == "doctor":
+		if wantsHelp(args[1:]) {
+			return printHelp("doctor")
+		}
+		if len(args) != 1 {
+			return fmt.Errorf("%w\n%s", errParse, subUsage["doctor"])
+		}
+		cfg, err := builderloop.ConfigFromEnv(root, os.LookupEnv)
+		if err != nil {
+			return err
+		}
+		return doctor(cfg)
 	case args[0] == "service":
 		return runService(ctx, root, args[1:])
 	default:
@@ -453,6 +470,107 @@ func dashIfEmpty(value string) string {
 	}
 
 	return value
+}
+
+// doctor runs operator-facing health checks for the builder loop:
+//   - progress.json exists, parses, and validates
+//   - the planner triggers path is writable (so the builder can append to it)
+//   - the latest health_updated event in the builder ledger is fresher than
+//     1 hour; warning-only since a fresh checkout has no history
+//
+// Each warning is advisory; the command exits 0 unless a hard precondition
+// fails. systemd timer status is intentionally not probed: the binary itself
+// running implies the unit fired.
+func doctor(cfg builderloop.Config) error {
+	if _, err := os.Stat(cfg.ProgressJSON); err != nil {
+		return err
+	}
+	if p, err := progress.Load(cfg.ProgressJSON); err != nil {
+		return fmt.Errorf("progress.json: %w", err)
+	} else if err := progress.Validate(p); err != nil {
+		return fmt.Errorf("progress.json validation: %w", err)
+	}
+	if err := triggerPathWritable(cfg.PlannerTriggersPath); err != nil {
+		return fmt.Errorf("planner triggers path: %w", err)
+	}
+	ledgerPath := filepath.Join(cfg.RunRoot, "state", "runs.jsonl")
+	if msg := driftWarning("builder-loop", ledgerPath, "health_updated", time.Hour); msg != "" {
+		fmt.Fprintln(commandStdout, msg)
+	}
+	_, err := fmt.Fprintln(commandStdout, "doctor: ok")
+	return err
+}
+
+// triggerPathWritable verifies the parent of path exists (creating it if
+// missing) and that we can append to a JSONL file there. The file itself is
+// created empty on first write so doctor on a fresh checkout passes.
+func triggerPathWritable(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+// driftWarning mirrors planner-loop's drift check: returns a non-empty
+// advisory string when the latest event of `eventName` in the ledger at
+// path is older than threshold (or absent entirely). A missing ledger file
+// is treated as "no history", not a stall.
+func driftWarning(loop, path, eventName string, threshold time.Duration) string {
+	latest, err := latestLedgerEventTime(path, eventName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ""
+		}
+		return fmt.Sprintf("doctor: warning: %s ledger unreadable at %s: %v", loop, path, err)
+	}
+	if latest.IsZero() {
+		return fmt.Sprintf("doctor: warning: %s ledger %s has no %s events yet", loop, path, eventName)
+	}
+	age := time.Since(latest)
+	if age > threshold {
+		return fmt.Sprintf("doctor: warning: %s last %s was %s ago (>%s); loop may be stalled", loop, eventName, age.Truncate(time.Second), threshold)
+	}
+	return ""
+}
+
+// latestLedgerEventTime scans the JSONL ledger at path and returns the
+// timestamp of the most recent event with the given Event field. Returns a
+// zero time and nil error if no matching event exists; bubbles os.IsNotExist
+// if the file is missing entirely.
+func latestLedgerEventTime(path, eventName string) (time.Time, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer f.Close()
+
+	var latest time.Time
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var ev struct {
+			TS    time.Time `json:"ts"`
+			Event string    `json:"event"`
+		}
+		if err := json.Unmarshal(line, &ev); err != nil {
+			continue
+		}
+		if ev.Event == eventName && ev.TS.After(latest) {
+			latest = ev.TS
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return time.Time{}, err
+	}
+	return latest, nil
 }
 
 // overlayEnv returns an EnvLookup that returns override for key (when

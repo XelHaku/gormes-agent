@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,10 +13,12 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/cmdrunner"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/plannerloop"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/plannertriggers"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/progress"
 )
 
 var commandStdout io.Writer = os.Stdout
@@ -431,11 +435,124 @@ func doctor(cfg plannerloop.Config) error {
 	if _, err := os.Stat(cfg.ProgressJSON); err != nil {
 		return err
 	}
+	// progress.json must actually parse + validate, not just exist —
+	// silent corruption was a pre-existing operator footgun.
+	if p, err := progress.Load(cfg.ProgressJSON); err != nil {
+		return fmt.Errorf("progress.json: %w", err)
+	} else if err := progress.Validate(p); err != nil {
+		return fmt.Errorf("progress.json validation: %w", err)
+	}
 	if _, err := exec.LookPath(cfg.Backend); err != nil {
 		return fmt.Errorf("backend %q not found on PATH: %w", cfg.Backend, err)
 	}
+	if err := triggerPathWritable(cfg.PlannerTriggersPath); err != nil {
+		return fmt.Errorf("planner triggers path: %w", err)
+	}
+	// Drift check: warn (do not fail) if the last planner health_updated
+	// event is older than 2× the configured interval. Doctor's job here is
+	// to surface "the loop runs but is not progressing" — historically the
+	// most-missed failure mode.
+	plannerLedger := filepath.Join(cfg.RunRoot, "state", "runs.jsonl")
+	threshold := plannerDriftThreshold()
+	if msg := driftWarning("planner", plannerLedger, "health_updated", threshold); msg != "" {
+		fmt.Fprintln(commandStdout, msg)
+	}
+	builderLedger := filepath.Join(cfg.AutoloopRunRoot, "state", "runs.jsonl")
+	if msg := driftWarning("builder-loop", builderLedger, "health_updated", time.Hour); msg != "" {
+		fmt.Fprintln(commandStdout, msg)
+	}
 	_, err := fmt.Fprintln(commandStdout, "doctor: ok")
 	return err
+}
+
+// plannerDriftThreshold returns 2× the planner timer interval, defaulting to
+// 12h when PLANNER_INTERVAL is unset/unparseable. Used by doctor to decide
+// whether the planner has fallen silent.
+func plannerDriftThreshold() time.Duration {
+	const defaultThreshold = 12 * time.Hour
+	value := os.Getenv("PLANNER_INTERVAL")
+	if value == "" {
+		return defaultThreshold
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil || d <= 0 {
+		return defaultThreshold
+	}
+	return 2 * d
+}
+
+// triggerPathWritable verifies the parent of path exists (creating it if
+// missing) and that we can append to a JSONL file there. The file itself is
+// created empty on first write so doctor on a fresh checkout passes.
+func triggerPathWritable(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+// driftWarning returns a non-empty warning string if the latest event of
+// kind `eventName` in the ledger at path is older than threshold (or absent
+// entirely). Returns "" when the ledger is fresh, missing entirely (a fresh
+// checkout has no history to be stale against), or when reads fail
+// transiently. Doctor surfaces these as advisory output, not hard failures.
+func driftWarning(loop, path, eventName string, threshold time.Duration) string {
+	latest, err := latestLedgerEventTime(path, eventName)
+	if err != nil {
+		// File missing on a fresh checkout is not a drift signal.
+		if os.IsNotExist(err) {
+			return ""
+		}
+		return fmt.Sprintf("doctor: warning: %s ledger unreadable at %s: %v", loop, path, err)
+	}
+	if latest.IsZero() {
+		return fmt.Sprintf("doctor: warning: %s ledger %s has no %s events yet", loop, path, eventName)
+	}
+	age := time.Since(latest)
+	if age > threshold {
+		return fmt.Sprintf("doctor: warning: %s last %s was %s ago (>%s); loop may be stalled", loop, eventName, age.Truncate(time.Second), threshold)
+	}
+	return ""
+}
+
+// latestLedgerEventTime scans the JSONL ledger at path and returns the
+// timestamp of the most recent event with the given Event field. Returns a
+// zero time and nil error if no matching event exists; bubbles os.IsNotExist
+// if the file is missing entirely.
+func latestLedgerEventTime(path, eventName string) (time.Time, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer f.Close()
+
+	var latest time.Time
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var ev struct {
+			TS    time.Time `json:"ts"`
+			Event string    `json:"event"`
+		}
+		if err := json.Unmarshal(line, &ev); err != nil {
+			continue
+		}
+		if ev.Event == eventName && ev.TS.After(latest) {
+			latest = ev.TS
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return time.Time{}, err
+	}
+	return latest, nil
 }
 
 // runTrigger appends a manual trigger event to the planner's triggers.jsonl

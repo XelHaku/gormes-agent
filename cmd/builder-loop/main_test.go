@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -91,6 +92,69 @@ func TestWriteDigestOutputRefusesClobber(t *testing.T) {
 	got, _ := os.ReadFile(path)
 	if string(got) != "existing" {
 		t.Fatalf("file overwritten unexpectedly: %q", got)
+	}
+}
+
+func TestLatestLedgerEventTimeFindsLatest(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runs.jsonl")
+	body := strings.Join([]string{
+		`{"ts":"2026-04-25T12:00:00Z","event":"run_started"}`,
+		`{"ts":"2026-04-25T12:01:00Z","event":"health_updated"}`,
+		`{"ts":"2026-04-25T12:05:00Z","event":"health_updated"}`,
+		`{"ts":"2026-04-25T12:10:00Z","event":"run_started"}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := latestLedgerEventTime(path, "health_updated")
+	if err != nil {
+		t.Fatalf("latestLedgerEventTime() error = %v", err)
+	}
+	want, _ := time.Parse(time.RFC3339, "2026-04-25T12:05:00Z")
+	if !got.Equal(want) {
+		t.Fatalf("got = %v, want %v", got, want)
+	}
+}
+
+func TestLatestLedgerEventTimeMissingFile(t *testing.T) {
+	_, err := latestLedgerEventTime(filepath.Join(t.TempDir(), "nope.jsonl"), "health_updated")
+	if !os.IsNotExist(err) {
+		t.Fatalf("err = %v, want os.IsNotExist", err)
+	}
+}
+
+func TestDriftWarningStaleEvent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runs.jsonl")
+	stale := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{"ts":%q,"event":"health_updated"}`+"\n", stale)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	msg := driftWarning("builder-loop", path, "health_updated", time.Hour)
+	if !strings.Contains(msg, "may be stalled") {
+		t.Fatalf("driftWarning() = %q, want stall warning", msg)
+	}
+}
+
+func TestDriftWarningFreshEvent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runs.jsonl")
+	fresh := time.Now().Add(-30 * time.Second).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{"ts":%q,"event":"health_updated"}`+"\n", fresh)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if msg := driftWarning("builder-loop", path, "health_updated", time.Hour); msg != "" {
+		t.Fatalf("driftWarning() = %q, want no warning", msg)
+	}
+}
+
+func TestDriftWarningMissingLedger(t *testing.T) {
+	if msg := driftWarning("builder-loop", filepath.Join(t.TempDir(), "absent.jsonl"), "health_updated", time.Hour); msg != "" {
+		t.Fatalf("driftWarning() = %q, want empty (no history is not a stall)", msg)
 	}
 }
 
