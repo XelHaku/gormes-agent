@@ -32,6 +32,7 @@ type Config struct {
 	Input      InputCfg      `toml:"input"`
 	Telegram   TelegramCfg   `toml:"telegram"`
 	Discord    DiscordCfg    `toml:"discord"`
+	Slack      SlackCfg      `toml:"slack"`
 	Cron       CronCfg       `toml:"cron"`
 	Skills     SkillsCfg     `toml:"skills"`
 	Delegation DelegationCfg `toml:"delegation"`
@@ -95,6 +96,16 @@ func (c DiscordCfg) Enabled() bool {
 		return false
 	}
 	return c.AllowedChannelID != "" || c.FirstRunDiscovery
+}
+
+// SlackCfg drives the Slack Socket Mode channel adapter.
+type SlackCfg struct {
+	Enabled           bool   `toml:"enabled"`
+	BotToken          string `toml:"bot_token"`
+	AppToken          string `toml:"app_token"`
+	AllowedChannelID  string `toml:"allowed_channel_id"`
+	CoalesceMs        int    `toml:"coalesce_ms"`
+	FirstRunDiscovery bool   `toml:"first_run_discovery"`
 }
 
 type CronCfg struct {
@@ -283,6 +294,11 @@ func defaults() Config {
 			CoalesceMs:        1000,
 			FirstRunDiscovery: false,
 		},
+		Slack: SlackCfg{
+			Enabled:           false,
+			CoalesceMs:        1000,
+			FirstRunDiscovery: false,
+		},
 		Cron: CronCfg{
 			Enabled:        false,
 			CallTimeout:    60 * time.Second,
@@ -403,6 +419,36 @@ func loadEnv(cfg *Config) error {
 	}
 	if v := os.Getenv("GORMES_DISCORD_SERVER_ACTIONS"); v != "" {
 		cfg.Discord.ServerActions = parseEnvCSV(v)
+	}
+	if v := os.Getenv("GORMES_SLACK_ENABLED"); v != "" {
+		parsed, err := parseEnvBool("GORMES_SLACK_ENABLED", v)
+		if err != nil {
+			return err
+		}
+		cfg.Slack.Enabled = parsed
+	}
+	if v := os.Getenv("GORMES_SLACK_BOT_TOKEN"); v != "" {
+		cfg.Slack.BotToken = v
+	}
+	if v := os.Getenv("GORMES_SLACK_APP_TOKEN"); v != "" {
+		cfg.Slack.AppToken = v
+	}
+	if v := os.Getenv("GORMES_SLACK_CHANNEL_ID"); v != "" {
+		cfg.Slack.AllowedChannelID = v
+	}
+	if v := os.Getenv("GORMES_SLACK_COALESCE_MS"); v != "" {
+		parsed, err := parseEnvInt("GORMES_SLACK_COALESCE_MS", v)
+		if err != nil {
+			return err
+		}
+		cfg.Slack.CoalesceMs = parsed
+	}
+	if v := os.Getenv("GORMES_SLACK_FIRST_RUN_DISCOVERY"); v != "" {
+		parsed, err := parseEnvBool("GORMES_SLACK_FIRST_RUN_DISCOVERY", v)
+		if err != nil {
+			return err
+		}
+		cfg.Slack.FirstRunDiscovery = parsed
 	}
 	if v := os.Getenv("GORMES_SKILLS_ROOT"); v != "" {
 		cfg.Skills.Root = v
@@ -558,6 +604,9 @@ func loadFlags(cfg *Config, args []string) error {
 func validateConfig(cfg *Config) error {
 	cfg.Gateway.ProxyURL = normalizeGatewayProxyURL(cfg.Gateway.ProxyURL)
 	cfg.Gateway.ProxyKey = strings.TrimSpace(cfg.Gateway.ProxyKey)
+	cfg.Slack.BotToken = strings.TrimSpace(cfg.Slack.BotToken)
+	cfg.Slack.AppToken = strings.TrimSpace(cfg.Slack.AppToken)
+	cfg.Slack.AllowedChannelID = strings.TrimSpace(cfg.Slack.AllowedChannelID)
 	cfg.Goncho.Workspace = strings.TrimSpace(cfg.Goncho.Workspace)
 	cfg.Goncho.ObserverPeer = strings.TrimSpace(cfg.Goncho.ObserverPeer)
 	cfg.Goncho.DialecticDefaultLevel = strings.ToLower(strings.TrimSpace(cfg.Goncho.DialecticDefaultLevel))

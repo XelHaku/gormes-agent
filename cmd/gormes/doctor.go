@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -12,6 +14,7 @@ import (
 	telegram "github.com/TrebuchetDynamics/gormes-agent/internal/channels/telegram"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/config"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/doctor"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/gateway"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/hermes"
 )
 
@@ -51,8 +54,14 @@ var doctorCmd = &cobra.Command{
 		fmt.Print(result.Format())
 		fmt.Print(doctorGonchoConfig(cfg).Format())
 
-		if cfg.Telegram.BotToken == "" && !cfg.Discord.Enabled() {
-			fmt.Println("[WARN] gateway: no channels configured ([telegram] or [discord])")
+		runtimeStatus := gateway.RuntimeStatus{}
+		if snapshot, err := gateway.NewRuntimeStatusStore(config.GatewayRuntimeStatusPath()).ReadRuntimeStatusSnapshot(context.Background()); err == nil && !snapshot.Missing {
+			runtimeStatus = snapshot.Status
+		}
+		fmt.Print(doctorSlackGatewayConfig(cfg, runtimeStatus).Format())
+
+		if cfg.Telegram.BotToken == "" && !cfg.Discord.Enabled() && !cfg.Slack.Enabled {
+			fmt.Println("[WARN] gateway: no channels configured ([telegram], [discord], or [slack])")
 		} else {
 			if cfg.Telegram.BotToken != "" {
 				if _, err := telegram.NewRealClient(cfg.Telegram.BotToken); err != nil {
@@ -80,6 +89,69 @@ var doctorCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+func doctorSlackGatewayConfig(cfg config.Config, runtime gateway.RuntimeStatus) doctor.CheckResult {
+	slackCfg := cfg.Slack
+	if !slackCfg.Enabled {
+		return doctor.CheckResult{
+			Name:    "Gateway Slack",
+			Status:  doctor.StatusWarn,
+			Summary: "disabled",
+		}
+	}
+
+	items := []doctor.ItemInfo{{
+		Name:   "config",
+		Status: doctor.StatusPass,
+		Note:   slackGatewayTargetDetail(slackCfg),
+	}}
+	if missing := missingSlackCredentials(slackCfg); len(missing) > 0 {
+		return doctor.CheckResult{
+			Name:    "Gateway Slack",
+			Status:  doctor.StatusWarn,
+			Summary: "missing_tokens=" + strings.Join(missing, ","),
+			Items:   items,
+		}
+	}
+
+	platform, ok := runtime.Platforms["slack"]
+	switch {
+	case ok && platform.State == gateway.PlatformStateRunning:
+		return doctor.CheckResult{
+			Name:    "Gateway Slack",
+			Status:  doctor.StatusPass,
+			Summary: "running",
+			Items:   items,
+		}
+	case ok && platform.State == gateway.PlatformStateFailed:
+		items = append(items, doctor.ItemInfo{
+			Name:   "runtime",
+			Status: doctor.StatusWarn,
+			Note:   platform.ErrorMessage,
+		})
+		return doctor.CheckResult{
+			Name:    "Gateway Slack",
+			Status:  doctor.StatusWarn,
+			Summary: "startup_failed",
+			Items:   items,
+		}
+	default:
+		return doctor.CheckResult{
+			Name:    "Gateway Slack",
+			Status:  doctor.StatusWarn,
+			Summary: "configured_not_running",
+			Items:   items,
+		}
+	}
+}
+
+func slackGatewayTargetDetail(cfg config.SlackCfg) string {
+	detail := "first_run_discovery=" + strconv.FormatBool(cfg.FirstRunDiscovery)
+	if cfg.AllowedChannelID != "" {
+		detail = "allowed_channel_id=" + cfg.AllowedChannelID
+	}
+	return detail + " coalesce_ms=" + strconv.Itoa(cfg.CoalesceMs)
 }
 
 func doctorGonchoConfig(cfg config.Config) doctor.CheckResult {

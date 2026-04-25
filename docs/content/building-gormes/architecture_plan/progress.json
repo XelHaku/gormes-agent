@@ -570,9 +570,9 @@
             },
             {
               "name": "Slack config + cmd/gormes gateway registration",
-              "status": "planned",
+              "status": "complete",
               "contract": "Slack config and cmd/gormes gateway registration use the shared gateway.Manager lifecycle after the Slack Channel shim is fixture-locked",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -603,7 +603,7 @@
                 "Doctor/status output distinguishes Slack disabled, missing-token, startup-failed, and running states.",
                 "Unit tests use fake Slack clients and do not contact Slack."
               ],
-              "note": "TDD: add Slack config loading, doctor coverage, and cmd/gormes gateway registration only after the Channel shim is green; current evidence shows only Telegram and Discord are registered there.",
+              "note": "Complete: TDD landed Slack config loading, cmd/gormes shared Manager registration, and status/doctor degraded reporting for disabled, missing-token, startup-failed, and running Slack states. Gateway registration fixtures use fake channels and prove Telegram/Discord-only runs do not require Slack credentials.",
               "write_scope": [
                 "cmd/gormes/",
                 "internal/config/",
@@ -619,10 +619,15 @@
               "done_signal": [
                 "Gateway registration tests prove Slack can be enabled through config and status/doctor output without requiring live Slack credentials."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T16:47:43Z",
+                "last_success": "2026-04-25T16:47:43Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T15:16:17Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "gormes",

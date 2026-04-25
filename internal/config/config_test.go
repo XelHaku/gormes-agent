@@ -247,6 +247,98 @@ first_run_discovery = true
 	}
 }
 
+func TestLoad_SlackFromFile(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[slack]
+enabled = true
+bot_token = "xoxb-file"
+app_token = "xapp-file"
+allowed_channel_id = "C123"
+coalesce_ms = 750
+first_run_discovery = true
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Slack.Enabled {
+		t.Error("Slack.Enabled = false, want true from config.toml")
+	}
+	if cfg.Slack.BotToken != "xoxb-file" {
+		t.Errorf("Slack.BotToken = %q", cfg.Slack.BotToken)
+	}
+	if cfg.Slack.AppToken != "xapp-file" {
+		t.Errorf("Slack.AppToken = %q", cfg.Slack.AppToken)
+	}
+	if cfg.Slack.AllowedChannelID != "C123" {
+		t.Errorf("Slack.AllowedChannelID = %q", cfg.Slack.AllowedChannelID)
+	}
+	if cfg.Slack.CoalesceMs != 750 {
+		t.Errorf("Slack.CoalesceMs = %d", cfg.Slack.CoalesceMs)
+	}
+	if !cfg.Slack.FirstRunDiscovery {
+		t.Error("Slack.FirstRunDiscovery = false, want true")
+	}
+}
+
+func TestLoad_SlackEnvOverridesFile(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	cfgDir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(`
+[slack]
+enabled = false
+bot_token = "xoxb-file"
+app_token = "xapp-file"
+allowed_channel_id = "C-file"
+coalesce_ms = 1000
+first_run_discovery = false
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GORMES_SLACK_ENABLED", "true")
+	t.Setenv("GORMES_SLACK_BOT_TOKEN", "xoxb-env")
+	t.Setenv("GORMES_SLACK_APP_TOKEN", "xapp-env")
+	t.Setenv("GORMES_SLACK_CHANNEL_ID", "C-env")
+	t.Setenv("GORMES_SLACK_COALESCE_MS", "250")
+	t.Setenv("GORMES_SLACK_FIRST_RUN_DISCOVERY", "true")
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Slack.Enabled {
+		t.Error("Slack.Enabled = false, want true from env")
+	}
+	if cfg.Slack.BotToken != "xoxb-env" {
+		t.Errorf("Slack.BotToken = %q", cfg.Slack.BotToken)
+	}
+	if cfg.Slack.AppToken != "xapp-env" {
+		t.Errorf("Slack.AppToken = %q", cfg.Slack.AppToken)
+	}
+	if cfg.Slack.AllowedChannelID != "C-env" {
+		t.Errorf("Slack.AllowedChannelID = %q", cfg.Slack.AllowedChannelID)
+	}
+	if cfg.Slack.CoalesceMs != 250 {
+		t.Errorf("Slack.CoalesceMs = %d", cfg.Slack.CoalesceMs)
+	}
+	if !cfg.Slack.FirstRunDiscovery {
+		t.Error("Slack.FirstRunDiscovery = false, want true from env")
+	}
+}
+
 func TestLoad_ResumeFlag(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	cfg, err := Load([]string{"--resume", "sess-abc123"})

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -46,11 +47,15 @@ func runGatewayStatus(cmd *cobra.Command, _ []string) error {
 		runtimeStatus = gateway.RuntimeStatus{}
 	}
 
-	_, err = fmt.Fprint(cmd.OutOrStdout(), gateway.RenderStatusSummary(gateway.StatusSummary{
+	out := gateway.RenderStatusSummary(gateway.StatusSummary{
 		Channels: configuredGatewayStatusChannels(cfg),
 		Pairing:  pairingStatus,
 		Runtime:  runtimeStatus,
-	}))
+	})
+	if !cfg.Slack.Enabled {
+		out += "gateway/slack: disabled\n"
+	}
+	_, err = fmt.Fprint(cmd.OutOrStdout(), out)
 	return err
 }
 
@@ -76,5 +81,22 @@ func configuredGatewayStatusChannels(cfg config.Config) []gateway.StatusChannel 
 			Detail: detail,
 		})
 	}
+	if cfg.Slack.Enabled {
+		channels = append(channels, gateway.StatusChannel{
+			Name:   "slack",
+			Detail: configuredSlackGatewayStatusDetail(cfg.Slack),
+		})
+	}
 	return channels
+}
+
+func configuredSlackGatewayStatusDetail(cfg config.SlackCfg) string {
+	if missing := missingSlackCredentials(cfg); len(missing) > 0 {
+		return "missing_tokens=" + strings.Join(missing, ",")
+	}
+	detail := "first_run_discovery=" + strconv.FormatBool(cfg.FirstRunDiscovery)
+	if cfg.AllowedChannelID != "" {
+		detail = "allowed_channel_id=" + cfg.AllowedChannelID
+	}
+	return detail
 }
