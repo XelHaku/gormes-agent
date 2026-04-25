@@ -20,6 +20,27 @@ var serviceRunner cmdrunner.Runner = cmdrunner.ExecRunner{}
 
 const usage = "usage: builder-loop [--repo-root <path>] run [--dry-run] [--backend codexu|claudeu|opencode] | progress validate | progress write | repo benchmark record | repo readme update | audit | digest [--output <path>] [--force] | service install | service install-audit | service disable legacy-timers"
 
+// subUsage maps each subcommand to its own help text. --help/-h on a
+// subcommand prints the matching entry instead of the giant top-level usage,
+// so an operator typing `builder-loop digest --help` sees just the digest
+// flags rather than the full builder-loop surface.
+var subUsage = map[string]string{
+	"run":                            "usage: builder-loop run [--dry-run] [--backend codexu|claudeu|opencode]",
+	"progress":                       "usage: builder-loop progress {validate|write}",
+	"progress validate":              "usage: builder-loop progress validate",
+	"progress write":                 "usage: builder-loop progress write",
+	"repo":                           "usage: builder-loop repo {benchmark record|readme update}",
+	"repo benchmark":                 "usage: builder-loop repo benchmark record",
+	"repo readme":                    "usage: builder-loop repo readme update",
+	"audit":                          "usage: builder-loop audit",
+	"digest":                         "usage: builder-loop digest [--output <path>] [--force]",
+	"service":                        "usage: builder-loop service {install|install-audit|disable legacy-timers} [--force]",
+	"service install":                "usage: builder-loop service install [--force]",
+	"service install-audit":          "usage: builder-loop service install-audit [--force]",
+	"service disable":                "usage: builder-loop service disable legacy-timers",
+	"service disable legacy-timers":  "usage: builder-loop service disable legacy-timers",
+}
+
 // supportedBuilderBackends lists the backends the run subcommand accepts via
 // --backend. The same names are accepted via the BACKEND environment
 // variable downstream.
@@ -27,6 +48,29 @@ var supportedBuilderBackends = []string{"codexu", "claudeu", "opencode"}
 
 // errParse marks parser-level failures so main() can map them to exit code 2.
 var errParse = errors.New("parse error")
+
+// wantsHelp returns true if any arg is --help or -h. Subcommand handlers
+// short-circuit on this so help routing is consistent across the binary.
+func wantsHelp(args []string) bool {
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
+// printHelp writes the help text for key (or the global usage if key is
+// missing from subUsage) to stdout. Help is intentionally exit-0 output, so
+// callers return nil after invoking this.
+func printHelp(key string) error {
+	help, ok := subUsage[key]
+	if !ok {
+		help = usage
+	}
+	_, err := fmt.Fprintln(commandStdout, help)
+	return err
+}
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -46,14 +90,20 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 
+	if len(args) == 0 {
+		return fmt.Errorf("%w\n%s", errParse, usage)
+	}
+	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
+		return printHelp("")
+	}
+
 	switch {
-	case len(args) >= 1 && args[0] == "run":
+	case args[0] == "run":
+		if wantsHelp(args[1:]) {
+			return printHelp("run")
+		}
 		runOpts, err := parseRunOptions(args[1:])
 		if err != nil {
-			return err
-		}
-		if runOpts.help {
-			_, err := fmt.Fprintln(commandStdout, usage)
 			return err
 		}
 		// --backend takes precedence over $BACKEND when both are set; we
@@ -64,11 +114,28 @@ func run(ctx context.Context, args []string) error {
 			return err
 		}
 		return runAutoloop(ctx, cfg, runOpts.dryRun)
-	case len(args) >= 1 && args[0] == "progress":
+	case args[0] == "progress":
+		if wantsHelp(args[1:]) {
+			key := "progress"
+			if len(args) >= 2 && !strings.HasPrefix(args[1], "-") {
+				key = "progress " + args[1]
+			}
+			return printHelp(key)
+		}
 		return runProgress(root, args[1:])
-	case len(args) >= 1 && args[0] == "repo":
+	case args[0] == "repo":
+		if wantsHelp(args[1:]) {
+			key := "repo"
+			if len(args) >= 2 && !strings.HasPrefix(args[1], "-") {
+				key = "repo " + args[1]
+			}
+			return printHelp(key)
+		}
 		return runRepo(root, args[1:])
-	case len(args) >= 1 && args[0] == "digest":
+	case args[0] == "digest":
+		if wantsHelp(args[1:]) {
+			return printHelp("digest")
+		}
 		opts, err := parseDigestOptions(args[1:])
 		if err != nil {
 			return err
@@ -82,7 +149,13 @@ func run(ctx context.Context, args []string) error {
 		}
 		_, err = fmt.Fprint(commandStdout, digest)
 		return err
-	case len(args) == 1 && args[0] == "audit":
+	case args[0] == "audit":
+		if wantsHelp(args[1:]) {
+			return printHelp("audit")
+		}
+		if len(args) != 1 {
+			return fmt.Errorf("%w\n%s", errParse, subUsage["audit"])
+		}
 		auditDir, err := auditReportDir()
 		if err != nil {
 			return err
@@ -96,29 +169,55 @@ func run(ctx context.Context, args []string) error {
 		}
 		_, err = fmt.Fprint(commandStdout, summary)
 		return err
-	case len(args) >= 2 && args[0] == "service" && args[1] == "install":
-		force, err := serviceForce(args[2:])
+	case args[0] == "service":
+		return runService(ctx, root, args[1:])
+	default:
+		return fmt.Errorf("%w\n%s", errParse, usage)
+	}
+}
+
+// runService dispatches the `service` subcommand family with --help routing.
+// Splitting it out keeps run() readable now that each verb has its own help.
+func runService(ctx context.Context, root string, args []string) error {
+	if wantsHelp(args) {
+		key := "service"
+		switch {
+		case len(args) >= 2 && args[0] == "disable":
+			key = "service disable"
+			if len(args) >= 2 && args[1] == "legacy-timers" {
+				key = "service disable legacy-timers"
+			}
+		case len(args) >= 1 && args[0] == "install":
+			key = "service install"
+		case len(args) >= 1 && args[0] == "install-audit":
+			key = "service install-audit"
+		}
+		return printHelp(key)
+	}
+
+	switch {
+	case len(args) >= 1 && args[0] == "install":
+		force, err := serviceForce(args[1:])
 		if err != nil {
 			return err
 		}
 		return installService(ctx, root, force)
-	case len(args) >= 2 && args[0] == "service" && args[1] == "install-audit":
-		force, err := serviceForce(args[2:])
+	case len(args) >= 1 && args[0] == "install-audit":
+		force, err := serviceForce(args[1:])
 		if err != nil {
 			return err
 		}
 		return installAuditService(ctx, root, force)
-	case len(args) == 3 && args[0] == "service" && args[1] == "disable" && args[2] == "legacy-timers":
+	case len(args) == 2 && args[0] == "disable" && args[1] == "legacy-timers":
 		return builderloop.DisableLegacyTimers(ctx, serviceRunner)
 	default:
-		return fmt.Errorf("%w\n%s", errParse, usage)
+		return fmt.Errorf("%w\n%s", errParse, subUsage["service"])
 	}
 }
 
 type runOptions struct {
 	dryRun  bool
 	backend string
-	help    bool
 }
 
 func parseRunOptions(args []string) (runOptions, error) {
@@ -130,18 +229,16 @@ func parseRunOptions(args []string) (runOptions, error) {
 			opts.dryRun = true
 		case "--backend":
 			if i+1 >= len(args) {
-				return runOptions{}, fmt.Errorf("%w: --backend requires a value\n%s", errParse, usage)
+				return runOptions{}, fmt.Errorf("%w: --backend requires a value\n%s", errParse, subUsage["run"])
 			}
 			i++
 			if !contains(supportedBuilderBackends, args[i]) {
 				return runOptions{}, fmt.Errorf("%w: unsupported backend %q (want one of %s)\n%s",
-					errParse, args[i], strings.Join(supportedBuilderBackends, ", "), usage)
+					errParse, args[i], strings.Join(supportedBuilderBackends, ", "), subUsage["run"])
 			}
 			opts.backend = args[i]
-		case "--help", "-h":
-			opts.help = true
 		default:
-			return runOptions{}, fmt.Errorf("%w\n%s", errParse, usage)
+			return runOptions{}, fmt.Errorf("%w\n%s", errParse, subUsage["run"])
 		}
 	}
 

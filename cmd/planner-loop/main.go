@@ -14,12 +14,25 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/cmdrunner"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/plannerloop"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/plannertriggers"
 )
 
 var commandStdout io.Writer = os.Stdout
 var commandRunner cmdrunner.Runner = cmdrunner.ExecRunner{}
 
-const usage = "usage: planner-loop [--repo-root <path>] run [--dry-run] [--backend codexu|claudeu] [--mode safe|full|unattended] [keyword ...] | status | show-report | doctor | service install [--force]"
+const usage = "usage: planner-loop [--repo-root <path>] run [--dry-run] [--backend codexu|claudeu] [--mode safe|full|unattended] [keyword ...] | status | show-report | doctor | trigger <reason> | service install [--force]"
+
+// subUsage maps each subcommand to its own help text. --help/-h on a
+// subcommand prints the matching entry instead of the full top-level usage.
+var subUsage = map[string]string{
+	"run":             "usage: planner-loop run [--dry-run] [--backend codexu|claudeu] [--mode safe|full|unattended] [keyword ...]",
+	"status":          "usage: planner-loop status",
+	"show-report":     "usage: planner-loop show-report",
+	"doctor":          "usage: planner-loop doctor",
+	"trigger":         "usage: planner-loop trigger <reason>",
+	"service":         "usage: planner-loop service install [--force]",
+	"service install": "usage: planner-loop service install [--force]",
+}
 
 // supportedPlannerBackends lists the backends the run subcommand accepts via
 // --backend. opencode is intentionally absent: planner runs need the richer
@@ -28,6 +41,28 @@ var supportedPlannerBackends = []string{"codexu", "claudeu"}
 
 // errParse marks parser-level failures so main() can map them to exit code 2.
 var errParse = errors.New("parse error")
+
+// wantsHelp returns true if any arg is --help or -h.
+func wantsHelp(args []string) bool {
+	for _, a := range args {
+		if a == "--help" || a == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
+// printHelp writes the help text for key (or the global usage if key is
+// missing from subUsage) to stdout. Help is intentionally exit-0 output, so
+// callers return nil after invoking this.
+func printHelp(key string) error {
+	help, ok := subUsage[key]
+	if !ok {
+		help = usage
+	}
+	_, err := fmt.Fprintln(commandStdout, help)
+	return err
+}
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -52,12 +87,11 @@ func run(ctx context.Context, args []string) error {
 
 	switch args[0] {
 	case "run":
+		if wantsHelp(args[1:]) {
+			return printHelp("run")
+		}
 		opts, err := parseRunOptions(args[1:])
 		if err != nil {
-			return err
-		}
-		if opts.help {
-			_, err := fmt.Fprintln(commandStdout, usage)
 			return err
 		}
 		cfg, err := plannerloop.ConfigFromEnv(root, plannerLookup(opts))
@@ -75,24 +109,49 @@ func run(ctx context.Context, args []string) error {
 		}
 		return printRunSummary(summary, opts.dryRun, opts.keywords)
 	case "status":
+		if wantsHelp(args[1:]) {
+			return printHelp("status")
+		}
 		cfg, err := plannerloop.ConfigFromEnv(root, plannerLookup(runOptions{}))
 		if err != nil {
 			return err
 		}
 		return printStatus(cfg)
 	case "show-report":
+		if wantsHelp(args[1:]) {
+			return printHelp("show-report")
+		}
 		cfg, err := plannerloop.ConfigFromEnv(root, plannerLookup(runOptions{}))
 		if err != nil {
 			return err
 		}
 		return printFile(filepath.Join(cfg.RunRoot, "latest_planner_report.md"))
 	case "doctor":
+		if wantsHelp(args[1:]) {
+			return printHelp("doctor")
+		}
 		cfg, err := plannerloop.ConfigFromEnv(root, plannerLookup(runOptions{}))
 		if err != nil {
 			return err
 		}
 		return doctor(cfg)
+	case "trigger":
+		if wantsHelp(args[1:]) {
+			return printHelp("trigger")
+		}
+		cfg, err := plannerloop.ConfigFromEnv(root, plannerLookup(runOptions{}))
+		if err != nil {
+			return err
+		}
+		return runTrigger(cfg, args[1:])
 	case "service":
+		if wantsHelp(args[1:]) {
+			key := "service"
+			if len(args) >= 2 && args[1] == "install" {
+				key = "service install"
+			}
+			return printHelp(key)
+		}
 		if len(args) >= 2 && args[1] == "install" {
 			force, err := plannerServiceForce(args[2:])
 			if err != nil {
@@ -104,10 +163,9 @@ func run(ctx context.Context, args []string) error {
 			}
 			return installPlannerService(ctx, root, force, cfg.PlannerTriggersPath)
 		}
-		return fmt.Errorf("%w\n%s", errParse, usage)
+		return fmt.Errorf("%w\n%s", errParse, subUsage["service"])
 	case "--help", "-h", "help":
-		_, err := fmt.Fprintln(commandStdout, usage)
-		return err
+		return printHelp("")
 	default:
 		return fmt.Errorf("%w\n%s", errParse, usage)
 	}
@@ -117,7 +175,6 @@ type runOptions struct {
 	dryRun   bool
 	backend  string
 	mode     string
-	help     bool
 	keywords []string
 }
 
@@ -144,8 +201,6 @@ func parseRunOptions(args []string) (runOptions, error) {
 			}
 			i++
 			opts.mode = args[i]
-		case "--help", "-h":
-			opts.help = true
 		default:
 			// Treat as positional keyword argument (L6 topical focus mode).
 			// Multi-word keywords (e.g. "skills tools") get split on
@@ -380,5 +435,31 @@ func doctor(cfg plannerloop.Config) error {
 		return fmt.Errorf("backend %q not found on PATH: %w", cfg.Backend, err)
 	}
 	_, err := fmt.Fprintln(commandStdout, "doctor: ok")
+	return err
+}
+
+// runTrigger appends a manual trigger event to the planner's triggers.jsonl
+// ledger. The .path systemd unit watches that file and fires a planner run
+// shortly after. Reason is surfaced in the planner prompt as the trigger
+// label so the next run can react to "operator-asked" vs scheduled vs
+// impl_change inputs.
+func runTrigger(cfg plannerloop.Config, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("%w: trigger requires a <reason>\n%s", errParse, subUsage["trigger"])
+	}
+	reason := strings.TrimSpace(strings.Join(args, " "))
+	if reason == "" {
+		return fmt.Errorf("%w: trigger reason cannot be empty\n%s", errParse, subUsage["trigger"])
+	}
+
+	if err := plannertriggers.AppendTriggerEvent(cfg.PlannerTriggersPath, plannertriggers.TriggerEvent{
+		Source: "manual",
+		Kind:   "manual",
+		Reason: reason,
+	}); err != nil {
+		return fmt.Errorf("append trigger: %w", err)
+	}
+
+	_, err := fmt.Fprintf(commandStdout, "trigger: appended manual event reason=%q to %s\n", reason, cfg.PlannerTriggersPath)
 	return err
 }

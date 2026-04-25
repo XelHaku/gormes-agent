@@ -418,8 +418,42 @@ func TestRunCommandHelpPrintsUsage(t *testing.T) {
 		t.Fatalf("run() error = %v", err)
 	}
 
-	if !strings.Contains(stdout.String(), "usage: builder-loop") {
-		t.Fatalf("stdout = %q, want usage", stdout.String())
+	if !strings.Contains(stdout.String(), "usage: builder-loop run") {
+		t.Fatalf("stdout = %q, want scoped run usage", stdout.String())
+	}
+	// Per-subcommand help should NOT dump the full top-level surface.
+	if strings.Contains(stdout.String(), "service disable legacy-timers") {
+		t.Fatalf("stdout = %q, expected scoped help only", stdout.String())
+	}
+}
+
+func TestSubcommandHelpPrintsScopedUsage(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "digest", args: []string{"digest", "--help"}, want: "usage: builder-loop digest"},
+		{name: "audit", args: []string{"audit", "-h"}, want: "usage: builder-loop audit"},
+		{name: "progress", args: []string{"progress", "--help"}, want: "usage: builder-loop progress"},
+		{name: "progress validate", args: []string{"progress", "validate", "--help"}, want: "usage: builder-loop progress validate"},
+		{name: "service install", args: []string{"service", "install", "--help"}, want: "usage: builder-loop service install"},
+		{name: "service disable legacy-timers", args: []string{"service", "disable", "legacy-timers", "--help"}, want: "usage: builder-loop service disable legacy-timers"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			oldStdout := commandStdout
+			commandStdout = &stdout
+			t.Cleanup(func() { commandStdout = oldStdout })
+			withTempCwd(t, t.TempDir())
+
+			if err := run(context.Background(), tc.args); err != nil {
+				t.Fatalf("run() error = %v", err)
+			}
+			if !strings.Contains(stdout.String(), tc.want) {
+				t.Fatalf("stdout = %q, want substring %q", stdout.String(), tc.want)
+			}
+		})
 	}
 }
 

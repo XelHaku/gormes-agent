@@ -244,6 +244,73 @@ func TestResolveRepoRootPrefersFlag(t *testing.T) {
 	}
 }
 
+func TestSubcommandHelpPrintsScopedUsage(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "run", args: []string{"run", "--help"}, want: "usage: planner-loop run"},
+		{name: "doctor", args: []string{"doctor", "-h"}, want: "usage: planner-loop doctor"},
+		{name: "trigger", args: []string{"trigger", "--help"}, want: "usage: planner-loop trigger <reason>"},
+		{name: "service", args: []string{"service", "--help"}, want: "usage: planner-loop service install"},
+		{name: "service install", args: []string{"service", "install", "--help"}, want: "usage: planner-loop service install"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			oldStdout := commandStdout
+			commandStdout = &stdout
+			t.Cleanup(func() { commandStdout = oldStdout })
+			withWorkingDir(t, t.TempDir())
+
+			if err := run(context.Background(), tc.args); err != nil {
+				t.Fatalf("run() error = %v", err)
+			}
+			if !strings.Contains(stdout.String(), tc.want) {
+				t.Fatalf("stdout = %q, want substring %q", stdout.String(), tc.want)
+			}
+		})
+	}
+}
+
+func TestTriggerAppendsManualEvent(t *testing.T) {
+	repoRoot := writeCommandFixture(t)
+	triggersPath := filepath.Join(repoRoot, "triggers.jsonl")
+	t.Setenv("PLANNER_TRIGGERS_PATH", triggersPath)
+	withWorkingDir(t, repoRoot)
+
+	var stdout bytes.Buffer
+	oldStdout := commandStdout
+	commandStdout = &stdout
+	t.Cleanup(func() { commandStdout = oldStdout })
+
+	if err := run(context.Background(), []string{"trigger", "operator-asked-for-refresh"}); err != nil {
+		t.Fatalf("run(trigger) error = %v", err)
+	}
+
+	body, err := os.ReadFile(triggersPath)
+	if err != nil {
+		t.Fatalf("read triggers.jsonl: %v", err)
+	}
+	if !strings.Contains(string(body), `"reason":"operator-asked-for-refresh"`) {
+		t.Fatalf("triggers.jsonl missing reason:\n%s", body)
+	}
+	if !strings.Contains(string(body), `"kind":"manual"`) {
+		t.Fatalf("triggers.jsonl missing kind=manual:\n%s", body)
+	}
+	if !strings.Contains(stdout.String(), "trigger: appended manual event") {
+		t.Fatalf("stdout = %q, want trigger confirmation", stdout.String())
+	}
+}
+
+func TestTriggerRequiresReason(t *testing.T) {
+	repoRoot := writeCommandFixture(t)
+	withWorkingDir(t, repoRoot)
+	if err := run(context.Background(), []string{"trigger"}); !errors.Is(err, errParse) {
+		t.Fatalf("err = %v, want errParse", err)
+	}
+}
+
 func writeCommandFixture(t *testing.T) string {
 	t.Helper()
 

@@ -16,10 +16,10 @@ leverage.
 | 2 | Replace mutually-exclusive backend flags with `--backend <name>`     | done         |
 | 3 | Push env reads into `*.ConfigFromEnv` (kill cmd/-side allowlists)    | done         |
 | 4 | Graceful shutdown via `signal.NotifyContext`                         | done         |
-| 5 | Per-subcommand `--help`                                              | open         |
+| 5 | Per-subcommand `--help`                                              | done         |
 | 6 | `planner-loop doctor` actually diagnoses drift                       | open         |
 | 7 | Show keywords in planner run summary                                 | done         |
-| 8 | `planner-loop trigger <reason>` verb                                 | open         |
+| 8 | `planner-loop trigger <reason>` verb                                 | done         |
 | 9 | Move `progress` and `repo` subcommands out of `builder-loop`         | open         |
 | 10 | Collapse `progress write` to a table-driven loop                    | open         |
 | 11 | Replace package-level test-seam globals with a `cliDeps` struct     | open         |
