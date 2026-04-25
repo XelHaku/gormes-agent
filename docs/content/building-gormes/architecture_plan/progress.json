@@ -2504,9 +2504,9 @@
             },
             {
               "name": "Codex Responses pure conversion harness",
-              "status": "planned",
+              "status": "complete",
               "contract": "OpenAI Responses request/response conversion for Codex-compatible providers without live OAuth",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -2535,7 +2535,7 @@
                 "Function tools convert to Responses function-tool schemas with deterministic call IDs.",
                 "Responses output items normalize back to shared provider events, messages, usage, and tool calls."
               ],
-              "note": "Upstream extracted `agent/codex_responses_adapter.py` as pure conversion logic. Port that shape first so Codex-compatible Responses behavior is fixture-backed before OAuth, model fallback, or live chatgpt.com backend calls are introduced.",
+              "note": "Complete: TDD added `internal/hermes/codex_responses_adapter.go` and `internal/hermes/codex_responses_adapter_test.go` as a pure Responses conversion harness. The fixture converts shared chat messages, system instructions, multimodal input_text/input_image content parts, function tool schemas, deterministic fallback call IDs, and function_call_output continuations into Responses payloads. It normalizes Responses output items back into shared assistant messages, reasoning/token/done events, usage, and tool calls. No OAuth/device login, ~/.codex import, or live Responses request is introduced; Codex status remains unavailable until auth wiring lands.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -2545,7 +2545,12 @@
               ],
               "done_signal": [
                 "Codex Responses fixtures convert chat input, tool schemas, output items, usage, and tool calls without live credentials."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T06:43:34Z",
+                "last_success": "2026-04-25T06:43:34Z"
+              }
             },
             {
               "name": "Codex OAuth state + stale-token relogin",

@@ -63,6 +63,18 @@ func anthropicProviderStatus() ProviderStatus {
 	}
 }
 
+func codexResponsesProviderStatus() ProviderStatus {
+	return ProviderStatus{
+		Provider: "openai-codex",
+		Runtime:  "responses_unavailable",
+		Capabilities: ProviderCapabilities{
+			PromptCache:     unavailableCapability("Codex Responses auth wiring not configured"),
+			RateGuard:       unavailableCapability("Codex provider rate guard not implemented"),
+			BudgetTelemetry: unavailableCapability("Codex budget telemetry not implemented"),
+		},
+	}
+}
+
 func unknownProviderStatus() ProviderStatus {
 	return ProviderStatus{
 		Provider: "unknown",

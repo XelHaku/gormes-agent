@@ -72,13 +72,21 @@ func (d ToolDescriptor) MarshalJSON() ([]byte, error) {
 }
 
 type Message struct {
-	Role         string            `json:"role"`
-	Content      string            `json:"content"`
-	CacheControl *CacheControl     `json:"cache_control,omitempty"`
-	Reasoning    *ReasoningContent `json:"reasoning,omitempty"`
-	ToolCalls    []ToolCall        `json:"tool_calls,omitempty"`   // set only on assistant messages that requested tools
-	ToolCallID   string            `json:"tool_call_id,omitempty"` // set only on "tool" role messages replying to a call
-	Name         string            `json:"name,omitempty"`         // set only on "tool" role messages; echoes the tool name
+	Role         string               `json:"role"`
+	Content      string               `json:"content"`
+	ContentParts []MessageContentPart `json:"content_parts,omitempty"`
+	CacheControl *CacheControl        `json:"cache_control,omitempty"`
+	Reasoning    *ReasoningContent    `json:"reasoning,omitempty"`
+	ToolCalls    []ToolCall           `json:"tool_calls,omitempty"`   // set only on assistant messages that requested tools
+	ToolCallID   string               `json:"tool_call_id,omitempty"` // set only on "tool" role messages replying to a call
+	Name         string               `json:"name,omitempty"`         // set only on "tool" role messages; echoes the tool name
+}
+
+type MessageContentPart struct {
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	ImageURL string `json:"image_url,omitempty"`
+	Detail   string `json:"detail,omitempty"`
 }
 
 // CacheControl carries provider-specific prompt-caching hints on content

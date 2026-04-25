@@ -59,6 +59,24 @@ func TestProviderStatusOfReportsCacheRateAndBudgetCapabilities(t *testing.T) {
 	}
 }
 
+func TestCodexProviderStatusReportsUnavailableUntilAuthWiring(t *testing.T) {
+	got := codexResponsesProviderStatus()
+	if got.Provider != "openai-codex" {
+		t.Fatalf("Provider = %q, want openai-codex", got.Provider)
+	}
+	if got.Runtime != "responses_unavailable" {
+		t.Fatalf("Runtime = %q, want responses_unavailable", got.Runtime)
+	}
+	if got.Capabilities.PromptCache.Available {
+		t.Fatal("PromptCache.Available = true, want unavailable until Codex auth wiring lands")
+	}
+	if !strings.Contains(got.Capabilities.PromptCache.Reason, "auth wiring not configured") {
+		t.Fatalf("PromptCache.Reason = %q, want auth wiring degradation", got.Capabilities.PromptCache.Reason)
+	}
+	assertUnavailableCapability(t, "RateGuard", got.Capabilities.RateGuard)
+	assertUnavailableCapability(t, "BudgetTelemetry", got.Capabilities.BudgetTelemetry)
+}
+
 func TestOpenAICompatibleCacheControlUnsupportedIsVisibleAndStripped(t *testing.T) {
 	var captured []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
