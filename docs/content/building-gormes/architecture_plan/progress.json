@@ -4812,9 +4812,9 @@
             {
               "name": "Terminal process watch notification throttle contract",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Terminal/process tools rate-limit watch-pattern notifications, suppress matches after process exit, and make notify_on_complete mutually exclusive with watch_patterns before any live process runner is exposed",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -4852,7 +4852,7 @@
                 "After three consecutive strike windows the session disables watch_patterns, promotes to notify_on_complete semantics, and emits one watch_disabled summary.",
                 "Matches arriving after session.exited are ignored, and a global fake-registry breaker suppresses more than 15 watch events in 10 seconds across sessions with trip/release summary evidence."
               ],
-              "note": "Hermes 97d54f0e hardened terminal watch-pattern notifications after agents combined notify_on_complete with noisy watch_patterns and flooded delayed completion queues. Gormes does not yet have a live terminal/process tool, so keep this as a pure policy fixture before the stateful process tool port starts.",
+              "note": "Complete: TDD landed internal/tools/process_notifications_test.go and a pure fake-clock process notification policy. The fixture proves notify_on_complete/watch_patterns mutual exclusion with operator evidence, per-session 1/15s watch throttling, three-strike watch disablement with notify_on_complete promotion, suppress-after-exit behavior, and global overflow trip/release summaries without spawning processes.",
               "write_scope": [
                 "internal/tools/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
