@@ -5,7 +5,7 @@ weight: 46
 
 # Goncho — The Honcho Port
 
-**Status:** Living document. First pass covers philosophy, Honcho architecture (extracted from upstream `plastic-labs/honcho`), the internal Go port plan, and its relationship to Phase 3. The latest docs-driven delta from Honcho v3 is captured in [Honcho Docs Study Plan](./03-honcho-docs-study/), and worker-ready execution slices are captured in [Agent Work Packets](./04-agent-work-packets).
+**Status:** Living document. First pass covers philosophy, Honcho architecture (extracted from upstream `plastic-labs/honcho`), the internal Go port plan, and its relationship to Phase 3. The latest docs-driven delta from Honcho v3 is captured in [Honcho Docs Study Plan](./03-honcho-docs-study/), and worker-ready execution slices are captured in [Agent Work Packets](./04-agent-work-packets/).
 
 **Audience:** Gormes contributors and future AI agents continuing the port. This is an **architecture reference**, not a migration cookbook — the cookbook lives in `docs/superpowers/specs/2026-04-21-goncho-architecture-design.md` and the Phase 3 ledger in `architecture_plan/phase-3-memory.md`.
 
@@ -25,7 +25,7 @@ linear read.
 | API and tool edge | §3, [Tool Schemas](./02-tool-schemas/) |
 | Deriver, dialectic, and dreamer mechanics | §5, [Prompts](./01-prompts/) |
 | Latest docs-driven implementation gaps | [Honcho Docs Study Plan](./03-honcho-docs-study/) |
-| Worker-ready memory implementation packets | [Agent Work Packets](./04-agent-work-packets) |
+| Worker-ready memory implementation packets | [Agent Work Packets](./04-agent-work-packets/) |
 | Implementation order | §13, then the Phase 3 ledger |
 | Open follow-up work | Coverage/TODO footers and §15 |
 
