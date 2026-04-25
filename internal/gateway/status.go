@@ -117,6 +117,15 @@ type RuntimeStatusUpdate struct {
 	NonResumableEvidence  *RuntimeNonResumableEvidence
 }
 
+// RuntimeStatusSnapshot is a read-only view of the runtime status file that
+// preserves whether the file was present. RuntimeStatusStore.ReadRuntimeStatus
+// synthesizes startup defaults for manager writers; status commands need to
+// distinguish that from "no runtime evidence has been written yet".
+type RuntimeStatusSnapshot struct {
+	Status  RuntimeStatus
+	Missing bool
+}
+
 // RuntimeStatusWriter is the manager-facing seam for lifecycle status writes.
 type RuntimeStatusWriter interface {
 	UpdateRuntimeStatus(context.Context, RuntimeStatusUpdate) error
@@ -172,6 +181,40 @@ func (s *RuntimeStatusStore) ReadRuntimeStatus(ctx context.Context) (RuntimeStat
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.readLocked()
+}
+
+// ReadRuntimeStatusSnapshot reads the current runtime status model from disk
+// without synthesizing a startup status when the file is missing or empty.
+func (s *RuntimeStatusStore) ReadRuntimeStatusSnapshot(ctx context.Context) (RuntimeStatusSnapshot, error) {
+	if s == nil || s.path == "" {
+		return RuntimeStatusSnapshot{Missing: true}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return RuntimeStatusSnapshot{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	raw, err := os.ReadFile(s.path)
+	if errors.Is(err, os.ErrNotExist) {
+		return RuntimeStatusSnapshot{Missing: true}, nil
+	}
+	if err != nil {
+		return RuntimeStatusSnapshot{}, fmt.Errorf("read runtime status: %w", err)
+	}
+	if len(raw) == 0 {
+		return RuntimeStatusSnapshot{Missing: true}, nil
+	}
+
+	var status RuntimeStatus
+	if err := json.Unmarshal(raw, &status); err != nil {
+		return RuntimeStatusSnapshot{}, fmt.Errorf("decode runtime status: %w", err)
+	}
+	if status.Platforms == nil {
+		status.Platforms = map[string]PlatformRuntimeStatus{}
+	}
+	return RuntimeStatusSnapshot{Status: status}, nil
 }
 
 func (s *RuntimeStatusStore) merge(status *RuntimeStatus, update RuntimeStatusUpdate) {

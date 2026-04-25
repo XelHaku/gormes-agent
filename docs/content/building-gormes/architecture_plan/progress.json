@@ -1762,9 +1762,9 @@
             {
               "name": "`gormes gateway status` read-only command",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "A read-only `gormes gateway status` command renders configured channels, pairing state, and runtime lifecycle from stores without starting transports or agent sessions",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1797,7 +1797,7 @@
                 "Configured Telegram/Discord/Slack rows can render running, stopped, failed, paired, pending, approved, and degraded pairing evidence from fake stores.",
                 "Focused command tests prove status execution does not construct real channel clients, session maps, memory stores, providers, or gateway.Manager."
               ],
-              "note": "A previous worker produced an unpromoted branch for this row, but current main lacks the files. Keep the row planned and fixture-ready until cmd/gormes/gateway_status.go and a pure status renderer are present on main.",
+              "note": "TDD landed: cmd/gormes gateway status now renders configured gateway channels through a pure internal/gateway status view over PairingStatus and RuntimeStatus snapshots, reports no-channel and missing runtime/pairing evidence without falling through to gateway startup, and command tests prove bogus Telegram/Discord credentials do not construct transports, session maps, memory stores, providers, or gateway.Manager.",
               "write_scope": [
                 "cmd/gormes/",
                 "internal/gateway/",
