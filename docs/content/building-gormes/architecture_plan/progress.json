@@ -2955,9 +2955,9 @@
             },
             {
               "name": "Routing policy and fallback selector",
-              "status": "planned",
+              "status": "complete",
               "contract": "Smart model routing is a pure selector over explicit overrides, provider availability, fallback policy, and model metadata before any provider call switches models",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -2987,7 +2987,7 @@
                 "Fallback choices are deterministic from fixture provider availability and model metadata.",
                 "Selector output includes a reason code suitable for telemetry and operator status."
               ],
-              "note": "TDD: port `agent/smart_model_routing.py` as a pure selector over task signals, explicit overrides, provider availability, and fallback_model behavior before any provider call can switch models.",
+              "note": "Complete: TDD added `internal/hermes/model_routing.go` plus `internal/hermes/model_routing_test.go` as a pure selector over turn/config overrides, provider availability, automatic simple-turn routing, fallback policy, and fixture model metadata. Tests prove explicit overrides win unless metadata is invalid, fallback selection is deterministic from availability and metadata, disabled fallback/provider gaps are reported as status codes, and selector output carries telemetry-ready reason codes without provider calls or kernel mutation.",
               "write_scope": [
                 "internal/hermes/",
                 "internal/kernel/",
@@ -2998,7 +2998,12 @@
               ],
               "done_signal": [
                 "Routing selector fixtures prove deterministic model choices and reason codes without provider calls or kernel mutation."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T07:03:32Z",
+                "last_success": "2026-04-25T07:03:32Z"
+              }
             },
             {
               "name": "Per-turn model selection",
