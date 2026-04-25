@@ -67,6 +67,10 @@ type SkillUsageRecorder interface {
 	RecordSkillUsage(ctx context.Context, skillNames []string) error
 }
 
+type memorySyncSkipper interface {
+	SkipMemorySync(ctx context.Context, turnKey, reason string) error
+}
+
 type Kernel struct {
 	cfg    Config
 	client hermes.Client
@@ -211,6 +215,7 @@ func (k *Kernel) Run(ctx context.Context) error {
 // to the store.Command payload and is otherwise opaque to the kernel.
 func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID string) {
 	prov := newProvenance(k.cfg.Endpoint)
+	turnKey := prov.LocalRunID
 
 	// 1. Admission. Reject locally before any HTTP.
 	if err := k.cfg.Admission.Validate(text); err != nil {
@@ -223,12 +228,14 @@ func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID st
 	// 2. Persist user turn with hard 250ms ack deadline (spec §7.8 store row).
 	storeCtx, storeCancel := context.WithTimeout(ctx, StoreAckDeadline)
 	userPayload, _ := json.Marshal(map[string]any{
-		"session_id":  k.sessionID,
-		"content":     text,
-		"ts_unix":     time.Now().Unix(),
-		"chat_id":     k.cfg.ChatKey,
-		"cron":        cronFlag(cronJobID),
-		"cron_job_id": cronJobID,
+		"session_id":         k.sessionID,
+		"content":            text,
+		"ts_unix":            time.Now().Unix(),
+		"chat_id":            k.cfg.ChatKey,
+		"cron":               cronFlag(cronJobID),
+		"cron_job_id":        cronJobID,
+		"turn_key":           turnKey,
+		"memory_sync_status": "pending",
 	})
 	_, err := k.store.Exec(storeCtx, store.Command{Kind: store.AppendUserTurn, Payload: userPayload})
 	storeCancel()
@@ -483,6 +490,7 @@ toolLoop:
 	}
 
 	if cancelled {
+		k.skipMemorySync(turnKey, "interrupted")
 		k.phase = PhaseCancelling
 		k.emitFrame("cancelled")
 	} else if k.draft != "" {
@@ -491,10 +499,12 @@ toolLoop:
 		// handles I/O off the hot path. 250ms context bound kept as a safety net
 		// in case someone injects a synchronous store in the future.
 		payload := map[string]any{
-			"session_id": k.sessionID,
-			"content":    k.draft,
-			"ts_unix":    time.Now().Unix(),
-			"chat_id":    k.cfg.ChatKey,
+			"session_id":         k.sessionID,
+			"content":            k.draft,
+			"ts_unix":            time.Now().Unix(),
+			"chat_id":            k.cfg.ChatKey,
+			"turn_key":           turnKey,
+			"memory_sync_status": "ready",
 		}
 		if len(toolCallsSeen) > 0 {
 			meta, _ := json.Marshal(map[string]any{"tool_calls": toolCallsSeen})
@@ -722,6 +732,18 @@ func cronFlag(cronJobID string) int {
 		return 0
 	}
 	return 1
+}
+
+func (k *Kernel) skipMemorySync(turnKey, reason string) {
+	skipper, ok := k.store.(memorySyncSkipper)
+	if !ok || turnKey == "" {
+		return
+	}
+	skipCtx, cancel := context.WithTimeout(context.Background(), StoreAckDeadline)
+	defer cancel()
+	if err := skipper.SkipMemorySync(skipCtx, turnKey, reason); err != nil {
+		k.log.Warn("kernel: skip memory sync failed", "err", err)
+	}
 }
 
 // truncate returns s clamped to n runes with an ellipsis suffix. Safe on

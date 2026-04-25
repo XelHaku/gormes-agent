@@ -3,7 +3,7 @@ package memory
 // schemaVersion is the canonical target version for this binary. OpenSqlite
 // migrates any earlier supported version up to this value, and refuses to
 // open DBs with an unknown version (future schemas).
-const schemaVersion = "3f"
+const schemaVersion = "3g"
 
 // schemaV3a is the baseline schema installed on a fresh DB. It matches
 // exactly what Phase 3.A shipped — any change to this string is a schema
@@ -208,4 +208,23 @@ CREATE TRIGGER IF NOT EXISTS goncho_conclusions_au AFTER UPDATE ON goncho_conclu
 END;
 
 UPDATE schema_meta SET v = '3f' WHERE k = 'version' AND v = '3e';
+`
+
+// migration3fTo3g adds the turn-finalization memory-sync gate:
+//   - turn_key correlates the pre-stream user turn with its finalization
+//     decision without changing the store.CommandKind surface
+//   - memory_sync_status keeps pre-finalized turns out of extraction/recall
+//   - memory_sync_reason records why an interrupted turn was skipped
+const migration3fTo3g = `
+ALTER TABLE turns ADD COLUMN turn_key TEXT;
+ALTER TABLE turns ADD COLUMN memory_sync_status TEXT NOT NULL DEFAULT 'ready'
+	CHECK(memory_sync_status IN ('pending','ready','skipped'));
+ALTER TABLE turns ADD COLUMN memory_sync_reason TEXT
+	CHECK(memory_sync_reason IS NULL OR memory_sync_reason IN ('interrupted','cancelled','client_disconnect'));
+CREATE INDEX IF NOT EXISTS idx_turns_memory_sync
+	ON turns(memory_sync_status, extracted, cron, id);
+CREATE INDEX IF NOT EXISTS idx_turns_turn_key
+	ON turns(turn_key) WHERE turn_key IS NOT NULL;
+
+UPDATE schema_meta SET v = '3g' WHERE k = 'version' AND v = '3f';
 `

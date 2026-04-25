@@ -190,6 +190,7 @@ func buildTurnSearchQuery(rawQuery string, sessionIDs, chatKeys []string, limit 
 		appendInClause(&b, "t.chat_id", chatKeys, &args)
 	}
 	b.WriteString(`)`)
+	b.WriteString(` AND t.memory_sync_status = 'ready'`)
 
 	if sessionsOnly {
 		b.WriteString(` GROUP BY t.session_id, t.chat_id ORDER BY latest_turn_unix DESC, t.session_id ASC LIMIT ?`)

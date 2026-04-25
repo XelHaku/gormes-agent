@@ -1227,9 +1227,9 @@
             {
               "name": "Interrupted-turn memory sync suppression",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Interrupted or cancelled turns cannot flush partial observations into GONCHO or external Honcho-compatible memory",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -1257,7 +1257,7 @@
                 "Completed turns still sync/extract normally.",
                 "Operator status can distinguish skipped interrupted sync from extractor failures."
               ],
-              "note": "TDD: mirror upstream Hermes commit 00c3d848 by proving cancelled or interrupted turns do not flush partial memory observations. Keep this as a finalization gate over the existing GONCHO/SQLite path; do not add an external Honcho provider in this slice.",
+              "note": "TDD landed: interrupted turns are marked as skipped with reason=interrupted, stay out of extractor and Honcho-compatible turn reads, and create no goncho_conclusions; completed turns still mark ready and extract normally. Fixtures cover internal/memory/interrupted_sync_test.go plus skipped-row guards in the memory session catalog and GONCHO service. Verified with go test ./internal/kernel ./internal/memory ./internal/goncho -count=1.",
               "write_scope": [
                 "internal/kernel/",
                 "internal/memory/",

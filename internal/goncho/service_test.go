@@ -118,6 +118,48 @@ func TestService_ContextIncludesPeerCardConclusionsAndRecentMessages(t *testing.
 	}
 }
 
+func TestService_SkipsInterruptedTurnsInSearchAndContext(t *testing.T) {
+	svc, cleanup := newTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().Unix()
+	if _, err := svc.db.ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id, memory_sync_status, memory_sync_reason)
+		 VALUES
+		 ('sess-ready', 'user', 'stable mango preference', ?, 'telegram:6586915095', 'ready', NULL),
+		 ('sess-skip', 'user', 'interrupted pineapple draft', ?, 'telegram:6586915095', 'skipped', 'interrupted')`,
+		now, now+1,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	search, err := svc.Search(ctx, SearchParams{
+		Peer:       "telegram:6586915095",
+		Query:      "pineapple",
+		MaxTokens:  200,
+		SessionKey: "telegram:6586915095",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(search.Results) != 0 {
+		t.Fatalf("Search returned skipped turn results: %+v", search.Results)
+	}
+
+	got, err := svc.Context(ctx, ContextParams{
+		Peer:       "telegram:6586915095",
+		MaxTokens:  400,
+		SessionKey: "telegram:6586915095",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.RecentMessages) != 1 || got.RecentMessages[0].Content != "stable mango preference" {
+		t.Fatalf("RecentMessages = %+v, want only ready turn", got.RecentMessages)
+	}
+}
+
 func TestService_DeleteConclusion(t *testing.T) {
 	svc, cleanup := newTestService(t)
 	defer cleanup()

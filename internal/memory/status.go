@@ -24,13 +24,24 @@ type DeadLetterErrorSummary struct {
 	Count int
 }
 
+// SkippedSyncSummary is one interrupted/cancelled turn that deliberately
+// stayed out of extraction and recall.
+type SkippedSyncSummary struct {
+	ID        int64
+	SessionID string
+	ChatID    string
+	Reason    string
+}
+
 // ExtractorStatus is the Phase 3.E.4 read model behind `gormes memory status`.
 type ExtractorStatus struct {
-	QueueDepth        int
-	DeadLetterCount   int
-	WorkerHealth      string
-	ErrorSummary      []DeadLetterErrorSummary
-	RecentDeadLetters []DeadLetterSummary
+	QueueDepth         int
+	DeadLetterCount    int
+	SkippedSyncCount   int
+	WorkerHealth       string
+	ErrorSummary       []DeadLetterErrorSummary
+	RecentDeadLetters  []DeadLetterSummary
+	RecentSkippedSyncs []SkippedSyncSummary
 }
 
 // ReadExtractorStatus summarizes extractor backlog and recent dead letters from
@@ -46,18 +57,21 @@ func ReadExtractorStatus(ctx context.Context, db *sql.DB, deadLetterLimit int) (
 	}
 
 	var status ExtractorStatus
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM turns WHERE extracted = 0 AND cron = 0`).Scan(&status.QueueDepth); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM turns WHERE extracted = 0 AND cron = 0 AND memory_sync_status = 'ready'`).Scan(&status.QueueDepth); err != nil {
 		return ExtractorStatus{}, fmt.Errorf("memory: queue depth: %w", err)
 	}
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM turns WHERE extracted = 2 AND cron = 0`).Scan(&status.DeadLetterCount); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM turns WHERE extracted = 2 AND cron = 0 AND memory_sync_status = 'ready'`).Scan(&status.DeadLetterCount); err != nil {
 		return ExtractorStatus{}, fmt.Errorf("memory: dead-letter count: %w", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM turns WHERE memory_sync_status = 'skipped' AND cron = 0`).Scan(&status.SkippedSyncCount); err != nil {
+		return ExtractorStatus{}, fmt.Errorf("memory: skipped sync count: %w", err)
 	}
 	status.WorkerHealth = extractorWorkerHealth(status.QueueDepth, status.DeadLetterCount)
 
 	summaryRows, err := db.QueryContext(ctx,
 		`SELECT COALESCE(extraction_error, ''), COUNT(*)
 		 FROM turns
-		 WHERE extracted = 2 AND cron = 0
+		 WHERE extracted = 2 AND cron = 0 AND memory_sync_status = 'ready'
 		 GROUP BY COALESCE(extraction_error, '')
 		 ORDER BY COUNT(*) DESC, COALESCE(extraction_error, '') ASC`,
 	)
@@ -79,7 +93,7 @@ func ReadExtractorStatus(ctx context.Context, db *sql.DB, deadLetterLimit int) (
 	rows, err := db.QueryContext(ctx,
 		`SELECT id, session_id, chat_id, extraction_attempts, COALESCE(extraction_error, '')
 		 FROM turns
-		 WHERE extracted = 2 AND cron = 0
+		 WHERE extracted = 2 AND cron = 0 AND memory_sync_status = 'ready'
 		 ORDER BY id DESC
 		 LIMIT ?`,
 		deadLetterLimit,
@@ -98,6 +112,29 @@ func ReadExtractorStatus(ctx context.Context, db *sql.DB, deadLetterLimit int) (
 	}
 	if err := rows.Err(); err != nil {
 		return ExtractorStatus{}, fmt.Errorf("memory: recent dead letters rows: %w", err)
+	}
+
+	skippedRows, err := db.QueryContext(ctx,
+		`SELECT id, session_id, chat_id, COALESCE(memory_sync_reason, '')
+		 FROM turns
+		 WHERE memory_sync_status = 'skipped' AND cron = 0
+		 ORDER BY id DESC
+		 LIMIT ?`,
+		deadLetterLimit,
+	)
+	if err != nil {
+		return ExtractorStatus{}, fmt.Errorf("memory: recent skipped syncs: %w", err)
+	}
+	defer skippedRows.Close()
+	for skippedRows.Next() {
+		var item SkippedSyncSummary
+		if err := skippedRows.Scan(&item.ID, &item.SessionID, &item.ChatID, &item.Reason); err != nil {
+			return ExtractorStatus{}, fmt.Errorf("memory: scan skipped sync: %w", err)
+		}
+		status.RecentSkippedSyncs = append(status.RecentSkippedSyncs, item)
+	}
+	if err := skippedRows.Err(); err != nil {
+		return ExtractorStatus{}, fmt.Errorf("memory: recent skipped sync rows: %w", err)
 	}
 
 	return status, nil

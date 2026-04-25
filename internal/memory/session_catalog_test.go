@@ -69,6 +69,41 @@ func TestSessionCatalog_SearchMessagesFiltersBySource(t *testing.T) {
 	}
 }
 
+func TestSessionCatalog_SearchMessagesSkipsInterruptedSyncRows(t *testing.T) {
+	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer func() {
+		if err := store.Close(context.Background()); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	now := time.Now().Unix()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id, memory_sync_status, memory_sync_reason)
+		 VALUES
+		 ('sess-ready', 'user', 'Atlas stable note', ?, 'telegram:42', 'ready', NULL),
+		 ('sess-skip', 'user', 'Atlas interrupted note', ?, 'telegram:42', 'skipped', 'interrupted')`,
+		now, now+1,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	hits, err := SearchMessages(ctx, store.DB(), []session.Metadata{
+		{SessionID: "sess-ready", Source: "telegram", ChatID: "42", UserID: "user-juan"},
+		{SessionID: "sess-skip", Source: "telegram", ChatID: "42", UserID: "user-juan"},
+	}, SearchFilter{UserID: "user-juan", Query: "Atlas"}, 10)
+	if err != nil {
+		t.Fatalf("SearchMessages: %v", err)
+	}
+	if len(hits) != 1 || hits[0].Content != "Atlas stable note" {
+		t.Fatalf("SearchMessages hits = %+v, want only ready row", hits)
+	}
+}
+
 func TestSessionCatalog_SearchSessionsOrdersByLatestTurn(t *testing.T) {
 	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
 	if err != nil {

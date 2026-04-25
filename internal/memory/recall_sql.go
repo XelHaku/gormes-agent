@@ -71,6 +71,7 @@ func seedsExactName(ctx context.Context, db *sql.DB, candidates []string, chatKe
 			 WHERE lower(e.name) IN (%s)
 			   AND length(e.name) >= 3
 			   AND t.chat_id IN (%s)
+			   AND t.memory_sync_status = 'ready'
 			 ORDER BY e.updated_at DESC
 			 LIMIT ?`, placeholders, chatPlaceholders)
 	}
@@ -132,7 +133,8 @@ func filterEntityIDsByChatScope(ctx context.Context, db *sql.DB, ids []int64, ch
 		 FROM entities e
 		 JOIN turns t ON lower(t.content) LIKE '%%' || lower(e.name) || '%%'
 		 WHERE e.id IN (%s)
-		   AND t.chat_id IN (%s)`, idPlaceholders, chatPlaceholders)
+		   AND t.chat_id IN (%s)
+		   AND t.memory_sync_status = 'ready'`, idPlaceholders, chatPlaceholders)
 	rows, err := db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("filterEntityIDsByChatScope: %w", err)
@@ -176,6 +178,7 @@ func seedsFTS5(ctx context.Context, db *sql.DB, userMessage, chatKey string, lim
 		JOIN entities e ON lower(t.content) LIKE '%' || lower(e.name) || '%'
 		WHERE turns_fts MATCH ?
 		  AND (t.chat_id = ? OR ? = '')
+		  AND t.memory_sync_status = 'ready'
 		  AND length(e.name) >= 3
 		LIMIT ?
 	`

@@ -181,7 +181,7 @@ func (e *Extractor) loopOnce(ctx context.Context) {
 func (e *Extractor) pollBatch(ctx context.Context) ([]turnRow, error) {
 	rows, err := e.store.db.QueryContext(ctx,
 		`SELECT id, role, content FROM turns
-		 WHERE extracted = 0 AND cron = 0 AND extraction_attempts < ?
+		 WHERE extracted = 0 AND cron = 0 AND memory_sync_status = 'ready' AND extraction_attempts < ?
 		 ORDER BY id LIMIT ?`,
 		e.cfg.MaxAttempts, e.cfg.BatchSize)
 	if err != nil {

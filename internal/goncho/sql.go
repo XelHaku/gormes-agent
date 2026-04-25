@@ -163,6 +163,7 @@ func findTurns(ctx context.Context, db *sql.DB, query, sessionKey string, limit 
 		SELECT content
 		FROM turns
 		WHERE (chat_id = ? OR session_id = ?)
+		  AND memory_sync_status = 'ready'
 	`
 	args := []any{sessionKey, sessionKey}
 	if trimmed := strings.TrimSpace(query); trimmed != "" {
@@ -200,7 +201,8 @@ func recentTurns(ctx context.Context, db *sql.DB, sessionKey string, limit int) 
 	rows, err := db.QueryContext(ctx, `
 		SELECT role, content
 		FROM turns
-		WHERE chat_id = ? OR session_id = ?
+		WHERE (chat_id = ? OR session_id = ?)
+		  AND memory_sync_status = 'ready'
 		ORDER BY ts_unix DESC, id DESC
 		LIMIT ?
 	`, sessionKey, sessionKey, limit)
