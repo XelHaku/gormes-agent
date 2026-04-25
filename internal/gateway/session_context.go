@@ -17,6 +17,12 @@ type SessionSource struct {
 	UserID   string
 	UserName string
 	ThreadID string
+	GuildID  string
+	// ParentChatID preserves the containing channel/forum for threaded sources.
+	ParentChatID string
+	// MessageID identifies the triggering platform message when the adapter
+	// explicitly supplies source metadata for it.
+	MessageID string
 }
 
 // SessionContext is the deterministic per-turn prompt block the gateway
@@ -40,18 +46,26 @@ type resolvedSession struct {
 }
 
 func sessionSourceFromInbound(ev InboundEvent) SessionSource {
+	platform := strings.ToLower(strings.TrimSpace(ev.Platform))
 	chatType := "dm"
 	if strings.TrimSpace(ev.ThreadID) != "" {
 		chatType = "thread"
 	}
+	messageID := strings.TrimSpace(ev.MessageID)
+	if messageID == "" && platform == "discord" {
+		messageID = strings.TrimSpace(ev.MsgID)
+	}
 	return SessionSource{
-		Platform: strings.ToLower(strings.TrimSpace(ev.Platform)),
-		ChatID:   strings.TrimSpace(ev.ChatID),
-		ChatName: strings.TrimSpace(ev.ChatName),
-		ChatType: chatType,
-		UserID:   strings.TrimSpace(ev.UserID),
-		UserName: strings.TrimSpace(ev.UserName),
-		ThreadID: strings.TrimSpace(ev.ThreadID),
+		Platform:     platform,
+		ChatID:       strings.TrimSpace(ev.ChatID),
+		ChatName:     strings.TrimSpace(ev.ChatName),
+		ChatType:     chatType,
+		UserID:       strings.TrimSpace(ev.UserID),
+		UserName:     strings.TrimSpace(ev.UserName),
+		ThreadID:     strings.TrimSpace(ev.ThreadID),
+		GuildID:      strings.TrimSpace(ev.GuildID),
+		ParentChatID: strings.TrimSpace(ev.ParentChatID),
+		MessageID:    messageID,
 	}
 }
 
@@ -143,8 +157,17 @@ func BuildSessionContextPrompt(ctx SessionContext) string {
 	if userID := strings.TrimSpace(source.UserID); userID != "" {
 		lines = append(lines, "**User ID:** `"+userID+"`")
 	}
+	if guildID := strings.TrimSpace(source.GuildID); guildID != "" {
+		lines = append(lines, "**Guild ID:** `"+guildID+"`")
+	}
+	if parentChatID := strings.TrimSpace(source.ParentChatID); parentChatID != "" {
+		lines = append(lines, "**Parent Chat ID:** `"+parentChatID+"`")
+	}
 	if threadID := strings.TrimSpace(source.ThreadID); threadID != "" {
 		lines = append(lines, "**Thread ID:** `"+threadID+"`")
+	}
+	if messageID := strings.TrimSpace(source.MessageID); messageID != "" {
+		lines = append(lines, "**Message ID:** `"+messageID+"`")
 	}
 	if key := strings.TrimSpace(ctx.SessionKey); key != "" {
 		lines = append(lines, "**Session Key:** `"+key+"`")

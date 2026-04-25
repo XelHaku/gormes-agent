@@ -74,8 +74,15 @@ type InboundEvent struct {
 	UserName string
 	ThreadID string
 	MsgID    string
-	Kind     EventKind
-	Text     string
+	GuildID  string
+	// ParentChatID preserves the containing channel/forum when ChatID and
+	// ThreadID identify a threaded conversation surface.
+	ParentChatID string
+	// MessageID is source-context metadata for the triggering platform message.
+	// MsgID remains the gateway's existing hook/reaction field.
+	MessageID string
+	Kind      EventKind
+	Text      string
 
 	ThreadLifecycle *ThreadLifecycleEvent
 
