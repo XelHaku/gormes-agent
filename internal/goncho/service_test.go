@@ -239,11 +239,12 @@ func TestService_SearchUserScopeRespectsSourceFilter(t *testing.T) {
 	}
 
 	got, err := svc.Search(ctx, SearchParams{
-		Peer:      "user-juan",
-		Query:     "Atlas",
-		MaxTokens: 200,
-		Scope:     "user",
-		Sources:   []string{"discord"},
+		Peer:       "user-juan",
+		Query:      "Atlas",
+		MaxTokens:  200,
+		SessionKey: "discord:chan-9",
+		Scope:      "user",
+		Sources:    []string{"discord"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -253,6 +254,68 @@ func TestService_SearchUserScopeRespectsSourceFilter(t *testing.T) {
 	}
 	if got.Results[0].Source != "turn" || got.Results[0].SessionKey != "sess-discord" {
 		t.Fatalf("Search result = %+v, want discord turn bound to sess-discord", got.Results[0])
+	}
+	if got.Results[0].OriginSource != "discord" {
+		t.Fatalf("Search result origin_source = %q, want discord source allowlist evidence", got.Results[0].OriginSource)
+	}
+}
+
+func TestService_SearchUserScopeUnknownCurrentBindingFallsBackSameSession(t *testing.T) {
+	store, dir, svc, cleanup := newTestServiceWithDirectory(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := dir.PutMetadata(ctx, session.Metadata{
+		SessionID: "sess-telegram",
+		Source:    "telegram",
+		ChatID:    "42",
+		UserID:    "user-juan",
+	}); err != nil {
+		t.Fatalf("PutMetadata telegram: %v", err)
+	}
+	now := time.Now().Unix()
+	for _, turn := range []struct {
+		sessionID string
+		chatID    string
+		content   string
+		ts        int64
+	}{
+		{
+			sessionID: "sess-telegram",
+			chatID:    "telegram:42",
+			content:   "Atlas remote user-scope note.",
+			ts:        now - 20,
+		},
+		{
+			sessionID: "sess-current",
+			chatID:    "discord:chan-9",
+			content:   "Atlas same-session fallback note.",
+			ts:        now - 10,
+		},
+	} {
+		if _, err := store.DB().ExecContext(ctx,
+			`INSERT INTO turns(session_id, role, content, ts_unix, chat_id) VALUES (?, ?, ?, ?, ?)`,
+			turn.sessionID, "user", turn.content, turn.ts, turn.chatID,
+		); err != nil {
+			t.Fatalf("insert turn %s: %v", turn.sessionID, err)
+		}
+	}
+
+	got, err := svc.Search(ctx, SearchParams{
+		Peer:       "user-juan",
+		Query:      "Atlas",
+		MaxTokens:  200,
+		SessionKey: "discord:chan-9",
+		Scope:      "user",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Results) != 1 {
+		t.Fatalf("Search results len = %d, want 1", len(got.Results))
+	}
+	if got.Results[0].Content != "Atlas same-session fallback note." {
+		t.Fatalf("Search result = %+v, want same-session fallback only", got.Results[0])
 	}
 }
 

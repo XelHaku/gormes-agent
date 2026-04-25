@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -214,6 +215,117 @@ func TestProvider_GetContext_CrossChatSourceFilter(t *testing.T) {
 	})
 	if !strings.Contains(allowed, "Acme") {
 		t.Fatalf("telegram source filter should allow Acme; got %q", allowed)
+	}
+}
+
+func TestProvider_GetContext_CrossChatUnknownCurrentBindingFallsBackSameChat(t *testing.T) {
+	s, p := openProviderWithRichGraph(t)
+	ctx := context.Background()
+	seedSameChatEntity(t, s, "Orchid", "same-chat only", "discord:7")
+
+	dir := session.NewMemMap()
+	if err := dir.PutMetadata(ctx, session.Metadata{
+		SessionID: "sess-telegram",
+		Source:    "telegram",
+		ChatID:    "42",
+		UserID:    "user-juan",
+	}); err != nil {
+		t.Fatalf("PutMetadata telegram: %v", err)
+	}
+
+	out := p.WithDirectory(dir).GetContext(ctx, RecallInput{
+		UserMessage: "Acme Orchid status?",
+		ChatKey:     "discord:7",
+		UserID:      "user-juan",
+		CrossChat:   true,
+	})
+	if !strings.Contains(out, "Orchid") {
+		t.Fatalf("unknown current binding should keep same-chat recall; got %q", out)
+	}
+	if strings.Contains(out, "Acme") {
+		t.Fatalf("unknown current binding widened into another chat; got %q", out)
+	}
+}
+
+func TestProvider_GetContext_CrossChatConflictingCurrentBindingFallsBackSameChat(t *testing.T) {
+	s, p := openProviderWithRichGraph(t)
+	ctx := context.Background()
+	seedSameChatEntity(t, s, "Orchid", "same-chat only", "discord:7")
+
+	p = p.WithDirectory(recallDirectoryFunc(func(context.Context, string) ([]session.Metadata, error) {
+		return []session.Metadata{
+			{
+				SessionID: "sess-current",
+				Source:    "discord",
+				ChatID:    "7",
+				UserID:    "user-maria",
+			},
+			{
+				SessionID: "sess-telegram",
+				Source:    "telegram",
+				ChatID:    "42",
+				UserID:    "user-juan",
+			},
+		}, nil
+	}))
+
+	out := p.GetContext(ctx, RecallInput{
+		UserMessage: "Acme Orchid status?",
+		ChatKey:     "discord:7",
+		UserID:      "user-juan",
+		CrossChat:   true,
+	})
+	if !strings.Contains(out, "Orchid") {
+		t.Fatalf("conflicting current binding should keep same-chat recall; got %q", out)
+	}
+	if strings.Contains(out, "Acme") {
+		t.Fatalf("conflicting current binding widened into another chat; got %q", out)
+	}
+}
+
+func TestProvider_GetContext_CrossChatUnresolvedDirectoryFallsBackSameChat(t *testing.T) {
+	s, p := openProviderWithRichGraph(t)
+	ctx := context.Background()
+	seedSameChatEntity(t, s, "Orchid", "same-chat only", "discord:7")
+
+	p = p.WithDirectory(recallDirectoryFunc(func(context.Context, string) ([]session.Metadata, error) {
+		return nil, errors.New("metadata unavailable")
+	}))
+
+	out := p.GetContext(ctx, RecallInput{
+		UserMessage: "Acme Orchid status?",
+		ChatKey:     "discord:7",
+		UserID:      "user-juan",
+		CrossChat:   true,
+	})
+	if !strings.Contains(out, "Orchid") {
+		t.Fatalf("unresolved current binding should keep same-chat recall; got %q", out)
+	}
+	if strings.Contains(out, "Acme") {
+		t.Fatalf("unresolved current binding widened into another chat; got %q", out)
+	}
+}
+
+type recallDirectoryFunc func(context.Context, string) ([]session.Metadata, error)
+
+func (f recallDirectoryFunc) ListMetadataByUserID(ctx context.Context, userID string) ([]session.Metadata, error) {
+	return f(ctx, userID)
+}
+
+func seedSameChatEntity(t *testing.T, s *SqliteStore, name, desc, chatKey string) {
+	t.Helper()
+	if _, err := s.db.ExecContext(context.Background(),
+		`INSERT INTO entities(name, type, description, updated_at) VALUES(?,?,?,?)`,
+		name, "PROJECT", desc, time.Now().Unix(),
+	); err != nil {
+		t.Fatalf("insert same-chat entity: %v", err)
+	}
+	if _, err := s.db.ExecContext(context.Background(),
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id)
+		 VALUES(?, 'user', ?, ?, ?)`,
+		"sess-"+strings.ToLower(name), name+" belongs to this chat", time.Now().Unix(), chatKey,
+	); err != nil {
+		t.Fatalf("insert same-chat turn: %v", err)
 	}
 }
 

@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -104,6 +105,41 @@ func TestSessionCatalog_SearchMessagesSkipsInterruptedSyncRows(t *testing.T) {
 	}
 }
 
+func TestSessionCatalog_SearchMessagesUnknownCurrentBindingDeniesUserScope(t *testing.T) {
+	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer func() {
+		if err := store.Close(context.Background()); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	now := time.Now().Unix()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id)
+		 VALUES
+		 ('sess-telegram', 'user', 'Atlas remote user note', ?, 'telegram:42'),
+		 ('sess-current', 'user', 'Atlas same-session note', ?, 'discord:chan-9')`,
+		now-20, now-10,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = SearchMessages(ctx, store.DB(), []session.Metadata{
+		{SessionID: "sess-telegram", Source: "telegram", ChatID: "42", UserID: "user-juan"},
+	}, SearchFilter{
+		UserID:         "user-juan",
+		Query:          "Atlas",
+		CurrentChatKey: "discord:chan-9",
+	}, 10)
+	if !errors.Is(err, ErrUserScopeDenied) {
+		t.Fatalf("SearchMessages err = %v, want ErrUserScopeDenied", err)
+	}
+}
+
 func TestSessionCatalog_SearchSessionsOrdersByLatestTurn(t *testing.T) {
 	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
 	if err != nil {
@@ -172,5 +208,41 @@ func TestSessionCatalog_SearchSessionsOrdersByLatestTurn(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("SearchSessions order = %v, want %v", got, want)
 		}
+	}
+}
+
+func TestSessionCatalog_SearchSessionsConflictingCurrentBindingDeniesUserScope(t *testing.T) {
+	store, err := OpenSqlite(t.TempDir()+"/memory.db", 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer func() {
+		if err := store.Close(context.Background()); err != nil {
+			t.Fatalf("Close: %v", err)
+		}
+	}()
+
+	ctx := context.Background()
+	now := time.Now().Unix()
+	if _, err := store.DB().ExecContext(ctx,
+		`INSERT INTO turns(session_id, role, content, ts_unix, chat_id)
+		 VALUES
+		 ('sess-telegram', 'user', 'project remote note', ?, 'telegram:42'),
+		 ('sess-current', 'user', 'project same-session note', ?, 'discord:chan-9')`,
+		now-20, now-10,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = SearchSessions(ctx, store.DB(), []session.Metadata{
+		{SessionID: "sess-current", Source: "discord", ChatID: "chan-9", UserID: "user-maria"},
+		{SessionID: "sess-telegram", Source: "telegram", ChatID: "42", UserID: "user-juan"},
+	}, SearchFilter{
+		UserID:         "user-juan",
+		Query:          "project",
+		CurrentChatKey: "discord:chan-9",
+	}, 10)
+	if !errors.Is(err, ErrUserScopeDenied) {
+		t.Fatalf("SearchSessions err = %v, want ErrUserScopeDenied", err)
 	}
 }

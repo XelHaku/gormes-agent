@@ -1368,9 +1368,9 @@
             },
             {
               "name": "Cross-chat deny-path fixtures",
-              "status": "planned",
+              "status": "complete",
               "contract": "Same-chat default recall with explicit user-scope widening",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -1401,7 +1401,7 @@
                 "Conflicting user bindings deny user-scope widening.",
                 "Allowed user-scope searches include source allowlist evidence."
               ],
-              "note": "TDD: prove unknown, unresolved, or conflicting user_id bindings cannot widen recall or session search, and pin same-chat fallback behavior with fixture-backed allow/deny cases before cross-chat access is exposed as shipped.",
+              "note": "TDD landed: recall and session-search fixtures now deny user-scope widening when the current chat binding is unknown, unresolved, or conflicting; denied paths fall back to same-chat/session behavior, and allowed user-scope GONCHO hits preserve origin_source evidence for source allowlists.",
               "write_scope": [
                 "internal/memory/",
                 "internal/goncho/",

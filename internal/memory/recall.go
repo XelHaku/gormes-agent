@@ -249,6 +249,11 @@ func (p *Provider) allowedChatKeys(ctx context.Context, in RecallInput) []string
 		return fallbackChatScope(chatKey)
 	}
 
+	userID := strings.TrimSpace(in.UserID)
+	if !metadataAllowsCurrentChat(metadata, userID, chatKey) {
+		return fallbackChatScope(chatKey)
+	}
+
 	seen := make(map[string]struct{}, len(metadata))
 	chats := make([]string, 0, len(metadata))
 	for _, meta := range metadata {
@@ -256,6 +261,9 @@ func (p *Provider) allowedChatKeys(ctx context.Context, in RecallInput) []string
 		chatID := strings.TrimSpace(meta.ChatID)
 		if source == "" || chatID == "" {
 			continue
+		}
+		if strings.TrimSpace(meta.UserID) != userID {
+			return fallbackChatScope(chatKey)
 		}
 		if len(allowedSources) > 0 {
 			if _, ok := allowedSources[source]; !ok {
@@ -273,6 +281,55 @@ func (p *Provider) allowedChatKeys(ctx context.Context, in RecallInput) []string
 		return fallbackChatScope(chatKey)
 	}
 	return chats
+}
+
+func metadataAllowsCurrentChat(metadata []session.Metadata, userID, chatKey string) bool {
+	chatKey = strings.TrimSpace(chatKey)
+	if chatKey == "" {
+		return true
+	}
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return false
+	}
+
+	matchedCurrent := false
+	for _, meta := range metadata {
+		if !sameChatKey(metadataChatKey(meta), chatKey) {
+			continue
+		}
+		matchedCurrent = true
+		if strings.TrimSpace(meta.UserID) != userID {
+			return false
+		}
+	}
+	return matchedCurrent
+}
+
+func metadataChatKey(meta session.Metadata) string {
+	source := strings.ToLower(strings.TrimSpace(meta.Source))
+	chatID := strings.TrimSpace(meta.ChatID)
+	if source == "" || chatID == "" {
+		return ""
+	}
+	return source + ":" + chatID
+}
+
+func sameChatKey(a, b string) bool {
+	aSource, aID, aOK := splitChatKey(a)
+	bSource, bID, bOK := splitChatKey(b)
+	if !aOK || !bOK {
+		return strings.TrimSpace(a) == strings.TrimSpace(b)
+	}
+	return strings.EqualFold(aSource, bSource) && aID == bID
+}
+
+func splitChatKey(chatKey string) (string, string, bool) {
+	source, chatID, ok := strings.Cut(strings.TrimSpace(chatKey), ":")
+	if !ok || strings.TrimSpace(source) == "" || strings.TrimSpace(chatID) == "" {
+		return "", "", false
+	}
+	return strings.TrimSpace(source), strings.TrimSpace(chatID), true
 }
 
 func fallbackChatScope(chatKey string) []string {

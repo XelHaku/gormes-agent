@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -256,19 +257,25 @@ func (s *Service) searchTurnFallback(ctx context.Context, params SearchParams) (
 			return nil, err
 		}
 		hits, err := memory.SearchMessages(ctx, s.db, metas, memory.SearchFilter{
-			UserID:  userID,
-			Sources: params.Sources,
-			Query:   params.Query,
+			UserID:           userID,
+			Sources:          params.Sources,
+			Query:            params.Query,
+			CurrentSessionID: params.SessionKey,
+			CurrentChatKey:   params.SessionKey,
 		}, 6)
+		if errors.Is(err, memory.ErrUserScopeDenied) {
+			return findTurns(ctx, s.db, params.Query, params.SessionKey, 6)
+		}
 		if err != nil {
 			return nil, err
 		}
 		out := make([]SearchHit, 0, len(hits))
 		for _, hit := range hits {
 			out = append(out, SearchHit{
-				Source:     "turn",
-				Content:    hit.Content,
-				SessionKey: hit.SessionID,
+				Source:       "turn",
+				OriginSource: hit.Source,
+				Content:      hit.Content,
+				SessionKey:   hit.SessionID,
 			})
 		}
 		return out, nil

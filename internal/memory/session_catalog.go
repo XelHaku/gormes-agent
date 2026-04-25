@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -10,12 +11,16 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/internal/session"
 )
 
+var ErrUserScopeDenied = errors.New("memory: user scope denied")
+
 // SearchFilter narrows cross-session search to one canonical user and an
 // optional set of transport sources.
 type SearchFilter struct {
-	UserID  string
-	Sources []string
-	Query   string
+	UserID           string
+	Sources          []string
+	Query            string
+	CurrentSessionID string
+	CurrentChatKey   string
 }
 
 // MessageSearchHit is one turn-level result from the session catalog.
@@ -39,7 +44,10 @@ type SessionSearchHit struct {
 // SearchMessages returns matching turns across the canonical sessions bound to
 // one user, optionally narrowed to a subset of sources.
 func SearchMessages(ctx context.Context, db *sql.DB, metas []session.Metadata, filter SearchFilter, limit int) ([]MessageSearchHit, error) {
-	selected := selectMetadata(metas, filter)
+	selected, err := selectMetadata(metas, filter)
+	if err != nil {
+		return nil, err
+	}
 	if len(selected) == 0 || limit == 0 {
 		return nil, nil
 	}
@@ -73,7 +81,10 @@ func SearchMessages(ctx context.Context, db *sql.DB, metas []session.Metadata, f
 
 // SearchSessions returns one row per matching session ordered by latest turn.
 func SearchSessions(ctx context.Context, db *sql.DB, metas []session.Metadata, filter SearchFilter, limit int) ([]SessionSearchHit, error) {
-	selected := selectMetadata(metas, filter)
+	selected, err := selectMetadata(metas, filter)
+	if err != nil {
+		return nil, err
+	}
 	if len(selected) == 0 || limit == 0 {
 		return nil, nil
 	}
@@ -105,15 +116,27 @@ func SearchSessions(ctx context.Context, db *sql.DB, metas []session.Metadata, f
 	return hits, nil
 }
 
-func selectMetadata(metas []session.Metadata, filter SearchFilter) []session.Metadata {
+func selectMetadata(metas []session.Metadata, filter SearchFilter) ([]session.Metadata, error) {
 	userID := strings.TrimSpace(filter.UserID)
 	if userID == "" {
-		return nil
+		return nil, nil
 	}
+	currentSessionID := strings.TrimSpace(filter.CurrentSessionID)
+	currentChatKey := strings.TrimSpace(filter.CurrentChatKey)
+	requireCurrentBinding := currentSessionID != "" || currentChatKey != ""
+	currentBindingMatched := !requireCurrentBinding
+
 	allowedSources := normalizeSources(filter.Sources)
 	selected := make([]session.Metadata, 0, len(metas))
 	for _, meta := range metas {
-		if strings.TrimSpace(meta.UserID) != userID {
+		metaUserID := strings.TrimSpace(meta.UserID)
+		if metadataMatchesCurrent(meta, currentSessionID, currentChatKey) {
+			if metaUserID != userID {
+				return nil, fmt.Errorf("%w: current binding belongs to %q", ErrUserScopeDenied, metaUserID)
+			}
+			currentBindingMatched = true
+		}
+		if metaUserID != userID {
 			continue
 		}
 		if len(allowedSources) > 0 && !slices.Contains(allowedSources, strings.ToLower(strings.TrimSpace(meta.Source))) {
@@ -121,7 +144,17 @@ func selectMetadata(metas []session.Metadata, filter SearchFilter) []session.Met
 		}
 		selected = append(selected, meta)
 	}
-	return selected
+	if !currentBindingMatched {
+		return nil, ErrUserScopeDenied
+	}
+	return selected, nil
+}
+
+func metadataMatchesCurrent(meta session.Metadata, currentSessionID, currentChatKey string) bool {
+	if currentSessionID != "" && strings.TrimSpace(meta.SessionID) == currentSessionID {
+		return true
+	}
+	return currentChatKey != "" && sameChatKey(canonicalChatKey(meta), currentChatKey)
 }
 
 func normalizeSources(sources []string) []string {
