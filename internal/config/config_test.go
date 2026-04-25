@@ -27,6 +27,9 @@ func TestLoad_BuiltinDefaults(t *testing.T) {
 	if cfg.Input.MaxBytes != 200_000 || cfg.Input.MaxLines != 10_000 {
 		t.Errorf("default input limits = %d/%d", cfg.Input.MaxBytes, cfg.Input.MaxLines)
 	}
+	if cfg.Delegation.MaxWaiting != 128 {
+		t.Errorf("default delegation.max_waiting = %d, want 128", cfg.Delegation.MaxWaiting)
+	}
 }
 
 func TestLoad_EnvOverridesFile(t *testing.T) {
@@ -225,6 +228,49 @@ func TestLoad_ResumeFlagEmptyDefault(t *testing.T) {
 	}
 	if cfg.Resume != "" {
 		t.Errorf("Resume (no flags) = %q, want \"\"", cfg.Resume)
+	}
+}
+
+func TestLoad_DelegationMaxWaitingFromConfig(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	dir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(`
+[delegation]
+max_waiting = 7
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Delegation.MaxWaiting != 7 {
+		t.Fatalf("Delegation.MaxWaiting = %d, want 7", cfg.Delegation.MaxWaiting)
+	}
+}
+
+func TestLoad_DelegationMaxWaitingRejectsNegative(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	dir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(`
+[delegation]
+max_waiting = -1
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(nil)
+	if err == nil || !strings.Contains(err.Error(), "delegation.max_waiting") {
+		t.Fatalf("Load err = %v, want delegation.max_waiting validation error", err)
 	}
 }
 

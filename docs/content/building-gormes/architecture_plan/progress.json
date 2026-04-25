@@ -843,9 +843,9 @@
             {
               "name": "Durable job backpressure + timeout audit",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes durable jobs expose GBrain-style max-waiting backpressure, wall-clock timeout evidence, and operator-readable queue health without importing Minions runtime code",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -875,7 +875,7 @@
                 "Wall-clock timeout_at is recorded and surfaced separately from context cancellation.",
                 "Doctor/status evidence reports waiting, claimed, timed-out, and backpressure-denied counts."
               ],
-              "note": "GBrain v0.20.3 added queue backpressure, wall-clock timeout evidence, and doctor/runbook surfaces. Gormes should borrow the resilience contract against its existing SQLite durable ledger, not import the GBrain Minions queue.",
+              "note": "Complete: TDD landed internal/subagent/durable_backpressure_test.go over the Go SQLite ledger. Durable submissions now reject with audited backpressure evidence when max_waiting is reached, claims persist timeout_at wall-clock evidence separately from cancellation intent, and doctor/status surfaces waiting, claimed, timed-out, stale waiting, queue-full, and backpressure-denied counts without importing GBrain Minions runtime code.",
               "write_scope": [
                 "internal/subagent/",
                 "internal/doctor/",
