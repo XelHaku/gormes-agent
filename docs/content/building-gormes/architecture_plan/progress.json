@@ -620,9 +620,9 @@
                 "Gateway registration tests prove Slack can be enabled through config and status/doctor output without requiring live Slack credentials."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T16:47:43Z",
-                "last_success": "2026-04-25T16:47:43Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
               },
               "planner_verdict": {
                 "reshape_count": 1,
@@ -1887,7 +1887,7 @@
                 "Stale state cleanup preserves last_error evidence while refusing to mark channels running.",
                 "The status renderer can display the validation result without starting or stopping any service."
               ],
-              "note": "TDD: port only the runtime-status/PID identity contract after the read-only status command lands, so stale-process handling does not collide with CLI rendering or token lock work.",
+              "note": "Complete: TDD landed RuntimeStatusStore PID identity records with start_time, generation, command, and argv fields in gateway_state.json plus the sibling gateway.pid record. Fake process-table fixtures prove missing state, missing PID file, stale PID, PID reuse, stopped process, permission-denied lookup, and live matching process classification; stale cleanup returns stopped channel state without dropping exit/error evidence, and `gormes gateway status` renders runtime_validation evidence from the read-only status path.",
               "write_scope": [
                 "internal/gateway/status.go",
                 "internal/gateway/status_test.go",
@@ -1903,11 +1903,10 @@
               "done_signal": [
                 "PID validation fixtures prove gateway_state.json cannot report a stale, stopped, or pid-reused process as running."
               ],
-              "note": "Complete: TDD landed RuntimeStatusStore PID identity records with start_time, generation, command, and argv fields in gateway_state.json plus the sibling gateway.pid record. Fake process-table fixtures prove missing state, missing PID file, stale PID, PID reuse, stopped process, permission-denied lookup, and live matching process classification; stale cleanup returns stopped channel state without dropping exit/error evidence, and `gormes gateway status` renders runtime_validation evidence from the read-only status path.",
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T16:48:05Z",
-                "last_success": "2026-04-25T16:48:05Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
               },
               "planner_verdict": {
                 "reshape_count": 1,
@@ -2096,6 +2095,20 @@
               "done_signal": [
                 "Expiry-finalization fixtures prove legacy migration, one-shot hook/cleanup persistence, retry/give-up evidence, and zero memory-flush task launches."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_failure": {
+                  "run_id": "20260425T163604Z-183378488",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5006b220 gateway/run.py",
@@ -4535,6 +4548,11 @@
               "done_signal": [
                 "Single-prompt compression fixtures prove auxiliary-bound thresholds use aux_context directly, preserve provider-cap evidence, and no longer reserve tool-schema or flush-memory headroom."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5006b220 run_agent.py",
@@ -5143,9 +5161,9 @@
                 "Codex Responses temperature fixtures and generated progress docs explain the no-temperature rule without memory-flush donor references."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T16:43:15Z",
-                "last_success": "2026-04-25T16:43:15Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -6381,6 +6399,11 @@
               "done_signal": [
                 "Oneshot flag fixtures prove top-level parsing, provider-without-model exit 2, env fallback, and no TUI/gateway startup during resolution."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T17:00:03Z",
+                "last_success": "2026-04-25T17:00:03Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5006b220 hermes_cli/oneshot.py",
