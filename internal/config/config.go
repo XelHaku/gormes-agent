@@ -83,10 +83,11 @@ type TelegramCfg struct {
 
 // DiscordCfg drives the Discord channel adapter.
 type DiscordCfg struct {
-	Token             string `toml:"token"`
-	AllowedChannelID  string `toml:"allowed_channel_id"`
-	CoalesceMs        int    `toml:"coalesce_ms"`
-	FirstRunDiscovery bool   `toml:"first_run_discovery"`
+	Token             string   `toml:"token"`
+	AllowedChannelID  string   `toml:"allowed_channel_id"`
+	ServerActions     []string `toml:"server_actions"`
+	CoalesceMs        int      `toml:"coalesce_ms"`
+	FirstRunDiscovery bool     `toml:"first_run_discovery"`
 }
 
 func (c DiscordCfg) Enabled() bool {
@@ -400,6 +401,9 @@ func loadEnv(cfg *Config) error {
 	if v := os.Getenv("GORMES_DISCORD_CHANNEL_ID"); v != "" {
 		cfg.Discord.AllowedChannelID = v
 	}
+	if v := os.Getenv("GORMES_DISCORD_SERVER_ACTIONS"); v != "" {
+		cfg.Discord.ServerActions = parseEnvCSV(v)
+	}
 	if v := os.Getenv("GORMES_SKILLS_ROOT"); v != "" {
 		cfg.Skills.Root = v
 	}
@@ -513,6 +517,18 @@ func parseEnvInt(name, value string) (int, error) {
 		return 0, fmt.Errorf("config env %s: %w", name, err)
 	}
 	return parsed, nil
+}
+
+func parseEnvCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 func loadFlags(cfg *Config, args []string) error {

@@ -4537,9 +4537,9 @@
             },
             {
               "name": "Discord tool split + platform-scoped toolsets",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes exposes Discord read/participate and Discord admin capabilities as separate descriptors/toolsets with platform-scoped availability",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -4575,7 +4575,7 @@
                 "Dynamic schema fixtures can drop actions based on missing token/intents/allowlist without leaving stale descriptions in the advertised schema.",
                 "Legacy discord_server remains unsupported or aliased only through explicit compatibility evidence, not as an active default tool."
               ],
-              "note": "Hermes b35d692f split Discord server introspection/management into least-privilege toolsets. Port descriptor and toolset scoping before any REST handler logic so Gormes agents do not see admin actions in non-Discord contexts.",
+              "note": "Complete: TDD landed descriptor-only Discord toolset fixtures and implementation. Gormes now exposes split discord and discord_admin descriptors only when the Discord or gateway platform scope explicitly enables those default-off toolsets, drops schemas for missing tokens, missing privileged intents, empty allowlists, or disallowed platforms, filters stale action-specific descriptions and parameters from dynamic schemas, preserves server_actions allowlist config, and keeps legacy discord_server out of active descriptors without porting Discord REST handlers.",
               "write_scope": [
                 "internal/tools/",
                 "internal/config/",
@@ -4588,6 +4588,11 @@
               "done_signal": [
                 "Discord toolset fixtures prove split descriptors, platform scoping, default-off behavior, and dynamic schema dropping without live Discord API calls."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T13:31:23Z",
+                "last_success": "2026-04-25T13:31:23Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:b35d692f tools/discord_tool.py",
