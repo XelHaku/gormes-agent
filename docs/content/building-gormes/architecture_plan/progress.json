@@ -453,10 +453,10 @@
             },
             {
               "name": "Non-editable gateway progress/commentary send fallback",
-              "status": "planned",
+              "status": "complete",
               "priority": "P3",
               "contract": "Channels without placeholder/edit capabilities receive progress-safe interim or final assistant messages through the plain Send path without EditMessage calls",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -485,7 +485,7 @@
                 "The same fixture proves no SendPlaceholder or EditMessage method is required for non-editable channels.",
                 "Editable channel streaming/coalescing tests keep their existing placeholder/edit behavior."
               ],
-              "note": "TDD: port the upstream f731c2c2 BlueBubbles quick-reply guard as a Go capability fixture: non-editable adapters should never be forced through the edit-message coalescer just to surface safe interim/commentary text.",
+              "note": "TDD landed: manager outbound tests now exercise a Channel-only fake from an originating inbound event, proving interim/commentary and terminal assistant output use the plain Send path with the original chat target while editable channels keep placeholder/edit coalescing.",
               "write_scope": [
                 "internal/gateway/manager.go",
                 "internal/gateway/manager_test.go",

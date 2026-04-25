@@ -36,6 +36,60 @@ func newFakeChannel(name string) *fakeChannel {
 	}
 }
 
+type channelOnlyFake struct {
+	name    string
+	inbox   chan<- InboundEvent
+	started chan struct{}
+
+	mu        sync.Mutex
+	sent      []fakeSent
+	nextMsgID int
+}
+
+func newChannelOnlyFake(name string) *channelOnlyFake {
+	return &channelOnlyFake{
+		name:      name,
+		started:   make(chan struct{}),
+		nextMsgID: 2000,
+	}
+}
+
+func (f *channelOnlyFake) Name() string { return f.name }
+
+func (f *channelOnlyFake) Run(ctx context.Context, inbox chan<- InboundEvent) error {
+	f.mu.Lock()
+	f.inbox = inbox
+	f.mu.Unlock()
+	close(f.started)
+	<-ctx.Done()
+	return nil
+}
+
+func (f *channelOnlyFake) Send(_ context.Context, chatID, text string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	id := strconv.Itoa(f.nextMsgID)
+	f.nextMsgID++
+	f.sent = append(f.sent, fakeSent{ChatID: chatID, Text: text, MsgID: id})
+	return id, nil
+}
+
+func (f *channelOnlyFake) pushInbound(e InboundEvent) {
+	<-f.started
+	f.mu.Lock()
+	in := f.inbox
+	f.mu.Unlock()
+	in <- e
+}
+
+func (f *channelOnlyFake) sentSnapshot() []fakeSent {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]fakeSent, len(f.sent))
+	copy(out, f.sent)
+	return out
+}
+
 func (f *fakeChannel) Name() string { return f.name }
 
 func (f *fakeChannel) Run(ctx context.Context, inbox chan<- InboundEvent) error {

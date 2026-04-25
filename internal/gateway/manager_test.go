@@ -334,6 +334,70 @@ func TestManager_Outbound_StreamsToPinnedChannel(t *testing.T) {
 	})
 }
 
+func TestManager_Outbound_NonEditableChannelUsesPlainSendForInterimAndFinal(t *testing.T) {
+	ch := newChannelOnlyFake("plainchat")
+	if _, ok := any(ch).(placeholderEditor); ok {
+		t.Fatal("channel-only fixture unexpectedly implements placeholder editing")
+	}
+	if _, ok := any(ch).(PlaceholderCapable); ok {
+		t.Fatal("channel-only fixture unexpectedly implements SendPlaceholder")
+	}
+	if _, ok := any(ch).(MessageEditor); ok {
+		t.Fatal("channel-only fixture unexpectedly implements EditMessage")
+	}
+
+	frames := make(chan kernel.RenderFrame, 8)
+	fk := &fakeKernel{}
+
+	m := NewManagerWithSubmitter(ManagerConfig{
+		AllowedChats: map[string]string{"plainchat": "thread-42"},
+		CoalesceMs:   10,
+	}, fk, slog.Default())
+	m.setRenderChan(frames)
+	if err := m.Register(ch); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = m.Run(ctx) }()
+
+	ch.pushInbound(InboundEvent{
+		Platform: "plainchat", ChatID: "thread-42", MsgID: "origin-msg",
+		Kind: EventSubmit, Text: "hi",
+	})
+	waitFor(t, 200*time.Millisecond, func() bool {
+		return len(fk.submitsSnapshot()) == 1
+	})
+
+	frames <- kernel.RenderFrame{
+		Phase:     kernel.PhaseStreaming,
+		DraftText: "I'll inspect the repo first.",
+	}
+	frames <- kernel.RenderFrame{
+		Phase: kernel.PhaseIdle,
+		History: []hermes.Message{
+			{Role: "user", Content: "hi"},
+			{Role: "assistant", Content: "done"},
+		},
+	}
+
+	waitFor(t, 500*time.Millisecond, func() bool {
+		return len(ch.sentSnapshot()) == 2
+	})
+
+	got := ch.sentSnapshot()
+	wantTexts := []string{"I'll inspect the repo first.", "done"}
+	for i, want := range wantTexts {
+		if got[i].ChatID != "thread-42" {
+			t.Fatalf("sent[%d].ChatID = %q, want original chat target %q", i, got[i].ChatID, "thread-42")
+		}
+		if got[i].Text != want {
+			t.Fatalf("sent[%d].Text = %q, want %q; sends=%#v", i, got[i].Text, want, got)
+		}
+	}
+}
+
 func TestManager_Outbound_FinalFrameClearsTurn(t *testing.T) {
 	tg := newFakeChannel("telegram")
 	frames := make(chan kernel.RenderFrame, 8)

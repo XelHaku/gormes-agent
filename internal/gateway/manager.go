@@ -442,8 +442,7 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 	}
 	pe, ok := ch.(placeholderEditor)
 	if !ok {
-		m.sendFinalNoStream(ctx, ch, f, chatID)
-		if f.Phase == kernel.PhaseIdle || f.Phase == kernel.PhaseFailed || f.Phase == kernel.PhaseCancelling {
+		if m.sendNoEdit(ctx, ch, f, chatID) {
 			m.drainNextFollowUp(ctx)
 		}
 		return
@@ -488,13 +487,20 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 	}
 }
 
-func (m *Manager) sendFinalNoStream(ctx context.Context, ch Channel, f kernel.RenderFrame, chatID string) {
+func (m *Manager) sendNoEdit(ctx context.Context, ch Channel, f kernel.RenderFrame, chatID string) bool {
 	switch f.Phase {
 	case kernel.PhaseIdle:
 		_, _ = m.sendWithHooks(ctx, ch, chatID, m.formatFinal(ch.Name(), f))
+		return true
 	case kernel.PhaseFailed, kernel.PhaseCancelling:
 		_, _ = m.sendWithHooks(ctx, ch, chatID, m.formatError(ch.Name(), f))
+		return true
+	case kernel.PhaseConnecting, kernel.PhaseStreaming, kernel.PhaseReconnecting, kernel.PhaseFinalizing:
+		if text := m.formatStream(ch.Name(), f); text != "" {
+			_, _ = m.sendWithHooks(ctx, ch, chatID, text)
+		}
 	}
+	return false
 }
 
 func (m *Manager) sendWithHooks(ctx context.Context, ch Channel, chatID, text string) (string, error) {
