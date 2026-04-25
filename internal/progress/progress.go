@@ -91,6 +91,10 @@ type Item struct {
 	Owner string `json:"owner,omitempty"`
 	ETA   string `json:"eta,omitempty"`
 	Note  string `json:"note,omitempty"`
+	// Health is execution-history metadata owned by autoloop. The planner
+	// must preserve this block verbatim across regenerations (see
+	// docs/superpowers/specs/2026-04-24-reactive-autoloop-design.md).
+	Health *RowHealth `json:"health,omitempty"`
 }
 
 type Subphase struct {
