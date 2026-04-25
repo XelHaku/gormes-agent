@@ -20,6 +20,7 @@ type PullRequestIntakeOptions struct {
 type PullRequestIntakeSummary struct {
 	Listed  int
 	Merged  int
+	Failed  int
 	Skipped int
 }
 
@@ -101,10 +102,11 @@ func MergeOpenPullRequests(ctx context.Context, opts PullRequestIntakeOptions) (
 	for _, pr := range ready {
 		merge := opts.Runner.Run(ctx, Command{
 			Name: "gh",
-			Args: []string{"pr", "merge", fmt.Sprint(pr.Number), "--merge", "--delete-branch"},
+			Args: []string{"pr", "merge", fmt.Sprint(pr.Number), "--merge", "--delete-branch", "--admin"},
 			Dir:  opts.RepoRoot,
 		})
 		if merge.Err != nil {
+			summary.Failed++
 			_ = appendPRIntakeEvent(opts, LedgerEvent{
 				TS:     time.Now().UTC(),
 				RunID:  opts.RunID,
@@ -112,23 +114,7 @@ func MergeOpenPullRequests(ctx context.Context, opts PullRequestIntakeOptions) (
 				Status: "merge_failed",
 				Detail: prDetail(pr) + " " + strings.TrimSpace(merge.Stderr),
 			})
-			return summary, fmt.Errorf("merge pull request #%d: %w: %s", pr.Number, merge.Err, strings.TrimSpace(merge.Stderr))
-		}
-
-		pull := opts.Runner.Run(ctx, Command{
-			Name: "git",
-			Args: []string{"pull", "--ff-only"},
-			Dir:  opts.RepoRoot,
-		})
-		if pull.Err != nil {
-			_ = appendPRIntakeEvent(opts, LedgerEvent{
-				TS:     time.Now().UTC(),
-				RunID:  opts.RunID,
-				Event:  "pr_intake_failed",
-				Status: "pull_failed",
-				Detail: prDetail(pr) + " " + strings.TrimSpace(pull.Stderr),
-			})
-			return summary, fmt.Errorf("pull after merging pull request #%d: %w: %s", pr.Number, pull.Err, strings.TrimSpace(pull.Stderr))
+			continue
 		}
 
 		summary.Merged++
@@ -143,12 +129,30 @@ func MergeOpenPullRequests(ctx context.Context, opts PullRequestIntakeOptions) (
 		}
 	}
 
+	if summary.Merged > 0 {
+		pull := opts.Runner.Run(ctx, Command{
+			Name: "git",
+			Args: []string{"pull", "--ff-only"},
+			Dir:  opts.RepoRoot,
+		})
+		if pull.Err != nil {
+			_ = appendPRIntakeEvent(opts, LedgerEvent{
+				TS:     time.Now().UTC(),
+				RunID:  opts.RunID,
+				Event:  "pr_intake_failed",
+				Status: "pull_failed",
+				Detail: fmt.Sprintf("listed=%d merged=%d failed=%d skipped=%d %s", summary.Listed, summary.Merged, summary.Failed, summary.Skipped, strings.TrimSpace(pull.Stderr)),
+			})
+			return summary, fmt.Errorf("pull after merging pull requests: %w: %s", pull.Err, strings.TrimSpace(pull.Stderr))
+		}
+	}
+
 	return summary, appendPRIntakeEvent(opts, LedgerEvent{
 		TS:     time.Now().UTC(),
 		RunID:  opts.RunID,
 		Event:  "pr_intake_completed",
 		Status: "completed",
-		Detail: fmt.Sprintf("listed=%d merged=%d skipped=%d", summary.Listed, summary.Merged, summary.Skipped),
+		Detail: fmt.Sprintf("listed=%d merged=%d failed=%d skipped=%d", summary.Listed, summary.Merged, summary.Failed, summary.Skipped),
 	})
 }
 

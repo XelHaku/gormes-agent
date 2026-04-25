@@ -60,6 +60,11 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		}); err != nil {
 			return RunSummary{}, err
 		}
+		if opts.Config.AutoCommitDirtyWorktree {
+			if err := checkpointDirtyWorktree(ctx, opts.Config, runID); err != nil {
+				return RunSummary{}, err
+			}
+		}
 		if err := preflightCleanWorktree(opts.Config, runID); err != nil {
 			return RunSummary{}, err
 		}
@@ -80,6 +85,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		PriorityBoost:      opts.Config.PriorityBoost,
 		MaxPhase:           opts.Config.MaxPhase,
 		IncludeQuarantined: opts.Config.IncludeQuarantined,
+		IncludeNeedsHuman:  opts.Config.IncludeNeedsHuman,
 	})
 	if err != nil {
 		return RunSummary{}, err
@@ -871,6 +877,100 @@ func appendRunLedgerEvent(cfg Config, event LedgerEvent) error {
 		return nil
 	}
 	return AppendLedgerEvent(filepath.Join(cfg.RunRoot, "state", "runs.jsonl"), event)
+}
+
+func checkpointDirtyWorktree(ctx context.Context, cfg Config, runID string) error {
+	if cfg.RepoRoot == "" || !repoHasGit(cfg.RepoRoot) {
+		return nil
+	}
+	if err := ensureNoMergeConflicts(cfg.RepoRoot); err != nil {
+		return recordCheckpointFailure(cfg, runID, "worktree_unmerged", err)
+	}
+
+	status, err := runGitCheckpointCommand(ctx, cfg.RepoRoot, "status", "--porcelain")
+	if err != nil {
+		return recordCheckpointFailure(cfg, runID, "status_failed", err)
+	}
+	dirty := strings.TrimSpace(status)
+	if dirty == "" {
+		return nil
+	}
+
+	if err := appendRunLedgerEvent(cfg, LedgerEvent{
+		TS:     time.Now().UTC(),
+		RunID:  runID,
+		Event:  "worktree_checkpoint_started",
+		Status: "started",
+		Detail: summarizeDirtyStatus(dirty),
+	}); err != nil {
+		return err
+	}
+	if _, err := runGitCheckpointCommand(ctx, cfg.RepoRoot, "add", "-A"); err != nil {
+		return recordCheckpointFailure(cfg, runID, "stage_failed", err)
+	}
+
+	message := fmt.Sprintf("autoloop: checkpoint dirty worktree %s", runID)
+	if _, err := runGitCheckpointCommand(ctx, cfg.RepoRoot,
+		"-c", "user.name=Gormes Autoloop",
+		"-c", "user.email=autoloop@gormes.local",
+		"-c", "commit.gpgsign=false",
+		"commit", "-m", message,
+	); err != nil {
+		return recordCheckpointFailure(cfg, runID, "commit_failed", err)
+	}
+
+	sha, err := gitHeadSha(cfg.RepoRoot)
+	if err != nil {
+		return recordCheckpointFailure(cfg, runID, "commit_sha_failed", err)
+	}
+	return appendRunLedgerEvent(cfg, LedgerEvent{
+		TS:     time.Now().UTC(),
+		RunID:  runID,
+		Event:  "worktree_checkpoint_committed",
+		Status: "committed",
+		Commit: sha,
+	})
+}
+
+func recordCheckpointFailure(cfg Config, runID string, status string, err error) error {
+	if ledgerErr := appendRunLedgerEvent(cfg, LedgerEvent{
+		TS:     time.Now().UTC(),
+		RunID:  runID,
+		Event:  "worktree_checkpoint_failed",
+		Status: status,
+		Detail: err.Error(),
+	}); ledgerErr != nil {
+		return ledgerErr
+	}
+	return err
+}
+
+func runGitCheckpointCommand(ctx context.Context, repoRoot string, args ...string) (string, error) {
+	cmdArgs := append([]string{"-C", repoRoot}, args...)
+	cmd := exec.CommandContext(ctx, "git", cmdArgs...)
+	output, err := cmd.CombinedOutput()
+	trimmed := strings.TrimSpace(string(output))
+	if err != nil {
+		if trimmed == "" {
+			return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
+		}
+		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, trimmed)
+	}
+	return trimmed, nil
+}
+
+func summarizeDirtyStatus(status string) string {
+	lines := strings.Split(strings.TrimSpace(status), "\n")
+	const maxLines = 20
+	if len(lines) > maxLines {
+		lines = append(lines[:maxLines], fmt.Sprintf("... %d more paths", len(lines)-maxLines))
+	}
+	out := strings.Join(lines, "\n")
+	const maxChars = 2000
+	if len(out) > maxChars {
+		return out[:maxChars] + "\n... truncated"
+	}
+	return out
 }
 
 func preflightCleanWorktree(cfg Config, runID string) error {

@@ -187,6 +187,73 @@ func TestNormalizeCandidates_StaleQuarantineFlagsAndIncludes(t *testing.T) {
 	}
 }
 
+func TestNormalizeCandidates_NeedsHumanSkippedByDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "progress.json")
+	writeHealthProgress(t, path, `{
+  "version": "1",
+  "phases": {
+    "1": {
+      "name": "P",
+      "subphases": {
+        "1.A": {
+          "name": "S",
+          "items": [
+            {"name": "row-a", "status": "planned", "contract": "do a", "contract_status": "draft",
+             "planner_verdict": {"needs_human": true, "reason": "auto", "since": "2026-04-25T10:00:00Z"}},
+            {"name": "row-b", "status": "planned", "contract": "do b", "contract_status": "draft"}
+          ]
+        }
+      }
+    }
+  }
+}
+`)
+	got, err := NormalizeCandidates(path, CandidateOptions{ActiveFirst: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ItemName != "row-b" {
+		t.Fatalf("expected only row-b, got %+v", got)
+	}
+}
+
+func TestNormalizeCandidates_IncludeNeedsHumanSurfacesAll(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "progress.json")
+	writeHealthProgress(t, path, `{
+  "version": "1",
+  "phases": {
+    "1": {
+      "name": "P",
+      "subphases": {
+        "1.A": {
+          "name": "S",
+          "items": [
+            {"name": "row-a", "status": "planned", "contract": "do a", "contract_status": "draft",
+             "planner_verdict": {"needs_human": true}}
+          ]
+        }
+      }
+    }
+  }
+}
+`)
+	got, err := NormalizeCandidates(path, CandidateOptions{ActiveFirst: true, IncludeNeedsHuman: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 candidate, got %d", len(got))
+	}
+	if !got[0].NeedsHumanFlag {
+		t.Fatal("NeedsHumanFlag should be true")
+	}
+	if reason := got[0].SelectionReason(); !strings.Contains(reason, "needs_human_visible") {
+		t.Fatalf("SelectionReason missing needs_human_visible; got: %s", reason)
+	}
+}
+
 func TestFailurePenalty_TableDriven(t *testing.T) {
 	cases := []struct {
 		consecutive int

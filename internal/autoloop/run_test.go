@@ -90,7 +90,7 @@ func TestRunOnceMergesOpenPullRequestsBeforeSelectingWork(t *testing.T) {
 	if got, want := runner.Commands[0], (Command{Name: "gh", Args: []string{"pr", "list", "--state", "open", "--limit", "100", "--json", "number,title,isDraft,mergeStateStatus,headRefName,url"}, Dir: repoRoot}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("first command = %#v, want PR list command %#v", got, want)
 	}
-	if got, want := runner.Commands[1], (Command{Name: "gh", Args: []string{"pr", "merge", "7", "--merge", "--delete-branch"}, Dir: repoRoot}); !reflect.DeepEqual(got, want) {
+	if got, want := runner.Commands[1], (Command{Name: "gh", Args: []string{"pr", "merge", "7", "--merge", "--delete-branch", "--admin"}, Dir: repoRoot}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("second command = %#v, want PR merge command %#v", got, want)
 	}
 
@@ -717,6 +717,61 @@ func TestRunOnceRefusesDirtyRepositoryBeforeWorkerLaunch(t *testing.T) {
 	}
 }
 
+func TestRunOnceAutoCommitsDirtyRepositoryBeforePreflight(t *testing.T) {
+	repoRoot := t.TempDir()
+	initCleanRepo(t, repoRoot)
+	progressPath := writeProgressJSON(t, `{"phases": {}}`)
+	if err := os.WriteFile(filepath.Join(repoRoot, "conflict.txt"), []byte("base changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoRoot, "new-cycle-file.txt"), []byte("cycle artifact\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runRoot := t.TempDir()
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:                repoRoot,
+			ProgressJSON:            progressPath,
+			RunRoot:                 runRoot,
+			Backend:                 "opencode",
+			Mode:                    "safe",
+			MaxAgents:               1,
+			AutoCommitDirtyWorktree: true,
+		},
+		Runner: &FakeRunner{},
+		Now:    time.Date(2026, 4, 25, 7, 8, 2, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if status := gitStatusPorcelain(t, repoRoot); status != "" {
+		t.Fatalf("git status = %q, want clean checkpointed worktree", status)
+	}
+	if subject := gitLogSubject(t, repoRoot); subject != "autoloop: checkpoint dirty worktree 20260425T070802Z" {
+		t.Fatalf("last commit subject = %q", subject)
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	var got []string
+	for _, event := range events {
+		got = append(got, event.Event+":"+event.Status)
+	}
+	want := []string{
+		"run_started:started",
+		"worktree_checkpoint_started:started",
+		"worktree_checkpoint_committed:committed",
+		"run_completed:completed",
+		"health_updated:ok",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ledger events = %#v, want %#v", got, want)
+	}
+	if events[2].Commit == "" {
+		t.Fatalf("checkpoint commit sha is empty")
+	}
+}
+
 func TestRunOnceFailsWhenWorkerLeavesDirtyWorktree(t *testing.T) {
 	repoRoot := t.TempDir()
 	initCleanRepo(t, repoRoot)
@@ -1097,6 +1152,16 @@ func gitStatusPorcelain(t *testing.T, repoRoot string) string {
 	out, err := exec.Command("git", "-C", repoRoot, "status", "--porcelain").Output()
 	if err != nil {
 		t.Fatalf("git status --porcelain failed: %v", err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func gitLogSubject(t *testing.T, repoRoot string) string {
+	t.Helper()
+
+	out, err := exec.Command("git", "-C", repoRoot, "log", "-1", "--pretty=%s").Output()
+	if err != nil {
+		t.Fatalf("git log -1 --pretty=%%s failed: %v", err)
 	}
 	return strings.TrimSpace(string(out))
 }

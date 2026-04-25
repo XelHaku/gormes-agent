@@ -24,6 +24,12 @@ type CandidateOptions struct {
 	// targets. Stale quarantines (spec hash mismatch) are always surfaced and
 	// flagged with Candidate.StaleQuarantine regardless of this setting.
 	IncludeQuarantined bool
+	// IncludeNeedsHuman causes NormalizeCandidates to surface rows whose
+	// PlannerVerdict.NeedsHuman is true. Default false: such rows are
+	// filtered out so the autoloop honors the planner's escalation. Mirrors
+	// IncludeQuarantined exactly. Surfaced rows are flagged with
+	// Candidate.NeedsHumanFlag for downstream visibility.
+	IncludeNeedsHuman bool
 }
 
 type Candidate struct {
@@ -62,6 +68,11 @@ type Candidate struct {
 	// (ConsecutiveFailures + 2*len(BackendsTried)). Recorded so the reason
 	// string and downstream tooling can surface why a row sank in priority.
 	PenaltyApplied int
+	// NeedsHumanFlag is set when the row's PlannerVerdict.NeedsHuman is true
+	// AND the candidate was surfaced anyway via IncludeNeedsHuman. Allows
+	// reporting / status tooling to highlight the override without re-loading
+	// the verdict block. Always false in the default skip-NeedsHuman path.
+	NeedsHumanFlag bool
 }
 
 // failurePenalty returns the ranking penalty for n consecutive failures.
@@ -102,6 +113,9 @@ func (candidate Candidate) SelectionReason() string {
 	}
 	if candidate.StaleQuarantine {
 		base += " quarantine_stale_cleared"
+	}
+	if candidate.NeedsHumanFlag {
+		base += " needs_human_visible"
 	}
 	return base
 }
@@ -195,6 +209,16 @@ func NormalizeCandidates(path string, opts CandidateOptions) ([]Candidate, error
 					} else if !opts.IncludeQuarantined {
 						continue
 					}
+				}
+				// L5 PlannerVerdict skip: rows the planner has escalated to
+				// "needs human" are removed from selection by default. Mirror
+				// of the quarantine-skip pattern above. IncludeNeedsHuman
+				// surfaces the row (flagged) for status / debug paths.
+				if item.PlannerVerdict != nil && item.PlannerVerdict.NeedsHuman {
+					if !opts.IncludeNeedsHuman {
+						continue
+					}
+					candidate.NeedsHumanFlag = true
 				}
 				if item.Health != nil {
 					pen := failurePenalty(item.Health.ConsecutiveFailures)
@@ -361,6 +385,10 @@ type progressItem struct {
 	// quarantine and ranking penalties without re-loading the file through
 	// the canonical progress.Load path.
 	Health *progress.RowHealth `json:"health,omitempty"`
+	// PlannerVerdict mirrors progress.Item.PlannerVerdict so candidate
+	// selection can honor planner-set NeedsHuman escalations without
+	// re-loading the file through progress.Load. Mirrors Health exactly.
+	PlannerVerdict *progress.PlannerVerdict `json:"planner_verdict,omitempty"`
 }
 
 // toProgressItem builds a progress.Item view containing only the fields used

@@ -153,6 +153,9 @@ func TestConfigFromEnvReactiveDefaults(t *testing.T) {
 	if cfg.IncludeQuarantined != false {
 		t.Fatalf("IncludeQuarantined = %v, want false", cfg.IncludeQuarantined)
 	}
+	if cfg.IncludeNeedsHuman != false {
+		t.Fatalf("IncludeNeedsHuman = %v, want false", cfg.IncludeNeedsHuman)
+	}
 	if cfg.ReportRepairEnabled != true {
 		t.Fatalf("ReportRepairEnabled = %v, want true", cfg.ReportRepairEnabled)
 	}
@@ -161,6 +164,9 @@ func TestConfigFromEnvReactiveDefaults(t *testing.T) {
 	}
 	if cfg.MergeOpenPullRequests != true {
 		t.Fatalf("MergeOpenPullRequests = %v, want true", cfg.MergeOpenPullRequests)
+	}
+	if cfg.AutoCommitDirtyWorktree != true {
+		t.Fatalf("AutoCommitDirtyWorktree = %v, want true", cfg.AutoCommitDirtyWorktree)
 	}
 	wantVerify := defaultPostPromotionVerifyCommands()
 	if !reflect.DeepEqual(cfg.PostPromotionVerifyCommands, wantVerify) {
@@ -180,9 +186,11 @@ func TestConfigFromEnvReactiveOverrides(t *testing.T) {
 		"BACKEND_DEGRADE_THRESHOLD":       "2",
 		"BACKEND_FALLBACK":                "codexu, claudeu ,opencode",
 		"GORMES_INCLUDE_QUARANTINED":      "true",
+		"GORMES_INCLUDE_NEEDS_HUMAN":      "yes",
 		"GORMES_REPORT_REPAIR":            "0",
 		"GORMES_PLANNER_QUARANTINE_LIMIT": "9",
 		"MERGE_OPEN_PULL_REQUESTS":        "0",
+		"AUTO_COMMIT_DIRTY_WORKTREE":      "false",
 		"POST_PROMOTION_VERIFY_COMMANDS":  "go test ./internal/autoloop -count=1;;go run ./cmd/autoloop progress validate",
 		"POST_PROMOTION_REPAIR":           "off",
 		"POST_PROMOTION_REPAIR_ATTEMPTS":  "2",
@@ -203,6 +211,9 @@ func TestConfigFromEnvReactiveOverrides(t *testing.T) {
 	if cfg.IncludeQuarantined != true {
 		t.Fatalf("IncludeQuarantined = %v, want true", cfg.IncludeQuarantined)
 	}
+	if cfg.IncludeNeedsHuman != true {
+		t.Fatalf("IncludeNeedsHuman = %v, want true", cfg.IncludeNeedsHuman)
+	}
 	if cfg.ReportRepairEnabled != false {
 		t.Fatalf("ReportRepairEnabled = %v, want false", cfg.ReportRepairEnabled)
 	}
@@ -211,6 +222,9 @@ func TestConfigFromEnvReactiveOverrides(t *testing.T) {
 	}
 	if cfg.MergeOpenPullRequests != false {
 		t.Fatalf("MergeOpenPullRequests = %v, want false", cfg.MergeOpenPullRequests)
+	}
+	if cfg.AutoCommitDirtyWorktree != false {
+		t.Fatalf("AutoCommitDirtyWorktree = %v, want false", cfg.AutoCommitDirtyWorktree)
 	}
 	verifyWant := []string{"go test ./internal/autoloop -count=1", "go run ./cmd/autoloop progress validate"}
 	if !reflect.DeepEqual(cfg.PostPromotionVerifyCommands, verifyWant) {

@@ -70,6 +70,11 @@ Useful environment variables:
   a failed post-promotion gate. Defaults to enabled.
 - `POST_PROMOTION_REPAIR_ATTEMPTS`: number of repair attempts before the run is
   recorded as failed. Defaults to `1`.
+- `AUTO_COMMIT_DIRTY_WORKTREE`: checkpoint dirty control-checkout changes
+  before preflight. Defaults to enabled for CLI cycles. Autoloop stages all
+  unignored changes with `git add -A` and commits them as
+  `autoloop: checkpoint dirty worktree <run-id>` so the next cycle can keep
+  moving. Set to `0` only when you want strict manual dirty-worktree refusal.
 
 ## Worker isolation and promotion
 
@@ -80,10 +85,13 @@ backend command runs with that worktree as its working directory, so worker
 edits cannot dirty the control checkout while autoloop is monitoring them.
 When more than one worker is selected, autoloop prepares all worker worktrees,
 launches their backend commands concurrently, then validates and promotes the
-finished branches in worker order. The flow per worker is:
+finished branches in worker order. Before candidate selection, autoloop
+checkpoints any dirty control-checkout changes by default, then runs the
+clean-worktree preflight. The flow per worker is:
 
-1. Pre-flight: refuse to launch if the repo has unmerged paths or uncommitted
-   changes (emits `run_failed:worktree_unmerged` / `run_failed:worktree_dirty`).
+1. Pre-flight: refuse to launch if the repo has unmerged paths or, after the
+   checkpoint attempt, still has uncommitted changes (emits
+   `run_failed:worktree_unmerged` / `run_failed:worktree_dirty`).
 2. Create a fresh worker branch in an isolated worktree and record its base
    commit.
 3. Run the backend with the worker prompt (which tells the agent the branch

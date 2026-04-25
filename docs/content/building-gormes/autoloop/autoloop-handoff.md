@@ -37,6 +37,7 @@ at a time. Do not maintain a parallel queue outside this docs tree.
 - Skip slice_size=umbrella rows until they are split.
 - Default cmd/autoloop runs cap eligible roadmap work at Phase 3 unless MAX_PHASE is explicitly overridden.
 - MAX_AGENTS is a safety cap: if fewer metadata-ready rows are available, run fewer workers instead of selecting filler or random work.
+- By default, each cmd/autoloop cycle checkpoints dirty control-checkout changes before preflight with `git add -A` and `autoloop: checkpoint dirty worktree <run-id>`.
 - Each worker runs in an isolated git worktree under RUN_ROOT/worktrees and promotion rejects committed paths outside the selected row's write_scope.
 - When git worktrees are available and MAX_AGENTS is greater than 1, cmd/autoloop launches selected workers concurrently, then validates and promotes each branch through the same ledgered safety gates.
 - After all promotions, cmd/autoloop runs the mandatory post-promotion full-suite gate before emitting run_completed or health_updated.

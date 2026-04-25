@@ -22,9 +22,11 @@ type Config struct {
 	BackendDegradeThreshold int      // BACKEND_DEGRADE_THRESHOLD, default 3
 	BackendFallback         []string // BACKEND_FALLBACK, default nil (no chain)
 	IncludeQuarantined      bool     // GORMES_INCLUDE_QUARANTINED, default false
+	IncludeNeedsHuman       bool     // GORMES_INCLUDE_NEEDS_HUMAN, default false (L5)
 	ReportRepairEnabled     bool     // GORMES_REPORT_REPAIR, default true (Task 6)
 	PlannerQuarantineLimit  int      // GORMES_PLANNER_QUARANTINE_LIMIT, default 5 (Task 7)
 	MergeOpenPullRequests   bool     // MERGE_OPEN_PULL_REQUESTS, default true
+	AutoCommitDirtyWorktree bool     // AUTO_COMMIT_DIRTY_WORKTREE, default true for CLI cycles
 
 	PostPromotionVerifyCommands []string // POST_PROMOTION_VERIFY_COMMANDS, default full-suite gate
 	PostPromotionRepairEnabled  bool     // POST_PROMOTION_REPAIR, default true
@@ -58,9 +60,11 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		BackendDegradeThreshold: 3,
 		BackendFallback:         nil,
 		IncludeQuarantined:      false,
+		IncludeNeedsHuman:       false,
 		ReportRepairEnabled:     true,
 		PlannerQuarantineLimit:  5,
 		MergeOpenPullRequests:   true,
+		AutoCommitDirtyWorktree: true,
 
 		PostPromotionVerifyCommands: defaultPostPromotionVerifyCommands(),
 		PostPromotionRepairEnabled:  true,
@@ -136,6 +140,13 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		}
 		cfg.IncludeQuarantined = b
 	}
+	if value := env["GORMES_INCLUDE_NEEDS_HUMAN"]; value != "" {
+		b, err := parseBoolEnv(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("GORMES_INCLUDE_NEEDS_HUMAN: %w", err)
+		}
+		cfg.IncludeNeedsHuman = b
+	}
 	if value := env["GORMES_REPORT_REPAIR"]; value != "" {
 		b, err := parseBoolEnv(value)
 		if err != nil {
@@ -159,6 +170,13 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 			return Config{}, fmt.Errorf("MERGE_OPEN_PULL_REQUESTS: %w", err)
 		}
 		cfg.MergeOpenPullRequests = b
+	}
+	if value := env["AUTO_COMMIT_DIRTY_WORKTREE"]; value != "" {
+		b, err := parseBoolEnv(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("AUTO_COMMIT_DIRTY_WORKTREE: %w", err)
+		}
+		cfg.AutoCommitDirtyWorktree = b
 	}
 	if value := env["POST_PROMOTION_VERIFY_COMMANDS"]; value != "" {
 		commands := splitCommandList(value)

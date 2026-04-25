@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -64,7 +63,7 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		return printStatus(filepath.Join(cfg.RunRoot, "planner_state.json"))
+		return printStatus(cfg)
 	case "show-report":
 		cfg, err := architectureplanner.ConfigFromEnv(root, plannerEnv(runOptions{}))
 		if err != nil {
@@ -196,29 +195,19 @@ func printRunSummary(summary architectureplanner.RunSummary, dryRun bool) error 
 	return nil
 }
 
-func printStatus(path string) error {
-	data, err := os.ReadFile(path)
+func printStatus(cfg architectureplanner.Config) error {
+	out, err := architectureplanner.RenderStatus(architectureplanner.RenderStatusOptions{
+		StatePath:          filepath.Join(cfg.RunRoot, "planner_state.json"),
+		PlannerLedgerPath:  filepath.Join(cfg.RunRoot, "state", "runs.jsonl"),
+		AutoloopLedgerPath: filepath.Join(cfg.AutoloopRunRoot, "state", "runs.jsonl"),
+		ProgressJSONPath:   cfg.ProgressJSON,
+		EvaluationWindow:   cfg.EvaluationWindow,
+	})
 	if err != nil {
 		return err
 	}
-	var state map[string]any
-	if err := json.Unmarshal(data, &state); err != nil {
-		return err
-	}
-	fmt.Fprintf(commandStdout, "Last run UTC: %s\n", stateString(state, "last_run_utc"))
-	fmt.Fprintf(commandStdout, "Backend: %s\n", stateString(state, "backend"))
-	fmt.Fprintf(commandStdout, "Mode: %s\n", stateString(state, "mode"))
-	fmt.Fprintf(commandStdout, "Progress JSON: %s\n", stateString(state, "progress_json"))
-	fmt.Fprintf(commandStdout, "Report: %s\n", stateString(state, "report_path"))
-	fmt.Fprintf(commandStdout, "Context: %s\n", stateString(state, "context_path"))
-	return nil
-}
-
-func stateString(state map[string]any, key string) string {
-	if value, ok := state[key].(string); ok && value != "" {
-		return value
-	}
-	return "unknown"
+	_, err = io.WriteString(commandStdout, out)
+	return err
 }
 
 func printFile(path string) error {

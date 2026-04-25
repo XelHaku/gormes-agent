@@ -66,6 +66,12 @@ instructions elsewhere. `autoloop` should consume the same source of truth that
 contributors read: progress rows for machine selection, generated pages for
 operator review, and row metadata for worker prompts.
 
+Each CLI cycle checkpoints dirty control-checkout changes before the clean
+preflight by default. That means self-improvement edits from the previous
+agent run are staged with `git add -A` and committed as
+`autoloop: checkpoint dirty worktree <run-id>` before the next phase slice is
+selected.
+
 Worker execution is isolated: `cmd/autoloop` creates a git worktree under
 `RUN_ROOT/worktrees` for each selected row, runs the backend there, and rejects
 committed paths outside that row's `write_scope` before promotion.
