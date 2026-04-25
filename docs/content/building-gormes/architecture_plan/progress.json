@@ -3288,6 +3288,11 @@
               "done_signal": [
                 "internal/hermes/context_compressor_budget_test.go proves initialization and UpdateModelContext-style model switches recalculate threshold, tail, and max-summary budgets from the active context window."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T10:36:15Z",
+                "last_success": "2026-04-25T10:36:15Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T10:20:06Z"
@@ -3296,11 +3301,6 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5401a008 agent/context_compressor.py",
                 "note": "Hermes defines the compressor budget behavior; Gormes must adapt it to Go-native ContextEngine budget/status code without importing Python runtime."
-              },
-              "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T10:34:30Z",
-                "last_success": "2026-04-25T10:34:30Z"
               }
             },
             {
