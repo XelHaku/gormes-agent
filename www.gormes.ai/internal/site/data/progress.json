@@ -18,6 +18,8 @@
       "candidate_policy": [
         "Skip rows with blocked_by until ready_when is satisfied.",
         "Skip slice_size=umbrella rows until they are split.",
+        "Default cmd/autoloop runs cap eligible roadmap work at Phase 3 unless MAX_PHASE is explicitly overridden.",
+        "MAX_AGENTS is a safety cap: if fewer metadata-ready rows are available, run fewer workers instead of selecting filler or random work.",
         "Prefer contract rows with write_scope, test_commands, and done_signal.",
         "Inject selected progress metadata into the worker prompt instead of asking workers to rescan the whole roadmap."
       ]

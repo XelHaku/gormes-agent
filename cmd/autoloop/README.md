@@ -53,9 +53,11 @@ Useful environment variables:
 - `RUN_ROOT`: override the autoloop runtime state/log root.
 - `BACKEND`: select `codexu`, `claudeu`, or `opencode`.
 - `MODE`: select `safe`, `unattended`, or `full`.
-- `MAX_AGENTS`: cap selected rows for one run.
-- `MAX_PHASE`: cap eligible roadmap phases. Defaults to `0` for no phase cap;
-  set a positive value when the operator wants to hold later phases.
+- `MAX_AGENTS`: cap selected rows for one run. If fewer rows are metadata-ready,
+  autoloop runs fewer workers instead of choosing filler or random work.
+- `MAX_PHASE`: cap eligible roadmap phases. Defaults to `3` so current
+  unattended runs stay inside Phases 1-3. Set `0` only for an explicit
+  unbounded run.
 - `PRIORITY_BOOST`: comma-separated subphase IDs to pull ahead of equally ready
   work. Defaults to the active priority channels: `2.B.3,2.B.4,2.B.10,2.B.11`.
 
