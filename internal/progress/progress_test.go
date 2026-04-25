@@ -65,10 +65,10 @@ func TestLoad_RealFile(t *testing.T) {
 	if got := p.Phases["2"].DerivedStatus(); got != StatusInProgress {
 		t.Errorf("Phase 2 = %q, want in_progress", got)
 	}
-	// Phase 3 is open again because Honcho dreaming is tracked as a planned
-	// local Goncho scheduler/status row.
-	if got := p.Phases["3"].DerivedStatus(); got != StatusInProgress {
-		t.Errorf("Phase 3 = %q, want in_progress", got)
+	// Phase 3 memory rows are shipped, including the local Goncho dream
+	// scheduler/status evidence row.
+	if got := p.Phases["3"].DerivedStatus(); got != StatusComplete {
+		t.Errorf("Phase 3 = %q, want complete", got)
 	}
 	// Phase 4 has the Anthropic adapter landed while the rest stays planned.
 	if got := p.Phases["4"].DerivedStatus(); got != StatusInProgress {
@@ -703,11 +703,13 @@ func TestLoad_RealFile_Phase2ExecutionQueue(t *testing.T) {
 	}
 
 	lifecycleStore := lifecycleItems["Pairing read-model schema + atomic persistence"]
-	if lifecycleStore.Status != StatusPlanned {
-		t.Fatalf("Phase 2.F.3 pairing read model status = %q, want planned", lifecycleStore.Status)
+	if lifecycleStore.Status != StatusComplete {
+		t.Fatalf("Phase 2.F.3 pairing read model status = %q, want complete", lifecycleStore.Status)
 	}
-	if !strings.Contains(lifecycleStore.Note, "gateway/pairing.py") || !strings.Contains(lifecycleStore.Note, "pairing.json") {
-		t.Fatalf("Phase 2.F.3 pairing read model note = %q, want pairing-donor/pairing.json detail", lifecycleStore.Note)
+	if !strings.Contains(lifecycleStore.Note, "PairingStore") ||
+		!strings.Contains(lifecycleStore.Note, "pairing.json") ||
+		!strings.Contains(lifecycleStore.Note, "no code-generation") {
+		t.Fatalf("Phase 2.F.3 pairing read model note = %q, want PairingStore/pairing.json/no-code-generation detail", lifecycleStore.Note)
 	}
 	approval := lifecycleItems["Pairing approval + rate-limit semantics"]
 	if approval.Status != StatusPlanned {
