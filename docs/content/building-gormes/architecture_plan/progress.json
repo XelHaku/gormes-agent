@@ -3863,6 +3863,11 @@
               "done_signal": [
                 "Headroom fixtures prove tool-schema overhead plus 12000 reserved tokens lower auxiliary-bound thresholds and clamp at the 64000-token floor without provider calls."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T14:12:37Z",
+                "last_success": "2026-04-25T14:12:37Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:6e561ffa run_agent.py",
@@ -4477,6 +4482,11 @@
               "done_signal": [
                 "Unsupported-parameter fixtures prove generic detector coverage, preserved temperature retry behavior, max_tokens-to-max_completion_tokens retry, and no retry when MaxTokens is absent."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T14:12:37Z",
+                "last_success": "2026-04-25T14:12:37Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:6e561ffa agent/auxiliary_client.py",
@@ -5576,9 +5586,9 @@
                 "Effective-toolset fixtures prove duplicate bundled plugin keys are collapsed, built-in labels win, unique plugin toolsets survive, and no plugin runtime executes."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T14:06:28Z",
-                "last_success": "2026-04-25T14:06:28Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T14:12:37Z",
+                "last_success": "2026-04-25T14:12:37Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
