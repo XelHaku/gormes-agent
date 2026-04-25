@@ -48,7 +48,17 @@ var memoryStatusCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		queueStatus, err := goncho.ReadQueueStatus(context.Background(), db)
+		cfg, err := config.Load(nil)
+		if err != nil {
+			return err
+		}
+		gonchoCfg := cfg.Goncho.RuntimeConfig()
+		queueStatus, err := goncho.ReadQueueStatus(context.Background(), db, goncho.QueueStatusConfig{
+			DreamEnabled:     gonchoCfg.DreamEnabled,
+			WorkspaceID:      gonchoCfg.WorkspaceID,
+			ObserverPeerID:   gonchoCfg.ObserverPeerID,
+			DreamIdleTimeout: gonchoCfg.DreamIdleTimeout,
+		})
 		if err != nil {
 			return err
 		}
@@ -93,8 +103,38 @@ func formatGonchoQueueStatus(status goncho.QueueStatus) string {
 			counts.CompletedWorkUnits,
 		))
 	}
+	b.WriteString(formatDreamQueueEvidence(status.Dream))
 	if status.Degraded {
-		b.WriteString("goncho_queue: unavailable (zero tracked work units)\n")
+		if status.WorkUnits["dream"].TotalWorkUnits > 0 {
+			b.WriteString("goncho_queue: degraded (dream work intent tracked locally; representation/summary workers unavailable)\n")
+		} else {
+			b.WriteString("goncho_queue: unavailable (zero tracked work units)\n")
+		}
+	}
+	return b.String()
+}
+
+func formatDreamQueueEvidence(status goncho.DreamQueueStatus) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("dream_status: %s\n", status.Status))
+	b.WriteString(fmt.Sprintf("dream_scheduler_table: %s\n", availableWord(status.TablePresent)))
+	if len(status.Evidence) == 0 {
+		b.WriteString("dream_evidence: none\n")
+		return b.String()
+	}
+	b.WriteString("dream_evidence:\n")
+	for _, item := range status.Evidence {
+		b.WriteString(fmt.Sprintf("- %s: %s", item.Code, item.Reason))
+		if item.ObservedPeerID != "" {
+			b.WriteString(fmt.Sprintf(" observed=%s", item.ObservedPeerID))
+		}
+		if item.CooldownUntil > 0 {
+			b.WriteString(fmt.Sprintf(" cooldown_until=%d", item.CooldownUntil))
+		}
+		if item.IdleUntil > 0 {
+			b.WriteString(fmt.Sprintf(" idle_until=%d", item.IdleUntil))
+		}
+		b.WriteString("\n")
 	}
 	return b.String()
 }

@@ -3,6 +3,7 @@ package goncho
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/memory"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/session"
@@ -21,6 +22,7 @@ type Config struct {
 	PeerCardEnabled              bool
 	SummaryEnabled               bool
 	DreamEnabled                 bool
+	DreamIdleTimeout             time.Duration
 	DeriverWorkers               int
 	RepresentationBatchMaxTokens int
 	DialecticDefaultLevel        DialecticLevel
@@ -44,6 +46,9 @@ const (
 	DefaultGetContextMaxTokens          = 100_000
 	DefaultDeriverWorkers               = 1
 	DefaultRepresentationBatchMaxTokens = 1024
+	DefaultDreamMinConclusions          = 50
+	DefaultDreamCooldown                = 8 * time.Hour
+	DefaultDreamIdleTimeout             = time.Hour
 )
 
 // Effective fills the Go-native Goncho defaults used when older callers still
@@ -72,6 +77,9 @@ func (c Config) Effective() Config {
 	out.ReasoningEnabled = true
 	out.PeerCardEnabled = true
 	out.SummaryEnabled = true
+	if out.DreamIdleTimeout <= 0 {
+		out.DreamIdleTimeout = DefaultDreamIdleTimeout
+	}
 	if out.DeriverWorkers <= 0 {
 		out.DeriverWorkers = DefaultDeriverWorkers
 	}
@@ -184,6 +192,7 @@ type ContextParams struct {
 	SearchMaxDistance   *float64 `json:"search_max_distance,omitempty"`
 	IncludeMostFrequent *bool    `json:"include_most_frequent,omitempty"`
 	MaxConclusions      *int     `json:"max_conclusions,omitempty"`
+	IncludeDreamStatus  *bool    `json:"include_dream_status,omitempty"`
 }
 
 // MessageSlice is one recent message excerpt included in context responses.

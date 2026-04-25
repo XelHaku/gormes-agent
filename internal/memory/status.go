@@ -13,6 +13,7 @@ var diagnosticTables = []string{
 	"goncho_peer_cards",
 	"goncho_conclusions",
 	"goncho_conclusions_fts",
+	"goncho_dreams",
 }
 
 // DeadLetterSummary is the operator-facing shape for one recent turn that

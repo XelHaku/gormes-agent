@@ -3020,9 +3020,9 @@
             {
               "name": "Goncho dreaming scheduler contract",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Goncho models Honcho dream scheduling as local auditable work intent with cooldown, idle, threshold, and dedupe gates before any LLM dream execution",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -3058,7 +3058,7 @@
                 "Manual schedule requests are deduped and report whether they created, reused, or rejected a dream intent.",
                 "Doctor/status output exposes dream_disabled, dream_pending, dream_in_progress, and dream_cooldown evidence without waiting for queue emptiness."
               ],
-              "note": "TDD-ready: add the Honcho dreaming scheduler contract as data and status evidence only. Keep deduction/induction execution, surprisal trees, and background workers for follow-up rows.",
+              "note": "TDD landed: Goncho now records local auditable dream work intent in goncho_dreams, gates automatic scheduling on 50 new conclusions, eight-hour cooldown, and configured idle timeout, dedupes pending/in-progress work per workspace/observer/observed tuple, marks pending dreams stale on new activity, and reports dream_disabled, dream_unavailable, dream_pending, dream_in_progress, and dream_cooldown in context, doctor, and status evidence without LLM execution, surprisal trees, hosted Honcho calls, or background workers.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",
