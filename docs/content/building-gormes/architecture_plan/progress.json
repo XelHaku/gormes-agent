@@ -5522,9 +5522,9 @@
             {
               "name": "Effective toolset picker dedupes bundled plugin keys",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "CLI toolset selection merges built-in toolsets with plugin-provided toolsets without duplicate keys, preserving the built-in label and description when bundled plugins such as Spotify share a key",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -5560,7 +5560,7 @@
                 "A unique user or project plugin toolset can still appear as a disabled metadata row without executing runtime code.",
                 "Duplicate keys produce deterministic evidence or status and do not appear twice in runtime-visible or persisted platform selections."
               ],
-              "note": "Hermes ac05daa1/6e561ffa fixed duplicate bundled-plugin toolsets in `hermes tools`. Gormes has plugin metadata and platform toolset persistence, but no row yet freezes the effective picker merge rule that keeps bundled plugins from duplicating built-in choices.",
+              "note": "Complete: TDD added a pure effective toolset picker helper and fixture. Built-in picker rows come from the upstream parity manifest, plugin-declared toolsets append only for unseen keys, bundled Spotify duplicates collapse with built-in label/description/source preserved, unique plugin toolsets remain disabled metadata rows, and duplicate evidence is reported without executing plugin runtime code.",
               "write_scope": [
                 "internal/cli/",
                 "internal/plugins/",
@@ -5575,6 +5575,11 @@
               "done_signal": [
                 "Effective-toolset fixtures prove duplicate bundled plugin keys are collapsed, built-in labels win, unique plugin toolsets survive, and no plugin runtime executes."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T14:06:28Z",
+                "last_success": "2026-04-25T14:06:28Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:6e561ffa hermes_cli/tools_config.py",
