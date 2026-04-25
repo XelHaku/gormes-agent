@@ -105,6 +105,47 @@ func TestRunStatusAndShowReportUseConfiguredRunRoot(t *testing.T) {
 	}
 }
 
+func TestServiceInstallWritesUnits(t *testing.T) {
+	repoRoot := writeCommandFixture(t)
+	xdg := filepath.Join(repoRoot, ".config")
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	t.Setenv("AUTO_START", "0")
+	t.Setenv("PLANNER_INTERVAL", "6h")
+	withWorkingDir(t, repoRoot)
+
+	runner := &autoloop.FakeRunner{Results: []autoloop.Result{{}}}
+	oldRunner := commandRunner
+	commandRunner = runner
+	t.Cleanup(func() { commandRunner = oldRunner })
+
+	if err := run([]string{"service", "install"}); err != nil {
+		t.Fatalf("service install error = %v", err)
+	}
+
+	servicePath := filepath.Join(xdg, "systemd", "user", "gormes-architecture-planner.service")
+	timerPath := filepath.Join(xdg, "systemd", "user", "gormes-architecture-planner.timer")
+	for _, path := range []string{servicePath, timerPath} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected unit at %s: %v", path, err)
+		}
+	}
+
+	timerBody, err := os.ReadFile(timerPath)
+	if err != nil {
+		t.Fatalf("read timer: %v", err)
+	}
+	if !strings.Contains(string(timerBody), "OnUnitActiveSec=6h") {
+		t.Fatalf("timer body missing 6h cadence:\n%s", timerBody)
+	}
+
+	if got, want := len(runner.Commands), 1; got != want {
+		t.Fatalf("Commands length = %d, want %d (daemon-reload only when AUTO_START=0)", got, want)
+	}
+	if runner.Commands[0].Name != "systemctl" || runner.Commands[0].Args[0] != "--user" || runner.Commands[0].Args[1] != "daemon-reload" {
+		t.Fatalf("Commands[0] = %#v, want systemctl --user daemon-reload", runner.Commands[0])
+	}
+}
+
 func TestRunRejectsUnknownCommand(t *testing.T) {
 	err := run([]string{"unknown"})
 	if err == nil {

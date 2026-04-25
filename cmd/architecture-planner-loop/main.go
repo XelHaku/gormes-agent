@@ -16,7 +16,7 @@ import (
 var commandStdout io.Writer = os.Stdout
 var commandRunner autoloop.Runner = autoloop.ExecRunner{}
 
-const usage = "usage: architecture-planner-loop run [--dry-run] [--codexu|--claudeu] [--mode safe|full|unattended] | status | show-report | doctor"
+const usage = "usage: architecture-planner-loop run [--dry-run] [--codexu|--claudeu] [--mode safe|full|unattended] | status | show-report | doctor | service install [--force]"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -75,6 +75,15 @@ func run(args []string) error {
 			return err
 		}
 		return doctor(cfg)
+	case "service":
+		if len(args) >= 2 && args[1] == "install" {
+			force, err := plannerServiceForce(args[2:])
+			if err != nil {
+				return err
+			}
+			return installPlannerService(root, force)
+		}
+		return fmt.Errorf(usage)
 	case "--help", "-h", "help":
 		_, err := fmt.Fprintln(commandStdout, usage)
 		return err
@@ -199,6 +208,55 @@ func printFile(path string) error {
 	}
 	_, err = commandStdout.Write(data)
 	return err
+}
+
+func plannerServiceForce(args []string) (bool, error) {
+	force := os.Getenv("FORCE") == "1"
+	for _, arg := range args {
+		if arg != "--force" {
+			return false, fmt.Errorf(usage)
+		}
+		force = true
+	}
+	return force, nil
+}
+
+func installPlannerService(root string, force bool) error {
+	unitDir, err := plannerUnitDir()
+	if err != nil {
+		return err
+	}
+	interval := os.Getenv("PLANNER_INTERVAL")
+	autoStart := os.Getenv("AUTO_START") != "0"
+
+	return architectureplanner.InstallPlannerService(context.Background(), architectureplanner.PlannerServiceInstallOptions{
+		Runner:      commandRunner,
+		UnitDir:     unitDir,
+		UnitName:    "gormes-architecture-planner.service",
+		TimerName:   "gormes-architecture-planner.timer",
+		PlannerPath: plannerWrapperPath(root),
+		WorkDir:     root,
+		Interval:    interval,
+		AutoStart:   autoStart,
+		Force:       force,
+	})
+}
+
+func plannerUnitDir() (string, error) {
+	if value := os.Getenv("XDG_CONFIG_HOME"); value != "" {
+		return filepath.Join(value, "systemd", "user"), nil
+	}
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".config", "systemd", "user"), nil
+	}
+	return "", fmt.Errorf("cannot determine systemd user unit directory: set XDG_CONFIG_HOME or HOME")
+}
+
+func plannerWrapperPath(root string) string {
+	if path := os.Getenv("PLANNER_PATH"); path != "" {
+		return path
+	}
+	return filepath.Join(root, "scripts", "architecture-planner-loop.sh")
 }
 
 func doctor(cfg architectureplanner.Config) error {
