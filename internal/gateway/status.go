@@ -44,6 +44,7 @@ type RuntimeStatus struct {
 	ExitReason   string                           `json:"exit_reason"`
 	ActiveAgents int                              `json:"active_agents"`
 	Platforms    map[string]PlatformRuntimeStatus `json:"platforms"`
+	Proxy        ProxyRuntimeStatus               `json:"proxy"`
 	UpdatedAt    string                           `json:"updated_at"`
 }
 
@@ -55,6 +56,14 @@ type PlatformRuntimeStatus struct {
 	UpdatedAt    string        `json:"updated_at"`
 }
 
+// ProxyRuntimeStatus reports gateway proxy mode health for operator readouts.
+type ProxyRuntimeStatus struct {
+	State        string `json:"state"`
+	URL          string `json:"url,omitempty"`
+	ErrorMessage string `json:"error_message"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
 // RuntimeStatusUpdate carries a partial update to the shared runtime status.
 type RuntimeStatusUpdate struct {
 	GatewayState GatewayState
@@ -64,6 +73,10 @@ type RuntimeStatusUpdate struct {
 	Platform      string
 	PlatformState PlatformState
 	ErrorMessage  string
+
+	ProxyState        string
+	ProxyURL          string
+	ProxyErrorMessage string
 }
 
 // RuntimeStatusWriter is the manager-facing seam for lifecycle status writes.
@@ -146,6 +159,16 @@ func (s *RuntimeStatusStore) merge(status *RuntimeStatus, update RuntimeStatusUp
 		} else {
 			status.ActiveAgents = *update.ActiveAgents
 		}
+	}
+	if update.ProxyState != "" || update.ProxyURL != "" || update.ProxyErrorMessage != "" {
+		if update.ProxyState != "" {
+			status.Proxy.State = update.ProxyState
+		}
+		if update.ProxyURL != "" {
+			status.Proxy.URL = update.ProxyURL
+		}
+		status.Proxy.ErrorMessage = update.ProxyErrorMessage
+		status.Proxy.UpdatedAt = status.UpdatedAt
 	}
 	if update.Platform == "" {
 		return

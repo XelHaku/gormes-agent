@@ -27,6 +27,7 @@ type Config struct {
 	ConfigVersion int `toml:"_config_version"`
 
 	Hermes     HermesCfg     `toml:"hermes"`
+	Gateway    GatewayCfg    `toml:"gateway"`
 	TUI        TUICfg        `toml:"tui"`
 	Input      InputCfg      `toml:"input"`
 	Telegram   TelegramCfg   `toml:"telegram"`
@@ -197,6 +198,11 @@ type HermesCfg struct {
 	Model    string `toml:"model"`
 }
 
+type GatewayCfg struct {
+	ProxyURL string `toml:"proxy_url"`
+	ProxyKey string `toml:"proxy_key"`
+}
+
 type TUICfg struct {
 	Theme string `toml:"theme"`
 }
@@ -359,6 +365,12 @@ func loadEnv(cfg *Config) error {
 	if v := os.Getenv("GORMES_API_KEY"); v != "" {
 		cfg.Hermes.APIKey = v
 	}
+	if v := strings.TrimSpace(os.Getenv("GATEWAY_PROXY_URL")); v != "" {
+		cfg.Gateway.ProxyURL = v
+	}
+	if v := strings.TrimSpace(os.Getenv("GATEWAY_PROXY_KEY")); v != "" {
+		cfg.Gateway.ProxyKey = v
+	}
 	if v := os.Getenv("GORMES_TELEGRAM_TOKEN"); v != "" {
 		cfg.Telegram.BotToken = v
 	}
@@ -506,6 +518,8 @@ func loadFlags(cfg *Config, args []string) error {
 }
 
 func validateConfig(cfg *Config) error {
+	cfg.Gateway.ProxyURL = normalizeGatewayProxyURL(cfg.Gateway.ProxyURL)
+	cfg.Gateway.ProxyKey = strings.TrimSpace(cfg.Gateway.ProxyKey)
 	cfg.Goncho.Workspace = strings.TrimSpace(cfg.Goncho.Workspace)
 	cfg.Goncho.ObserverPeer = strings.TrimSpace(cfg.Goncho.ObserverPeer)
 	cfg.Goncho.DialecticDefaultLevel = strings.ToLower(strings.TrimSpace(cfg.Goncho.DialecticDefaultLevel))
@@ -538,6 +552,10 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("config: goncho.deriver_workers must be at least 1")
 	}
 	return nil
+}
+
+func normalizeGatewayProxyURL(raw string) string {
+	return strings.TrimRight(strings.TrimSpace(raw), "/")
 }
 
 func xdgConfigHome() string {

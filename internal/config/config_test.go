@@ -49,6 +49,60 @@ endpoint = "http://file:8642"
 	}
 }
 
+func TestLoad_GatewayProxyURLFromConfigNormalizesTrailingSlash(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	t.Setenv("GATEWAY_PROXY_URL", "")
+	dir := filepath.Join(cfgHome, "gormes")
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "config.toml"), []byte(`
+[gateway]
+proxy_url = "http://config-proxy:8642/"
+`), 0o644)
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Gateway.ProxyURL != "http://config-proxy:8642" {
+		t.Errorf("Gateway.ProxyURL = %q, want normalized config proxy URL", cfg.Gateway.ProxyURL)
+	}
+}
+
+func TestLoad_GatewayProxyEnvOverridesConfigAndBlankEnvIsUnset(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	dir := filepath.Join(cfgHome, "gormes")
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "config.toml"), []byte(`
+[gateway]
+proxy_url = "http://config-proxy:8642/"
+proxy_key = "config-secret"
+`), 0o644)
+
+	t.Setenv("GATEWAY_PROXY_URL", "  ")
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Gateway.ProxyURL != "http://config-proxy:8642" {
+		t.Fatalf("blank env Gateway.ProxyURL = %q, want config fallback", cfg.Gateway.ProxyURL)
+	}
+
+	t.Setenv("GATEWAY_PROXY_URL", "http://env-proxy:8642/")
+	t.Setenv("GATEWAY_PROXY_KEY", "env-secret")
+	cfg, err = Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Gateway.ProxyURL != "http://env-proxy:8642" {
+		t.Errorf("Gateway.ProxyURL = %q, want env proxy URL without trailing slash", cfg.Gateway.ProxyURL)
+	}
+	if cfg.Gateway.ProxyKey != "env-secret" {
+		t.Errorf("Gateway.ProxyKey = %q, want env secret", cfg.Gateway.ProxyKey)
+	}
+}
+
 func TestLoad_FlagOverridesEnv(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("GORMES_ENDPOINT", "http://env:8642")
