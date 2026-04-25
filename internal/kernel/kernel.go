@@ -87,12 +87,13 @@ type Kernel struct {
 	// All fields below this line are OWNED EXCLUSIVELY by the Run goroutine.
 	// No other goroutine may read or write them without a channel-based
 	// handshake. Violating this invariant is a race.
-	phase     Phase
-	draft     string
-	history   []hermes.Message
-	soul      []SoulEntry
-	sessionID string
-	lastError string
+	phase       Phase
+	draft       string
+	history     []hermes.Message
+	soul        []SoulEntry
+	sessionID   string
+	lastError   string
+	retryStatus RetryStatus
 }
 
 func New(cfg Config, c hermes.Client, s store.Store, tm telemetry.Telemetry, log *slog.Logger) *Kernel {
@@ -101,14 +102,15 @@ func New(cfg Config, c hermes.Client, s store.Store, tm telemetry.Telemetry, log
 	}
 	tm.SetModel(cfg.Model)
 	return &Kernel{
-		cfg:       cfg,
-		client:    c,
-		store:     s,
-		tm:        tm,
-		log:       log,
-		render:    make(chan RenderFrame, RenderMailboxCap),
-		events:    make(chan PlatformEvent, PlatformEventMailboxCap),
-		sessionID: cfg.InitialSessionID,
+		cfg:         cfg,
+		client:      c,
+		store:       s,
+		tm:          tm,
+		log:         log,
+		render:      make(chan RenderFrame, RenderMailboxCap),
+		events:      make(chan PlatformEvent, PlatformEventMailboxCap),
+		sessionID:   cfg.InitialSessionID,
+		retryStatus: NewRetryStatus(),
 	}
 }
 
@@ -251,6 +253,7 @@ func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID st
 	k.history = append(k.history, hermes.Message{Role: "user", Content: text})
 	k.draft = ""
 	k.lastError = ""
+	k.retryStatus = NewRetryStatus()
 	k.phase = PhaseConnecting
 	k.emitFrame("connecting")
 	prov.LogPOSTSent(k.log)
@@ -345,12 +348,14 @@ toolLoop:
 			stream, err := k.client.OpenStream(runCtx, request)
 			if err != nil {
 				cancelRun()
-				if hermes.Classify(err) == hermes.ClassRetryable && !retryBudget.Exhausted() {
+				classification := hermes.ClassifyProviderError(err)
+				if classification.Class == hermes.ClassRetryable && !retryBudget.Exhausted() {
+					decision := retryBudget.NextDelayDecision(err)
+					k.retryStatus = retryStatusWithDecision(k.retryStatus, decision, classification)
 					k.phase = PhaseReconnecting
 					k.lastError = "reconnecting: " + err.Error()
 					k.emitFrame("reconnecting")
-					delay := retryBudget.NextDelayFor(err)
-					if werr := Wait(ctx, delay); werr != nil {
+					if werr := Wait(ctx, decision.Delay); werr != nil {
 						cancelled = true
 						break toolLoop
 					}
@@ -385,15 +390,21 @@ toolLoop:
 				break toolLoop
 			case streamOutcomeRetryable:
 				if retryBudget.Exhausted() {
+					k.retryStatus.LastDecision = RetryDecisionBudgetExhaust
 					k.phase = PhaseFailed
 					k.lastError = "reconnect budget exhausted"
 					k.emitFrame("reconnect budget exhausted")
 					return
 				}
+				decision := retryBudget.NextDelayDecision(nil)
+				k.retryStatus = retryStatusWithDecision(k.retryStatus, decision, hermes.ProviderErrorClassification{
+					Kind:      hermes.ProviderErrorRetryable,
+					Class:     hermes.ClassRetryable,
+					Retryable: true,
+				})
 				k.phase = PhaseReconnecting
 				k.emitFrame("reconnecting")
-				delay := retryBudget.NextDelay()
-				if werr := Wait(ctx, delay); werr != nil {
+				if werr := Wait(ctx, decision.Delay); werr != nil {
 					cancelled = true
 					break toolLoop
 				}
@@ -699,16 +710,18 @@ func (k *Kernel) addSoul(text string) {
 // one. This is what keeps a slow TUI from backpressuring the kernel.
 func (k *Kernel) emitFrame(status string) {
 	frame := RenderFrame{
-		Seq:        k.seq.Add(1),
-		Phase:      k.phase,
-		DraftText:  k.draft,
-		History:    append([]hermes.Message(nil), k.history...),
-		Telemetry:  k.tm.Snapshot(),
-		StatusText: status,
-		SessionID:  k.sessionID,
-		Model:      k.cfg.Model,
-		LastError:  k.lastError,
-		SoulEvents: append([]SoulEntry(nil), k.soul...),
+		Seq:            k.seq.Add(1),
+		Phase:          k.phase,
+		DraftText:      k.draft,
+		History:        append([]hermes.Message(nil), k.history...),
+		Telemetry:      k.tm.Snapshot(),
+		ProviderStatus: hermes.ProviderStatusOf(k.client),
+		RetryStatus:    k.retryStatus.snapshot(),
+		StatusText:     status,
+		SessionID:      k.sessionID,
+		Model:          k.cfg.Model,
+		LastError:      k.lastError,
+		SoulEvents:     append([]SoulEntry(nil), k.soul...),
 	}
 	// Drain old frame if present, then enqueue new.
 	select {

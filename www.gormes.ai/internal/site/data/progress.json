@@ -1902,9 +1902,9 @@
             {
               "name": "Goncho file upload import ingestion",
               "priority": "P4",
-              "status": "planned",
+              "status": "complete",
               "contract": "Goncho can import text-like memory files as session messages without persisting original file bytes, matching Honcho's file-upload migration model",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -1942,7 +1942,7 @@
                 "created_at, metadata, and configuration are preserved when provided.",
                 "Runtime chunk size follows Honcho source settings.MAX_MESSAGE_SIZE at 25000 characters unless upstream changes that setting."
               ],
-              "note": "Honcho docs and the OpenClaw integration use file upload as the non-destructive path for legacy USER.md, MEMORY.md, SOUL.md, memory/, and similar files. Gormes should port the import semantics before adding a managed API client or web upload surface.",
+              "note": "TDD landed: internal/goncho/file_import_test.go covers text, Markdown, and JSON imports as ordinary session messages, file metadata in meta_json, required peer_id, unsupported content-type rejection before writes, no raw JSON file-byte persistence, created_at/metadata/configuration preservation, Honcho MAX_MESSAGE_SIZE chunking at 25000 characters, and queue-unavailable evidence. Verified with go test ./internal/goncho ./internal/memory ./cmd/gormes -count=1.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",
@@ -1954,7 +1954,12 @@
               ],
               "done_signal": [
                 "File import fixtures prove supported formats become ordinary messages, unsupported formats fail before writes, and original files are not persisted."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-25T05:34:12Z",
+                "last_success": "2026-04-25T05:34:12Z"
+              }
             },
             {
               "name": "Goncho topology design fixtures",

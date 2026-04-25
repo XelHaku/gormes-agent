@@ -37,6 +37,10 @@ func NewHTTPClient(baseURL, apiKey string) Client {
 	}
 }
 
+func (c *httpClient) ProviderStatus() ProviderStatus {
+	return openAICompatibleProviderStatus()
+}
+
 func (c *httpClient) Health(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+defaultHealthPath, nil)
 	if err != nil {

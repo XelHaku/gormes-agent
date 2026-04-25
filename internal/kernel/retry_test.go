@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -116,6 +117,99 @@ func TestKernel_OpenStreamRetryUsesProviderRetryAfterHint(t *testing.T) {
 	}
 }
 
+func TestKernel_InitialFrameExposesProviderCapabilitiesAndRetrySchedule(t *testing.T) {
+	client := &statusClient{status: hermes.ProviderStatus{
+		Provider: "fixture-provider",
+		Runtime:  "fixture-runtime",
+		Capabilities: hermes.ProviderCapabilities{
+			PromptCache:     hermes.CapabilityStatus{Available: false, Reason: "fixture cache disabled"},
+			RateGuard:       hermes.CapabilityStatus{Available: false, Reason: "fixture rate guard unavailable"},
+			BudgetTelemetry: hermes.CapabilityStatus{Available: false, Reason: "fixture budget telemetry unavailable"},
+		},
+	}}
+	k := New(Config{
+		Model:     "hermes-agent",
+		Endpoint:  "http://mock",
+		Admission: Admission{MaxBytes: 200_000, MaxLines: 10_000},
+	}, client, store.NewNoop(), telemetry.New(), nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go k.Run(ctx)
+
+	frame := <-k.Render()
+	if frame.ProviderStatus.Provider != "fixture-provider" {
+		t.Fatalf("ProviderStatus.Provider = %q, want fixture-provider", frame.ProviderStatus.Provider)
+	}
+	if frame.ProviderStatus.Capabilities.PromptCache.Reason != "fixture cache disabled" {
+		t.Fatalf("PromptCache.Reason = %q, want fixture cache disabled", frame.ProviderStatus.Capabilities.PromptCache.Reason)
+	}
+	wantSchedule := []time.Duration{
+		1 * time.Second,
+		2 * time.Second,
+		4 * time.Second,
+		8 * time.Second,
+		16 * time.Second,
+	}
+	if !reflect.DeepEqual(frame.RetryStatus.Schedule, wantSchedule) {
+		t.Fatalf("RetryStatus.Schedule = %v, want %v", frame.RetryStatus.Schedule, wantSchedule)
+	}
+	if frame.RetryStatus.MaxProviderRetryAfter != 16*time.Second {
+		t.Fatalf("RetryStatus.MaxProviderRetryAfter = %v, want 16s", frame.RetryStatus.MaxProviderRetryAfter)
+	}
+}
+
+func TestKernel_ReconnectingFrameReportsProviderRetryAfterDecision(t *testing.T) {
+	client := &retryAfterClient{
+		firstErr: &hermes.HTTPError{
+			Status:     http.StatusTooManyRequests,
+			Body:       `{"error":{"message":"slow down","code":"rate_limit"}}`,
+			RetryAfter: 25 * time.Millisecond,
+		},
+	}
+	k := New(Config{
+		Model:     "hermes-agent",
+		Endpoint:  "http://mock",
+		Admission: Admission{MaxBytes: 200_000, MaxLines: 10_000},
+	}, client, store.NewNoop(), telemetry.New(), nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go k.Run(ctx)
+
+	initial := <-k.Render()
+	if initial.Phase != PhaseIdle {
+		t.Fatalf("initial phase = %v, want Idle", initial.Phase)
+	}
+	if err := k.Submit(PlatformEvent{Kind: PlatformEventSubmit, Text: "hi"}); err != nil {
+		t.Fatal(err)
+	}
+
+	reconnecting := waitForFrameMatching(t, k.Render(), func(f RenderFrame) bool {
+		return f.Phase == PhaseReconnecting && f.RetryStatus.LastDecision == RetryDecisionProviderHint
+	}, 300*time.Millisecond)
+
+	if reconnecting.RetryStatus.AttemptsUsed != 1 {
+		t.Fatalf("AttemptsUsed = %d, want 1", reconnecting.RetryStatus.AttemptsUsed)
+	}
+	if reconnecting.RetryStatus.LastProviderRetryAfter != 25*time.Millisecond {
+		t.Fatalf("LastProviderRetryAfter = %v, want 25ms", reconnecting.RetryStatus.LastProviderRetryAfter)
+	}
+	if reconnecting.RetryStatus.LastDelay != 25*time.Millisecond {
+		t.Fatalf("LastDelay = %v, want provider hint 25ms", reconnecting.RetryStatus.LastDelay)
+	}
+	if reconnecting.RetryStatus.LastScheduledDelay < 800*time.Millisecond ||
+		reconnecting.RetryStatus.LastScheduledDelay > 1200*time.Millisecond {
+		t.Fatalf("LastScheduledDelay = %v, want first jittered backoff envelope", reconnecting.RetryStatus.LastScheduledDelay)
+	}
+	if reconnecting.RetryStatus.LastErrorKind != hermes.ProviderErrorRateLimit.String() {
+		t.Fatalf("LastErrorKind = %q, want %q", reconnecting.RetryStatus.LastErrorKind, hermes.ProviderErrorRateLimit)
+	}
+	if reconnecting.RetryStatus.LastErrorClass != hermes.ClassRetryable.String() {
+		t.Fatalf("LastErrorClass = %q, want retryable", reconnecting.RetryStatus.LastErrorClass)
+	}
+}
+
 type retryAfterClient struct {
 	firstErr error
 	calls    int
@@ -139,6 +233,22 @@ func (c *retryAfterClient) OpenRunEvents(context.Context, string) (hermes.RunEve
 }
 
 func (c *retryAfterClient) Health(context.Context) error { return nil }
+
+type statusClient struct {
+	status hermes.ProviderStatus
+}
+
+func (c *statusClient) OpenStream(context.Context, hermes.ChatRequest) (hermes.Stream, error) {
+	return nil, io.EOF
+}
+
+func (c *statusClient) OpenRunEvents(context.Context, string) (hermes.RunEventStream, error) {
+	return nil, hermes.ErrRunEventsNotSupported
+}
+
+func (c *statusClient) Health(context.Context) error { return nil }
+
+func (c *statusClient) ProviderStatus() hermes.ProviderStatus { return c.status }
 
 type retryAfterStream struct {
 	events []hermes.Event

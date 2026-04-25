@@ -38,16 +38,18 @@ func (p Phase) String() string {
 // RenderFrame is the only TUI input. The TUI never assembles assistant text
 // from raw provider events; it renders this frame, full stop.
 type RenderFrame struct {
-	Seq        uint64
-	Phase      Phase
-	DraftText  string
-	History    []hermes.Message
-	Telemetry  telemetry.Snapshot
-	StatusText string
-	SessionID  string
-	Model      string
-	LastError  string
-	SoulEvents []SoulEntry
+	Seq            uint64
+	Phase          Phase
+	DraftText      string
+	History        []hermes.Message
+	Telemetry      telemetry.Snapshot
+	ProviderStatus hermes.ProviderStatus
+	RetryStatus    RetryStatus
+	StatusText     string
+	SessionID      string
+	Model          string
+	LastError      string
+	SoulEvents     []SoulEntry
 }
 
 type SoulEntry struct {

@@ -75,6 +75,10 @@ func NewAnthropicClient(baseURL, apiKey string) Client {
 	}
 }
 
+func (c *anthropicClient) ProviderStatus() ProviderStatus {
+	return anthropicProviderStatus()
+}
+
 func (c *anthropicClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, error) {
 	payload, err := buildAnthropicRequest(req)
 	if err != nil {
