@@ -3807,7 +3807,7 @@
             },
             {
               "name": "OpenAI-compatible chat-completions API server",
-              "status": "planned",
+              "status": "complete",
               "contract": "OpenAI-compatible chat.completions HTTP surface over the native Gormes turn loop",
               "contract_status": "fixture_ready",
               "slice_size": "medium",
