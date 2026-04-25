@@ -32,7 +32,7 @@ func TestGonchoDoctorCommand_TextZeroStateReportsOperatorLadder(t *testing.T) {
 		"workspace: gormes",
 		"observer_peer: gormes",
 		"Schema",
-		"schema_version: 3g",
+		"schema_version: " + memory.CurrentSchemaVersion(),
 		"Session catalog",
 		"no session catalog data",
 		"Tool registration",
@@ -47,7 +47,8 @@ func TestGonchoDoctorCommand_TextZeroStateReportsOperatorLadder(t *testing.T) {
 		"Conclusion availability",
 		"conclusion_count: 0",
 		"Summary availability",
-		"summary_table: unavailable",
+		"summary_table: available",
+		"summary_count: 0",
 		"Provider readiness",
 		"optional_provider_checks: degraded",
 		"Degraded modes",
@@ -129,7 +130,7 @@ func TestGonchoDoctorCommand_JSONZeroStateIsMachineReadable(t *testing.T) {
 	if got.Config.MemoryDBPath != config.MemoryDBPath() || got.Config.Workspace != "gormes" || got.Config.ObserverPeer != "gormes" {
 		t.Fatalf("config = %+v", got.Config)
 	}
-	if got.Schema.Version != "3g" || !got.Schema.Tables["goncho_conclusions"] {
+	if got.Schema.Version != memory.CurrentSchemaVersion() || !got.Schema.Tables["goncho_conclusions"] {
 		t.Fatalf("schema = %+v", got.Schema)
 	}
 	if !slices.Contains(got.ToolRegistration.Registered, "honcho_context") {
@@ -149,8 +150,8 @@ func TestGonchoDoctorCommand_JSONZeroStateIsMachineReadable(t *testing.T) {
 	if got.ConclusionAvailability.Total != 0 {
 		t.Fatalf("conclusion total = %d, want 0", got.ConclusionAvailability.Total)
 	}
-	if got.SummaryAvailability.Status != "degraded" || got.SummaryAvailability.TablePresent {
-		t.Fatalf("summary availability = %+v, want degraded absent table", got.SummaryAvailability)
+	if got.SummaryAvailability.Status != "zero_state" || !got.SummaryAvailability.TablePresent {
+		t.Fatalf("summary availability = %+v, want zero_state present table", got.SummaryAvailability)
 	}
 	if got.ProviderReadiness.Status != "degraded" || got.ProviderReadiness.Required || got.ProviderReadiness.Checked {
 		t.Fatalf("provider readiness = %+v, want optional degraded without network check", got.ProviderReadiness)

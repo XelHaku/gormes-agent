@@ -300,16 +300,16 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 3.F — Goncho Honcho Memory Parity 🔨
 
 - [x] Goncho context representation options
-- [ ] Goncho search filter grammar
-- [ ] Directional peer cards and representation scopes
+- [x] Goncho search filter grammar
+- [x] Directional peer cards and representation scopes
 - [ ] Goncho queue status read model
-- [ ] Goncho summary context budget
-- [ ] Goncho dialectic chat contract
+- [x] Goncho summary context budget
+- [x] Goncho dialectic chat contract
 - [ ] Goncho file upload import ingestion
 - [x] Goncho topology design fixtures
-- [ ] Goncho operator diagnostics contract
+- [x] Goncho operator diagnostics contract
 - [ ] Goncho streaming chat persistence contract
-- [ ] Goncho configuration namespace
+- [x] Goncho configuration namespace
 
 ## Phase 4 — The Brain Transplant 🔨
 

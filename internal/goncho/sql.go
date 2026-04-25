@@ -33,7 +33,7 @@ type sessionSummaryRow struct {
 	TokenCount  int
 }
 
-func upsertPeerCard(ctx context.Context, db *sql.DB, workspaceID, peer string, card []string) error {
+func upsertPeerCard(ctx context.Context, db *sql.DB, workspaceID, observer, peer string, card []string) error {
 	raw, err := json.Marshal(card)
 	if err != nil {
 		return fmt.Errorf("goncho: marshal peer card: %w", err)

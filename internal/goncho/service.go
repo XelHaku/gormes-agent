@@ -263,7 +263,7 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 	sessionKey := strings.TrimSpace(params.SessionKey)
 	query := effectiveContextQuery(params)
 	tokenLimit := effectiveContextTokenLimit(params)
-	unavailable := contextUnavailableEvidence(params)
+	unavailable := contextUnavailableEvidence(params, s.observer, peer)
 
 	card, err := getPeerCard(ctx, s.db, s.workspaceID, s.observer, peer)
 	if err != nil {
@@ -359,6 +359,66 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 		RecentMessages: recentMessages,
 		Unavailable:    unavailable,
 	}, nil
+}
+
+func (s *Service) Chat(ctx context.Context, peer string, params ChatParams) (ChatResult, error) {
+	peer = strings.TrimSpace(peer)
+	if peer == "" {
+		return ChatResult{}, fmt.Errorf("goncho: peer is required")
+	}
+	query := strings.TrimSpace(params.Query)
+	if query == "" {
+		return ChatResult{}, fmt.Errorf("goncho: query is required")
+	}
+	reasoningLevel := normalizeReasoningLevel(params.ReasoningLevel)
+	if !ValidDialecticLevel(reasoningLevel) {
+		return ChatResult{}, fmt.Errorf("goncho: unsupported reasoning_level %q", params.ReasoningLevel)
+	}
+
+	card, err := getPeerCard(ctx, s.db, s.workspaceID, s.observer, peer)
+	if err != nil {
+		return ChatResult{}, err
+	}
+	searchResult, err := s.Search(ctx, SearchParams{
+		Peer:       peer,
+		Query:      query,
+		SessionKey: params.SessionID,
+	})
+	if err != nil {
+		return ChatResult{}, err
+	}
+
+	unavailable := chatUnavailableEvidence(params)
+	return ChatResult{
+		Content: buildChatContent(peer, query, reasoningLevel, card, searchResult.Results, unavailable),
+	}, nil
+}
+
+func normalizeReasoningLevel(level string) string {
+	level = strings.ToLower(strings.TrimSpace(level))
+	if level == "" {
+		return string(DialecticLevelLow)
+	}
+	return level
+}
+
+func chatUnavailableEvidence(params ChatParams) []ContextUnavailableEvidence {
+	var unavailable []ContextUnavailableEvidence
+	if params.Stream {
+		unavailable = append(unavailable, ContextUnavailableEvidence{
+			Field:      "stream",
+			Capability: "streaming_chat",
+			Reason:     "streaming chat transport is unavailable; returning deterministic non-streaming content",
+		})
+	}
+	if strings.TrimSpace(params.Target) != "" {
+		unavailable = append(unavailable, ContextUnavailableEvidence{
+			Field:      "target",
+			Capability: "target_specific_reasoning",
+			Reason:     "target-specific dialectic reasoning is unavailable; default observer recall was used",
+		})
+	}
+	return unavailable
 }
 
 func effectiveContextQuery(params ContextParams) string {

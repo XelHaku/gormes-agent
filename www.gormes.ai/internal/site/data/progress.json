@@ -1639,9 +1639,9 @@
             {
               "name": "Goncho search filter grammar",
               "priority": "P4",
-              "status": "planned",
+              "status": "complete",
               "contract": "Goncho search accepts a typed subset of Honcho v3 filters and rejects unsupported filter operators visibly",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -1672,7 +1672,7 @@
                 "The first executable implementation supports a documented subset and returns unsupported-filter evidence for the rest.",
                 "Limit defaults to 10 and clamps to the Honcho-documented maximum of 100."
               ],
-              "note": "Honcho docs expose a richer filter grammar than current Goncho sources[]. Port this as an internal AST and evidence contract before adding public HTTP search parity.",
+              "note": "TDD landed: Goncho SearchParams now accept Honcho-shaped filters and limit, parse an internal AST for AND, OR, NOT, gt, gte, lt, lte, ne, in, contains, icontains, metadata paths, and wildcard values, then compile only the current enforceable subset. session_id, source, and peer_id equality/in/wildcard filters narrow search; metadata, content, created_at, OR, NOT, unknown fields, and unknown operators return structured unsupported-filter errors instead of being ignored. Same-chat source/session deny paths and user-scope session/source filters are fixture-locked, and search limit defaults to 10 with a maximum of 100.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",
@@ -1688,9 +1688,9 @@
             {
               "name": "Directional peer cards and representation scopes",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Peer cards and stored representations are keyed by workspace, observer, and observed peer instead of a flat workspace/peer pair",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -1722,7 +1722,7 @@
                 "Directional target cards are stored independently from default self cards.",
                 "Late-join non-retroactive reasoning remains documented as unsupported until the deriver queue exists."
               ],
-              "note": "Honcho docs make directional cards and representations a public concept. Goncho has an observer default but still stores cards as workspace+peer only; this row adds the storage and tool-edge semantics without implementing observe_others task scheduling.",
+              "note": "TDD landed: peer cards are stored by workspace, observer, and observed peer with legacy flat cards migrated to observer=gormes. Directional fixtures prove observer/observed isolation, max-40 truncation, and manual set_card replacement semantics; honcho_profile exposes optional target for directional card reads/writes. Context still reports directional representation as unavailable and uses only the default gormes observer view. Late-join non-retroactive reasoning and observe_others scheduling remain unsupported until the deriver queue exists.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",
@@ -1788,9 +1788,9 @@
             {
               "name": "Goncho summary context budget",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Session summaries use Honcho's short/long cadence and 40/60 context budget without double-billing last-N-turn recall",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -1822,7 +1822,7 @@
                 "Service.Context allocates 40 percent of the token budget to summary and 60 percent to recent messages when summary=true.",
                 "summary=false fills the budget with recent messages only."
               ],
-              "note": "Honcho docs clarify that summaries are recursive compression slots, not the same thing as last-N-turn recall. Port this after context options so tool callers can request or disable the summary component explicitly.",
+              "note": "TDD landed: Goncho now stores one short and one long session summary slot in goncho_session_summaries, refreshes deterministic short/long slots at the Honcho default 20/60 message cadence, exposes summary/tokens/search_query context options, allocates summary=true context with a 40 percent summary budget and 60 percent recent-message budget without reusing messages covered by the selected summary, lets summary=false spend the token budget on recent messages only, and reports summary_absent evidence when no requested summary can fit.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",
@@ -1839,9 +1839,9 @@
             {
               "name": "Goncho dialectic chat contract",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Goncho exposes a Honcho peer.chat-compatible request and response contract while keeping query-specific reasoning separate from prompt-time context assembly",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -2016,9 +2016,9 @@
             {
               "name": "Goncho operator diagnostics contract",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes exposes a Honcho-inspired Goncho doctor path that checks memory topology, queues, config, and degraded modes without requiring operators to inspect raw tables",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -2061,7 +2061,7 @@
                 "Zero-state databases report no data without failing.",
                 "The command reuses existing memory status where possible instead of adding a second status model."
               ],
-              "note": "Honcho CLI docs emphasize fast diagnosis for peers that are not learning, wrong context, and dialectic issues. Goncho needs the same operator ladder so long-running agents can repair the right layer without guessing.",
+              "note": "TDD landed: `gormes goncho doctor` reports config paths, schema/table presence, session catalog state, Honcho-compatible tool registration, context dry-run output, extractor and Goncho queue status, conclusion and summary availability, provider readiness, and visible degraded modes without external Honcho, network services, or hosted LLM calls by default. JSON output is available for autoloop/planner consumption; exit-code fixtures cover 0 healthy/degraded, 1 client/config, 2 runtime/storage, and 3 auth/provider. `gormes memory status` now includes the observability-only Goncho representation/summary/dream zero-state alongside the existing extractor queue.",
               "write_scope": [
                 "cmd/gormes/",
                 "internal/goncho/",
@@ -2137,9 +2137,9 @@
             {
               "name": "Goncho configuration namespace",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes owns a Go-native [goncho] configuration namespace that maps Honcho runtime limits and feature gates into existing config loading",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -2179,7 +2179,7 @@
                 "Invalid reasoning levels and negative limits fail config validation.",
                 "Doctor output includes the effective Goncho config with secrets redacted."
               ],
-              "note": "Honcho configuration docs are Python-service oriented. Gormes should map only the durable runtime semantics into its existing Go config path so operators do not run a shadow Honcho service to use Goncho.",
+              "note": "TDD landed: internal/config/goncho_config_test.go proves [goncho] defaults, GORMES_GONCHO_* overrides, invalid dialectic levels, negative limit validation, and mapping into goncho.Config; internal/goncho/config_test.go locks the Go-native runtime defaults and dialectic levels; cmd/gormes/goncho_doctor_test.go proves doctor visibility with secrets absent and dream feature-disabled evidence.",
               "write_scope": [
                 "internal/config/",
                 "internal/goncho/",
