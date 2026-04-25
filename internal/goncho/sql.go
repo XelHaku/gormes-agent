@@ -22,30 +22,30 @@ type conclusionRow struct {
 	EvidenceJSON   string
 }
 
-func upsertPeerCard(ctx context.Context, db *sql.DB, workspaceID, peer string, card []string) error {
+func upsertPeerCard(ctx context.Context, db *sql.DB, workspaceID, observer, peer string, card []string) error {
 	raw, err := json.Marshal(card)
 	if err != nil {
 		return fmt.Errorf("goncho: marshal peer card: %w", err)
 	}
 	_, err = db.ExecContext(ctx, `
-		INSERT INTO goncho_peer_cards(workspace_id, peer_id, card_json, updated_at)
-		VALUES(?, ?, ?, ?)
-		ON CONFLICT(workspace_id, peer_id)
+		INSERT INTO goncho_peer_cards(workspace_id, observer_peer_id, peer_id, card_json, updated_at)
+		VALUES(?, ?, ?, ?, ?)
+		ON CONFLICT(workspace_id, observer_peer_id, peer_id)
 		DO UPDATE SET card_json = excluded.card_json, updated_at = excluded.updated_at
-	`, workspaceID, peer, string(raw), time.Now().Unix())
+	`, workspaceID, observer, peer, string(raw), time.Now().Unix())
 	if err != nil {
 		return fmt.Errorf("goncho: upsert peer card: %w", err)
 	}
 	return nil
 }
 
-func getPeerCard(ctx context.Context, db *sql.DB, workspaceID, peer string) ([]string, error) {
+func getPeerCard(ctx context.Context, db *sql.DB, workspaceID, observer, peer string) ([]string, error) {
 	var raw string
 	err := db.QueryRowContext(ctx, `
 		SELECT card_json
 		FROM goncho_peer_cards
-		WHERE workspace_id = ? AND peer_id = ?
-	`, workspaceID, peer).Scan(&raw)
+		WHERE workspace_id = ? AND observer_peer_id = ? AND peer_id = ?
+	`, workspaceID, observer, peer).Scan(&raw)
 	if err == sql.ErrNoRows {
 		return []string{}, nil
 	}

@@ -22,9 +22,12 @@ type SessionDirectory interface {
 
 // ProfileResult is the external shape used by profile reads and updates.
 type ProfileResult struct {
-	WorkspaceID string   `json:"workspace_id"`
-	Peer        string   `json:"peer"`
-	Card        []string `json:"card"`
+	WorkspaceID    string   `json:"workspace_id"`
+	Peer           string   `json:"peer"`
+	Target         string   `json:"target,omitempty"`
+	ObserverPeerID string   `json:"observer_peer_id,omitempty"`
+	ObservedPeerID string   `json:"observed_peer_id,omitempty"`
+	Card           []string `json:"card"`
 }
 
 // ConcludeParams controls manual conclusion writes and deletes.
@@ -106,6 +109,8 @@ type ContextUnavailableEvidence struct {
 type ContextResult struct {
 	WorkspaceID    string                       `json:"workspace_id"`
 	Peer           string                       `json:"peer"`
+	ObserverPeerID string                       `json:"observer_peer_id,omitempty"`
+	ObservedPeerID string                       `json:"observed_peer_id,omitempty"`
 	SessionKey     string                       `json:"session_key,omitempty"`
 	PeerCard       []string                     `json:"peer_card"`
 	Representation string                       `json:"representation"`

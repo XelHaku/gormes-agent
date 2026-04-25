@@ -24,6 +24,14 @@ type Service struct {
 	log         *slog.Logger
 }
 
+const maxPeerCardFacts = 40
+
+type peerCardScope struct {
+	Observer string
+	Observed string
+	Target   string
+}
+
 // NewService constructs a Goncho service with conservative defaults.
 func NewService(db *sql.DB, cfg Config, log *slog.Logger) *Service {
 	if log == nil {
@@ -52,27 +60,89 @@ func NewService(db *sql.DB, cfg Config, log *slog.Logger) *Service {
 }
 
 func (s *Service) SetProfile(ctx context.Context, peer string, card []string) error {
-	peer = strings.TrimSpace(peer)
-	if peer == "" {
-		return fmt.Errorf("goncho: peer is required")
+	scope, err := s.defaultPeerCardScope(peer)
+	if err != nil {
+		return err
 	}
-	return upsertPeerCard(ctx, s.db, s.workspaceID, peer, card)
+	return upsertPeerCard(ctx, s.db, s.workspaceID, scope.Observer, scope.Observed, normalizePeerCard(card))
+}
+
+func (s *Service) SetProfileForTarget(ctx context.Context, peer, target string, card []string) error {
+	scope, err := directionalPeerCardScope(peer, target)
+	if err != nil {
+		return err
+	}
+	return upsertPeerCard(ctx, s.db, s.workspaceID, scope.Observer, scope.Observed, normalizePeerCard(card))
 }
 
 func (s *Service) Profile(ctx context.Context, peer string) (ProfileResult, error) {
+	scope, err := s.defaultPeerCardScope(peer)
+	if err != nil {
+		return ProfileResult{}, err
+	}
+	return s.profileForScope(ctx, scope)
+}
+
+func (s *Service) ProfileForTarget(ctx context.Context, peer, target string) (ProfileResult, error) {
+	scope, err := directionalPeerCardScope(peer, target)
+	if err != nil {
+		return ProfileResult{}, err
+	}
+	return s.profileForScope(ctx, scope)
+}
+
+func (s *Service) defaultPeerCardScope(peer string) (peerCardScope, error) {
 	peer = strings.TrimSpace(peer)
 	if peer == "" {
+		return peerCardScope{}, fmt.Errorf("goncho: peer is required")
+	}
+	return peerCardScope{
+		Observer: s.observer,
+		Observed: peer,
+	}, nil
+}
+
+func directionalPeerCardScope(peer, target string) (peerCardScope, error) {
+	peer = strings.TrimSpace(peer)
+	target = strings.TrimSpace(target)
+	if peer == "" {
+		return peerCardScope{}, fmt.Errorf("goncho: peer is required")
+	}
+	if target == "" {
+		return peerCardScope{}, fmt.Errorf("goncho: target is required")
+	}
+	return peerCardScope{
+		Observer: peer,
+		Observed: target,
+		Target:   target,
+	}, nil
+}
+
+func (s *Service) profileForScope(ctx context.Context, scope peerCardScope) (ProfileResult, error) {
+	if scope.Observer == "" || scope.Observed == "" {
 		return ProfileResult{}, fmt.Errorf("goncho: peer is required")
 	}
-	card, err := getPeerCard(ctx, s.db, s.workspaceID, peer)
+	card, err := getPeerCard(ctx, s.db, s.workspaceID, scope.Observer, scope.Observed)
 	if err != nil {
 		return ProfileResult{}, err
 	}
 	return ProfileResult{
-		WorkspaceID: s.workspaceID,
-		Peer:        peer,
-		Card:        card,
+		WorkspaceID:    s.workspaceID,
+		Peer:           scope.Observed,
+		Target:         scope.Target,
+		ObserverPeerID: scope.Observer,
+		ObservedPeerID: scope.Observed,
+		Card:           card,
 	}, nil
+}
+
+func normalizePeerCard(card []string) []string {
+	if len(card) > maxPeerCardFacts {
+		card = card[:maxPeerCardFacts]
+	}
+	out := make([]string, len(card))
+	copy(out, card)
+	return out
 }
 
 func (s *Service) Conclude(ctx context.Context, params ConcludeParams) (ConcludeResult, error) {
@@ -166,9 +236,9 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 		return ContextResult{}, fmt.Errorf("goncho: peer is required")
 	}
 	sessionKey := strings.TrimSpace(params.SessionKey)
-	unavailable := contextUnavailableEvidence(params)
+	unavailable := contextUnavailableEvidence(params, s.observer, peer)
 
-	card, err := getPeerCard(ctx, s.db, s.workspaceID, peer)
+	card, err := getPeerCard(ctx, s.db, s.workspaceID, s.observer, peer)
 	if err != nil {
 		return ContextResult{}, err
 	}
@@ -221,6 +291,8 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 	return ContextResult{
 		WorkspaceID:    s.workspaceID,
 		Peer:           peer,
+		ObserverPeerID: s.observer,
+		ObservedPeerID: peer,
 		SessionKey:     sessionKey,
 		PeerCard:       card,
 		Representation: buildRepresentation(peer, card, conclusions),
@@ -235,21 +307,26 @@ func limitToSession(params ContextParams) bool {
 	return params.LimitToSession != nil && *params.LimitToSession
 }
 
-func contextUnavailableEvidence(params ContextParams) []ContextUnavailableEvidence {
+func contextUnavailableEvidence(params ContextParams, defaultObserver, observed string) []ContextUnavailableEvidence {
 	var unavailable []ContextUnavailableEvidence
+	directionalReason := fmt.Sprintf(
+		"directional representation is unavailable; only the default %s observer view was used for %s",
+		defaultObserver,
+		observed,
+	)
 
 	if strings.TrimSpace(params.PeerTarget) != "" {
 		unavailable = append(unavailable, ContextUnavailableEvidence{
 			Field:      "peer_target",
 			Capability: "directional_representation",
-			Reason:     "peer_target requires observer/observed representation storage",
+			Reason:     directionalReason,
 		})
 	}
 	if strings.TrimSpace(params.PeerPerspective) != "" {
 		unavailable = append(unavailable, ContextUnavailableEvidence{
 			Field:      "peer_perspective",
 			Capability: "directional_representation",
-			Reason:     "peer_perspective requires observer/observed representation storage",
+			Reason:     directionalReason,
 		})
 	}
 	if params.SearchTopK != nil {

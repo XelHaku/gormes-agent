@@ -1688,9 +1688,9 @@
             {
               "name": "Directional peer cards and representation scopes",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Peer cards and stored representations are keyed by workspace, observer, and observed peer instead of a flat workspace/peer pair",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -1722,7 +1722,7 @@
                 "Directional target cards are stored independently from default self cards.",
                 "Late-join non-retroactive reasoning remains documented as unsupported until the deriver queue exists."
               ],
-              "note": "Honcho docs make directional cards and representations a public concept. Goncho has an observer default but still stores cards as workspace+peer only; this row adds the storage and tool-edge semantics without implementing observe_others task scheduling.",
+              "note": "TDD landed: peer cards are stored by workspace, observer, and observed peer with legacy flat cards migrated to observer=gormes. Directional fixtures prove observer/observed isolation, max-40 truncation, and manual set_card replacement semantics; honcho_profile exposes optional target for directional card reads/writes. Context still reports directional representation as unavailable and uses only the default gormes observer view. Late-join non-retroactive reasoning and observe_others scheduling remain unsupported until the deriver queue exists.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",

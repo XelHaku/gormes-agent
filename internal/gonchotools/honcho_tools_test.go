@@ -60,6 +60,14 @@ func TestHonchoContextTool_SchemaExposesOptionalRepresentationOptions(t *testing
 	})
 }
 
+func TestHonchoProfileTool_SchemaExposesOptionalTarget(t *testing.T) {
+	tool := &HonchoProfileTool{}
+
+	assertOptionalSchemaProperties(t, tool.Schema(), []string{"peer"}, map[string]string{
+		"target": "string",
+	})
+}
+
 func TestHonchoSearchTool_OmittedScopeSourcesPreservesSameChatDefault(t *testing.T) {
 	reg, svc, cleanup := newTestHonchoRegistry(t)
 	defer cleanup()
@@ -127,6 +135,35 @@ func TestHonchoProfileTool_UsesService(t *testing.T) {
 	}
 	if !strings.Contains(string(outputs[1].Output), `"Prefers exact outputs"`) {
 		t.Fatalf("profile output = %s", outputs[1].Output)
+	}
+}
+
+func TestHonchoProfileTool_TargetStoresDirectionalCard(t *testing.T) {
+	reg, _, cleanup := newTestHonchoRegistry(t)
+	defer cleanup()
+
+	targetOutput := executeHonchoTool(t, reg, "honcho_profile", json.RawMessage(`{
+		"peer":"alice",
+		"target":"bob",
+		"card":["Alice saw Bob order tea"]
+	}`))
+	if !strings.Contains(string(targetOutput), "Alice saw Bob order tea") {
+		t.Fatalf("target profile output missing directional card: %s", targetOutput)
+	}
+
+	defaultOutput := executeHonchoTool(t, reg, "honcho_profile", json.RawMessage(`{
+		"peer":"bob"
+	}`))
+	if strings.Contains(string(defaultOutput), "Alice saw Bob order tea") {
+		t.Fatalf("default profile read leaked directional card: %s", defaultOutput)
+	}
+
+	readTargetOutput := executeHonchoTool(t, reg, "honcho_profile", json.RawMessage(`{
+		"peer":"alice",
+		"target":"bob"
+	}`))
+	if !strings.Contains(string(readTargetOutput), "Alice saw Bob order tea") {
+		t.Fatalf("target profile read missing directional card: %s", readTargetOutput)
 	}
 }
 

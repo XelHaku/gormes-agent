@@ -3,7 +3,7 @@ package memory
 // schemaVersion is the canonical target version for this binary. OpenSqlite
 // migrates any earlier supported version up to this value, and refuses to
 // open DBs with an unknown version (future schemas).
-const schemaVersion = "3g"
+const schemaVersion = "3h"
 
 // schemaV3a is the baseline schema installed on a fresh DB. It matches
 // exactly what Phase 3.A shipped — any change to this string is a schema
@@ -154,17 +154,20 @@ UPDATE schema_meta SET v = '3e' WHERE k = 'version' AND v = '3d';
 `
 
 // migration3eTo3f adds the first Goncho-owned persistence surface:
-//   - goncho_peer_cards stores the global card per peer
+//   - goncho_peer_cards stores the observer-scoped card per peer
 //   - goncho_conclusions stores durable manual or derived facts
 //   - goncho_conclusions_fts indexes conclusion content for lexical search
 const migration3eTo3f = `
 CREATE TABLE IF NOT EXISTS goncho_peer_cards (
-	workspace_id TEXT NOT NULL,
-	peer_id      TEXT NOT NULL,
-	card_json    TEXT NOT NULL,
-	updated_at   INTEGER NOT NULL,
-	PRIMARY KEY(workspace_id, peer_id)
+	workspace_id      TEXT NOT NULL,
+	observer_peer_id  TEXT NOT NULL,
+	peer_id           TEXT NOT NULL,
+	card_json         TEXT NOT NULL,
+	updated_at        INTEGER NOT NULL,
+	PRIMARY KEY(workspace_id, observer_peer_id, peer_id)
 );
+CREATE INDEX IF NOT EXISTS idx_goncho_peer_cards_observed
+	ON goncho_peer_cards(workspace_id, peer_id, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS goncho_conclusions (
 	id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -227,4 +230,28 @@ CREATE INDEX IF NOT EXISTS idx_turns_turn_key
 	ON turns(turn_key) WHERE turn_key IS NOT NULL;
 
 UPDATE schema_meta SET v = '3g' WHERE k = 'version' AND v = '3f';
+`
+
+// migration3gTo3h makes peer cards directional. Existing flat cards are
+// preserved as the default Gormes observer's view of the stored peer.
+const migration3gTo3h = `
+CREATE TABLE IF NOT EXISTS goncho_peer_cards_directional (
+	workspace_id      TEXT NOT NULL,
+	observer_peer_id  TEXT NOT NULL,
+	peer_id           TEXT NOT NULL,
+	card_json         TEXT NOT NULL,
+	updated_at        INTEGER NOT NULL,
+	PRIMARY KEY(workspace_id, observer_peer_id, peer_id)
+);
+INSERT INTO goncho_peer_cards_directional(
+	workspace_id, observer_peer_id, peer_id, card_json, updated_at
+)
+SELECT workspace_id, 'gormes', peer_id, card_json, updated_at
+FROM goncho_peer_cards;
+DROP TABLE goncho_peer_cards;
+ALTER TABLE goncho_peer_cards_directional RENAME TO goncho_peer_cards;
+CREATE INDEX IF NOT EXISTS idx_goncho_peer_cards_observed
+	ON goncho_peer_cards(workspace_id, peer_id, updated_at DESC);
+
+UPDATE schema_meta SET v = '3h' WHERE k = 'version' AND v = '3g';
 `

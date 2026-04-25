@@ -36,13 +36,14 @@ func (*HonchoProfileTool) Description() string {
 	return "Read or update the peer card for a peer. Pass card to update; omit it to read."
 }
 func (*HonchoProfileTool) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string","description":"peer identity"},"card":{"type":"array","items":{"type":"string"},"description":"optional replacement peer card"}},"required":["peer"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string","description":"peer identity"},"target":{"type":"string","description":"optional observed peer for a directional card from peer's perspective"},"card":{"type":"array","items":{"type":"string"},"description":"optional replacement peer card"}},"required":["peer"]}`)
 }
 func (*HonchoProfileTool) Timeout() time.Duration { return 5 * time.Second }
 func (t *HonchoProfileTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
 	var in struct {
-		Peer string   `json:"peer"`
-		Card []string `json:"card"`
+		Peer   string   `json:"peer"`
+		Target string   `json:"target"`
+		Card   []string `json:"card"`
 	}
 	if err := json.Unmarshal(args, &in); err != nil {
 		return nil, fmt.Errorf("honcho_profile: invalid args: %w", err)
@@ -51,11 +52,23 @@ func (t *HonchoProfileTool) Execute(ctx context.Context, args json.RawMessage) (
 		return nil, fmt.Errorf("honcho_profile: peer is required")
 	}
 	if in.Card != nil {
-		if err := t.Service.SetProfile(ctx, in.Peer, in.Card); err != nil {
+		var err error
+		if strings.TrimSpace(in.Target) == "" {
+			err = t.Service.SetProfile(ctx, in.Peer, in.Card)
+		} else {
+			err = t.Service.SetProfileForTarget(ctx, in.Peer, in.Target, in.Card)
+		}
+		if err != nil {
 			return nil, err
 		}
 	}
-	out, err := t.Service.Profile(ctx, in.Peer)
+	var out goncho.ProfileResult
+	var err error
+	if strings.TrimSpace(in.Target) == "" {
+		out, err = t.Service.Profile(ctx, in.Peer)
+	} else {
+		out, err = t.Service.ProfileForTarget(ctx, in.Peer, in.Target)
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -319,6 +319,78 @@ func TestMigrate_3fTo3g_AddsMemorySyncColumns(t *testing.T) {
 	}
 }
 
+func TestMigrate_3gTo3h_PreservesFlatPeerCardsAsGormesObserver(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memory.db")
+	fixture, err := OpenSqlite(path, 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite fixture: %v", err)
+	}
+	if err := fixture.Close(context.Background()); err != nil {
+		t.Fatalf("close fixture store: %v", err)
+	}
+
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		t.Fatalf("sql.Open: %v", err)
+	}
+	if err := applyPragmas(db); err != nil {
+		t.Fatalf("applyPragmas: %v", err)
+	}
+	if _, err := db.Exec(`
+		DROP TABLE goncho_peer_cards;
+		CREATE TABLE goncho_peer_cards (
+			workspace_id TEXT NOT NULL,
+			peer_id      TEXT NOT NULL,
+			card_json    TEXT NOT NULL,
+			updated_at   INTEGER NOT NULL,
+			PRIMARY KEY(workspace_id, peer_id)
+		);
+		INSERT INTO goncho_peer_cards(workspace_id, peer_id, card_json, updated_at)
+		VALUES('default', 'bob', '["Legacy Bob card"]', 123);
+		UPDATE schema_meta SET v = '3g' WHERE k = 'version';
+	`); err != nil {
+		t.Fatalf("build legacy peer card fixture: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close 3g fixture: %v", err)
+	}
+
+	s, err := OpenSqlite(path, 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite migrated fixture: %v", err)
+	}
+	defer s.Close(context.Background())
+
+	var observer string
+	var card string
+	err = s.db.QueryRow(`
+		SELECT observer_peer_id, card_json
+		FROM goncho_peer_cards
+		WHERE workspace_id = 'default' AND peer_id = 'bob'
+	`).Scan(&observer, &card)
+	if err != nil {
+		t.Fatalf("query migrated peer card: %v", err)
+	}
+	if observer != "gormes" {
+		t.Fatalf("observer_peer_id = %q, want gormes", observer)
+	}
+	if card != `["Legacy Bob card"]` {
+		t.Fatalf("card_json = %s, want legacy card", card)
+	}
+
+	var pkCount int
+	if err := s.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('goncho_peer_cards')
+		WHERE name IN ('workspace_id', 'observer_peer_id', 'peer_id') AND pk > 0
+	`).Scan(&pkCount); err != nil {
+		t.Fatalf("query peer-card primary key: %v", err)
+	}
+	if pkCount != 3 {
+		t.Fatalf("directional primary key column count = %d, want 3", pkCount)
+	}
+}
+
 func TestMigrate_3dTo3e_AddsCronColumnsToTurns(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "memory.db")
 	s, _ := OpenSqlite(path, 0, nil)
