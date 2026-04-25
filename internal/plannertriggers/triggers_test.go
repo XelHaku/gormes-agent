@@ -31,8 +31,8 @@ func TestAppendTriggerEvent_GeneratesIDIfEmpty(t *testing.T) {
 	if ev.TS == "" {
 		t.Fatal("AppendTriggerEvent should generate a TS when empty")
 	}
-	if ev.Source != "autoloop" {
-		t.Fatalf("Source = %q, want autoloop default", ev.Source)
+	if ev.Source != "builder-loop" {
+		t.Fatalf("Source = %q, want builder-loop default", ev.Source)
 	}
 }
 

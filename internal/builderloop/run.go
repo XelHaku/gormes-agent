@@ -1127,7 +1127,7 @@ func emitPlannerTriggers(path string, events []FlushedTriggerEvent) {
 	}
 	for _, ev := range events {
 		entry := plannertriggers.TriggerEvent{
-			Source:        "autoloop",
+			Source:        "builder-loop",
 			Kind:          ev.Kind,
 			PhaseID:       ev.PhaseID,
 			SubphaseID:    ev.SubphaseID,
@@ -1136,7 +1136,7 @@ func emitPlannerTriggers(path string, events []FlushedTriggerEvent) {
 			AutoloopRunID: ev.AutoloopRunID,
 		}
 		if err := plannertriggers.AppendTriggerEvent(path, entry); err != nil {
-			log.Printf("autoloop: append planner trigger failed: %v", err)
+			log.Printf("builder-loop: append planner trigger failed: %v", err)
 		}
 	}
 }
@@ -1178,10 +1178,10 @@ func checkpointDirtyWorktree(ctx context.Context, cfg Config, runID string) erro
 		return recordCheckpointFailure(cfg, runID, "stage_failed", err)
 	}
 
-	message := fmt.Sprintf("autoloop: checkpoint dirty worktree %s", runID)
+	message := fmt.Sprintf("builder-loop: checkpoint dirty worktree %s", runID)
 	if _, err := runGitCheckpointCommand(ctx, cfg.RepoRoot,
-		"-c", "user.name=Gormes Autoloop",
-		"-c", "user.email=autoloop@gormes.local",
+		"-c", "user.name=Gormes Builder Loop",
+		"-c", "user.email=builder-loop@gormes.local",
 		"-c", "commit.gpgsign=false",
 		"commit", "-m", message,
 	); err != nil {
@@ -1339,7 +1339,7 @@ func commitRunHealth(ctx context.Context, cfg Config, runner Runner) error {
 
 	commit := runner.Run(ctx, Command{
 		Name: "git",
-		Args: []string{"commit", "-m", "autoloop: record run health", "--", rel},
+		Args: []string{"commit", "-m", "builder-loop: record run health", "--", rel},
 		Dir:  cfg.RepoRoot,
 	})
 	if commit.Err != nil {

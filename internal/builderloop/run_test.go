@@ -836,7 +836,7 @@ func TestRunOnceAutoCommitsDirtyRepositoryBeforePreflight(t *testing.T) {
 	if status := gitStatusPorcelain(t, repoRoot); status != "" {
 		t.Fatalf("git status = %q, want clean checkpointed worktree", status)
 	}
-	if subject := gitLogSubject(t, repoRoot); subject != "autoloop: checkpoint dirty worktree 20260425T070802Z" {
+	if subject := gitLogSubject(t, repoRoot); subject != "builder-loop: checkpoint dirty worktree 20260425T070802Z" {
 		t.Fatalf("last commit subject = %q", subject)
 	}
 

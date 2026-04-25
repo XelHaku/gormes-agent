@@ -322,7 +322,7 @@ func TestRenderUmbrellaCleanup(t *testing.T) {
 }
 
 func TestRenderAutoloopHandoff(t *testing.T) {
-	p := &Progress{Meta: Meta{Autoloop: AutoloopMeta{
+	p := &Progress{Meta: Meta{BuilderLoop: BuilderLoopMeta{
 		Entrypoint:      "scripts/gormes-auto-codexu-orchestrator.sh",
 		Plan:            "docs/superpowers/plans/plan.md",
 		AgentQueue:      "docs/content/building-gormes/autoloop/agent-queue.md",

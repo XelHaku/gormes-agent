@@ -2,6 +2,7 @@ package plannerloop
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -9,6 +10,53 @@ import (
 
 	"github.com/TrebuchetDynamics/gormes-agent/internal/builderloop"
 )
+
+// defaultPlannerLoopRunRoot returns .codex/planner-loop/ unless only the
+// legacy .codex/architecture-planner/ directory exists, in which case the
+// legacy path wins so existing planner_state.json, planner reports, and
+// trigger cursor remain accessible across the rename.
+func defaultPlannerLoopRunRoot(repoRoot string) string {
+	canonical := filepath.Join(repoRoot, ".codex", "planner-loop")
+	legacy := filepath.Join(repoRoot, ".codex", "architecture-planner")
+	if _, err := os.Stat(canonical); err == nil {
+		return canonical
+	}
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return canonical
+}
+
+// defaultBuilderLoopRunRootFromPlanner mirrors builderloop's default but is
+// inlined here to avoid plannerloop importing internals from builderloop
+// for a path constant. Same fallback logic: prefer the new
+// .codex/builder-loop/ but use the legacy .codex/orchestrator/ if only
+// that exists.
+func defaultBuilderLoopRunRootFromPlanner(repoRoot string) string {
+	canonical := filepath.Join(repoRoot, ".codex", "builder-loop")
+	legacy := filepath.Join(repoRoot, ".codex", "orchestrator")
+	if _, err := os.Stat(canonical); err == nil {
+		return canonical
+	}
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return canonical
+}
+
+// defaultPlannerTriggersPathFromPlanner returns the planner-loop triggers
+// path unless only the legacy architecture-planner triggers.jsonl exists.
+func defaultPlannerTriggersPathFromPlanner(repoRoot string) string {
+	canonical := filepath.Join(repoRoot, ".codex", "planner-loop", "triggers.jsonl")
+	legacy := filepath.Join(repoRoot, ".codex", "architecture-planner", "triggers.jsonl")
+	if _, err := os.Stat(canonical); err == nil {
+		return canonical
+	}
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return canonical
+}
 
 type Config struct {
 	RepoRoot        string
@@ -106,8 +154,8 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 	cfg := Config{
 		RepoRoot:               repoRoot,
 		ProgressJSON:           filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"),
-		RunRoot:                filepath.Join(repoRoot, ".codex", "architecture-planner"),
-		AutoloopRunRoot:        filepath.Join(repoRoot, ".codex", "orchestrator"),
+		RunRoot:                defaultPlannerLoopRunRoot(repoRoot),
+		AutoloopRunRoot:        defaultBuilderLoopRunRootFromPlanner(repoRoot),
 		Backend:                "codexu",
 		Mode:                   "safe",
 		HermesDir:              filepath.Join(parent, "hermes-agent"),
@@ -119,7 +167,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		Validate:               true,
 		SyncRepos:              true,
 		PlannerQuarantineLimit: 5,
-		PlannerTriggersPath:    filepath.Join(repoRoot, ".codex", "architecture-planner", "triggers.jsonl"),
+		PlannerTriggersPath:    defaultPlannerTriggersPathFromPlanner(repoRoot),
 		MaxRetries:             DefaultMaxRetries,
 		BackendTimeout:         20 * time.Minute,
 		MergeOpenPullRequests:  true,

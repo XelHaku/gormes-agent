@@ -47,7 +47,7 @@ const (
 	ExecutionOwnerOrchestrator ExecutionOwner = "orchestrator"
 )
 
-type AutoloopMeta struct {
+type BuilderLoopMeta struct {
 	Entrypoint      string   `json:"entrypoint"`
 	Plan            string   `json:"plan"`
 	AgentQueue      string   `json:"agent_queue"`
@@ -58,10 +58,32 @@ type AutoloopMeta struct {
 }
 
 type Meta struct {
-	Version     string       `json:"version"`
-	LastUpdated string       `json:"last_updated"`
-	Links       Links        `json:"links"`
-	Autoloop    AutoloopMeta `json:"autoloop,omitempty"`
+	Version     string          `json:"version"`
+	LastUpdated string          `json:"last_updated"`
+	Links       Links           `json:"links"`
+	BuilderLoop BuilderLoopMeta `json:"builder_loop,omitempty"`
+}
+
+// UnmarshalJSON accepts the legacy "autoloop" key as a fallback for the
+// renamed "builder_loop" field so progress.json files written before the
+// rename still parse cleanly. New writes always emit "builder_loop".
+func (m *Meta) UnmarshalJSON(data []byte) error {
+	type metaAlias Meta
+	aux := struct {
+		Autoloop    *BuilderLoopMeta `json:"autoloop,omitempty"`
+		BuilderLoop *BuilderLoopMeta `json:"builder_loop,omitempty"`
+		*metaAlias
+	}{metaAlias: (*metaAlias)(m)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	switch {
+	case aux.BuilderLoop != nil:
+		m.BuilderLoop = *aux.BuilderLoop
+	case aux.Autoloop != nil:
+		m.BuilderLoop = *aux.Autoloop
+	}
+	return nil
 }
 
 type Links struct {

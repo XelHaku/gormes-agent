@@ -23,10 +23,10 @@ func TestConfigFromEnvDefaultsToArchitecturePlannerPaths(t *testing.T) {
 	if cfg.ProgressJSON != filepath.Join(root, "docs", "content", "building-gormes", "architecture_plan", "progress.json") {
 		t.Fatalf("ProgressJSON = %q", cfg.ProgressJSON)
 	}
-	if cfg.RunRoot != filepath.Join(root, ".codex", "architecture-planner") {
+	if cfg.RunRoot != filepath.Join(root, ".codex", "planner-loop") {
 		t.Fatalf("RunRoot = %q", cfg.RunRoot)
 	}
-	if cfg.AutoloopRunRoot != filepath.Join(root, ".codex", "orchestrator") {
+	if cfg.AutoloopRunRoot != filepath.Join(root, ".codex", "builder-loop") {
 		t.Fatalf("AutoloopRunRoot = %q", cfg.AutoloopRunRoot)
 	}
 	if cfg.Backend != "codexu" {
@@ -173,12 +173,12 @@ func TestConfigFromEnv_BackendTimeoutValidation(t *testing.T) {
 func TestConfigFromEnv_PlannerTriggersPathDefaultAndOverride(t *testing.T) {
 	root := filepath.Join("tmp", "repo")
 
-	// Default: PlannerTriggersPath under repoRoot/.codex/architecture-planner.
+	// Default: PlannerTriggersPath under repoRoot/.codex/planner-loop.
 	cfg, err := ConfigFromEnv(root, map[string]string{})
 	if err != nil {
 		t.Fatalf("ConfigFromEnv() error = %v", err)
 	}
-	wantDefault := filepath.Join(root, ".codex", "architecture-planner", "triggers.jsonl")
+	wantDefault := filepath.Join(root, ".codex", "planner-loop", "triggers.jsonl")
 	if cfg.PlannerTriggersPath != wantDefault {
 		t.Fatalf("PlannerTriggersPath default = %q, want %q", cfg.PlannerTriggersPath, wantDefault)
 	}

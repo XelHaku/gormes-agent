@@ -2,11 +2,45 @@ package builderloop
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// defaultBuilderLoopRunRoot returns the canonical .codex/builder-loop/ path
+// unless the legacy .codex/orchestrator/ path is the only one that exists,
+// in which case the legacy path wins so existing on-disk state (worktrees,
+// runs.jsonl ledger, planner_state.json) keeps being consulted across the
+// rename without an operator-side migration step.
+func defaultBuilderLoopRunRoot(repoRoot string) string {
+	canonical := filepath.Join(repoRoot, ".codex", "builder-loop")
+	legacy := filepath.Join(repoRoot, ".codex", "orchestrator")
+	if _, err := os.Stat(canonical); err == nil {
+		return canonical
+	}
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return canonical
+}
+
+// defaultPlannerTriggersPath returns the canonical triggers.jsonl path
+// under .codex/planner-loop/ unless only the legacy
+// .codex/architecture-planner/triggers.jsonl exists, in which case the
+// legacy path wins so the planner cursor stays valid across the rename.
+func defaultPlannerTriggersPath(repoRoot string) string {
+	canonical := filepath.Join(repoRoot, ".codex", "planner-loop", "triggers.jsonl")
+	legacy := filepath.Join(repoRoot, ".codex", "architecture-planner", "triggers.jsonl")
+	if _, err := os.Stat(canonical); err == nil {
+		return canonical
+	}
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return canonical
+}
 
 type Config struct {
 	RepoRoot      string
@@ -75,7 +109,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 	cfg := Config{
 		RepoRoot:       repoRoot,
 		ProgressJSON:   filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json"),
-		RunRoot:        filepath.Join(repoRoot, ".codex", "orchestrator"),
+		RunRoot:        defaultBuilderLoopRunRoot(repoRoot),
 		Backend:        "codexu",
 		Mode:           "safe",
 		MaxAgents:      4,
@@ -101,7 +135,7 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 		PrePromotionRepairEnabled:   true,
 		PrePromotionRepairAttempts:  1,
 
-		PlannerTriggersPath: filepath.Join(repoRoot, ".codex", "architecture-planner", "triggers.jsonl"),
+		PlannerTriggersPath: defaultPlannerTriggersPath(repoRoot),
 	}
 
 	if value := env["PROGRESS_JSON"]; value != "" {

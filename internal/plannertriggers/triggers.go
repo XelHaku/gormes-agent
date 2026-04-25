@@ -1,13 +1,13 @@
-// Package plannertriggers is the shared bridge between the autoloop
+// Package plannertriggers is the shared bridge between the builderloop
 // package (which appends trigger events when row health state transitions
-// matter to the planner) and the architectureplanner package (which
-// consumes those events on its next run via a persisted cursor).
+// matter to the planner) and the plannerloop package (which consumes
+// those events on its next run via a persisted cursor).
 //
 // The package exists as a separate, lower-level package on purpose:
-// architectureplanner already imports autoloop (for the LedgerEvent type
-// and the Runner/ExecRunner shapes), so autoloop cannot import
-// architectureplanner without creating an import cycle. Both packages can
-// safely depend on plannertriggers, which depends on neither.
+// plannerloop already imports builderloop (for the LedgerEvent type and
+// the Runner/ExecRunner shapes), so builderloop cannot import plannerloop
+// without creating an import cycle. Both packages can safely depend on
+// plannertriggers, which depends on neither.
 package plannertriggers
 
 import (
@@ -20,13 +20,13 @@ import (
 	"time"
 )
 
-// TriggerEvent is one event in the autoloop->planner triggers.jsonl
-// ledger. Autoloop appends; the planner reads on its next run and advances
-// a TriggerCursor past the consumed IDs.
+// TriggerEvent is one event in the builder-loop->planner triggers.jsonl
+// ledger. The builder loop appends; the planner reads on its next run and
+// advances a TriggerCursor past the consumed IDs.
 type TriggerEvent struct {
 	ID            string `json:"id"`     // ULID-ish: timestamp + monotonic counter
 	TS            string `json:"ts"`     // RFC3339 emission timestamp
-	Source        string `json:"source"` // "autoloop"
+	Source        string `json:"source"` // "builder-loop" (legacy "autoloop" still accepted by readers)
 	Kind          string `json:"kind"`   // "quarantine_added" | "quarantine_stale_cleared" | "manual"
 	PhaseID       string `json:"phase_id,omitempty"`
 	SubphaseID    string `json:"subphase_id,omitempty"`
@@ -53,8 +53,8 @@ var triggerIDCounter atomic.Uint64
 // AppendTriggerEvent atomically appends one TriggerEvent to the JSONL
 // ledger at path. If event.ID is empty a process-monotonic ID is
 // generated; if event.TS is empty it defaults to time.Now in UTC; if
-// event.Source is empty it defaults to "autoloop". The parent directory
-// is created if missing.
+// event.Source is empty it defaults to "builder-loop". The parent
+// directory is created if missing.
 func AppendTriggerEvent(path string, event TriggerEvent) error {
 	if event.ID == "" {
 		now := time.Now().UTC()
@@ -65,7 +65,7 @@ func AppendTriggerEvent(path string, event TriggerEvent) error {
 		event.TS = time.Now().UTC().Format(time.RFC3339)
 	}
 	if event.Source == "" {
-		event.Source = "autoloop"
+		event.Source = "builder-loop"
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

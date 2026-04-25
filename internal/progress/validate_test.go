@@ -28,11 +28,11 @@ func TestValidate_RejectsBadVersion(t *testing.T) {
 	}
 }
 
-func TestValidate_AcceptsCompleteAutoloopMeta(t *testing.T) {
+func TestValidate_AcceptsCompleteBuilderLoopMeta(t *testing.T) {
 	p := &Progress{
 		Meta: Meta{
 			Version: "2.0",
-			Autoloop: AutoloopMeta{
+			BuilderLoop: BuilderLoopMeta{
 				Entrypoint:      "scripts/gormes-auto-codexu-orchestrator.sh",
 				Plan:            "docs/superpowers/plans/2026-04-24-autoloop-repoctl-go-port.md",
 				AgentQueue:      "docs/content/building-gormes/autoloop/agent-queue.md",
@@ -49,11 +49,11 @@ func TestValidate_AcceptsCompleteAutoloopMeta(t *testing.T) {
 	}
 }
 
-func TestValidate_RejectsPartialAutoloopMeta(t *testing.T) {
+func TestValidate_RejectsPartialBuilderLoopMeta(t *testing.T) {
 	p := &Progress{
 		Meta: Meta{
 			Version: "2.0",
-			Autoloop: AutoloopMeta{
+			BuilderLoop: BuilderLoopMeta{
 				Entrypoint:      "scripts/gormes-auto-codexu-orchestrator.sh",
 				CandidatePolicy: []string{" "},
 			},

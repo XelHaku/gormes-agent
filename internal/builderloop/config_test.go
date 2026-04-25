@@ -24,7 +24,7 @@ func TestConfigFromEnvDefaultsToRepoRootPaths(t *testing.T) {
 		t.Fatalf("ProgressJSON = %q, want %q", cfg.ProgressJSON, wantProgressJSON)
 	}
 
-	wantRunRoot := filepath.Join(root, ".codex", "orchestrator")
+	wantRunRoot := filepath.Join(root, ".codex", "builder-loop")
 	if cfg.RunRoot != wantRunRoot {
 		t.Fatalf("RunRoot = %q, want %q", cfg.RunRoot, wantRunRoot)
 	}

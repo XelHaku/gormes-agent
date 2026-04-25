@@ -231,8 +231,8 @@ func RenderUmbrellaCleanup(p *Progress) string {
 // worker loop. These live in progress.json meta so docs and prompts do not
 // drift from each other.
 func RenderAutoloopHandoff(p *Progress) string {
-	m := p.Meta.Autoloop
-	if !autoloopMetaDeclared(m) {
+	m := p.Meta.BuilderLoop
+	if !builderLoopMetaDeclared(m) {
 		return "_No autoloop metadata declared in canonical progress._\n"
 	}
 

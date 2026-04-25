@@ -15,7 +15,7 @@ func Validate(p *Progress) error {
 		return fmt.Errorf("progress: meta.version = %q, want %q", p.Meta.Version, "2.0")
 	}
 	var errs []error
-	errs = append(errs, validateAutoloopMeta(p.Meta.Autoloop)...)
+	errs = append(errs, validateBuilderLoopMeta(p.Meta.BuilderLoop)...)
 	for _, phKey := range sortedMapKeys(p.Phases) {
 		ph := p.Phases[phKey]
 		for _, spKey := range sortedMapKeys(ph.Subphases) {
@@ -66,8 +66,8 @@ func Validate(p *Progress) error {
 	return errors.Join(errs...)
 }
 
-func validateAutoloopMeta(m AutoloopMeta) []error {
-	if !autoloopMetaDeclared(m) {
+func validateBuilderLoopMeta(m BuilderLoopMeta) []error {
+	if !builderLoopMetaDeclared(m) {
 		return nil
 	}
 	var errs []error
@@ -97,7 +97,7 @@ func validateAutoloopMeta(m AutoloopMeta) []error {
 	return errs
 }
 
-func autoloopMetaDeclared(m AutoloopMeta) bool {
+func builderLoopMetaDeclared(m BuilderLoopMeta) bool {
 	return m.Entrypoint != "" ||
 		m.Plan != "" ||
 		m.AgentQueue != "" ||

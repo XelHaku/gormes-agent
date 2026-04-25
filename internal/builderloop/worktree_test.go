@@ -11,7 +11,7 @@ func TestWorkerBranchNameIncludesRunWorkerAndSlug(t *testing.T) {
 		SubphaseID: "2.B.3",
 		ItemName:   "Slack CommandRegistry parser wiring",
 	})
-	want := "autoloop/20260101T000000Z/w3/2-2.b.3-slack-commandregistry-parser-wiring"
+	want := "builder-loop/20260101T000000Z/w3/2-2.b.3-slack-commandregistry-parser-wiring"
 
 	if got != want {
 		t.Fatalf("WorkerBranchName() = %q, want %q", got, want)
@@ -25,7 +25,7 @@ func TestWorkerBranchNameTruncatesLongSlug(t *testing.T) {
 		ItemName:   "this is a deliberately very long item name that should be truncated to keep the branch reasonable",
 	})
 
-	if len(got) > len("autoloop/run/w1/")+60 {
+	if len(got) > len("builder-loop/run/w1/")+60 {
 		t.Fatalf("WorkerBranchName() = %q, want slug truncated to <=60 chars", got)
 	}
 }
