@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: gormes-www-pages
+  group: gormes-agent-landing-pages
   cancel-in-progress: true
 
 jobs:
@@ -83,14 +83,14 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages project create gormes-www --production-branch=main
+          command: pages project create gormes-agent-landing --production-branch=main
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy www.gormes.ai/dist --project-name=gormes-www --branch=main --commit-dirty=true
+          command: pages deploy www.gormes.ai/dist --project-name=gormes-agent-landing --branch=main --commit-dirty=true
 
       - name: Attach gormes.ai
         env:
@@ -101,7 +101,7 @@ jobs:
           for domain in gormes.ai www.gormes.ai; do
             echo "attaching ${domain}"
             response=$(curl -sS -o /tmp/cf-resp.json -w "%{http_code}" -X POST \
-              "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/gormes-www/domains" \
+              "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/gormes-agent-landing/domains" \
               -H "Authorization: Bearer ${CF_API_TOKEN}" \
               -H "Content-Type: application/json" \
               -d "{\"name\":\"${domain}\"}")
