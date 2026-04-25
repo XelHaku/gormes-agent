@@ -2824,7 +2824,7 @@
             },
             {
               "name": "Provider-enforced context-length resolver",
-              "status": "planned",
+              "status": "complete",
               "contract": "Displayed and budgeted context windows prefer provider-enforced limits over raw models.dev metadata",
               "contract_status": "fixture_ready",
               "slice_size": "small",
@@ -2857,7 +2857,7 @@
                 "Provider-specific caps for Codex OAuth, Copilot, and Nous win over model-info fallbacks when present.",
                 "Unknown resolver failures fall back to fixture model metadata and report unknown when both sources are empty."
               ],
-              "note": "Hermes now routes /model display through resolve_display_context_length so provider-enforced caps win over raw models.dev entries. Gormes should port the resolver as a pure metadata fixture first; CLI/gateway display wiring can consume it later without duplicating cap logic.",
+              "note": "TDD landed: internal/hermes/model_context_resolver_test.go proves ResolveDisplayContextLength and ModelContextResolver deterministically prefer provider-enforced caps over raw models.dev metadata, fall back to fixture model metadata when provider metadata is unavailable, and report unknown when both sources are empty. The pure resolver has no live provider credentials, disk cache, routing policy, or network dependency.",
               "write_scope": [
                 "internal/hermes/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
