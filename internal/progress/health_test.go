@@ -230,3 +230,55 @@ func TestApplyHealthUpdates_UnknownRowReturnsError(t *testing.T) {
 		t.Fatal("expected error when target row does not exist")
 	}
 }
+
+func TestPlannerVerdict_RoundTrip(t *testing.T) {
+	verdict := &PlannerVerdict{
+		NeedsHuman:   true,
+		Reason:       "auto: 3 reshapes without unsticking; last category report_validation_failed",
+		Since:        "2026-04-24T12:00:00Z",
+		ReshapeCount: 3,
+		LastReshape:  "2026-04-24T11:00:00Z",
+		LastOutcome:  "still_failing",
+	}
+
+	data, err := json.Marshal(verdict)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var got PlannerVerdict
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !got.NeedsHuman {
+		t.Fatal("NeedsHuman should round-trip true")
+	}
+	if got.ReshapeCount != 3 {
+		t.Fatalf("ReshapeCount = %d, want 3", got.ReshapeCount)
+	}
+	if got.LastOutcome != "still_failing" {
+		t.Fatalf("LastOutcome = %q, want still_failing", got.LastOutcome)
+	}
+}
+
+func TestPlannerVerdict_OmitemptyKeepsZeroFieldsOut(t *testing.T) {
+	v := &PlannerVerdict{}
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(data) != "{}" {
+		t.Fatalf("zero-value PlannerVerdict should marshal to {}, got %s", data)
+	}
+}
+
+func TestItem_PlannerVerdictOmitemptyByDefault(t *testing.T) {
+	item := &Item{Name: "x", Status: StatusPlanned}
+	data, err := json.Marshal(item)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(data), "planner_verdict") {
+		t.Fatalf("Item with no verdict should not emit planner_verdict key, got %s", data)
+	}
+}

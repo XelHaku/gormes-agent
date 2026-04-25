@@ -102,6 +102,11 @@ type Item struct {
 	// must preserve this block verbatim across regenerations (see
 	// docs/superpowers/specs/2026-04-24-reactive-autoloop-design.md).
 	Health *RowHealth `json:"health,omitempty"`
+	// PlannerVerdict is execution-history metadata owned by the planner
+	// runtime. Autoloop reads it (to skip human-escalated rows) and must
+	// preserve it verbatim across writes (see
+	// docs/superpowers/specs/2026-04-24-planner-self-healing-design.md).
+	PlannerVerdict *PlannerVerdict `json:"planner_verdict,omitempty"`
 }
 
 type Subphase struct {

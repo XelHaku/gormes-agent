@@ -56,6 +56,23 @@ type Quarantine struct {
 	LastCategory FailureCategory `json:"last_category"`
 }
 
+// PlannerVerdict is execution-history metadata about one progress.json item,
+// OWNED by the architecture-planner runtime. Autoloop READS it (to skip rows
+// escalated for human review) and MUST preserve it verbatim across writes
+// (structural via typed JSON round-trip).
+//
+// Symmetric to RowHealth (autoloop-owned + planner-preserved).
+type PlannerVerdict struct {
+	// NeedsHuman is sticky: once true, only a human edit can clear it.
+	// Planner runtime never auto-unsets it.
+	NeedsHuman   bool   `json:"needs_human,omitempty"`
+	Reason       string `json:"reason,omitempty"`
+	Since        string `json:"since,omitempty"`         // RFC3339; set when NeedsHuman first triggers
+	ReshapeCount int    `json:"reshape_count,omitempty"` // monotonic; total times planner reshaped this row
+	LastReshape  string `json:"last_reshape,omitempty"`  // RFC3339 of most recent reshape
+	LastOutcome  string `json:"last_outcome,omitempty"`  // "unstuck" | "still_failing" | "no_attempts_yet"
+}
+
 // ItemSpecHash returns a stable SHA-256 hex digest of the row's spec fields
 // used for quarantine auto-clear detection. Excludes Name, Status, Health,
 // and other run-state metadata so a quarantine survives cosmetic edits but
