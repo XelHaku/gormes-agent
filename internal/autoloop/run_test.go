@@ -180,6 +180,88 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 	}
 }
 
+func TestRunOnceLaunchesGitWorkersConcurrently(t *testing.T) {
+	repoRoot := t.TempDir()
+	initCleanRepo(t, repoRoot)
+	progressPath := writeProgressJSON(t, `{
+		"phases": {
+			"12": {
+				"subphases": {
+					"12.A": {
+						"items": [
+							{"item_name": "first parallel candidate", "status": "planned", "contract": "first contract", "contract_status": "draft"}
+						]
+					},
+					"12.B": {
+						"items": [
+							{"item_name": "second parallel candidate", "status": "planned", "contract": "second contract", "contract_status": "draft"}
+						]
+					}
+				}
+			}
+		}
+	}`)
+	runRoot := t.TempDir()
+	started := make(chan string, 2)
+	firstBackend := make(chan struct{}, 1)
+	releaseFirst := make(chan struct{})
+	runner := runnerFunc(func(ctx context.Context, command Command) Result {
+		switch command.Name {
+		case "opencode":
+			started <- filepath.Base(command.Dir)
+			select {
+			case firstBackend <- struct{}{}:
+				select {
+				case <-releaseFirst:
+				case <-ctx.Done():
+					return Result{Err: ctx.Err()}
+				}
+			default:
+			}
+			return Result{}
+		default:
+			return Result{}
+		}
+	})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := RunOnce(context.Background(), RunOptions{
+			Config: Config{
+				RepoRoot:     repoRoot,
+				ProgressJSON: progressPath,
+				RunRoot:      runRoot,
+				Backend:      "opencode",
+				Mode:         "safe",
+				MaxAgents:    2,
+			},
+			Runner: runner,
+		})
+		done <- err
+	}()
+
+	var seen []string
+	seen = append(seen, <-started)
+	select {
+	case worker := <-started:
+		seen = append(seen, worker)
+		close(releaseFirst)
+	case <-time.After(2 * time.Second):
+		close(releaseFirst)
+		if err := <-done; err != nil {
+			t.Fatalf("RunOnce() error = %v", err)
+		}
+		t.Fatalf("started workers = %#v, want a second worker to start before the first backend returns", seen)
+	}
+
+	if err := <-done; err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if seen[0] == seen[1] {
+		t.Fatalf("started workers = %#v, want distinct worker worktrees", seen)
+	}
+}
+
 func TestRunOncePassesExecutionMetadataPromptToBackend(t *testing.T) {
 	progressPath := writeProgressJSON(t, `{
 		"phases": {

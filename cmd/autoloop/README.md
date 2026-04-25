@@ -54,7 +54,9 @@ Useful environment variables:
 - `BACKEND`: select `codexu`, `claudeu`, or `opencode`.
 - `MODE`: select `safe`, `unattended`, or `full`.
 - `MAX_AGENTS`: cap selected rows for one run. If fewer rows are metadata-ready,
-  autoloop runs fewer workers instead of choosing filler or random work.
+  autoloop runs fewer workers instead of choosing filler or random work. In a
+  git checkout, selected workers run concurrently when this is greater than
+  one.
 - `MAX_PHASE`: cap eligible roadmap phases. Defaults to `3` so current
   unattended runs stay inside Phases 1-3. Set `0` only for an explicit
   unbounded run.
@@ -67,8 +69,10 @@ Each selected worker runs in its own git worktree under
 `$RUN_ROOT/worktrees/<run-id>/w<worker>` on a branch named
 `autoloop/<run-id>/w<worker>/<slug>` cut from the autoloop base branch. The
 backend command runs with that worktree as its working directory, so worker
-edits cannot dirty the control checkout while autoloop is monitoring them. The
-flow per worker is:
+edits cannot dirty the control checkout while autoloop is monitoring them.
+When more than one worker is selected, autoloop prepares all worker worktrees,
+launches their backend commands concurrently, then validates and promotes the
+finished branches in worker order. The flow per worker is:
 
 1. Pre-flight: refuse to launch if the repo has unmerged paths or uncommitted
    changes (emits `run_failed:worktree_unmerged` / `run_failed:worktree_dirty`).

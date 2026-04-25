@@ -38,6 +38,7 @@ at a time. Do not maintain a parallel queue outside this docs tree.
 - Default cmd/autoloop runs cap eligible roadmap work at Phase 3 unless MAX_PHASE is explicitly overridden.
 - MAX_AGENTS is a safety cap: if fewer metadata-ready rows are available, run fewer workers instead of selecting filler or random work.
 - Each worker runs in an isolated git worktree under RUN_ROOT/worktrees and promotion rejects committed paths outside the selected row's write_scope.
+- When git worktrees are available and MAX_AGENTS is greater than 1, cmd/autoloop launches selected workers concurrently, then validates and promotes each branch through the same ledgered safety gates.
 - Prefer contract rows with write_scope, test_commands, and done_signal.
 - Inject selected progress metadata into the worker prompt instead of asking workers to rescan the whole roadmap.
 <!-- PROGRESS:END -->
