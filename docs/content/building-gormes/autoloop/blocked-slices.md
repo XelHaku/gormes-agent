@@ -29,6 +29,8 @@ Use it to avoid assigning work before the dependency chain is ready.
 | 3 / 3.F | Directional peer cards and representation scopes | Goncho context representation options | Context options expose observer/target fields and current peer-card replacement behavior is fixture-locked. | - |
 | 3 / 3.F | Goncho queue status read model | Directional peer cards and representation scopes | At least one Goncho-owned task type or a zero-state read model is available to report deterministically. | - |
 | 3 / 3.F | Goncho summary context budget | Goncho context representation options | Context options are schema-visible and the memory store can add a session_summaries table via migration. | - |
+| 3 / 3.F | Goncho dialectic chat contract | Goncho context representation options | Context options are schema-visible and manual conclusions can be queried through the existing Goncho service. | - |
+| 3 / 3.F | Goncho file upload import ingestion | Goncho queue status read model | Goncho has a deterministic session-message write path or a documented queue-unavailable degraded path for imported messages. | - |
 | 4 / 4.A | Bedrock stale-client eviction + retry classification | Bedrock SigV4 + credential seam | A Bedrock client/cache seam exists behind the provider adapter and can be exercised without live AWS credentials. | - |
 | 4 / 4.A | Codex OAuth state + stale-token relogin | Token vault, Multi-account auth, Codex Responses pure conversion harness | Gormes has an XDG-scoped token vault and account-selection seam for provider credentials. | - |
 | 4 / 4.A | Codex stream repair + tool-call leak sanitizer | Codex Responses pure conversion harness | Codex Responses conversion fixtures can replay streamed and non-streamed output without live credentials. | - |

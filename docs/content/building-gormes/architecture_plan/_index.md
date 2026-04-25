@@ -304,6 +304,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Directional peer cards and representation scopes
 - [ ] Goncho queue status read model
 - [ ] Goncho summary context budget
+- [ ] Goncho dialectic chat contract
+- [ ] Goncho file upload import ingestion
 
 ## Phase 4 — The Brain Transplant 🔨
 
