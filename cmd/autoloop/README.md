@@ -61,6 +61,31 @@ Useful environment variables:
 - `PRIORITY_BOOST`: comma-separated subphase IDs to pull ahead of equally ready
   work. Defaults to the active priority channels: `2.B.3,2.B.4,2.B.10,2.B.11`.
 
+## Worker isolation and promotion
+
+Each selected worker runs on its own branch named
+`autoloop/<run-id>/w<worker>/<slug>` cut from the autoloop base branch. The
+flow per worker is:
+
+1. Pre-flight: refuse to launch if the repo has unmerged paths or uncommitted
+   changes (emits `run_failed:worktree_unmerged` / `run_failed:worktree_dirty`).
+2. Switch to a fresh worker branch and record its base commit.
+3. Run the backend with the worker prompt (which tells the agent the branch
+   name).
+4. Verify no merge conflicts and require the worker branch to be clean. Dirty
+   output emits `worker_failed:worktree_dirty` and the run stops for inspection.
+5. Restore the autoloop base branch and call `PromoteWorker`:
+   `git push origin <branch>` then `gh pr create --fill --head <branch>`,
+   falling back to `git cherry-pick -Xtheirs <commit>` if push or `gh` fails.
+
+Each promotion attempt emits a `worker_promoted` or `worker_promotion_failed`
+ledger event so the audit's `productivity` metric reflects work that actually
+landed, not just claims that survived a backend call.
+
+When `MAX_AGENTS > 1`, candidate selection diversifies across subphases
+(one slot per distinct subphase first) before stacking additional workers,
+so eight workers don't all collide on the same subphase's hot files.
+
 ## Documentation Contract
 
 If autoloop chooses the wrong work, lacks enough worker context, or cannot tell
