@@ -271,6 +271,9 @@ func DisableLegacyTimers(ctx context.Context, runner Runner) error {
 	for _, timer := range []string{
 		"gormes-architecture-planner-tasks-manager.timer",
 		"gormes-architectureplanneragent.timer",
+		"gormes-architecture-planner.timer",
+		"gormes-architecture-planner.path",
+		"gormes-architecture-planner-impl.path",
 	} {
 		result := runner.Run(ctx, Command{
 			Name: "systemctl",

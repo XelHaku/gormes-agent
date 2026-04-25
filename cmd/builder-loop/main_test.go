@@ -677,7 +677,7 @@ func TestServiceInstallAuditHonorsAutoStartZero(t *testing.T) {
 }
 
 func TestServiceDisableLegacyTimersUsesRunner(t *testing.T) {
-	runner := &builderloop.FakeRunner{Results: []builderloop.Result{{}, {}, {}}}
+	runner := &builderloop.FakeRunner{Results: []builderloop.Result{{}, {}, {}, {}, {}, {}}}
 	oldRunner := serviceRunner
 	serviceRunner = runner
 	t.Cleanup(func() {
@@ -691,11 +691,14 @@ func TestServiceDisableLegacyTimersUsesRunner(t *testing.T) {
 	wantCommands := []builderloop.Command{
 		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner-tasks-manager.timer"}},
 		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architectureplanneragent.timer"}},
+		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner.timer"}},
+		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner.path"}},
+		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner-impl.path"}},
 	}
-	if len(runner.Commands) != 3 || !reflect.DeepEqual(runner.Commands[:2], wantCommands) {
+	if len(runner.Commands) != 6 || !reflect.DeepEqual(runner.Commands[:5], wantCommands) {
 		t.Fatalf("commands = %#v, want systemd disables plus cron cleanup", runner.Commands)
 	}
-	cronCommand := runner.Commands[2]
+	cronCommand := runner.Commands[5]
 	if cronCommand.Name != "sh" || len(cronCommand.Args) != 2 || !strings.Contains(cronCommand.Args[1], "landingpage-improver\\.sh") {
 		t.Fatalf("cron cleanup command = %#v, want sh cleanup for legacy cron entries", cronCommand)
 	}

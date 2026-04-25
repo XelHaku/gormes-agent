@@ -123,8 +123,8 @@ func TestServiceInstallWritesUnits(t *testing.T) {
 		t.Fatalf("service install error = %v", err)
 	}
 
-	servicePath := filepath.Join(xdg, "systemd", "user", "gormes-architecture-planner.service")
-	timerPath := filepath.Join(xdg, "systemd", "user", "gormes-architecture-planner.timer")
+	servicePath := filepath.Join(xdg, "systemd", "user", "gormes-planner-loop.service")
+	timerPath := filepath.Join(xdg, "systemd", "user", "gormes-planner-loop.timer")
 	for _, path := range []string{servicePath, timerPath} {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected unit at %s: %v", path, err)

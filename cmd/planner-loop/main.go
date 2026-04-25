@@ -249,7 +249,7 @@ func installPlannerService(root string, force bool, pathToWatch string) error {
 	if value := os.Getenv("PLANNER_IMPL_PATHS"); value != "" {
 		implPaths = splitAndTrim(value)
 	}
-	implPathName := "gormes-architecture-planner-impl.path"
+	implPathName := "gormes-planner-loop-impl.path"
 	if len(implPaths) == 0 {
 		implPathName = ""
 	}
@@ -257,9 +257,9 @@ func installPlannerService(root string, force bool, pathToWatch string) error {
 	return plannerloop.InstallPlannerService(context.Background(), plannerloop.PlannerServiceInstallOptions{
 		Runner:           commandRunner,
 		UnitDir:          unitDir,
-		UnitName:         "gormes-architecture-planner.service",
-		TimerName:        "gormes-architecture-planner.timer",
-		PathName:         "gormes-architecture-planner.path",
+		UnitName:         "gormes-planner-loop.service",
+		TimerName:        "gormes-planner-loop.timer",
+		PathName:         "gormes-planner-loop.path",
 		PathToWatch:      pathToWatch,
 		ImplPathName:     implPathName,
 		ImplPathsToWatch: implPaths,

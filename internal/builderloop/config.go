@@ -54,7 +54,8 @@ type Config struct {
 	// BackendTimeout bounds each LLM backend invocation launched by
 	// autoloop workers or repair agents. A stuck codexu/claudeu/opencode
 	// child must not park the infinite loop forever. Sourced from
-	// AUTOLOOP_BACKEND_TIMEOUT (Go time.ParseDuration syntax, e.g. "30m");
+	// BUILDER_LOOP_BACKEND_TIMEOUT (Go time.ParseDuration syntax, e.g. "30m");
+	// AUTOLOOP_BACKEND_TIMEOUT is read as a fallback for back-compat;
 	// default 30 minutes.
 	BackendTimeout time.Duration
 
@@ -173,13 +174,20 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 	if value := env["PRIORITY_BOOST"]; value != "" {
 		cfg.PriorityBoost = splitCSV(value)
 	}
-	if value := env["AUTOLOOP_BACKEND_TIMEOUT"]; value != "" {
-		d, err := time.ParseDuration(value)
+	// BUILDER_LOOP_BACKEND_TIMEOUT is the canonical name; AUTOLOOP_BACKEND_TIMEOUT
+	// is read as a fallback so existing operator env files keep working
+	// across the autoloop -> builder-loop rename.
+	timeoutSrc, timeoutValue := "BUILDER_LOOP_BACKEND_TIMEOUT", env["BUILDER_LOOP_BACKEND_TIMEOUT"]
+	if timeoutValue == "" {
+		timeoutSrc, timeoutValue = "AUTOLOOP_BACKEND_TIMEOUT", env["AUTOLOOP_BACKEND_TIMEOUT"]
+	}
+	if timeoutValue != "" {
+		d, err := time.ParseDuration(timeoutValue)
 		if err != nil {
-			return Config{}, fmt.Errorf("AUTOLOOP_BACKEND_TIMEOUT must be a Go duration (e.g. \"30m\"): %w", err)
+			return Config{}, fmt.Errorf("%s must be a Go duration (e.g. \"30m\"): %w", timeoutSrc, err)
 		}
 		if d <= 0 {
-			return Config{}, fmt.Errorf("AUTOLOOP_BACKEND_TIMEOUT must be positive")
+			return Config{}, fmt.Errorf("%s must be positive", timeoutSrc)
 		}
 		cfg.BackendTimeout = d
 	}

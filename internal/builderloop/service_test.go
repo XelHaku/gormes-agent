@@ -369,7 +369,7 @@ func TestInstallServiceReturnsEnableFailure(t *testing.T) {
 
 func TestDisableLegacyTimersRunsExpectedSystemctlCalls(t *testing.T) {
 	runner := &FakeRunner{
-		Results: []Result{{}, {}, {}},
+		Results: []Result{{}, {}, {}, {}, {}, {}},
 	}
 
 	if err := DisableLegacyTimers(context.Background(), runner); err != nil {
@@ -379,6 +379,9 @@ func TestDisableLegacyTimersRunsExpectedSystemctlCalls(t *testing.T) {
 	wantCommands := []Command{
 		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner-tasks-manager.timer"}},
 		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architectureplanneragent.timer"}},
+		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner.timer"}},
+		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner.path"}},
+		{Name: "systemctl", Args: []string{"--user", "disable", "--now", "gormes-architecture-planner-impl.path"}},
 		{Name: "sh", Args: []string{"-c", legacyCronCleanupScript}},
 	}
 	if !reflect.DeepEqual(runner.Commands, wantCommands) {
@@ -388,7 +391,7 @@ func TestDisableLegacyTimersRunsExpectedSystemctlCalls(t *testing.T) {
 
 func TestDisableLegacyTimersInvokesCronCleanup(t *testing.T) {
 	runner := &FakeRunner{
-		Results: []Result{{}, {}, {}},
+		Results: []Result{{}, {}, {}, {}, {}, {}},
 	}
 
 	if err := DisableLegacyTimers(context.Background(), runner); err != nil {
@@ -404,8 +407,7 @@ func TestDisableLegacyTimersIgnoresMissingTimerAndContinues(t *testing.T) {
 	runner := &FakeRunner{
 		Results: []Result{
 			{Stderr: "Failed to disable unit: Unit file gormes-architecture-planner-tasks-manager.timer does not exist.", Err: errors.New("missing")},
-			{},
-			{},
+			{}, {}, {}, {}, {},
 		},
 	}
 
@@ -413,7 +415,7 @@ func TestDisableLegacyTimersIgnoresMissingTimerAndContinues(t *testing.T) {
 		t.Fatalf("DisableLegacyTimers() error = %v", err)
 	}
 
-	if got, want := len(runner.Commands), 3; got != want {
+	if got, want := len(runner.Commands), 6; got != want {
 		t.Fatalf("commands length = %d, want %d", got, want)
 	}
 }
@@ -438,15 +440,14 @@ func TestDisableLegacyTimersIgnoresHyphenatedMissingStates(t *testing.T) {
 			runner := &FakeRunner{
 				Results: []Result{
 					{Stderr: test.stderr, Err: errors.New(test.name)},
-					{},
-					{},
+					{}, {}, {}, {}, {},
 				},
 			}
 
 			if err := DisableLegacyTimers(context.Background(), runner); err != nil {
 				t.Fatalf("DisableLegacyTimers() error = %v", err)
 			}
-			if got, want := len(runner.Commands), 3; got != want {
+			if got, want := len(runner.Commands), 6; got != want {
 				t.Fatalf("commands length = %d, want %d", got, want)
 			}
 		})

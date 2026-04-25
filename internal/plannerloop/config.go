@@ -185,7 +185,13 @@ func ConfigFromEnv(repoRoot string, env map[string]string) (Config, error) {
 	if value := env["RUN_ROOT"]; value != "" {
 		cfg.RunRoot = value
 	}
-	if value := env["AUTOLOOP_RUN_ROOT"]; value != "" {
+	// BUILDER_LOOP_RUN_ROOT is the canonical override for the path the
+	// planner watches for the builder-loop ledger; AUTOLOOP_RUN_ROOT is
+	// read as a fallback so existing operator env files keep working
+	// across the autoloop -> builder-loop rename.
+	if value := env["BUILDER_LOOP_RUN_ROOT"]; value != "" {
+		cfg.AutoloopRunRoot = value
+	} else if value := env["AUTOLOOP_RUN_ROOT"]; value != "" {
 		cfg.AutoloopRunRoot = value
 	}
 	if value := env["BACKEND"]; value != "" {

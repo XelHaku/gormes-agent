@@ -147,7 +147,7 @@ type PlannerServiceInstallOptions struct {
 	TimerName string
 	// PathName is the filename of the .path unit that reactively fires
 	// the planner service on triggers ledger changes. Defaults to
-	// "gormes-architecture-planner.path" if empty.
+	// "gormes-planner-loop.path" if empty.
 	PathName string
 	// PathToWatch is the absolute filesystem path the .path unit
 	// watches (autoloop's triggers JSONL ledger). Threaded in from the
@@ -208,7 +208,7 @@ func InstallPlannerService(ctx context.Context, opts PlannerServiceInstallOption
 
 	pathName := opts.PathName
 	if pathName == "" {
-		pathName = "gormes-architecture-planner.path"
+		pathName = "gormes-planner-loop.path"
 	}
 	pathUnitPath := filepath.Join(opts.UnitDir, pathName)
 	if err := writePlannerUnit(pathUnitPath, opts.Force, RenderPlannerPathUnit(PlannerPathUnitOptions{
