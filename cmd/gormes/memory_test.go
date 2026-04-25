@@ -84,7 +84,7 @@ func TestMemoryStatusCommand_PrintsGonchoQueueZeroState(t *testing.T) {
 
 	out := stdout.String()
 	for _, want := range []string{
-		"Goncho queue status (observability only; not synchronization)",
+		"Goncho queue status (observability/debugging only; not synchronization; do not wait for empty queue)",
 		"representation: total=0 pending=0 in_progress=0 completed=0",
 		"summary: total=0 pending=0 in_progress=0 completed=0",
 		"dream: total=0 pending=0 in_progress=0 completed=0",

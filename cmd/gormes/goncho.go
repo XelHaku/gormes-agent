@@ -565,7 +565,7 @@ func formatGonchoDoctorReport(report gonchoDoctorReport) string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("Queue status (observability only; not synchronization)\n")
+	b.WriteString("Queue status (observability/debugging only; not synchronization; do not wait for empty queue)\n")
 	fmt.Fprintf(&b, "extractor_worker_health: %s\n", report.QueueStatus.Extractor.WorkerHealth)
 	fmt.Fprintf(&b, "extractor_queue_depth: %d\n", report.QueueStatus.Extractor.QueueDepth)
 	fmt.Fprintf(&b, "extractor_dead_letters: %d\n", report.QueueStatus.Extractor.DeadLetterCount)

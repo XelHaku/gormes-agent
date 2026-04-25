@@ -13,10 +13,11 @@ var QueueTaskTypes = []string{"representation", "summary", "dream"}
 
 // QueueWorkUnitStatus mirrors Honcho's queue status count shape.
 type QueueWorkUnitStatus struct {
-	CompletedWorkUnits  int `json:"completed_work_units"`
-	InProgressWorkUnits int `json:"in_progress_work_units"`
-	PendingWorkUnits    int `json:"pending_work_units"`
-	TotalWorkUnits      int `json:"total_work_units"`
+	CompletedWorkUnits  int                            `json:"completed_work_units"`
+	InProgressWorkUnits int                            `json:"in_progress_work_units"`
+	PendingWorkUnits    int                            `json:"pending_work_units"`
+	TotalWorkUnits      int                            `json:"total_work_units"`
+	Sessions            map[string]QueueWorkUnitStatus `json:"sessions,omitempty"`
 }
 
 // QueueStatus is the local Goncho queue status read model. Until a dedicated
@@ -54,6 +55,6 @@ func ZeroQueueStatus() QueueStatus {
 		ObservabilityOnly: true,
 		WorkUnits:         workUnits,
 		Degraded:          true,
-		Message:           "no dedicated Goncho task queue exists yet; zero tracked work units",
+		Message:           "no dedicated Goncho task queue exists yet; zero tracked work units; queue status is for observability and debugging, do not wait for an empty queue",
 	}
 }
