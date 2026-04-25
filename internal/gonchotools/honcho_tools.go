@@ -109,7 +109,7 @@ func (*HonchoContextTool) Description() string {
 	return "Build a structured Goncho context block: peer card, representation, conclusions, and recent messages."
 }
 func (*HonchoContextTool) Schema() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"max_tokens":{"type":"integer"},"session_key":{"type":"string"},"scope":{"type":"string"},"sources":{"type":"array","items":{"type":"string"}},"peer_target":{"type":"string"},"peer_perspective":{"type":"string"},"limit_to_session":{"type":"boolean"},"search_top_k":{"type":"integer"},"search_max_distance":{"type":"number"},"include_most_frequent":{"type":"boolean"},"max_conclusions":{"type":"integer"}},"required":["peer"]}`)
+	return json.RawMessage(`{"type":"object","properties":{"peer":{"type":"string"},"query":{"type":"string"},"search_query":{"type":"string"},"max_tokens":{"type":"integer"},"tokens":{"type":"integer"},"summary":{"type":"boolean"},"session_key":{"type":"string"},"scope":{"type":"string"},"sources":{"type":"array","items":{"type":"string"}},"peer_target":{"type":"string"},"peer_perspective":{"type":"string"},"limit_to_session":{"type":"boolean"},"search_top_k":{"type":"integer"},"search_max_distance":{"type":"number"},"include_most_frequent":{"type":"boolean"},"max_conclusions":{"type":"integer"}},"required":["peer"]}`)
 }
 func (*HonchoContextTool) Timeout() time.Duration { return 5 * time.Second }
 func (t *HonchoContextTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {

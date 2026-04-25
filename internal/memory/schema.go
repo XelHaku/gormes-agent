@@ -232,26 +232,23 @@ CREATE INDEX IF NOT EXISTS idx_turns_turn_key
 UPDATE schema_meta SET v = '3g' WHERE k = 'version' AND v = '3f';
 `
 
-// migration3gTo3h makes peer cards directional. Existing flat cards are
-// preserved as the default Gormes observer's view of the stored peer.
+// migration3gTo3h adds Honcho-compatible Goncho session summary slots:
+//   - one short and one long summary per workspace/session
+//   - message_id records the last covered turn
+//   - token_count makes context-budget decisions deterministic
 const migration3gTo3h = `
-CREATE TABLE IF NOT EXISTS goncho_peer_cards_directional (
-	workspace_id      TEXT NOT NULL,
-	observer_peer_id  TEXT NOT NULL,
-	peer_id           TEXT NOT NULL,
-	card_json         TEXT NOT NULL,
-	updated_at        INTEGER NOT NULL,
-	PRIMARY KEY(workspace_id, observer_peer_id, peer_id)
+CREATE TABLE IF NOT EXISTS goncho_session_summaries (
+	workspace_id TEXT    NOT NULL,
+	session_key  TEXT    NOT NULL,
+	summary_type TEXT    NOT NULL CHECK(summary_type IN ('short','long')),
+	content      TEXT    NOT NULL,
+	message_id   INTEGER NOT NULL,
+	created_at   INTEGER NOT NULL,
+	token_count  INTEGER NOT NULL CHECK(token_count >= 0),
+	PRIMARY KEY(workspace_id, session_key, summary_type)
 );
-INSERT INTO goncho_peer_cards_directional(
-	workspace_id, observer_peer_id, peer_id, card_json, updated_at
-)
-SELECT workspace_id, 'gormes', peer_id, card_json, updated_at
-FROM goncho_peer_cards;
-DROP TABLE goncho_peer_cards;
-ALTER TABLE goncho_peer_cards_directional RENAME TO goncho_peer_cards;
-CREATE INDEX IF NOT EXISTS idx_goncho_peer_cards_observed
-	ON goncho_peer_cards(workspace_id, peer_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_goncho_session_summaries_session
+	ON goncho_session_summaries(workspace_id, session_key);
 
 UPDATE schema_meta SET v = '3h' WHERE k = 'version' AND v = '3g';
 `

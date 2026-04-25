@@ -13,6 +13,11 @@ import (
 	"github.com/TrebuchetDynamics/gormes-agent/internal/memory"
 )
 
+const (
+	defaultShortSummaryCadence = 20
+	defaultLongSummaryCadence  = 60
+)
+
 // Service is the first in-binary Goncho domain facade. It sits directly on
 // top of the SQLite store used by Gormes today.
 type Service struct {
@@ -237,7 +242,9 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 		return ContextResult{}, fmt.Errorf("goncho: peer is required")
 	}
 	sessionKey := strings.TrimSpace(params.SessionKey)
-	unavailable := contextUnavailableEvidence(params, s.observer, peer)
+	query := effectiveContextQuery(params)
+	tokenLimit := effectiveContextTokenLimit(params)
+	unavailable := contextUnavailableEvidence(params)
 
 	card, err := getPeerCard(ctx, s.db, s.workspaceID, s.observer, peer)
 	if err != nil {
@@ -247,7 +254,7 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 	searchResult := SearchResultSet{
 		WorkspaceID: s.workspaceID,
 		Peer:        peer,
-		Query:       params.Query,
+		Query:       query,
 	}
 	if limitToSession(params) && sessionKey == "" {
 		unavailable = append(unavailable, ContextUnavailableEvidence{
@@ -262,8 +269,8 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 		}
 		searchResult, err = s.Search(ctx, SearchParams{
 			Peer:       peer,
-			Query:      params.Query,
-			MaxTokens:  params.MaxTokens,
+			Query:      query,
+			MaxTokens:  effectiveSearchTokenLimit(params),
 			SessionKey: sessionKey,
 			Scope:      scope,
 			Sources:    params.Sources,
@@ -273,6 +280,7 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 		}
 	}
 
+	var summary *SessionSummary
 	conclusions := make([]string, 0, len(searchResult.Results))
 	for _, hit := range searchResult.Results {
 		if hit.Source != "conclusion" {
@@ -283,9 +291,39 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 
 	recentMessages := []MessageSlice{}
 	if sessionKey != "" {
-		recentMessages, err = recentTurns(ctx, s.db, sessionKey, s.recentLimit)
+		turnCount, err := s.refreshSessionSummaries(ctx, sessionKey)
 		if err != nil {
 			return ContextResult{}, err
+		}
+
+		messageBudget := tokenLimit
+		messageStartID := int64(0)
+		if includeSummaryComponent(params) {
+			var reason string
+			summary, reason, err = selectSessionContextSummary(ctx, s.db, s.workspaceID, sessionKey, tokenLimit)
+			if err != nil {
+				return ContextResult{}, err
+			}
+			if summary != nil {
+				messageStartID = summary.MessageID
+				if tokenLimit > 0 {
+					_, messageBudget = splitContextTokenBudget(tokenLimit)
+				}
+			} else if tokenLimit > 0 && turnCount > 0 {
+				unavailable = append(unavailable, summaryAbsentEvidence(reason))
+			}
+		}
+
+		if tokenLimit > 0 {
+			recentMessages, err = recentTurnsByTokenBudget(ctx, s.db, sessionKey, messageStartID, messageBudget)
+			if err != nil {
+				return ContextResult{}, err
+			}
+		} else {
+			recentMessages, err = recentTurnsAfter(ctx, s.db, sessionKey, messageStartID, s.recentLimit)
+			if err != nil {
+				return ContextResult{}, err
+			}
 		}
 	}
 
@@ -297,78 +335,139 @@ func (s *Service) Context(ctx context.Context, params ContextParams) (ContextRes
 		SessionKey:     sessionKey,
 		PeerCard:       card,
 		Representation: buildRepresentation(peer, card, conclusions),
-		Summary:        "",
+		Summary:        summary,
 		Conclusions:    conclusions,
 		RecentMessages: recentMessages,
 		Unavailable:    unavailable,
 	}, nil
 }
 
-func (s *Service) Chat(ctx context.Context, peer string, params ChatParams) (ChatResult, error) {
-	peer = strings.TrimSpace(peer)
-	if peer == "" {
-		return ChatResult{}, fmt.Errorf("goncho: peer is required")
+func effectiveContextQuery(params ContextParams) string {
+	if trimmed := strings.TrimSpace(params.SearchQuery); trimmed != "" {
+		return trimmed
 	}
-	query := strings.TrimSpace(params.Query)
-	if query == "" {
-		return ChatResult{}, fmt.Errorf("goncho: query is required")
+	return params.Query
+}
+
+func effectiveContextTokenLimit(params ContextParams) int {
+	if params.Tokens > 0 {
+		return params.Tokens
 	}
-	if len([]rune(query)) > 10000 {
-		return ChatResult{}, fmt.Errorf("goncho: query must be 10000 characters or fewer")
+	return params.MaxTokens
+}
+
+func effectiveSearchTokenLimit(params ContextParams) int {
+	if params.MaxTokens > 0 {
+		return params.MaxTokens
 	}
-	reasoningLevel, err := normalizeChatReasoningLevel(params.ReasoningLevel)
+	return params.Tokens
+}
+
+func includeSummaryComponent(params ContextParams) bool {
+	return params.Summary == nil || *params.Summary
+}
+
+func splitContextTokenBudget(tokenLimit int) (summaryBudget, messageBudget int) {
+	if tokenLimit <= 0 {
+		return 0, 0
+	}
+	summaryBudget = int(float64(tokenLimit) * 0.4)
+	messageBudget = tokenLimit - summaryBudget
+	return summaryBudget, messageBudget
+}
+
+func selectSessionContextSummary(ctx context.Context, db *sql.DB, workspaceID, sessionKey string, tokenLimit int) (*SessionSummary, string, error) {
+	shortSummary, longSummary, err := getSessionSummaries(ctx, db, workspaceID, sessionKey)
 	if err != nil {
-		return ChatResult{}, err
+		return nil, "", err
+	}
+	if shortSummary == nil && longSummary == nil {
+		return nil, "no session summary is available yet", nil
+	}
+	if tokenLimit <= 0 {
+		if longSummary != nil {
+			return longSummary, "", nil
+		}
+		return shortSummary, "", nil
 	}
 
-	card, err := getPeerCard(ctx, s.db, s.workspaceID, peer)
-	if err != nil {
-		return ChatResult{}, err
+	summaryBudget, _ := splitContextTokenBudget(tokenLimit)
+	if longSummary != nil && longSummary.TokenCount <= summaryBudget {
+		return longSummary, "", nil
 	}
-	searchResult, err := s.Search(ctx, SearchParams{
-		Peer:       peer,
-		Query:      query,
-		SessionKey: strings.TrimSpace(params.SessionID),
+	if shortSummary != nil && shortSummary.TokenCount <= summaryBudget {
+		return shortSummary, "", nil
+	}
+	return nil, fmt.Sprintf("session summaries exceed the %d-token summary budget", summaryBudget), nil
+}
+
+func summaryAbsentEvidence(reason string) ContextUnavailableEvidence {
+	if strings.TrimSpace(reason) == "" {
+		reason = "no session summary could fit in the requested token budget"
+	}
+	return ContextUnavailableEvidence{
+		Field:      "summary_absent",
+		Capability: "session_summary",
+		Reason:     reason,
+	}
+}
+
+func (s *Service) refreshSessionSummaries(ctx context.Context, sessionKey string) (int, error) {
+	count, err := countReadySessionTurns(ctx, s.db, sessionKey)
+	if err != nil {
+		return 0, err
+	}
+	for _, cfg := range []struct {
+		summaryType string
+		cadence     int
+	}{
+		{summaryType: "short", cadence: defaultShortSummaryCadence},
+		{summaryType: "long", cadence: defaultLongSummaryCadence},
+	} {
+		if err := s.refreshSessionSummarySlot(ctx, sessionKey, cfg.summaryType, cfg.cadence, count); err != nil {
+			return 0, err
+		}
+	}
+	return count, nil
+}
+
+func (s *Service) refreshSessionSummarySlot(ctx context.Context, sessionKey, summaryType string, cadence, turnCount int) error {
+	if cadence <= 0 || turnCount < cadence {
+		return nil
+	}
+	coveredCount := (turnCount / cadence) * cadence
+	messageID, err := readySessionTurnIDAtPosition(ctx, s.db, sessionKey, coveredCount)
+	if err != nil {
+		return err
+	}
+	if messageID == 0 {
+		return nil
+	}
+
+	existing, err := getSessionSummary(ctx, s.db, s.workspaceID, sessionKey, summaryType)
+	if err != nil {
+		return err
+	}
+	if existing != nil && existing.MessageID >= messageID {
+		return nil
+	}
+
+	content := deterministicSummaryContent(sessionKey, summaryType, coveredCount, messageID)
+	return upsertSessionSummary(ctx, s.db, sessionSummaryRow{
+		WorkspaceID: s.workspaceID,
+		SessionKey:  sessionKey,
+		SummaryType: summaryType,
+		Content:     content,
+		MessageID:   messageID,
+		TokenCount:  approxTokens(content),
 	})
-	if err != nil {
-		return ChatResult{}, err
-	}
-
-	return ChatResult{
-		Content: buildChatContent(peer, query, reasoningLevel, card, searchResult.Results, chatUnsupportedEvidence(params)),
-	}, nil
 }
 
-func normalizeChatReasoningLevel(level string) (string, error) {
-	level = strings.TrimSpace(level)
-	if level == "" {
-		return "low", nil
+func deterministicSummaryContent(sessionKey, summaryType string, coveredCount int, messageID int64) string {
+	if summaryType == "long" {
+		return fmt.Sprintf("long comprehensive summary for session %s covers %d messages through message %d.", sessionKey, coveredCount, messageID)
 	}
-	switch level {
-	case "minimal", "low", "medium", "high", "max":
-		return level, nil
-	default:
-		return "", fmt.Errorf("goncho: invalid reasoning_level %q", level)
-	}
-}
-
-func chatUnsupportedEvidence(params ChatParams) []ContextUnavailableEvidence {
-	var unavailable []ContextUnavailableEvidence
-	if params.Stream {
-		unavailable = append(unavailable, ContextUnavailableEvidence{
-			Field:      "stream",
-			Capability: "streaming_dialectic_chat",
-			Reason:     "stream=true requires the future dialectic streaming transport",
-		})
-	}
-	if strings.TrimSpace(params.Target) != "" {
-		unavailable = append(unavailable, ContextUnavailableEvidence{
-			Field:      "target",
-			Capability: "target_specific_reasoning",
-			Reason:     "target requires directional representation storage and the dialectic tool loop",
-		})
-	}
-	return unavailable
+	return fmt.Sprintf("short summary for session %s covers %d messages through message %d.", sessionKey, coveredCount, messageID)
 }
 
 func limitToSession(params ContextParams) bool {

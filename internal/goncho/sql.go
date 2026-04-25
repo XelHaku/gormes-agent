@@ -22,7 +22,17 @@ type conclusionRow struct {
 	EvidenceJSON   string
 }
 
-func upsertPeerCard(ctx context.Context, db *sql.DB, workspaceID, observer, peer string, card []string) error {
+type sessionSummaryRow struct {
+	WorkspaceID string
+	SessionKey  string
+	SummaryType string
+	Content     string
+	MessageID   int64
+	CreatedAt   int64
+	TokenCount  int
+}
+
+func upsertPeerCard(ctx context.Context, db *sql.DB, workspaceID, peer string, card []string) error {
 	raw, err := json.Marshal(card)
 	if err != nil {
 		return fmt.Errorf("goncho: marshal peer card: %w", err)
@@ -57,6 +67,98 @@ func getPeerCard(ctx context.Context, db *sql.DB, workspaceID, observer, peer st
 		return nil, fmt.Errorf("goncho: decode peer card: %w", err)
 	}
 	return card, nil
+}
+
+func upsertSessionSummary(ctx context.Context, db *sql.DB, row sessionSummaryRow) error {
+	createdAt := row.CreatedAt
+	if createdAt <= 0 {
+		createdAt = time.Now().Unix()
+	}
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO goncho_session_summaries(
+			workspace_id, session_key, summary_type, content, message_id, created_at, token_count
+		)
+		VALUES(?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(workspace_id, session_key, summary_type)
+		DO UPDATE SET
+			content = excluded.content,
+			message_id = excluded.message_id,
+			created_at = excluded.created_at,
+			token_count = excluded.token_count
+	`,
+		row.WorkspaceID,
+		row.SessionKey,
+		row.SummaryType,
+		row.Content,
+		row.MessageID,
+		createdAt,
+		row.TokenCount,
+	)
+	if err != nil {
+		return fmt.Errorf("goncho: upsert session summary: %w", err)
+	}
+	return nil
+}
+
+func getSessionSummary(ctx context.Context, db *sql.DB, workspaceID, sessionKey, summaryType string) (*SessionSummary, error) {
+	var summary SessionSummary
+	err := db.QueryRowContext(ctx, `
+		SELECT content, message_id, summary_type, created_at, token_count
+		FROM goncho_session_summaries
+		WHERE workspace_id = ? AND session_key = ? AND summary_type = ?
+	`, workspaceID, sessionKey, summaryType).Scan(
+		&summary.Content,
+		&summary.MessageID,
+		&summary.SummaryType,
+		&summary.CreatedAt,
+		&summary.TokenCount,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("goncho: get session summary: %w", err)
+	}
+	return &summary, nil
+}
+
+func getSessionSummaries(ctx context.Context, db *sql.DB, workspaceID, sessionKey string) (*SessionSummary, *SessionSummary, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT content, message_id, summary_type, created_at, token_count
+		FROM goncho_session_summaries
+		WHERE workspace_id = ? AND session_key = ?
+	`, workspaceID, sessionKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("goncho: get session summaries: %w", err)
+	}
+	defer rows.Close()
+
+	var shortSummary *SessionSummary
+	var longSummary *SessionSummary
+	for rows.Next() {
+		var summary SessionSummary
+		if err := rows.Scan(
+			&summary.Content,
+			&summary.MessageID,
+			&summary.SummaryType,
+			&summary.CreatedAt,
+			&summary.TokenCount,
+		); err != nil {
+			return nil, nil, fmt.Errorf("goncho: scan session summary: %w", err)
+		}
+		switch summary.SummaryType {
+		case "short":
+			item := summary
+			shortSummary = &item
+		case "long":
+			item := summary
+			longSummary = &item
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("goncho: iterate session summaries: %w", err)
+	}
+	return shortSummary, longSummary, nil
 }
 
 func upsertConclusion(ctx context.Context, db *sql.DB, row conclusionRow) (int64, string, error) {
@@ -198,14 +300,19 @@ func findTurns(ctx context.Context, db *sql.DB, query, sessionKey string, limit 
 }
 
 func recentTurns(ctx context.Context, db *sql.DB, sessionKey string, limit int) ([]MessageSlice, error) {
+	return recentTurnsAfter(ctx, db, sessionKey, 0, limit)
+}
+
+func recentTurnsAfter(ctx context.Context, db *sql.DB, sessionKey string, afterID int64, limit int) ([]MessageSlice, error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT role, content
 		FROM turns
 		WHERE (chat_id = ? OR session_id = ?)
 		  AND memory_sync_status = 'ready'
+		  AND id > ?
 		ORDER BY ts_unix DESC, id DESC
 		LIMIT ?
-	`, sessionKey, sessionKey, limit)
+	`, sessionKey, sessionKey, afterID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("goncho: recent turns: %w", err)
 	}
@@ -228,6 +335,83 @@ func recentTurns(ctx context.Context, db *sql.DB, sessionKey string, limit int) 
 		out = append(out, reverse[i])
 	}
 	return out, nil
+}
+
+func recentTurnsByTokenBudget(ctx context.Context, db *sql.DB, sessionKey string, afterID int64, tokenBudget int) ([]MessageSlice, error) {
+	if tokenBudget <= 0 {
+		return []MessageSlice{}, nil
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT role, content
+		FROM turns
+		WHERE (chat_id = ? OR session_id = ?)
+		  AND memory_sync_status = 'ready'
+		  AND id > ?
+		ORDER BY ts_unix DESC, id DESC
+	`, sessionKey, sessionKey, afterID)
+	if err != nil {
+		return nil, fmt.Errorf("goncho: recent turns by token budget: %w", err)
+	}
+	defer rows.Close()
+
+	used := 0
+	var reverse []MessageSlice
+	for rows.Next() {
+		var msg MessageSlice
+		if err := rows.Scan(&msg.Role, &msg.Content); err != nil {
+			return nil, fmt.Errorf("goncho: scan recent turn by token budget: %w", err)
+		}
+		cost := approxTokens(msg.Content)
+		if used+cost > tokenBudget {
+			break
+		}
+		reverse = append(reverse, msg)
+		used += cost
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("goncho: iterate recent turns by token budget: %w", err)
+	}
+
+	out := make([]MessageSlice, 0, len(reverse))
+	for i := len(reverse) - 1; i >= 0; i-- {
+		out = append(out, reverse[i])
+	}
+	return out, nil
+}
+
+func countReadySessionTurns(ctx context.Context, db *sql.DB, sessionKey string) (int, error) {
+	var count int
+	if err := db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM turns
+		WHERE (chat_id = ? OR session_id = ?)
+		  AND memory_sync_status = 'ready'
+	`, sessionKey, sessionKey).Scan(&count); err != nil {
+		return 0, fmt.Errorf("goncho: count ready session turns: %w", err)
+	}
+	return count, nil
+}
+
+func readySessionTurnIDAtPosition(ctx context.Context, db *sql.DB, sessionKey string, position int) (int64, error) {
+	if position <= 0 {
+		return 0, nil
+	}
+	var id int64
+	err := db.QueryRowContext(ctx, `
+		SELECT id
+		FROM turns
+		WHERE (chat_id = ? OR session_id = ?)
+		  AND memory_sync_status = 'ready'
+		ORDER BY ts_unix ASC, id ASC
+		LIMIT 1 OFFSET ?
+	`, sessionKey, sessionKey, position-1).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("goncho: find ready session turn position: %w", err)
+	}
+	return id, nil
 }
 
 func nullIfBlank(value string) any {

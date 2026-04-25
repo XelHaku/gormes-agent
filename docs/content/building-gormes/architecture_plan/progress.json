@@ -1788,9 +1788,9 @@
             {
               "name": "Goncho summary context budget",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Session summaries use Honcho's short/long cadence and 40/60 context budget without double-billing last-N-turn recall",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "memory",
               "trust_class": [
@@ -1822,7 +1822,7 @@
                 "Service.Context allocates 40 percent of the token budget to summary and 60 percent to recent messages when summary=true.",
                 "summary=false fills the budget with recent messages only."
               ],
-              "note": "Honcho docs clarify that summaries are recursive compression slots, not the same thing as last-N-turn recall. Port this after context options so tool callers can request or disable the summary component explicitly.",
+              "note": "TDD landed: Goncho now stores one short and one long session summary slot in goncho_session_summaries, refreshes deterministic short/long slots at the Honcho default 20/60 message cadence, exposes summary/tokens/search_query context options, allocates summary=true context with a 40 percent summary budget and 60 percent recent-message budget without reusing messages covered by the selected summary, lets summary=false spend the token budget on recent messages only, and reports summary_absent evidence when no requested summary can fit.",
               "write_scope": [
                 "internal/goncho/",
                 "internal/memory/",

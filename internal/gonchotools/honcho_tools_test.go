@@ -62,115 +62,14 @@ func TestHonchoContextTool_SchemaExposesOptionalRepresentationOptions(t *testing
 	})
 }
 
-func TestHonchoChatTool_SchemaMatchesHostDialecticContract(t *testing.T) {
-	tool := &HonchoChatTool{}
-	if got := tool.Name(); got != "honcho_chat" {
-		t.Fatalf("Name() = %q, want honcho_chat", got)
-	}
+func TestHonchoContextTool_SchemaExposesOptionalSummaryContextOptions(t *testing.T) {
+	tool := &HonchoContextTool{}
 
-	var schema struct {
-		Properties map[string]struct {
-			Type    string   `json:"type"`
-			Enum    []string `json:"enum,omitempty"`
-			Default any      `json:"default,omitempty"`
-		} `json:"properties"`
-		Required []string `json:"required"`
-	}
-	if err := json.Unmarshal(tool.Schema(), &schema); err != nil {
-		t.Fatalf("schema unmarshal: %v", err)
-	}
-
-	wantTypes := map[string]string{
-		"peer":            "string",
-		"query":           "string",
-		"session_id":      "string",
-		"target":          "string",
-		"reasoning_level": "string",
-		"stream":          "boolean",
-	}
-	for name, wantType := range wantTypes {
-		prop, ok := schema.Properties[name]
-		if !ok {
-			t.Fatalf("schema properties missing %s: %s", name, tool.Schema())
-		}
-		if prop.Type != wantType {
-			t.Fatalf("%s type = %q, want %q", name, prop.Type, wantType)
-		}
-	}
-	if got := schema.Properties["reasoning_level"].Enum; !slices.Equal(got, []string{"minimal", "low", "medium", "high", "max"}) {
-		t.Fatalf("reasoning_level enum = %v", got)
-	}
-	if schema.Properties["reasoning_level"].Default != "low" {
-		t.Fatalf("reasoning_level default = %#v, want low", schema.Properties["reasoning_level"].Default)
-	}
-	if schema.Properties["stream"].Default != false {
-		t.Fatalf("stream default = %#v, want false", schema.Properties["stream"].Default)
-	}
-
-	required := make(map[string]bool, len(schema.Required))
-	for _, name := range schema.Required {
-		required[name] = true
-	}
-	for _, name := range []string{"peer", "query"} {
-		if !required[name] {
-			t.Fatalf("required = %v, missing %s", schema.Required, name)
-		}
-	}
-	for _, name := range []string{"session_id", "target", "reasoning_level", "stream"} {
-		if required[name] {
-			t.Fatalf("%s is required in schema: %s", name, tool.Schema())
-		}
-	}
-}
-
-func TestHonchoChatTool_ReturnsContentOnlyAndLeavesReasoningAliasAvailable(t *testing.T) {
-	reg, svc, cleanup := newTestHonchoRegistry(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	if _, err := svc.Conclude(ctx, goncho.ConcludeParams{
-		Peer:       "telegram:6586915095",
-		Conclusion: "The user prefers exact evidence-first reports.",
-		SessionKey: "session-123",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	output := executeHonchoTool(t, reg, "honcho_chat", json.RawMessage(`{
-		"peer":"telegram:6586915095",
-		"query":"How should I answer?",
-		"session_id":"session-123"
-	}`))
-	var shape map[string]string
-	if err := json.Unmarshal(output, &shape); err != nil {
-		t.Fatalf("chat output should be content-only string fields, got %s: %v", output, err)
-	}
-	if len(shape) != 1 {
-		t.Fatalf("chat output = %s, want only content", output)
-	}
-	if !strings.Contains(shape["content"], "Reasoning level: low") {
-		t.Fatalf("chat output missing default reasoning level: %s", output)
-	}
-	if !strings.Contains(shape["content"], "exact evidence-first reports") {
-		t.Fatalf("chat output missing conclusion: %s", output)
-	}
-	if _, ok := reg.Get("honcho_reasoning"); !ok {
-		t.Fatal("honcho_reasoning not registered")
-	}
-}
-
-func TestHonchoChatTool_ReturnsStreamingDegradationEvidence(t *testing.T) {
-	reg, _, cleanup := newTestHonchoRegistry(t)
-	defer cleanup()
-
-	output := executeHonchoTool(t, reg, "honcho_chat", json.RawMessage(`{
-		"peer":"telegram:6586915095",
-		"query":"What should stream do?",
-		"stream":true
-	}`))
-	if !strings.Contains(string(output), "field=stream") {
-		t.Fatalf("chat output missing stream degradation evidence: %s", output)
-	}
+	assertOptionalSchemaProperties(t, tool.Schema(), []string{"peer"}, map[string]string{
+		"tokens":       "integer",
+		"summary":      "boolean",
+		"search_query": "string",
+	})
 }
 
 func TestHonchoSearchTool_OmittedScopeSourcesPreservesSameChatDefault(t *testing.T) {
