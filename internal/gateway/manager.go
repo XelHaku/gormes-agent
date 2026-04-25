@@ -58,6 +58,7 @@ type ManagerConfig struct {
 	Hooks          *Hooks
 	RuntimeStatus  RuntimeStatusWriter
 	Restart        RestartConfig
+	SessionExpiry  SessionExpiryConfig
 	Now            func() time.Time
 }
 
@@ -1185,6 +1186,10 @@ func (m *Manager) writeNonResumableEvidence(ctx context.Context, evidence Runtim
 
 func (m *Manager) writeExpiryFinalizedEvidence(ctx context.Context, evidence RuntimeExpiryFinalizedEvidence) {
 	m.writeRuntimeStatus(ctx, RuntimeStatusUpdate{ExpiryFinalizedEvidence: &evidence})
+}
+
+func (m *Manager) writeExpiryFinalizeEvidence(ctx context.Context, evidence RuntimeExpiryFinalizeEvidence) {
+	m.writeRuntimeStatus(ctx, RuntimeStatusUpdate{ExpiryFinalizeEvidence: &evidence})
 }
 
 func resumePendingNote(reason string) string {

@@ -25,21 +25,36 @@ var ErrUserBindingConflict = errors.New("session: chat already bound to differen
 // SessionID remains the resume handle; Source+ChatID identify the transport
 // chat; UserID is the canonical participant identity that can span chats.
 type Metadata struct {
-	SessionID             string `json:"session_id"`
-	Source                string `json:"source,omitempty"`
-	ChatID                string `json:"chat_id,omitempty"`
-	UserID                string `json:"user_id,omitempty"`
-	ParentSessionID       string `json:"parent_session_id,omitempty"`
-	LineageKind           string `json:"lineage_kind"`
-	UpdatedAt             int64  `json:"updated_at"`
-	ResumePending         bool   `json:"resume_pending,omitempty"`
-	ResumeReason          string `json:"resume_reason,omitempty"`
-	ResumeMarkedAt        int64  `json:"resume_marked_at,omitempty"`
-	NonResumableReason    string `json:"non_resumable_reason,omitempty"`
-	NonResumableAt        int64  `json:"non_resumable_at,omitempty"`
-	ExpiryFinalized       bool   `json:"expiry_finalized,omitempty"`
-	MigratedMemoryFlushed bool   `json:"migrated_memory_flushed,omitempty"`
+	SessionID                    string               `json:"session_id"`
+	Source                       string               `json:"source,omitempty"`
+	ChatID                       string               `json:"chat_id,omitempty"`
+	UserID                       string               `json:"user_id,omitempty"`
+	ParentSessionID              string               `json:"parent_session_id,omitempty"`
+	LineageKind                  string               `json:"lineage_kind"`
+	UpdatedAt                    int64                `json:"updated_at"`
+	ResumePending                bool                 `json:"resume_pending,omitempty"`
+	ResumeReason                 string               `json:"resume_reason,omitempty"`
+	ResumeMarkedAt               int64                `json:"resume_marked_at,omitempty"`
+	NonResumableReason           string               `json:"non_resumable_reason,omitempty"`
+	NonResumableAt               int64                `json:"non_resumable_at,omitempty"`
+	ExpiryFinalized              bool                 `json:"expiry_finalized,omitempty"`
+	ExpiryFinalizeStatus         ExpiryFinalizeStatus `json:"expiry_finalize_status,omitempty"`
+	ExpiryFinalizeAttempts       int                  `json:"expiry_finalize_attempts,omitempty"`
+	ExpiryFinalizeLastError      string               `json:"expiry_finalize_last_error,omitempty"`
+	ExpiryFinalizeLastEvidenceAt int64                `json:"expiry_finalize_last_evidence_at,omitempty"`
+	MigratedMemoryFlushed        bool                 `json:"migrated_memory_flushed,omitempty"`
 }
+
+// ExpiryFinalizeStatus is persisted evidence for gateway session-expiry
+// finalization attempts. Values intentionally match the operator status text.
+type ExpiryFinalizeStatus string
+
+const (
+	ExpiryFinalizeStatusPending   ExpiryFinalizeStatus = "expiry_finalize_pending"
+	ExpiryFinalizeStatusFailed    ExpiryFinalizeStatus = "expiry_finalize_failed"
+	ExpiryFinalizeStatusGaveUp    ExpiryFinalizeStatus = "expiry_finalize_gave_up"
+	ExpiryFinalizeStatusFinalized ExpiryFinalizeStatus = "expiry_finalized"
+)
 
 func normalizeMetadata(meta Metadata) Metadata {
 	meta.SessionID = strings.TrimSpace(meta.SessionID)
@@ -50,6 +65,11 @@ func normalizeMetadata(meta Metadata) Metadata {
 	meta.LineageKind = strings.ToLower(strings.TrimSpace(meta.LineageKind))
 	meta.ResumeReason = strings.ToLower(strings.TrimSpace(meta.ResumeReason))
 	meta.NonResumableReason = strings.ToLower(strings.TrimSpace(meta.NonResumableReason))
+	meta.ExpiryFinalizeStatus = ExpiryFinalizeStatus(strings.ToLower(strings.TrimSpace(string(meta.ExpiryFinalizeStatus))))
+	meta.ExpiryFinalizeLastError = strings.TrimSpace(meta.ExpiryFinalizeLastError)
+	if meta.ExpiryFinalizeAttempts < 0 {
+		meta.ExpiryFinalizeAttempts = 0
+	}
 	return meta
 }
 
@@ -97,6 +117,15 @@ func mergeMetadata(existing, incoming Metadata) (Metadata, error) {
 	}
 	if incoming.ExpiryFinalized {
 		out.ExpiryFinalized = true
+	}
+	if incoming.ExpiryFinalizeStatus != "" ||
+		incoming.ExpiryFinalizeAttempts != 0 ||
+		incoming.ExpiryFinalizeLastError != "" ||
+		incoming.ExpiryFinalizeLastEvidenceAt != 0 {
+		out.ExpiryFinalizeStatus = incoming.ExpiryFinalizeStatus
+		out.ExpiryFinalizeAttempts = incoming.ExpiryFinalizeAttempts
+		out.ExpiryFinalizeLastError = incoming.ExpiryFinalizeLastError
+		out.ExpiryFinalizeLastEvidenceAt = incoming.ExpiryFinalizeLastEvidenceAt
 	}
 	if incoming.MigratedMemoryFlushed {
 		out.MigratedMemoryFlushed = true

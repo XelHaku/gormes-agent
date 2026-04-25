@@ -58,10 +58,15 @@ func RenderStatusSummary(summary StatusSummary) string {
 	}
 
 	expiryFinalized := sortedExpiryFinalizedEvidence(summary.Runtime.ExpiryFinalized)
-	if len(expiryFinalized) > 0 {
+	expiryFinalize := sortedExpiryFinalizeEvidence(summary.Runtime.ExpiryFinalize)
+	if len(expiryFinalized) > 0 || len(expiryFinalize) > 0 {
 		b.WriteString("session_expiry:\n")
 		for _, evidence := range expiryFinalized {
 			b.WriteString(renderExpiryFinalizedEvidence(evidence))
+			b.WriteByte('\n')
+		}
+		for _, evidence := range expiryFinalize {
+			b.WriteString(renderExpiryFinalizeEvidence(evidence))
 			b.WriteByte('\n')
 		}
 	}
@@ -132,6 +137,7 @@ func runtimeStatusMissing(runtime RuntimeStatus) bool {
 		len(runtime.Platforms) == 0 &&
 		len(runtime.TokenLocks) == 0 &&
 		len(runtime.ExpiryFinalized) == 0 &&
+		len(runtime.ExpiryFinalize) == 0 &&
 		len(runtime.TakeoverMarkers) == 0 &&
 		len(runtime.DuplicateRestarts) == 0 &&
 		len(runtime.ServiceManagerUnavailable) == 0 &&
@@ -190,6 +196,33 @@ func renderExpiryFinalizedEvidence(evidence RuntimeExpiryFinalizedEvidence) stri
 	fmt.Fprintf(&b, " expiry_finalized=%t", evidence.ExpiryFinalized)
 	if evidence.MigratedMemoryFlushed {
 		b.WriteString(" migrated_memory_flushed=true")
+	}
+	return b.String()
+}
+
+func renderExpiryFinalizeEvidence(evidence RuntimeExpiryFinalizeEvidence) string {
+	var b strings.Builder
+	status := evidence.Status
+	if status == "" {
+		status = "expiry_finalize_pending"
+	}
+	b.WriteString("- ")
+	b.WriteString(status)
+	if evidence.SessionID != "" {
+		fmt.Fprintf(&b, " session=%s", evidence.SessionID)
+	}
+	if evidence.Source != "" {
+		fmt.Fprintf(&b, " source=%s", evidence.Source)
+	}
+	if evidence.ChatID != "" {
+		fmt.Fprintf(&b, " chat=%s", evidence.ChatID)
+	}
+	if evidence.UserID != "" {
+		fmt.Fprintf(&b, " user=%s", evidence.UserID)
+	}
+	fmt.Fprintf(&b, " attempts=%d", evidence.Attempts)
+	if evidence.Error != "" {
+		fmt.Fprintf(&b, " error=%q", evidence.Error)
 	}
 	return b.String()
 }
@@ -263,6 +296,27 @@ func sortedExpiryFinalizedEvidence(records []RuntimeExpiryFinalizedEvidence) []R
 		left, right := out[i], out[j]
 		if left.SessionID != right.SessionID {
 			return left.SessionID < right.SessionID
+		}
+		if left.Source != right.Source {
+			return left.Source < right.Source
+		}
+		if left.ChatID != right.ChatID {
+			return left.ChatID < right.ChatID
+		}
+		return left.UserID < right.UserID
+	})
+	return out
+}
+
+func sortedExpiryFinalizeEvidence(records []RuntimeExpiryFinalizeEvidence) []RuntimeExpiryFinalizeEvidence {
+	out := append([]RuntimeExpiryFinalizeEvidence(nil), records...)
+	sort.SliceStable(out, func(i, j int) bool {
+		left, right := out[i], out[j]
+		if left.SessionID != right.SessionID {
+			return left.SessionID < right.SessionID
+		}
+		if left.Status != right.Status {
+			return left.Status < right.Status
 		}
 		if left.Source != right.Source {
 			return left.Source < right.Source
