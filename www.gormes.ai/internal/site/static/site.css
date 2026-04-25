@@ -647,14 +647,31 @@ a:focus-visible,
 .footer-nav {
   display: flex;
   align-items: center;
-  gap: 16px;
   flex-wrap: wrap;
+  /* Belt and suspenders: gap separates flex items, but explicit
+     ::before middle-dots on adjacent siblings keep the items
+     visually separated even if flex-gap rendering misbehaves. */
 }
 .footer-nav a {
   font-size: 12px;
   font-weight: 700;
   color: var(--muted-strong);
   border-bottom-color: rgba(240, 200, 75, 0.35);
+  padding: 4px 16px 4px 0;
+  margin-right: 16px;
+  position: relative;
+}
+.footer-nav a:last-child {
+  margin-right: 0;
+  padding-right: 0;
+}
+.footer-nav a + a::before {
+  content: '·';
+  position: absolute;
+  left: -18px;
+  color: var(--label);
+  font-weight: 400;
+  pointer-events: none;
 }
 .footer-meta {
   display: flex;
