@@ -1289,9 +1289,9 @@
             },
             {
               "name": "Pairing read-model schema + atomic persistence",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway pairing state is persisted as a Go-native XDG read model with atomic writes, deterministic pending/approved ordering, and per-platform paired/unpaired status before approval UX",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1323,7 +1323,7 @@
                 "Corrupt JSON and missing files return structured degraded evidence and deterministic empty read models.",
                 "List output is sorted by platform, user_id, and code age so docs/status tests do not depend on map iteration order."
               ],
-              "note": "TDD-ready: port only the storage/read-model part of upstream gateway/pairing.py first into a Go-owned pairing.json-compatible read model. Keep code generation, expiry, lockout, and unauthorized-DM behavior in the blocked sibling rows so workers do not mix persistence with policy.",
+              "note": "TDD landed: internal/gateway.PairingStore now persists a Go-owned XDG pairing.json read model with explicit pending and approved per-platform records, temp-file plus atomic rename writes, owner-only file mode, structured missing/corrupt/permission-denied degraded reads, deterministic platform/user/code-age ordering, and no code-generation or adapter UX wiring.",
               "write_scope": [
                 "internal/gateway/pairing_store.go",
                 "internal/gateway/pairing_store_test.go",
