@@ -1426,9 +1426,9 @@
           "items": [
             {
               "name": "parent_session_id lineage for compression splits",
-              "status": "planned",
+              "status": "complete",
               "contract": "Session metadata records compression/fork lineage and can resolve the live descendant without rewriting ancestor history",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "memory",
               "trust_class": [
@@ -1459,7 +1459,7 @@
                 "Self-parent and trivial parent loops are rejected in BoltMap and MemMap tests.",
                 "SessionIndexMirror or an equivalent read model exposes parent/child/orphan lineage for operator audit."
               ],
-              "note": "Execution plan frozen and refined after upstream Hermes commit 19a3e2ce: add parent_session_id + lineage_kind to session.Metadata, keep roots null/primary by default, reject trivial loops, and surface orphan chains in mirrors/status instead of failing silently. This is only lineage storage and resolution scaffolding; compression, gateway resume routing, and lineage-aware search are separate dependent rows.",
+              "note": "Complete: internal/session.Metadata now persists parent_session_id plus lineage_kind, roots default to primary without a parent, BoltMap and MemMap reject self-parent and parent-chain loops, ResolveLineageTip walks append-only compression descendants without rewriting ancestor metadata, and SessionIndexMirror renders child/orphan lineage status for operator audit. Compression execution, gateway resume routing, and lineage-aware search remain separate dependent rows.",
               "write_scope": [
                 "internal/session/",
                 "docs/content/building-gormes/architecture_plan/progress.json"

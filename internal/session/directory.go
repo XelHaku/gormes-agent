@@ -25,11 +25,13 @@ var ErrUserBindingConflict = errors.New("session: chat already bound to differen
 // SessionID remains the resume handle; Source+ChatID identify the transport
 // chat; UserID is the canonical participant identity that can span chats.
 type Metadata struct {
-	SessionID string `json:"session_id"`
-	Source    string `json:"source,omitempty"`
-	ChatID    string `json:"chat_id,omitempty"`
-	UserID    string `json:"user_id,omitempty"`
-	UpdatedAt int64  `json:"updated_at"`
+	SessionID       string `json:"session_id"`
+	Source          string `json:"source,omitempty"`
+	ChatID          string `json:"chat_id,omitempty"`
+	UserID          string `json:"user_id,omitempty"`
+	ParentSessionID string `json:"parent_session_id,omitempty"`
+	LineageKind     string `json:"lineage_kind"`
+	UpdatedAt       int64  `json:"updated_at"`
 }
 
 func normalizeMetadata(meta Metadata) Metadata {
@@ -37,23 +39,12 @@ func normalizeMetadata(meta Metadata) Metadata {
 	meta.Source = strings.TrimSpace(meta.Source)
 	meta.ChatID = strings.TrimSpace(meta.ChatID)
 	meta.UserID = strings.TrimSpace(meta.UserID)
+	meta.ParentSessionID = strings.TrimSpace(meta.ParentSessionID)
+	meta.LineageKind = strings.ToLower(strings.TrimSpace(meta.LineageKind))
 	return meta
 }
 
-func validateMetadata(meta Metadata) error {
-	if meta.SessionID == "" {
-		return errors.New("session: metadata session_id is required")
-	}
-	if (meta.Source == "") != (meta.ChatID == "") {
-		return errors.New("session: metadata source and chat_id must both be set or both be empty")
-	}
-	if meta.UserID != "" && (meta.Source == "" || meta.ChatID == "") {
-		return errors.New("session: metadata user_id requires source and chat_id")
-	}
-	return nil
-}
-
-func mergeMetadata(existing, incoming Metadata) Metadata {
+func mergeMetadata(existing, incoming Metadata) (Metadata, error) {
 	out := existing
 	out.SessionID = incoming.SessionID
 	if incoming.Source != "" {
@@ -65,10 +56,22 @@ func mergeMetadata(existing, incoming Metadata) Metadata {
 	if incoming.UserID != "" {
 		out.UserID = incoming.UserID
 	}
+	if incoming.ParentSessionID != "" {
+		if out.ParentSessionID != "" && out.ParentSessionID != incoming.ParentSessionID {
+			return Metadata{}, fmt.Errorf("%w: %s parent_session_id already %s", ErrLineageConflict, incoming.SessionID, out.ParentSessionID)
+		}
+		out.ParentSessionID = incoming.ParentSessionID
+	}
+	if incoming.LineageKind != "" {
+		if out.LineageKind != "" && out.LineageKind != LineageKindPrimary && out.LineageKind != incoming.LineageKind {
+			return Metadata{}, fmt.Errorf("%w: %s lineage_kind already %s", ErrLineageConflict, incoming.SessionID, out.LineageKind)
+		}
+		out.LineageKind = incoming.LineageKind
+	}
 	if incoming.UpdatedAt != 0 {
 		out.UpdatedAt = incoming.UpdatedAt
 	}
-	return out
+	return finalizeMetadata(out), nil
 }
 
 func chatBindingKey(source, chatID string) string {
@@ -89,7 +92,7 @@ func decodeMetadata(raw []byte) (Metadata, error) {
 	if err := json.Unmarshal(raw, &meta); err != nil {
 		return Metadata{}, err
 	}
-	return normalizeMetadata(meta), nil
+	return finalizeMetadata(meta), nil
 }
 
 func (m *BoltMap) PutMetadata(ctx context.Context, meta Metadata) error {
@@ -104,7 +107,7 @@ func (m *BoltMap) PutMetadata(ctx context.Context, meta Metadata) error {
 	}
 
 	meta = normalizeMetadata(meta)
-	if err := validateMetadata(meta); err != nil {
+	if err := validateMetadataIdentity(meta); err != nil {
 		return err
 	}
 
@@ -120,7 +123,27 @@ func (m *BoltMap) PutMetadata(ctx context.Context, meta Metadata) error {
 			if err != nil {
 				return fmt.Errorf("session: decode metadata for %q: %w", meta.SessionID, err)
 			}
-			meta = mergeMetadata(existing, meta)
+			meta, err = mergeMetadata(existing, meta)
+			if err != nil {
+				return err
+			}
+		}
+		meta = finalizeMetadata(meta)
+		if err := validateMetadata(meta); err != nil {
+			return err
+		}
+		if err := detectLineageLoop(meta.SessionID, meta.ParentSessionID, func(id string) (Metadata, bool, error) {
+			raw := mb.Get([]byte(id))
+			if raw == nil {
+				return Metadata{}, false, nil
+			}
+			meta, err := decodeMetadata(raw)
+			if err != nil {
+				return Metadata{}, false, fmt.Errorf("session: decode lineage parent %q: %w", id, err)
+			}
+			return meta, true, nil
+		}); err != nil {
+			return err
 		}
 
 		if meta.Source != "" && meta.ChatID != "" {
@@ -269,12 +292,53 @@ func (m *BoltMap) ListMetadataByUserID(ctx context.Context, userID string) ([]Me
 	return items, nil
 }
 
+func (m *BoltMap) listAllMetadata(ctx context.Context) ([]Metadata, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	m.closeMu.Lock()
+	db := m.db
+	m.closeMu.Unlock()
+	if db == nil {
+		return nil, errors.New("session: BoltMap is closed")
+	}
+
+	var items []Metadata
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(metadataBucketName))
+		if b == nil {
+			return errors.New("session: metadata bucket missing")
+		}
+		return b.ForEach(func(_, raw []byte) error {
+			meta, err := decodeMetadata(raw)
+			if err != nil {
+				return fmt.Errorf("session: decode metadata during list: %w", err)
+			}
+			items = append(items, meta)
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	sortMetadata(items)
+	return items, nil
+}
+
+func (m *BoltMap) ResolveLineageTip(ctx context.Context, sessionID string) (LineageResolution, error) {
+	items, err := m.listAllMetadata(ctx)
+	if err != nil {
+		return LineageResolution{}, err
+	}
+	return resolveLineageTipFromMetadata(strings.TrimSpace(sessionID), items), nil
+}
+
 func (m *MemMap) PutMetadata(ctx context.Context, meta Metadata) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	meta = normalizeMetadata(meta)
-	if err := validateMetadata(meta); err != nil {
+	if err := validateMetadataIdentity(meta); err != nil {
 		return err
 	}
 
@@ -282,7 +346,24 @@ func (m *MemMap) PutMetadata(ctx context.Context, meta Metadata) error {
 	defer m.mu.Unlock()
 
 	if existing, ok := m.meta[meta.SessionID]; ok {
-		meta = mergeMetadata(existing, meta)
+		var err error
+		meta, err = mergeMetadata(existing, meta)
+		if err != nil {
+			return err
+		}
+	}
+	meta = finalizeMetadata(meta)
+	if err := validateMetadata(meta); err != nil {
+		return err
+	}
+	if err := detectLineageLoop(meta.SessionID, meta.ParentSessionID, func(id string) (Metadata, bool, error) {
+		meta, ok := m.meta[id]
+		if !ok {
+			return Metadata{}, false, nil
+		}
+		return finalizeMetadata(meta), true, nil
+	}); err != nil {
+		return err
 	}
 	if meta.Source != "" && meta.ChatID != "" {
 		key := chatBindingKey(meta.Source, meta.ChatID)
@@ -351,4 +432,26 @@ func (m *MemMap) ListMetadataByUserID(ctx context.Context, userID string) ([]Met
 	}
 	sortMetadata(items)
 	return items, nil
+}
+
+func (m *MemMap) listAllMetadata(ctx context.Context) ([]Metadata, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	items := make([]Metadata, 0, len(m.meta))
+	for _, meta := range m.meta {
+		items = append(items, finalizeMetadata(meta))
+	}
+	sortMetadata(items)
+	return items, nil
+}
+
+func (m *MemMap) ResolveLineageTip(ctx context.Context, sessionID string) (LineageResolution, error) {
+	items, err := m.listAllMetadata(ctx)
+	if err != nil {
+		return LineageResolution{}, err
+	}
+	return resolveLineageTipFromMetadata(strings.TrimSpace(sessionID), items), nil
 }
