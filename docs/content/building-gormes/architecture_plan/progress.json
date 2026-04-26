@@ -33,7 +33,7 @@
   },
   "phases": {
     "1": {
-      "name": "Phase 1 — The Dashboard",
+      "name": "Phase 1 \u2014 The Dashboard",
       "deliverable": "Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary",
       "subphases": {
         "1.A": {
@@ -369,7 +369,7 @@
       }
     },
     "2": {
-      "name": "Phase 2 — The Gateway",
+      "name": "Phase 2 \u2014 The Gateway",
       "deliverable": "Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before focused channel closeout",
       "subphases": {
         "2.A": {
@@ -1027,7 +1027,7 @@
               "blocked_by": [
                 "Discord forum channel ingress + thread lifecycle"
               ],
-              "note": "TDD: port upstream PR #607be54a (forum channel media + polish) after the ingress slice is green — attachment flow for forum posts, initial-post vs reply differences, and deterministic outbound routing to forum threads. Keep the shared-chassis send contract intact so non-forum Discord behavior cannot regress."
+              "note": "TDD: port upstream PR #607be54a (forum channel media + polish) after the ingress slice is green \u2014 attachment flow for forum posts, initial-post vs reply differences, and deterministic outbound routing to forum threads. Keep the shared-chassis send contract intact so non-forum Discord behavior cannot regress."
             }
           ]
         },
@@ -2283,7 +2283,7 @@
             {
               "name": "Gateway-handled slash commands bypass active-session guard",
               "status": "planned",
-              "note": "TDD: mirror upstream PRs #12334 and #511ed4da — registry-resolved gateway slash commands must execute even while an agent is running for that session, without interrupting the running turn and without queuing discardable command text. Keep non-gateway/unknown commands behind the existing busy-state response so only the safe registry surface bypasses the guard; cover both allowed and denied paths with fixture tests before shipping."
+              "note": "TDD: mirror upstream PRs #12334 and #511ed4da \u2014 registry-resolved gateway slash commands must execute even while an agent is running for that session, without interrupting the running turn and without queuing discardable command text. Keep non-gateway/unknown commands behind the existing busy-state response so only the safe registry surface bypasses the guard; cover both allowed and denied paths with fixture tests before shipping."
             }
           ]
         },
@@ -2316,7 +2316,7 @@
       }
     },
     "3": {
-      "name": "Phase 3 — The Black Box (Memory)",
+      "name": "Phase 3 \u2014 The Black Box (Memory)",
       "deliverable": "SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes session visibility, audit trails, decay, and cross-chat/session boundaries",
       "subphases": {
         "3.A": {
@@ -3782,7 +3782,7 @@
       }
     },
     "4": {
-      "name": "Phase 4 — The Brain Transplant",
+      "name": "Phase 4 \u2014 The Brain Transplant",
       "deliverable": "Native Go agent orchestrator + prompt builder",
       "dependency_note": "Build priority: 2.E0 deterministic subagent runtime -> 2.G static skills + reviewed candidate flow -> runner-enforced delegation policy + wider gateway surface -> native agent loop",
       "subphases": {
@@ -4253,37 +4253,142 @@
                 "Azure Foundry probe fixtures prove path sniffing, OpenAI /models detection, Anthropic Messages fallback detection, manual-required evidence, and zero config/credential mutation."
               ],
               "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
+                "attempt_count": 0,
+                "consecutive_failures": 0,
                 "last_attempt": "2026-04-26T12:49:08Z",
-                "last_failure": {
-                  "run_id": "20260426T124900Z-808544274",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry transport probe read model"
-                },
                 "backends_tried": [
                   "codexu"
                 ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T12:49:08Z",
-                  "after_run_id": "20260426T124900Z-808544274",
-                  "threshold": 3,
-                  "spec_hash": "bdc6aab158d03e7afc757007b702cd7cb454b1f8f64439b23b6aa7b36e1246e5",
-                  "last_category": "no_progress"
-                }
-              },
-              "planner_verdict": {
-                "needs_human": true,
-                "reason": "manual audit 2026-04-26: three no-progress worker attempts after fixture_ready row; remove from default queue until a human either lands internal/hermes/azure_foundry_probe_test.go fixtures or splits path-sniffing, /models probing, and Anthropic fallback into separate rows.",
-                "since": "2026-04-26T14:39:26Z",
-                "last_outcome": "still_failing"
+                "dequarantined_at": "2026-04-26T15:04:59Z",
+                "dequarantined_reason": "manual audit 2026-04-26: split into smaller slices listed in blocked_by"
               },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:731e1ef8 hermes_cli/azure_detect.py",
                 "note": "Hermes defines Azure Foundry probing semantics; Gormes ports the pure read model first to avoid another setup/runtime umbrella attempt."
+              },
+              "blocked_by": [
+                "Azure Foundry probe \u2014 path sniffing",
+                "Azure Foundry probe \u2014 /models classification + Anthropic fallback"
+              ]
+            },
+            {
+              "name": "Azure Foundry probe \u2014 path sniffing",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Azure Foundry endpoint URLs are classified into anthropic_messages, openai_chat_completions, or unknown solely by URL path/host inspection, with no HTTP, no credential reads, and no config writes",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Probe status reports azure_path_sniff_unknown when no path heuristic matches, and azure_path_sniff_evidence with detected scheme/host/path otherwise.",
+              "fixture": "internal/hermes/azure_foundry_path_sniff_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
+                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
+                "internal/hermes/azure_openai_transport_test.go",
+                "internal/hermes/azure_anthropic_transport_test.go"
+              ],
+              "ready_when": [
+                "Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are validated; this slice classifies URLs into one of those two known transports.",
+                "Pure-function table-driven tests with synthetic URLs are sufficient \u2014 no httptest server is required."
+              ],
+              "not_ready_when": [
+                "The slice opens HTTP connections, performs a /models probe, reads AZURE_FOUNDRY_BASE_URL or AZURE_FOUNDRY_API_KEY, or mutates config.",
+                "The slice introduces detection of any third transport family (Bedrock, Vertex, etc.)."
+              ],
+              "unblocks": [
+                "Azure Foundry probe \u2014 /models classification + Anthropic fallback"
+              ],
+              "acceptance": [
+                "URLs whose path contains /anthropic/ classify as anthropic_messages with the matched-token evidence preserved.",
+                "URLs whose path contains /openai/deployments/.../chat/completions classify as openai_chat_completions with deployment-name evidence preserved.",
+                "Other URLs classify as unknown without panicking and surface the host/path that was inspected.",
+                "No test in this slice creates an httptest.Server or reads OS env."
+              ],
+              "note": "Split 1/2 of quarantined Azure Foundry probe row. Path-sniffing-only keeps the surface tiny so a worker can land deterministic table tests in one cycle.",
+              "write_scope": [
+                "internal/hermes/azure_foundry_path_sniff.go",
+                "internal/hermes/azure_foundry_path_sniff_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestAzureFoundryPathSniff -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "azure_foundry_path_sniff fixtures prove anthropic-path, openai-deployment-path, and unknown-host classifications are deterministic and side-effect-free."
+              ],
+              "provenance": {
+                "origin_type": "split",
+                "parent_row": "Azure Foundry transport probe read model",
+                "parent_subphase": "4/4.A",
+                "note": "Path-sniffing slice carved off so the worker can land a deterministic table-test in one cycle.",
+                "split_at": "2026-04-26T15:04:59Z"
+              }
+            },
+            {
+              "name": "Azure Foundry probe \u2014 /models classification + Anthropic fallback",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Given a fake /models response (or its absence), classify an Azure Foundry deployment as openai_chat_completions, anthropic_messages, or manual-required, with explicit probe evidence and zero credential or config writes",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Probe status reports azure_models_probe_failed, azure_anthropic_probe_failed, or azure_detect_manual_required when classification cannot be made; manual api_mode entry remains available.",
+              "fixture": "internal/hermes/azure_foundry_models_probe_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
+                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
+                "internal/hermes/http_client.go",
+                "internal/hermes/azure_openai_transport_test.go",
+                "internal/hermes/azure_anthropic_transport_test.go"
+              ],
+              "ready_when": [
+                "Azure Foundry probe \u2014 path sniffing is fixture-ready or validated, so this slice consumes a typed sniff result instead of duplicating URL inspection.",
+                "httptest.Server-driven fakes are acceptable; no live Azure call is permitted."
+              ],
+              "not_ready_when": [
+                "The slice persists deployment lists, mutates AZURE_FOUNDRY_* env, or runs interactive setup.",
+                "The slice changes existing Azure OpenAI or Azure Anthropic request-builder behavior."
+              ],
+              "unblocks": [
+                "Azure Foundry transport probe read model"
+              ],
+              "acceptance": [
+                "A fake /models OpenAI-shaped response selects openai_chat_completions and records advisory model IDs without persisting them.",
+                "A failed /models call followed by a fake Anthropic Messages-shaped error selects anthropic_messages with explicit probe evidence.",
+                "Total probe failure returns manual-required evidence rather than a fatal error, and does not hide manual api_mode selection.",
+                "No test in this slice writes to AZURE_FOUNDRY_API_KEY, real config files, or a live Azure host."
+              ],
+              "note": "Split 2/2 of quarantined Azure Foundry probe row. Composes the path-sniff slice into deterministic /models + Anthropic fallback classification.",
+              "write_scope": [
+                "internal/hermes/azure_foundry_models_probe.go",
+                "internal/hermes/azure_foundry_models_probe_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestAzureFoundryModelsProbe -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "azure_foundry_models_probe fixtures prove OpenAI-shape detection, Anthropic-shape fallback, and manual-required all return typed evidence with no credential/config side effects."
+              ],
+              "provenance": {
+                "origin_type": "split",
+                "parent_row": "Azure Foundry transport probe read model",
+                "parent_subphase": "4/4.A",
+                "note": "Composes the path-sniff slice with deterministic /models + Anthropic fallback fixtures.",
+                "split_at": "2026-04-26T15:04:59Z"
               }
             },
             {
@@ -4414,7 +4519,7 @@
             {
               "name": "Bedrock",
               "status": "planned",
-              "note": "Umbrella only: not landed on main. Five codexu/* worker attempts on 2026-04-23 produced candidate Bedrock adapters (`feat(phase4): add bedrock provider adapter` x2, `feat(provider): add bedrock client`, `feat(provider): add native Bedrock adapter`, `feat(gormes): add native bedrock provider adapter`) but none merged — no `bedrock_*.go` file is tracked in `internal/hermes/` and `grep -i bedrock|converse[sS]tream` over that package returns zero matches. Execute via the three dependency-ordered TDD slices below (payload mapping -> stream decoding -> SigV4/credential seam) before another full-rewrite attempt."
+              "note": "Umbrella only: not landed on main. Five codexu/* worker attempts on 2026-04-23 produced candidate Bedrock adapters (`feat(phase4): add bedrock provider adapter` x2, `feat(provider): add bedrock client`, `feat(provider): add native Bedrock adapter`, `feat(gormes): add native bedrock provider adapter`) but none merged \u2014 no `bedrock_*.go` file is tracked in `internal/hermes/` and `grep -i bedrock|converse[sS]tream` over that package returns zero matches. Execute via the three dependency-ordered TDD slices below (payload mapping -> stream decoding -> SigV4/credential seam) before another full-rewrite attempt."
             },
             {
               "name": "Bedrock Converse payload mapping (no AWS SDK)",
@@ -4468,7 +4573,7 @@
             {
               "name": "Bedrock stream event decoding (SSE fixtures)",
               "status": "planned",
-              "note": "TDD second slice: decode Bedrock stream reasoning/text/tool-use deltas and stop reasons into the shared `hermes.Event` model from captured SSE fixtures, reusing the Anthropic stream harness where possible. No AWS SDK dependency — the fixture set must cover empty-stream, retry-safe finish, truncated-stream, and tool-call-split events before the SigV4 slice lands."
+              "note": "TDD second slice: decode Bedrock stream reasoning/text/tool-use deltas and stop reasons into the shared `hermes.Event` model from captured SSE fixtures, reusing the Anthropic stream harness where possible. No AWS SDK dependency \u2014 the fixture set must cover empty-stream, retry-safe finish, truncated-stream, and tool-call-split events before the SigV4 slice lands."
             },
             {
               "name": "Bedrock SigV4 + credential seam",
@@ -4526,7 +4631,7 @@
             {
               "name": "OpenRouter",
               "status": "planned",
-              "note": "Not landed on main. Five codexu/* worker attempts on 2026-04-23 (`343ec085` / `c009045d` / `e7b271a7` / `f00010b1` / `b3b0c366`) produced candidate OpenRouter adapters but none merged — no `openrouter_*.go` file is tracked in `internal/hermes/` and `grep -i openrouter` over that package returns zero matches. Prior planner note incorrectly cited `agent/openrouter_client.py`, which does not exist upstream: `tools/openrouter_client.py` is only a 33-line async-client getter that delegates to `agent/auxiliary_client.py`. TDD scope: OpenRouter is not a standalone adapter upstream — it is one of several OpenAI-compatible providers routed through the shared provider resolver. Pin the behavior by porting against the real upstream surfaces: `agent/auxiliary_client.py:815 _try_openrouter`, `agent/auxiliary_client.py:2069 _is_openrouter_client`, the `X-OpenRouter-Title` / `X-OpenRouter-Categories` / `HTTP-Referer` app-attribution headers around `agent/auxiliary_client.py:170`, `agent/model_metadata.py:214 _is_openrouter_base_url`, `agent/usage_pricing.py:411 _openrouter_pricing_entry`, and `hermes_cli/runtime_provider.py:429 _resolve_openrouter_runtime`. Fixture-only unit tests must prove (a) base URL and model-family selection over the OpenAI-compatible client seam, (b) attribution-header emission, (c) retryable vs fatal error mapping through `internal/hermes/errors.go`, and (d) usage/pricing accounting against captured response fixtures — no live `OPENROUTER_API_KEY` in tests. Land after `Provider interface + stream fixture harness` and `Tool-call normalization + continuation contract` closeout so this slice reuses the shared transcript harness rather than inventing its own."
+              "note": "Not landed on main. Five codexu/* worker attempts on 2026-04-23 (`343ec085` / `c009045d` / `e7b271a7` / `f00010b1` / `b3b0c366`) produced candidate OpenRouter adapters but none merged \u2014 no `openrouter_*.go` file is tracked in `internal/hermes/` and `grep -i openrouter` over that package returns zero matches. Prior planner note incorrectly cited `agent/openrouter_client.py`, which does not exist upstream: `tools/openrouter_client.py` is only a 33-line async-client getter that delegates to `agent/auxiliary_client.py`. TDD scope: OpenRouter is not a standalone adapter upstream \u2014 it is one of several OpenAI-compatible providers routed through the shared provider resolver. Pin the behavior by porting against the real upstream surfaces: `agent/auxiliary_client.py:815 _try_openrouter`, `agent/auxiliary_client.py:2069 _is_openrouter_client`, the `X-OpenRouter-Title` / `X-OpenRouter-Categories` / `HTTP-Referer` app-attribution headers around `agent/auxiliary_client.py:170`, `agent/model_metadata.py:214 _is_openrouter_base_url`, `agent/usage_pricing.py:411 _openrouter_pricing_entry`, and `hermes_cli/runtime_provider.py:429 _resolve_openrouter_runtime`. Fixture-only unit tests must prove (a) base URL and model-family selection over the OpenAI-compatible client seam, (b) attribution-header emission, (c) retryable vs fatal error mapping through `internal/hermes/errors.go`, and (d) usage/pricing accounting against captured response fixtures \u2014 no live `OPENROUTER_API_KEY` in tests. Land after `Provider interface + stream fixture harness` and `Tool-call normalization + continuation contract` closeout so this slice reuses the shared transcript harness rather than inventing its own."
             },
             {
               "name": "Google Code Assist",
@@ -4547,7 +4652,7 @@
                 "Codex OAuth state + stale-token relogin",
                 "Codex stream repair + tool-call leak sanitizer"
               ],
-              "note": "Not landed on main. Four codexu/* worker attempts on 2026-04-23 (`a93551c9` / `a4c433f2` / `c9bc6d8d` / `a057f47c`) produced candidate Codex adapters but none merged — no `codex_*.go` file is tracked in `internal/hermes/` and `grep -i codex` over that package returns zero matches. TDD scope: upstream Codex is an OpenAI-Codex OAuth surface over the Responses API (not standard chat.completions), so the adapter must wrap `/v1/responses` at `https://chatgpt.com/backend-api/codex` — upstream surface lives at `agent/auxiliary_client.py:483 CodexAuxiliaryClient` / `:313 _CodexCompletionsAdapter` / `:501 _AsyncCodexCompletionsAdapter` / `:1038 _try_codex` (Responses→chat-completions shim, empty-output backfill from stream events, `gpt-5.2-codex` vs `gpt-5.3-codex` fallback), and the auth seam lives at `hermes_cli/auth.py:1451 refresh_codex_oauth_pure` / `:1546 _refresh_codex_auth_tokens` / `:1567 _import_codex_cli_tokens` / `:1601 resolve_codex_runtime_credentials` / `:3023 _codex_device_code_login`, with model enumeration at `hermes_cli/codex_models.py:147 get_codex_model_ids`. Pin behavior via fake-auth fixture tests: developer-message role handling, tool-call deltas, Responses→chat-completions envelope parity (including stream-event backfill when `response.output` arrives empty), `gpt-5.3-codex` rejection fallback, and explicit unsupported-feature errors. Upstream PR #12360 requires Codex auth state to live under Gormes's own home rather than touching `~/.codex/auth.json`, and upstream PR #2a2e5c0f requires 401/403 token-refresh failures to force a relogin rather than silently retrying with a stale token — freeze both behaviors as fake-auth unit tests before any live Codex request can fire. Land after `Provider interface + stream fixture harness`, `Tool-call normalization + continuation contract`, and `4.G Token vault` + `Multi-account auth` so the Codex adapter consumes a frozen credential seam rather than touching OS home paths directly."
+              "note": "Not landed on main. Four codexu/* worker attempts on 2026-04-23 (`a93551c9` / `a4c433f2` / `c9bc6d8d` / `a057f47c`) produced candidate Codex adapters but none merged \u2014 no `codex_*.go` file is tracked in `internal/hermes/` and `grep -i codex` over that package returns zero matches. TDD scope: upstream Codex is an OpenAI-Codex OAuth surface over the Responses API (not standard chat.completions), so the adapter must wrap `/v1/responses` at `https://chatgpt.com/backend-api/codex` \u2014 upstream surface lives at `agent/auxiliary_client.py:483 CodexAuxiliaryClient` / `:313 _CodexCompletionsAdapter` / `:501 _AsyncCodexCompletionsAdapter` / `:1038 _try_codex` (Responses\u2192chat-completions shim, empty-output backfill from stream events, `gpt-5.2-codex` vs `gpt-5.3-codex` fallback), and the auth seam lives at `hermes_cli/auth.py:1451 refresh_codex_oauth_pure` / `:1546 _refresh_codex_auth_tokens` / `:1567 _import_codex_cli_tokens` / `:1601 resolve_codex_runtime_credentials` / `:3023 _codex_device_code_login`, with model enumeration at `hermes_cli/codex_models.py:147 get_codex_model_ids`. Pin behavior via fake-auth fixture tests: developer-message role handling, tool-call deltas, Responses\u2192chat-completions envelope parity (including stream-event backfill when `response.output` arrives empty), `gpt-5.3-codex` rejection fallback, and explicit unsupported-feature errors. Upstream PR #12360 requires Codex auth state to live under Gormes's own home rather than touching `~/.codex/auth.json`, and upstream PR #2a2e5c0f requires 401/403 token-refresh failures to force a relogin rather than silently retrying with a stale token \u2014 freeze both behaviors as fake-auth unit tests before any live Codex request can fire. Land after `Provider interface + stream fixture harness`, `Tool-call normalization + continuation contract`, and `4.G Token vault` + `Multi-account auth` so the Codex adapter consumes a frozen credential seam rather than touching OS home paths directly."
             },
             {
               "name": "Codex Responses pure conversion harness",
@@ -5102,7 +5207,7 @@
             {
               "name": "Tool-result pruning + protected head/tail summary",
               "status": "planned",
-              "note": "TDD: freeze old tool-output pruning, protected system/first-turn head messages, recent-tail preservation, and summary prefix compatibility before mutating live message history. Must keep tool-call arguments JSON valid when shrinking per upstream PR #3128d9fc — a pruning pass that truncates an argument string mid-JSON breaks the continuation payload on the next turn, so the head/tail contract has to respect tool-call argument boundaries and never emit partial JSON values."
+              "note": "TDD: freeze old tool-output pruning, protected system/first-turn head messages, recent-tail preservation, and summary prefix compatibility before mutating live message history. Must keep tool-call arguments JSON valid when shrinking per upstream PR #3128d9fc \u2014 a pruning pass that truncates an argument string mid-JSON breaks the continuation payload on the next turn, so the head/tail contract has to respect tool-call argument boundaries and never emit partial JSON values."
             },
             {
               "name": "Aux compression single-prompt threshold reconciliation",
@@ -6037,7 +6142,9 @@
               "blocked_by": [
                 "Provider-side resilience",
                 "Classified provider-error taxonomy",
-                "Retry-After header parsing + HTTPError hint"
+                "Retry-After header parsing + HTTPError hint",
+                "Provider rate guard \u2014 x-ratelimit header classification",
+                "Provider rate guard \u2014 degraded-state + last-known-good evidence"
               ],
               "acceptance": [
                 "Headers with remaining=0 and reset window >=60s classify as genuine account rate limit and record redacted reset evidence.",
@@ -6061,37 +6168,134 @@
                 "Provider rate-guard fixtures prove genuine quota, upstream-capacity, last-known-state, malformed-header, and no-sleep degraded decisions with visible status evidence."
               ],
               "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
+                "attempt_count": 0,
+                "consecutive_failures": 0,
                 "last_attempt": "2026-04-26T12:49:08Z",
-                "last_failure": {
-                  "run_id": "20260426T124900Z-808544274",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard + budget telemetry"
-                },
                 "backends_tried": [
                   "codexu"
                 ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T12:49:08Z",
-                  "after_run_id": "20260426T124900Z-808544274",
-                  "threshold": 3,
-                  "spec_hash": "25b39bdce6d1371988267d060360d7ba63c514dc221dbb2301fa09962fc112d9",
-                  "last_category": "no_progress"
-                }
-              },
-              "planner_verdict": {
-                "needs_human": true,
-                "reason": "manual audit 2026-04-26: three no-progress attempts on draft rate-guard row; keep out of default builder selection until a human splits genuine-quota, upstream-capacity, last-known-state, and malformed-header fixtures or lands internal/hermes/provider_rate_guard_test.go first.",
-                "since": "2026-04-26T14:39:26Z",
-                "last_outcome": "still_failing"
+                "dequarantined_at": "2026-04-26T15:04:59Z",
+                "dequarantined_reason": "manual audit 2026-04-26: split into smaller slices listed in blocked_by"
               },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:192e7eb2 agent/nous_rate_guard.py",
                 "note": "Hermes defines the Nous 429 distinction; Gormes adapts it to native provider status and retry/budget telemetry."
+              }
+            },
+            {
+              "name": "Provider rate guard \u2014 x-ratelimit header classification",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Pure functions parse x-ratelimit-* headers and classify a 429 as genuine_quota, upstream_capacity, or insufficient_evidence with redacted reset windows, no sleeps, and no shared breaker writes",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports rate_guard_classified as one of {genuine_quota, upstream_capacity, insufficient_evidence}, plus reset-window evidence when present, instead of silently tripping a global breaker.",
+              "fixture": "internal/hermes/provider_rate_guard_classification_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/nous_rate_guard.py@192e7eb2",
+                "../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2",
+                "internal/hermes/errors.go"
+              ],
+              "ready_when": [
+                "Provider-side resilience and classified provider-error taxonomy are validated, so this slice only adds a pure header-parsing classifier on top.",
+                "Tests use synthetic headers and a fake clock; no live Nous Portal or wall-clock sleep is required."
+              ],
+              "not_ready_when": [
+                "The slice changes retry timing, provider routing, or model fallback policy.",
+                "The slice writes process-global breaker state in unit tests or sleeps to simulate reset windows."
+              ],
+              "unblocks": [
+                "Provider rate guard \u2014 degraded-state + last-known-good evidence"
+              ],
+              "acceptance": [
+                "Headers with remaining=0 and reset window >=60s classify as genuine_quota with redacted reset evidence.",
+                "429 responses with healthy x-ratelimit buckets classify as upstream_capacity and do not trip cross-session breaker state.",
+                "Missing or unparseable headers classify as insufficient_evidence and surface which header(s) failed parsing.",
+                "No test in this slice opens a network connection or calls time.Sleep."
+              ],
+              "note": "Split 1/2 of quarantined Provider rate guard row. Header parsing + classification is deterministic and table-testable.",
+              "write_scope": [
+                "internal/hermes/provider_rate_guard.go",
+                "internal/hermes/provider_rate_guard_classification_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestProviderRateGuardClassification -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "rate_guard classification fixtures prove genuine_quota, upstream_capacity, and insufficient_evidence outcomes are all reachable from synthetic headers with no side effects."
+              ],
+              "provenance": {
+                "origin_type": "split",
+                "parent_row": "Provider rate guard + budget telemetry",
+                "parent_subphase": "4/4.H",
+                "note": "Header-classification slice carved off so the parser/state-machine lands as pure functions before degraded-mode reporting.",
+                "split_at": "2026-04-26T15:04:59Z"
+              }
+            },
+            {
+              "name": "Provider rate guard \u2014 degraded-state + last-known-good evidence",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Last-known-good bucket state distinguishes bare 429s; degraded modes (rate_guard_unavailable, budget_header_missing) are reported as visible provider status evidence without retry timing changes or shared mutable breaker state",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports last_known_good=present|absent, plus rate_guard_unavailable or budget_header_missing when classification is unsafe; no retry amplification.",
+              "fixture": "internal/hermes/provider_rate_guard_degraded_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/nous_rate_guard.py@192e7eb2",
+                "../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2",
+                "../hermes-agent/run_agent.py@192e7eb2",
+                "internal/hermes/errors.go",
+                "internal/hermes/client.go"
+              ],
+              "ready_when": [
+                "Provider rate guard \u2014 x-ratelimit header classification is fixture-ready or validated, so this slice composes a typed classification result with last-known-good state."
+              ],
+              "not_ready_when": [
+                "The slice writes a process-global or cross-session breaker.",
+                "The slice changes retry policy or treats every 429 as account-level quota exhaustion."
+              ],
+              "unblocks": [
+                "Provider rate guard + budget telemetry"
+              ],
+              "acceptance": [
+                "A bare 429 with last-known-good=exhausted classifies as genuine_quota; with last-known-good=healthy classifies as upstream_capacity.",
+                "A bare 429 with no last-known-good record classifies as insufficient_evidence and reports rate_guard_unavailable.",
+                "Malformed budget headers degrade visibly with budget_header_missing evidence and do not amplify retries or block unrelated models.",
+                "No test in this slice writes process-global state or sleeps."
+              ],
+              "note": "Split 2/2 of quarantined Provider rate guard row. Composes the classification slice with last-known-good state and degraded-mode reporting.",
+              "write_scope": [
+                "internal/hermes/provider_rate_guard_degraded.go",
+                "internal/hermes/provider_rate_guard_degraded_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestProviderRateGuardDegraded -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "rate_guard degraded fixtures prove last-known-good composition, rate_guard_unavailable, and budget_header_missing evidence are all reachable without shared state or retry timing changes."
+              ],
+              "provenance": {
+                "origin_type": "split",
+                "parent_row": "Provider rate guard + budget telemetry",
+                "parent_subphase": "4/4.H",
+                "note": "Degraded-mode + last-known-good slice; depends on the classification slice landing first.",
+                "split_at": "2026-04-26T15:04:59Z"
               }
             }
           ],
@@ -6104,7 +6308,7 @@
       }
     },
     "5": {
-      "name": "Phase 5 — The Final Purge",
+      "name": "Phase 5 \u2014 The Final Purge",
       "deliverable": "Python tool scripts ported to Go or WASM",
       "subphases": {
         "5.A": {
@@ -8940,7 +9144,7 @@
             {
               "name": "Unix installer (install.sh) source-backed update flow",
               "status": "planned",
-              "note": "TDD slice 1 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): port upstream Unix installer semantics into canonical `scripts/install.sh`, with the site embedding a synced `www.gormes.ai/internal/site/installers/install.sh` copy. The installer uses user-scoped PATH publication, a managed checkout under a Hermes-analogy install home, rerun-as-update behavior, and no root-owned target paths. Cover path selection, managed checkout, update-on-rerun, and publish+verify flow via a new `install_unix_test.go` Go test that executes the script under a temporary fake toolchain — no network calls in unit tests. Do not install Hermes/Python/Node: Gormes' current feature set does not require them."
+              "note": "TDD slice 1 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): port upstream Unix installer semantics into canonical `scripts/install.sh`, with the site embedding a synced `www.gormes.ai/internal/site/installers/install.sh` copy. The installer uses user-scoped PATH publication, a managed checkout under a Hermes-analogy install home, rerun-as-update behavior, and no root-owned target paths. Cover path selection, managed checkout, update-on-rerun, and publish+verify flow via a new `install_unix_test.go` Go test that executes the script under a temporary fake toolchain \u2014 no network calls in unit tests. Do not install Hermes/Python/Node: Gormes' current feature set does not require them."
             },
             {
               "name": "Unix installer root/FHS layout policy",
@@ -9003,7 +9207,7 @@
             {
               "name": "Windows installer (install.ps1 + install.cmd) parity",
               "status": "planned",
-              "note": "TDD slice 2 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): add `www.gormes.ai/internal/site/install.ps1` (native PowerShell) plus `install.cmd` wrapper that launches it, matching the Unix contract (user-scoped PATH, managed checkout, rerun-as-update, source-backed). Cover content/smoke assertions — PATH publication, managed checkout layout, release branch handling, and stable global command publication — via `install_windows_test.go` over fake toolchains; no live network calls in unit tests."
+              "note": "TDD slice 2 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): add `www.gormes.ai/internal/site/install.ps1` (native PowerShell) plus `install.cmd` wrapper that launches it, matching the Unix contract (user-scoped PATH, managed checkout, rerun-as-update, source-backed). Cover content/smoke assertions \u2014 PATH publication, managed checkout layout, release branch handling, and stable global command publication \u2014 via `install_windows_test.go` over fake toolchains; no live network calls in unit tests."
             },
             {
               "name": "Installer site asset/route coverage",
@@ -9942,17 +10146,17 @@
             {
               "name": "Execution-mode resolver + config precedence",
               "status": "planned",
-              "note": "TDD slice 1 of 4: pure helper in `internal/tools/execute_code.go` that returns `off`/`project`/`strict` from (a) env var (e.g. `GORMES_EXECUTE_CODE_MODE`), then (b) config key, then (c) default, with unknown values falling back to default and emitting a warning. Table tests only — no sandbox coupling, no CWD/interpreter behavior yet. Freeze the token set here so later slices cannot silently add modes."
+              "note": "TDD slice 1 of 4: pure helper in `internal/tools/execute_code.go` that returns `off`/`project`/`strict` from (a) env var (e.g. `GORMES_EXECUTE_CODE_MODE`), then (b) config key, then (c) default, with unknown values falling back to default and emitting a warning. Table tests only \u2014 no sandbox coupling, no CWD/interpreter behavior yet. Freeze the token set here so later slices cannot silently add modes."
             },
             {
               "name": "Strict-mode CWD + interpreter parity",
               "status": "planned",
-              "note": "TDD slice 2 of 4: strict mode keeps today's behavior frozen — isolated tmpdir CWD plus the canonical interpreter resolved via `LocalCodeSandbox.resolveRuntime`. Fixtures must prove the 5.K blocked-result envelope (status, error, filesystem_access, network_access) is unchanged and that relative imports/filesystem access outside the tmpdir continue to fail. This slice exists only to pin the reference behavior before project-mode lands."
+              "note": "TDD slice 2 of 4: strict mode keeps today's behavior frozen \u2014 isolated tmpdir CWD plus the canonical interpreter resolved via `LocalCodeSandbox.resolveRuntime`. Fixtures must prove the 5.K blocked-result envelope (status, error, filesystem_access, network_access) is unchanged and that relative imports/filesystem access outside the tmpdir continue to fail. This slice exists only to pin the reference behavior before project-mode lands."
             },
             {
               "name": "Project-mode CWD + active venv detection",
               "status": "planned",
-              "note": "TDD slice 3 of 4: port upstream `_resolve_python_binary`/`_resolve_cwd` project semantics — session's working directory for CWD and the active virtualenv/conda python when present, falling back to the resolved system interpreter. Unit tests must drive resolution via injected env (`VIRTUAL_ENV`, `CONDA_PREFIX`), not the real host. Do not widen the 5.K filesystem/network blocking contract — project mode still flows through the same `sandboxGuardReason` gate."
+              "note": "TDD slice 3 of 4: port upstream `_resolve_python_binary`/`_resolve_cwd` project semantics \u2014 session's working directory for CWD and the active virtualenv/conda python when present, falling back to the resolved system interpreter. Unit tests must drive resolution via injected env (`VIRTUAL_ENV`, `CONDA_PREFIX`), not the real host. Do not widen the 5.K filesystem/network blocking contract \u2014 project mode still flows through the same `sandboxGuardReason` gate."
             },
             {
               "name": "Default mode selection + config cut-over",
@@ -9964,7 +10168,7 @@
       }
     },
     "6": {
-      "name": "Phase 6 — The Learning Loop (Soul)",
+      "name": "Phase 6 \u2014 The Learning Loop (Soul)",
       "deliverable": "Native skill extraction. Compounding intelligence. The feature Hermes doesn't have.",
       "subphases": {
         "6.A": {
@@ -10312,7 +10516,7 @@
       }
     },
     "7": {
-      "name": "Phase 7 — Paused Channel Backlog",
+      "name": "Phase 7 \u2014 Paused Channel Backlog",
       "deliverable": "Deferred non-priority channel adapters after Telegram, Discord, Slack, WhatsApp, and WeChat stabilize",
       "subphases": {
         "7.A": {
