@@ -6528,9 +6528,9 @@
             },
             {
               "name": "Provider rate guard + budget telemetry",
-              "status": "planned",
+              "status": "complete",
               "contract": "Provider rate guards distinguish true account quota exhaustion from upstream-capacity 429s and expose budget telemetry without sleeping or blocking unrelated models in unit tests",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -6567,7 +6567,7 @@
                 "Last-known-good exhausted bucket evidence can classify a bare 429 as genuine, while healthy last-known state keeps a bare 429 as upstream_capacity.",
                 "Malformed or missing budget headers degrade visibly without sleeping, retry amplification, or blocking other provider/model choices."
               ],
-              "note": "Hermes 192e7eb2 fixed Nous Portal upstream-capacity 429s tripping the cross-session breaker. Gormes should port the decision table as provider-status evidence first, not as a live shared-file breaker.",
+              "note": "Complete (2026-04-26): TDD added DecideRateGuard + ParseBudget plus the four StatusRateGuardUnavailable / StatusNousRateLimited / StatusNousUpstreamCapacity / StatusBudgetHeaderMissing evidence tags in internal/hermes/provider_rate_guard.go, reusing the existing Classify429 + ApplyClassification helpers. internal/hermes/provider_rate_guard_test.go fixtures prove genuine_quota with redacted reset-window evidence, healthy-header upstream_capacity (overrides stale last_known without tripping a breaker), bare-429 fallback to last-known genuine vs upstream, missing/malformed degraded decisions with rate_guard_unavailable + budget_header_missing tags, decision purity across repeated calls, and a no-sleep timing assertion. The slice does not change retry timing, provider routing, or model fallback policy and writes no process-global breaker state.",
               "write_scope": [
                 "internal/hermes/provider_rate_guard.go",
                 "internal/hermes/provider_rate_guard_test.go",
@@ -6583,7 +6583,9 @@
                 "Provider rate-guard fixtures prove genuine quota, upstream-capacity, last-known-state, malformed-header, and no-sleep degraded decisions with visible status evidence."
               ],
               "health": {
-                "last_attempt": "2026-04-26T12:49:08Z",
+                "attempt_count": 2,
+                "last_attempt": "2026-04-26T19:58:11Z",
+                "last_success": "2026-04-26T19:58:11Z",
                 "backends_tried": [
                   "codexu"
                 ]
