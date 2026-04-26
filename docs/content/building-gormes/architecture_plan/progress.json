@@ -4795,8 +4795,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T02:10:57Z",
-            "origin_decision": "Hermes ad0ac894 widened DeepSeek/Kimi thinking-mode replay from assistant tool-call turns to all assistant turns after the earlier f93d4624 cross-provider isolation row landed in Gormes. Hermes 24b4b24d/ac571142/c15064fa/7bfa9442/d8e4c721/731e1ef8/7c50ed70 also moved Azure OpenAI, Azure Anthropic, and Azure Foundry provider behavior ahead of Gormes. Gormes still trails those provider edges, so this subphase remains upstream-led until the all-assistant reasoning_content row and the three Azure fixture rows validate; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
+            "last_upstream_check": "2026-04-26T12:19:33Z",
+            "origin_decision": "Hermes ad0ac894 widened DeepSeek/Kimi thinking-mode replay from assistant tool-call turns to all assistant turns, and the Gormes provider fixtures now validate the DeepSeek/Kimi, Azure OpenAI, and Azure Anthropic edges. Azure Foundry remains upstream-led but is split into probe, runtime read-model, and CLI/status fallback rows after the prior umbrella row quarantined with no-progress. Later Hermes 192e7eb2 provider-rate drift is tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
           }
         },
         "4.B": {
