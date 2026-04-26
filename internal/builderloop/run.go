@@ -1842,7 +1842,7 @@ func CheckpointDirtyWorktree(ctx context.Context, cfg Config, runID string) erro
 		"-c", "user.email=builder-loop@gormes.local",
 		"-c", "commit.gpgsign=false",
 	}
-	amended := lastCommitIsBuilderLoopCheckpoint(ctx, cfg.RepoRoot)
+	amended := shouldAmendLastCheckpoint(ctx, cfg.RepoRoot)
 	if amended {
 		commitArgs = append(commitArgs, "commit", "--amend", "--no-edit")
 	} else {
@@ -1866,6 +1866,13 @@ func CheckpointDirtyWorktree(ctx context.Context, cfg Config, runID string) erro
 	})
 }
 
+func shouldAmendLastCheckpoint(ctx context.Context, repoRoot string) bool {
+	if !lastCommitIsBuilderLoopCheckpoint(ctx, repoRoot) {
+		return false
+	}
+	return !headIsPublishedToUpstream(ctx, repoRoot)
+}
+
 func lastCommitIsBuilderLoopCheckpoint(ctx context.Context, repoRoot string) bool {
 	subject, err := runGitCheckpointCommand(ctx, repoRoot, "log", "-1", "--pretty=%s")
 	if err != nil {
@@ -1878,6 +1885,14 @@ func isBuilderLoopCheckpointSubject(subject string) bool {
 	subject = strings.TrimSpace(subject)
 	return strings.HasPrefix(subject, "builder-loop: checkpoint dirty worktree ") ||
 		strings.HasPrefix(subject, "builder-loop: watchdog checkpoint ")
+}
+
+func headIsPublishedToUpstream(ctx context.Context, repoRoot string) bool {
+	if _, err := runGitCheckpointCommand(ctx, repoRoot, "rev-parse", "--verify", "@{upstream}"); err != nil {
+		return false
+	}
+	_, err := runGitCheckpointCommand(ctx, repoRoot, "merge-base", "--is-ancestor", "HEAD", "@{upstream}")
+	return err == nil
 }
 
 func checkpointCommitDetail(amended bool) string {

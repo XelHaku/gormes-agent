@@ -1122,6 +1122,49 @@ func TestCheckpointDirtyWorktreeAmendsPreviousCheckpointCommit(t *testing.T) {
 	}
 }
 
+func TestCheckpointDirtyWorktreeDoesNotAmendPublishedCheckpointCommit(t *testing.T) {
+	dir := t.TempDir()
+	origin := filepath.Join(dir, "origin.git")
+	if output, err := exec.Command("git", "init", "--bare", origin).CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare failed: %v\n%s", err, output)
+	}
+
+	repoRoot := filepath.Join(dir, "repo")
+	if err := os.MkdirAll(repoRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	initCleanRepo(t, repoRoot)
+	runGitCommand(t, repoRoot, "remote", "add", "origin", origin)
+	runGitCommand(t, repoRoot, "push", "-u", "origin", "HEAD")
+
+	runRoot := t.TempDir()
+	cfg := Config{RepoRoot: repoRoot, RunRoot: runRoot}
+
+	if err := os.WriteFile(filepath.Join(repoRoot, "first.txt"), []byte("first\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckpointDirtyWorktree(context.Background(), cfg, "loop-checkpoint-20260426T120000Z"); err != nil {
+		t.Fatalf("first CheckpointDirtyWorktree() error = %v", err)
+	}
+	runGitCommand(t, repoRoot, "push")
+
+	if err := os.WriteFile(filepath.Join(repoRoot, "second.txt"), []byte("second\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckpointDirtyWorktree(context.Background(), cfg, "loop-checkpoint-20260426T120030Z"); err != nil {
+		t.Fatalf("second CheckpointDirtyWorktree() error = %v", err)
+	}
+	if got := gitCommitCount(t, repoRoot); got != "3" {
+		t.Fatalf("commit count after second checkpoint = %s, want new checkpoint commit above published tip", got)
+	}
+	if status := gitStatusPorcelain(t, repoRoot); status != "" {
+		t.Fatalf("git status = %q, want clean checkpointed worktree", status)
+	}
+	if got := gitAheadBehind(t, repoRoot); got != "1\t0" {
+		t.Fatalf("ahead/behind = %q, want one local commit and zero upstream commits", got)
+	}
+}
+
 func TestRunOnceFailsWhenWorkerLeavesDirtyWorktree(t *testing.T) {
 	repoRoot := t.TempDir()
 	initCleanRepo(t, repoRoot)
@@ -1606,6 +1649,16 @@ func gitCommitCount(t *testing.T, repoRoot string) string {
 	out, err := exec.Command("git", "-C", repoRoot, "rev-list", "--count", "HEAD").Output()
 	if err != nil {
 		t.Fatalf("git rev-list --count HEAD failed: %v", err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func gitAheadBehind(t *testing.T, repoRoot string) string {
+	t.Helper()
+
+	out, err := exec.Command("git", "-C", repoRoot, "rev-list", "--left-right", "--count", "HEAD...@{upstream}").Output()
+	if err != nil {
+		t.Fatalf("git rev-list --left-right --count HEAD...@{upstream} failed: %v", err)
 	}
 	return strings.TrimSpace(string(out))
 }
