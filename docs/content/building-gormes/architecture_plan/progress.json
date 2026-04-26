@@ -6673,9 +6673,9 @@
             {
               "name": "Provider rate guard — degraded-state + last-known-good evidence",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "TDD packet for a missing pure state-transition helper. The prerequisite (RateLimitClass + Classify429 in internal/hermes/provider_rate_guard.go) is shipped on main as of commit a1d7d928; do NOT stub or duplicate those constants. STEP 1: write internal/hermes/provider_rate_guard_degraded_test.go in package hermes (importing only `testing` and `time`). Define t0 and t1 once at the top of TestApplyClassification: `t0 := time.Date(2026,4,26,12,0,0,0,time.UTC); t1 := t0.Add(5*time.Minute)`. Add six t.Run subtests in this order — preserves_last_known_when_insufficient, treats_empty_class_as_insufficient, fresh_genuine_quota_clears_unavailable, fresh_upstream_capacity_clears_unavailable, input_immutability_via_struct_value, transitions_back_to_available_on_fresh_evidence — each calling ApplyClassification with explicit GuardState literals and asserting the returned struct field-by-field with t.Fatalf on mismatch. STEP 2: write internal/hermes/provider_rate_guard_degraded.go in package hermes (importing only `time`). Define `type GuardState struct { LastKnownClass RateLimitClass; LastKnownAt time.Time; Unavailable bool }` and `func ApplyClassification(state GuardState, now time.Time, class RateLimitClass) GuardState`. Algorithm: if class == RateLimitInsufficientEvidence OR class == RateLimitClass(\"\"), return GuardState{LastKnownClass: state.LastKnownClass, LastKnownAt: state.LastKnownAt, Unavailable: true}. Otherwise return GuardState{LastKnownClass: class, LastKnownAt: now, Unavailable: false}. The helper takes its argument by value, never mutates it, never reads time.Now, never spawns a goroutine, and never touches retry/breaker code.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -6725,9 +6725,10 @@
                 "internal/hermes/provider_rate_guard_degraded.go contains only GuardState and ApplyClassification, reusing RateLimitClass from provider_rate_guard.go with no duplicated constants."
               ],
               "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T15:09:01Z",
+                "attempt_count": 4,
+                "consecutive_failures": 0,
+                "last_attempt": "2026-04-26T19:42:54Z",
+                "last_success": "2026-04-26T19:42:54Z",
                 "last_failure": {
                   "run_id": "20260426T150848Z-251659260",
                   "category": "no_progress",
@@ -6741,7 +6742,7 @@
               "planner_verdict": {
                 "reshape_count": 13,
                 "last_reshape": "2026-04-26T19:13Z",
-                "last_outcome": "reshaped_after_prerequisite_shipped"
+                "last_outcome": "validated_post_ship"
               },
               "provenance": {
                 "origin_type": "hybrid",
