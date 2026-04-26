@@ -8024,9 +8024,9 @@
             {
               "name": "TUI launch model override + static alias resolver",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes TUI honors top-level --model/--provider and GORMES_INFERENCE_* overrides at startup without network model lookup or oneshot-only coupling",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -8060,7 +8060,7 @@
                 "A provider override without an explicit model returns the same exit-code-2 ambiguity class as oneshot resolution.",
                 "Resume/session startup still persists the same TUI session key and does not mutate persisted config defaults."
               ],
-              "note": "Hermes 283c8fd6 moved model/provider overrides into TUI launch and fixed startup alias resolution to avoid network lookup. Gormes already parses top-level flags for oneshot; add a TUI-specific fixture before remote TUI transport so model state is not silently stale.",
+              "note": "Complete: TUI startup now resolves top-level --model/--provider and GORMES_INFERENCE_* overrides through the shared inference resolver, applies embedded static aliases such as sonnet -> claude-sonnet-4-20250514 without network catalog lookup, returns exit-code-2 ambiguity errors before TUI startup when a provider is explicit without a model, and preserves persisted config defaults.",
               "write_scope": [
                 "cmd/gormes/main.go",
                 "cmd/gormes/tui_model_override_test.go",

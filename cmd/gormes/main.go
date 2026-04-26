@@ -42,17 +42,21 @@ func main() {
 }
 
 func newRootCommand() *cobra.Command {
-	return newRootCommandWithRuntime(rootRuntime{
-		runTUI: runTUI,
-	})
+	return newRootCommandWithRuntime(rootRuntime{})
 }
 
 type rootRuntime struct {
 	runTUI                 func(*cobra.Command, []string) error
+	runResolvedTUI         func(*cobra.Command, tuiInvocation) error
 	runOneshot             func(*cobra.Command, oneshotInvocation) error
 	newOneshotClient       oneshotClientFactory
 	configureOneshotKernel oneshotKernelConfigurer
 	tuiProgramFactory      tuiProgramFactory
+}
+
+type tuiInvocation struct {
+	Inference config.TUIInferenceResolution
+	Config    config.Config
 }
 
 type oneshotInvocation struct {
@@ -62,9 +66,14 @@ type oneshotInvocation struct {
 }
 
 func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
-	if runtime.runTUI == nil {
-		runtime.runTUI = func(cmd *cobra.Command, args []string) error {
-			return runTUIWithRuntime(cmd, args, runtime)
+	if runtime.runResolvedTUI == nil {
+		if runtime.runTUI != nil {
+			runLegacyTUI := runtime.runTUI
+			runtime.runResolvedTUI = func(cmd *cobra.Command, _ tuiInvocation) error {
+				return runLegacyTUI(cmd, nil)
+			}
+		} else {
+			runtime.runResolvedTUI = runResolvedTUI
 		}
 	}
 	if runtime.newOneshotClient == nil {
@@ -87,8 +96,8 @@ func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
 		},
 	}
 	root.Flags().StringP("oneshot", "z", "", "one-shot mode: send a single prompt and resolve model/provider selection without starting the TUI")
-	root.Flags().StringP("model", "m", "", "model override for -z/--oneshot; also settable via GORMES_INFERENCE_MODEL")
-	root.Flags().String("provider", "", "provider override for -z/--oneshot; also settable via GORMES_INFERENCE_PROVIDER")
+	root.Flags().StringP("model", "m", "", "model override for --oneshot or TUI startup; also settable via GORMES_INFERENCE_MODEL")
+	root.Flags().String("provider", "", "provider override for --oneshot or TUI startup; also settable via GORMES_INFERENCE_PROVIDER")
 	root.Flags().Bool("offline", false, "skip startup api_server health check (dev only — turns the TUI into a cosmetic smoke-tester)")
 	root.Flags().String("resume", "", "override persisted session_id for the TUI's default key")
 	root.AddCommand(doctorCmd, versionCmd, telegramCmd, gatewayCmd, sessionCmd, memoryCmd, gonchoCmd)
@@ -103,7 +112,11 @@ func runRootCommand(cmd *cobra.Command, args []string, runtime rootRuntime) erro
 		}
 		return runtime.runOneshot(cmd, invocation)
 	}
-	return runtime.runTUI(cmd, args)
+	invocation, err := resolveTUIInvocation(cmd)
+	if err != nil {
+		return err
+	}
+	return runtime.runResolvedTUI(cmd, invocation)
 }
 
 func resolveOneshotInvocation(cmd *cobra.Command) (oneshotInvocation, error) {
@@ -120,6 +133,7 @@ func resolveOneshotInvocation(cmd *cobra.Command) (oneshotInvocation, error) {
 		ModelFlag:    modelFlag,
 		ProviderFlag: providerFlag,
 	})
+	resolution = resolveStaticStartupInference(resolution)
 	invocation := oneshotInvocation{
 		Prompt:    prompt,
 		Inference: resolution,
@@ -129,6 +143,49 @@ func resolveOneshotInvocation(cmd *cobra.Command) (oneshotInvocation, error) {
 		return invocation, newExitCodeError(2, err)
 	}
 	return invocation, nil
+}
+
+func resolveTUIInvocation(cmd *cobra.Command) (tuiInvocation, error) {
+	modelFlag, _ := cmd.Flags().GetString("model")
+	providerFlag, _ := cmd.Flags().GetString("provider")
+
+	cfg, err := config.Load(nil)
+	if err != nil {
+		return tuiInvocation{}, err
+	}
+	resolution, err := config.ResolveTUIInference(config.TUIInferenceRequest{
+		Config:       cfg,
+		ModelFlag:    modelFlag,
+		ProviderFlag: providerFlag,
+	})
+	resolution = resolveStaticStartupInference(resolution)
+	invocation := tuiInvocation{
+		Inference: resolution,
+		Config:    cfg,
+	}
+	if err != nil {
+		return invocation, newExitCodeError(2, err)
+	}
+	return invocation, nil
+}
+
+func resolveStaticStartupInference(resolution config.InferenceResolution) config.InferenceResolution {
+	if resolution.Model == "" {
+		return resolution
+	}
+	metadata := hermes.LookupModelMetadata(hermes.ModelRegistryQuery{
+		Provider: resolution.Provider,
+		Model:    resolution.Model,
+	})
+	if !metadata.Found {
+		return resolution
+	}
+	resolution.Model = metadata.Model
+	if resolution.Provider == "" {
+		resolution.Provider = metadata.Provider
+		resolution.ProviderAutoDetectRequired = false
+	}
+	return resolution
 }
 
 type oneshotClientFactory func(context.Context, config.Config, oneshotInvocation) (hermes.Client, error)
@@ -254,35 +311,24 @@ func finalAssistantContent(history []hermes.Message) (string, bool) {
 }
 
 func runTUI(cmd *cobra.Command, _ []string) error {
-	return runTUIWithRuntime(cmd, nil, rootRuntime{})
-}
-
-type tuiProgram interface {
-	Run() (tea.Model, error)
-	Quit()
-}
-
-type tuiProgramFactory func(tea.Model, ...tea.ProgramOption) tuiProgram
-
-func defaultTUIProgramFactory(model tea.Model, options ...tea.ProgramOption) tuiProgram {
-	return tea.NewProgram(model, options...)
-}
-
-func runTUIWithRuntime(cmd *cobra.Command, _ []string, runtime rootRuntime) error {
-	runNativeTUIStartupPreflight(context.Background(), tuiStartupPreflightOptions{})
-	if runtime.tuiProgramFactory == nil {
-		runtime.tuiProgramFactory = defaultTUIProgramFactory
-	}
-
-	cfg, err := config.Load(nil)
+	invocation, err := resolveTUIInvocation(cmd)
 	if err != nil {
 		return err
 	}
+	return runResolvedTUI(cmd, invocation)
+}
+
+func runResolvedTUI(cmd *cobra.Command, invocation tuiInvocation) error {
+	cfg := invocation.Config
 	if p, ok := config.LegacyHermesHome(); ok {
 		slog.Info("detected upstream Hermes home — Gormes uses XDG paths and does NOT read state from it; run `gormes migrate --from-hermes` (planned Phase 5.O) to import sessions and memory", "hermes_home", p)
 	}
 
-	c := hermes.NewHTTPClient(cfg.Hermes.Endpoint, cfg.Hermes.APIKey)
+	modelName := invocation.Inference.Model
+	if modelName == "" {
+		modelName = cfg.Hermes.Model
+	}
+	c := hermes.NewHTTPClientWithProvider(cfg.Hermes.Endpoint, cfg.Hermes.APIKey, invocation.Inference.Provider)
 
 	// Health check: 2s budget. Surface an actionable error if unreachable.
 	offline, _ := cmd.Flags().GetBool("offline")
@@ -331,10 +377,10 @@ func runTUIWithRuntime(cmd *cobra.Command, _ []string, runtime rootRuntime) erro
 	tm := telemetry.New()
 	toolAudit := audit.NewJSONLWriter(config.ToolAuditLogPath())
 	k := kernel.New(kernel.Config{
-		Model:             cfg.Hermes.Model,
+		Model:             modelName,
 		Endpoint:          cfg.Hermes.Endpoint,
 		Admission:         kernel.Admission{MaxBytes: cfg.Input.MaxBytes, MaxLines: cfg.Input.MaxLines},
-		Tools:             buildDefaultRegistry(rootCtx, cfg.Delegation, cfg.SkillsRoot(), c, cfg.Hermes.Model),
+		Tools:             buildDefaultRegistry(rootCtx, cfg.Delegation, cfg.SkillsRoot(), c, modelName),
 		MaxToolIterations: 10,
 		MaxToolDuration:   30 * time.Second,
 		InitialSessionID:  initialSID,

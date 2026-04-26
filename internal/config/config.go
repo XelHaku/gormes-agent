@@ -239,14 +239,18 @@ const (
 	InferenceValueSourceConfig InferenceValueSource = "config"
 )
 
-type OneshotInferenceRequest struct {
+type InferenceRequest struct {
 	Config       Config
 	ModelFlag    string
 	ProviderFlag string
 	LookupEnv    func(string) (string, bool)
+	CommandLabel string
 }
 
-type OneshotInferenceResolution struct {
+type OneshotInferenceRequest = InferenceRequest
+type TUIInferenceRequest = InferenceRequest
+
+type InferenceResolution struct {
 	Model                      string
 	ModelSource                InferenceValueSource
 	Provider                   string
@@ -254,11 +258,24 @@ type OneshotInferenceResolution struct {
 	ProviderAutoDetectRequired bool
 }
 
+type OneshotInferenceResolution = InferenceResolution
+type TUIInferenceResolution = InferenceResolution
+
 // ResolveOneshotInference applies the Hermes-compatible one-shot precedence:
 // flag > GORMES_INFERENCE_* env > config defaults. A provider override without
 // a flag/env model is rejected so a stale configured model is not silently
 // paired with a different provider.
 func ResolveOneshotInference(req OneshotInferenceRequest) (OneshotInferenceResolution, error) {
+	req.CommandLabel = "gormes -z"
+	return ResolveInference(req)
+}
+
+func ResolveTUIInference(req TUIInferenceRequest) (TUIInferenceResolution, error) {
+	req.CommandLabel = "gormes tui"
+	return ResolveInference(req)
+}
+
+func ResolveInference(req InferenceRequest) (InferenceResolution, error) {
 	lookupEnv := req.LookupEnv
 	if lookupEnv == nil {
 		lookupEnv = os.LookupEnv
@@ -274,7 +291,7 @@ func ResolveOneshotInference(req OneshotInferenceRequest) (OneshotInferenceResol
 		inferenceCandidate{value: lookupInferenceEnv(lookupEnv, "GORMES_INFERENCE_PROVIDER"), source: InferenceValueSourceEnv},
 	)
 
-	resolution := OneshotInferenceResolution{
+	resolution := InferenceResolution{
 		Model:          model,
 		ModelSource:    modelSource,
 		Provider:       provider,
@@ -283,7 +300,7 @@ func ResolveOneshotInference(req OneshotInferenceRequest) (OneshotInferenceResol
 	explicitModel := modelSource == InferenceValueSourceFlag || modelSource == InferenceValueSourceEnv
 	explicitProvider := providerSource == InferenceValueSourceFlag || providerSource == InferenceValueSourceEnv
 	if explicitProvider && !explicitModel {
-		return resolution, oneshotProviderRequiresExplicitModelError(providerSource)
+		return resolution, providerRequiresExplicitModelError(req.CommandLabel, providerSource)
 	}
 	resolution.ProviderAutoDetectRequired = explicitModel && providerSource == InferenceValueSourceUnset
 	return resolution, nil
@@ -312,11 +329,15 @@ func lookupInferenceEnv(lookup func(string) (string, bool), name string) string 
 	return value
 }
 
-func oneshotProviderRequiresExplicitModelError(source InferenceValueSource) error {
-	if source == InferenceValueSourceEnv {
-		return fmt.Errorf("gormes -z: GORMES_INFERENCE_PROVIDER requires --model or GORMES_INFERENCE_MODEL. Set both inference env vars, pass both flags, or neither to use your configured defaults")
+func providerRequiresExplicitModelError(commandLabel string, source InferenceValueSource) error {
+	commandLabel = strings.TrimSpace(commandLabel)
+	if commandLabel == "" {
+		commandLabel = "gormes inference"
 	}
-	return fmt.Errorf("gormes -z: --provider requires --model (or GORMES_INFERENCE_MODEL). Pass both explicitly, or neither to use your configured defaults.")
+	if source == InferenceValueSourceEnv {
+		return fmt.Errorf("%s: GORMES_INFERENCE_PROVIDER requires --model or GORMES_INFERENCE_MODEL. Set both inference env vars, pass both flags, or neither to use your configured defaults", commandLabel)
+	}
+	return fmt.Errorf("%s: --provider requires --model (or GORMES_INFERENCE_MODEL). Pass both explicitly, or neither to use your configured defaults.", commandLabel)
 }
 
 // Load resolves configuration from (in precedence order) CLI flags, env vars,
