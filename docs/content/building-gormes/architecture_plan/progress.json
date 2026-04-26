@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-26T18:25:41Z",
+    "last_updated": "2026-04-26T18:37:44Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -7218,9 +7218,9 @@
             {
               "name": "Browser hybrid private-URL local sidecar routing",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure routing helper internal/tools/browser_hybrid_routing.go exposes type BrowserRoute struct{SessionKey string; ForceLocal bool; Reason string}, IsPrivateBrowserHost(host string) bool, and RouteBrowserNavigation(taskID, rawURL string, cloudConfigured, autoLocalForPrivateURLs, cdpOverride, camofoxMode bool) BrowserRoute. When cloudConfigured && autoLocalForPrivateURLs && !cdpOverride && !camofoxMode and rawURL's host is localhost, loopback, RFC1918 IPv4, IPv6 loopback, IPv4 link-local, or suffix .local/.lan/.internal, return SessionKey=\"<taskID-or-default>::local\", ForceLocal=true, Reason=\"private_url_local_sidecar\". Public URLs and disabled/override cases return the bare taskID/default, ForceLocal=false. No browser startup, DNS resolution, network calls, chromedp/Rod imports, global session maps, cleanup logic, or config loading in this slice.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
