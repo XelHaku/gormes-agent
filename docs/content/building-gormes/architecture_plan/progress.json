@@ -6437,9 +6437,68 @@
           "name": "Skills System (Remaining)",
           "items": [
             {
-              "name": "Skills hub",
+              "name": "Skills hub search RPC read model",
               "status": "planned",
-              "note": "TDD: port `tools/skills_hub.py` and registry lookup as read-only search/install planning first, reusing the Phase 2.G active/inactive store instead of creating another skills root."
+              "contract": "Skills hub search is exposed as a read-only RPC/command contract over configured registries without installing skills, mutating the active store, or requiring the Hermes Python hub runtime",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Skill surfaces report skills_search_unavailable, registry_rate_limited, empty_query, or no_results evidence instead of failing TUI/gateway command dispatch.",
+              "fixture": "internal/skills/hub_search_test.go",
+              "source_refs": [
+                "../hermes-agent/tui_gateway/server.py@91a7a0ac:skills.manage",
+                "../hermes-agent/tests/tui_gateway/test_protocol.py@91a7a0ac:test_skills_manage_search_uses_tools_hub_sources",
+                "../hermes-agent/hermes_cli/skills_hub.py@91a7a0ac",
+                "../hermes-agent/tools/skills_hub.py@91a7a0ac",
+                "internal/skills/store.go",
+                "internal/gateway/commands.go"
+              ],
+              "ready_when": [
+                "Phase 2.G active/inactive skill store is complete and Skill preprocessing + dynamic slash commands is validated, so this row only adds a read-only search result contract.",
+                "The worker can use fake registry providers and fake RPC/command dispatch; no GitHub network, install flow, or prompt injection is required."
+              ],
+              "not_ready_when": [
+                "The slice installs skills, edits active/inactive SKILL.md files, downloads registry content, or ports registry caching/signature verification.",
+                "The slice blocks TUI/gateway dispatch on live GitHub or skills.sh availability."
+              ],
+              "blocked_by": [
+                "Skill preprocessing + dynamic slash commands"
+              ],
+              "unblocks": [
+                "Skill registries",
+                "TUI + Telegram browsing"
+              ],
+              "acceptance": [
+                "A skills.manage/search-style fixture returns stable result rows with name, description, source, and install_id from fake registry data.",
+                "Empty query, unavailable registry, rate-limit, and no-results cases return explicit degraded evidence without mutating the active skill store.",
+                "Gateway/TUI command dispatch can call the read model without injecting returned skills into prompts.",
+                "Install planning remains a separate row; this slice is read-only."
+              ],
+              "note": "Hermes 91a7a0ac restored TUI skills search RPC via tools.skills_hub sources. Gormes should port the read-only search result contract first and leave registry metadata/install flows in dependent slices.",
+              "write_scope": [
+                "internal/skills/hub_search.go",
+                "internal/skills/hub_search_test.go",
+                "internal/gateway/commands.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/skills ./internal/gateway -run 'Test.*Skill.*Hub|Test.*Skills.*Search' -count=1",
+                "go test ./internal/skills ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Skills hub search fixtures prove read-only fake-registry search, degraded evidence, RPC/command dispatch, and no active-store mutation or prompt injection."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:91a7a0ac tui_gateway/server.py",
+                "note": "Hermes defines the skills.manage search RPC shape; Gormes adapts it to native skills storage and gateway command dispatch."
+              }
             },
             {
               "name": "Skill registries",
