@@ -163,6 +163,117 @@ func TestRunOnce_HealthUpdatedEventEmittedOnSuccess(t *testing.T) {
 	}
 }
 
+func TestRunOnce_NoChangeWorkerCountsAsNoProgressAndSkipsPostVerify(t *testing.T) {
+	repoRoot := t.TempDir()
+	initCleanRepo(t, repoRoot)
+
+	progressPath := filepath.Join(repoRoot, "docs", "content", "building-gormes", "architecture_plan", "progress.json")
+	if err := os.MkdirAll(filepath.Dir(progressPath), 0o755); err != nil {
+		t.Fatalf("mkdir progress dir: %v", err)
+	}
+	if err := os.WriteFile(progressPath, []byte(`{
+  "meta": {"version": "2.0", "last_updated": "2026-04-24",
+    "links": {"github_readme": "", "landing_page": "", "docs_site": "", "source_code": ""}},
+  "phases": {
+    "12": {
+      "name": "P12",
+      "deliverable": "x",
+      "subphases": {
+        "12.A": {
+          "name": "S",
+          "items": [
+            {
+              "name": "stuck row",
+              "status": "planned",
+              "contract": "make a real code change",
+              "contract_status": "draft",
+              "write_scope": ["internal/goncho/"],
+              "health": {"attempt_count": 2, "consecutive_failures": 2}
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+`), 0o644); err != nil {
+		t.Fatalf("write progress: %v", err)
+	}
+	runGitCommand(t, repoRoot, "add", ".")
+	runGitCommand(t, repoRoot, "commit", "-m", "add progress")
+
+	var postVerifyRuns int
+	runner := runnerFunc(func(ctx context.Context, command Command) Result {
+		switch command.Name {
+		case "opencode":
+			return Result{}
+		case "sh":
+			postVerifyRuns++
+			return Result{}
+		default:
+			return (ExecRunner{}).Run(ctx, command)
+		}
+	})
+	runRoot := t.TempDir()
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:                    repoRoot,
+			ProgressJSON:                progressPath,
+			RunRoot:                     runRoot,
+			Backend:                     "opencode",
+			Mode:                        "safe",
+			MaxAgents:                   1,
+			MaxPhase:                    12,
+			PostPromotionVerifyCommands: []string{"go test ./... -count=1"},
+			QuarantineThreshold:         3,
+			BackendDegradeThreshold:     3,
+		},
+		Runner: runner,
+		Now:    time.Date(2026, 4, 26, 7, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("RunOnce() error = %v", err)
+	}
+	if postVerifyRuns != 0 {
+		t.Fatalf("post-promotion verify commands ran %d times, want 0 for no-change worker", postVerifyRuns)
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	if !ledgerContainsEvent(events, "worker_no_changes") {
+		t.Fatalf("ledger missing worker_no_changes; got=%v", ledgerEventNames(events))
+	}
+	if ledgerContainsEvent(events, "worker_success") {
+		t.Fatalf("ledger contains worker_success for no-change worker; got=%v", ledgerEventNames(events))
+	}
+	if ledgerContainsEvent(events, "post_promotion_verify_started") {
+		t.Fatalf("ledger contains post_promotion_verify_started for no-change worker; got=%v", ledgerEventNames(events))
+	}
+	if !ledgerContainsEvent(events, "run_completed") {
+		t.Fatalf("ledger missing run_completed; got=%v", ledgerEventNames(events))
+	}
+
+	item := loadItem(t, progressPath, "12", "12.A", "stuck row")
+	if item.Health == nil {
+		t.Fatal("item.Health is nil after no-change run")
+	}
+	if item.Health.LastSuccess != "" {
+		t.Fatalf("LastSuccess = %q, want empty for no-change worker", item.Health.LastSuccess)
+	}
+	if item.Health.ConsecutiveFailures != 3 {
+		t.Fatalf("ConsecutiveFailures = %d, want 3", item.Health.ConsecutiveFailures)
+	}
+	if item.Health.LastFailure == nil || item.Health.LastFailure.Category != progress.FailureNoProgress {
+		t.Fatalf("LastFailure = %+v, want no_progress category", item.Health.LastFailure)
+	}
+	if item.Health.Quarantine == nil {
+		t.Fatal("Quarantine is nil, want no-progress row quarantined at threshold")
+	}
+	if item.Health.Quarantine.LastCategory != progress.FailureNoProgress {
+		t.Fatalf("Quarantine.LastCategory = %q, want %q", item.Health.Quarantine.LastCategory, progress.FailureNoProgress)
+	}
+}
+
 func TestRunOnce_PostPromotionVerifyFailureStopsBeforeRunHealth(t *testing.T) {
 	progressPath := writeNamedProgressJSON(t, baseNamedProgress)
 	runRoot := t.TempDir()

@@ -341,10 +341,6 @@ func originSourceFromChatKey(chatKey string) string {
 	return chatKey[:idx]
 }
 
-func recentTurns(ctx context.Context, db *sql.DB, sessionKey string, limit int) ([]MessageSlice, error) {
-	return recentTurnsAfter(ctx, db, sessionKey, 0, limit)
-}
-
 func recentTurnsAfter(ctx context.Context, db *sql.DB, sessionKey string, afterID int64, limit int) ([]MessageSlice, error) {
 	rows, err := db.QueryContext(ctx, `
 		SELECT role, content
