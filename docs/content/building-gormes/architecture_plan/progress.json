@@ -5629,9 +5629,9 @@
             {
               "name": "Cross-provider reasoning-tag sanitization",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/hermes owns one provider-neutral reasoning-tag sanitizer that strips model-emitted reasoning tags from stored assistant text, visible operator text, and resume recap text without mutating raw stream/transcript evidence",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -5677,7 +5677,7 @@
                 "TestSanitizeReasoningTags_RawAuditTextUnchanged proves callers receive sanitized copies and the original raw string remains byte-identical for stream/transcript audit.",
                 "The implementation imports only strings/regexp-style standard-library packages plus testing in the test file; no provider clients, kernel package imports, or filesystem reads."
               ],
-              "note": "Refined 2026-04-26T23:39:31Z after the builder-loop dry run reported zero selectable candidates. This turns the prior placeholder into one unblocked, fixture-ready 4.A slice over a pure internal/hermes sanitizer, using Hermes ec48ec55, 9489d157, and bd01ec78 as donor evidence while avoiding adapter/kernel/TUI churn.",
+              "note": "Complete: TDD added `internal/hermes/reasoning_tag_sanitizer_test.go` and a shared provider-neutral text sanitizer. Stored assistant text, visible operator text, and resume recap fixtures strip complete and unterminated reasoning tags while raw audit strings remain byte-identical. Verified with `go test ./internal/hermes -run '^TestSanitizeReasoningTags' -count=1`, `go test ./internal/hermes -count=1`, and `go run ./cmd/builder-loop progress validate`.",
               "write_scope": [
                 "internal/hermes/reasoning_tag_sanitizer.go",
                 "internal/hermes/reasoning_tag_sanitizer_test.go",
@@ -5699,6 +5699,11 @@
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:ec48ec55+9489d157+bd01ec78 run_agent.py,cli.py",
                 "note": "Hermes provides the reasoning-tag sanitization regressions; Gormes centralizes them as a provider-neutral Go text sanitizer before more reasoning-model adapters land."
+              },
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T23:50:41Z",
+                "last_success": "2026-04-26T23:50:41Z"
               }
             },
             {
