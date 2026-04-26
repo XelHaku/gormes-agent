@@ -410,18 +410,26 @@
                 "watchdog_coalesce_test fixtures prove first-tick-commits, later-ticks-noop-or-amend, fresh-window-allowed, and a coalesce_decision field in record_run_health."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T15:09:01Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T15:09:51Z",
                 "last_failure": {
-                  "run_id": "20260426T150848Z-251659260",
+                  "run_id": "20260426T150941Z-113448856",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 1/1.C/Watchdog checkpoint coalescing"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T15:09:51Z",
+                  "after_run_id": "20260426T150941Z-113448856",
+                  "threshold": 3,
+                  "spec_hash": "2bf4f1e1a34cc697eba235d10e8ef9bc11fdcfb90928967c72e03cb612fc6615",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -477,18 +485,26 @@
                 "pr_intake backoff fixtures prove suppression after consecutive empties, reset on first non-empty result, and idle_backoff evidence in pr_intake_completed events."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T15:09:01Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T15:09:51Z",
                 "last_failure": {
-                  "run_id": "20260426T150848Z-251659260",
+                  "run_id": "20260426T150941Z-113448856",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 1/1.C/PR-intake idle backoff"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T15:09:51Z",
+                  "after_run_id": "20260426T150941Z-113448856",
+                  "threshold": 3,
+                  "spec_hash": "5becdbc07d8f538760df3544798bdd8aed3f820dc63c20aa220f9a6af8427b70",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -546,18 +562,26 @@
                 "watchdog_state fixtures prove dead-fast, silent-slow, recovery, and worker_state evidence on record_run_health are all reachable with synthetic PIDs and a fake clock."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T15:09:01Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T15:09:51Z",
                 "last_failure": {
-                  "run_id": "20260426T150848Z-251659260",
+                  "run_id": "20260426T150941Z-113448856",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 1/1.C/Watchdog dead-process vs slow-progress separation"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T15:09:51Z",
+                  "after_run_id": "20260426T150941Z-113448856",
+                  "threshold": 3,
+                  "spec_hash": "24f8551fb920d476973febac169c25c1641f80bd34737dc320bdf0922fc0bebe",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -612,18 +636,26 @@
                 "ship_ratio fixtures prove self_improvement vs user_feature classification, unclassified bucketing, null evidence on insufficient history, and ratio computed against synthetic ship events."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T15:09:01Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T15:09:51Z",
                 "last_failure": {
-                  "run_id": "20260426T150848Z-251659260",
+                  "run_id": "20260426T150941Z-113448856",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 1/1.C/Builder-loop self-improvement vs user-feature ratio metric"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T15:09:51Z",
+                  "after_run_id": "20260426T150941Z-113448856",
+                  "threshold": 3,
+                  "spec_hash": "57dd640e6dead1eff066922878b6b0ce49e3826c055318329345b00704de9aa8",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "operator_audit",
