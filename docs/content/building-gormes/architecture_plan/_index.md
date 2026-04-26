@@ -75,7 +75,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Planner divergence and provenance awareness
 - [x] Watchdog checkpoint coalescing
 - [x] PR-intake idle backoff
-- [ ] Watchdog dead-process vs slow-progress separation
+- [x] Watchdog dead-process vs slow-progress separation
 - [ ] Builder-loop self-improvement vs user-feature ratio metric
 
 ## Phase 2 — The Gateway 🔨
@@ -347,7 +347,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Azure OpenAI query/default_query transport contract
 - [x] Azure Anthropic Messages endpoint contract
 - [ ] Azure Foundry transport probe read model
-- [ ] Azure Foundry probe — path sniffing
+- [x] Azure Foundry probe — path sniffing
 - [x] Azure Foundry probe — /models classification + Anthropic fallback
 - [ ] Azure Foundry runtime env/config read model
 - [ ] Azure Foundry CLI setup/status manual fallback
@@ -427,7 +427,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Streaming interrupt retry suppression
 - [ ] Prompt-cache capability guard
 - [ ] Provider rate guard + budget telemetry
-- [ ] Provider rate guard — x-ratelimit header classification
+- [x] Provider rate guard — x-ratelimit header classification
 - [ ] Provider rate guard — degraded-state + last-known-good evidence
 
 ## Phase 5 — The Final Purge 🔨
@@ -476,7 +476,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.F — Skills System (Remaining) 🔨
 
 - [x] Skills hub search result types + in-memory registry provider
-- [ ] Skills hub search read-model function over registry providers
+- [x] Skills hub search read-model function over registry providers
 - [ ] Skill registries
 - [x] Skill preprocessing + dynamic slash commands
 - [ ] [IMPORTANT:] prompt prefix for cron and skill commands
@@ -486,7 +486,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] MCP client
 - [x] MCP server config/env resolver
-- [ ] MCP stdio transport + tool/list discovery
+- [x] MCP stdio transport + tool/list discovery
 - [ ] MCP HTTP transport + tool/list discovery
 - [ ] MCP schema normalization + structured-content adapter
 - [x] MCP OAuth state store + noninteractive auth errors
@@ -571,7 +571,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] doctorCustomEndpointReadiness check function
 - [ ] Custom provider model-switch credential preservation
 - [x] CLI log redactor for known secret shapes
-- [ ] CLI log snapshot reader using shared redactor
+- [x] CLI log snapshot reader using shared redactor
 
 ### 5.P — Docker / Packaging ⏳
 
@@ -592,11 +592,11 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] TUI mouse tracking config + slash toggle
 - [x] Native TUI bundle independence check
 - [x] TUI launch model override + static alias resolver
-- [ ] TUI prompt-submit auto-title eligibility helper
+- [x] TUI prompt-submit auto-title eligibility helper
 - [ ] TUI TerminalNativeSelectionHelp constant + help-string fixture
 - [x] Native TUI slash-command dispatch table
 - [ ] Native TUI /save canonical session export
-- [ ] Native TUI /branch session fork + transcript target switch
+- [x] Native TUI /branch session fork + transcript target switch
 - [ ] TUI running-agent placeholder surfaces interrupt + queued slash actions
 - [ ] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server

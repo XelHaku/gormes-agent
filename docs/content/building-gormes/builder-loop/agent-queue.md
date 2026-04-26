@@ -22,90 +22,28 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. Watchdog dead-process vs slow-progress separation
-
-- Phase: 1 / 1.C
-- Owner: `orchestrator`
-- Size: `small`
-- Status: `planned`
-- Priority: `P1`
-- Contract: TDD packet for a missing pure helper; create exactly two files and do not wire them into the watchdog loop. STEP 1: cd into the repo root and run `ls internal/builderloop/watchdog_state*.go` — both files must be absent before the worker writes them. STEP 2: write internal/builderloop/watchdog_state_test.go in package builderloop with one TestDiagnose function holding a t.Run-driven table. The subtests are named exactly zero_pid_dead, pid_not_live_after_dead_threshold, live_after_slow_threshold, dead_wins_when_both_thresholds_fire, healthy_recent_live, and pid_live_silent_for_a_year_is_slow_not_dead. Use a fixed time anchor `now := time.Date(2026,4,26,18,0,0,0,time.UTC)` and pass deadAfter=120*time.Second, slowAfter=600*time.Second. STEP 3: write internal/builderloop/watchdog_state.go exposing type Verdict string with constants VerdictHealthy="healthy", VerdictSlow="slow", VerdictDead="dead"; type WorkerVitals struct{PID int; LastCommitAt time.Time; PIDIsLive bool}; and func Diagnose(now time.Time, v WorkerVitals, deadAfter, slowAfter time.Duration) Verdict. Verdict precedence (evaluate in this order): if v.PID==0 return VerdictDead; let elapsed := now.Sub(v.LastCommitAt); if !v.PIDIsLive && elapsed>=deadAfter return VerdictDead; if v.PIDIsLive && elapsed>=slowAfter return VerdictSlow; otherwise return VerdictHealthy. STEP 4: the helper uses only caller-injected now and PIDIsLive — no os.FindProcess, signal delivery, time.Now, goroutines, watchdog wiring, config validation, or imports beyond `time`.
-- Trust class: operator, system
-- Ready when: Existing watchdog timer (commit f96a5d94) emits stall events at a single threshold; this slice carves the threshold into two independent ones., Watchdog checkpoint coalescing is fixture-ready or validated, so the dead-process tick does not amplify the commit storm., Both target files are absent on main; the worker's first edit is the focused failing table test, then the helper., If either target file already exists in the worker checkout, the worker should run the focused test and update this progress row instead of creating a duplicate helper.
-- Not ready when: The slice changes how worker output is rejected or how dirty worktrees are committed — only worker liveness detection is in scope., The slice introduces process-group signal sending or container-aware death detection (those belong to a separate sandboxing row)., The worker needs to edit internal/builderloop/run.go, watchdog timers, backend prompts, ledger writing, or process-kill behavior to make the test pass.
-- Degraded mode: Watchdog status reports worker_state ∈ {alive_progressing, alive_silent, dead, unknown} and the threshold each one tripped; record_run_health carries the worker_state and which threshold (dead_after_seconds, silent_after_seconds) fired.
-- Fixture: `internal/builderloop/watchdog_state_test.go (new file)::TestDiagnose/zero_pid_dead+dead_wins_when_both_thresholds_fire`
-- Write scope: `internal/builderloop/watchdog_state.go`, `internal/builderloop/watchdog_state_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/builderloop -run '^TestDiagnose$' -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/builderloop/watchdog_state_test.go fixtures prove healthy/slow/dead verdicts including the dead-vs-slow precedence rule with no os.FindProcess or signal calls., internal/builderloop/watchdog_state.go contains exactly the new Verdict, WorkerVitals, and Diagnose helper API; no existing builderloop runtime file changes are required.
-- Acceptance: TestDiagnose/healthy_recent_live: v={PID:1234, LastCommitAt:now-5*time.Second, PIDIsLive:true}, deadAfter=120s, slowAfter=600s returns VerdictHealthy., TestDiagnose/live_after_slow_threshold: v={PID:1234, LastCommitAt:now-700*time.Second, PIDIsLive:true} returns VerdictSlow., TestDiagnose/pid_not_live_after_dead_threshold: v={PID:1234, LastCommitAt:now-200*time.Second, PIDIsLive:false} returns VerdictDead., TestDiagnose/zero_pid_dead: v={PID:0, LastCommitAt:now-1*time.Second, PIDIsLive:true} returns VerdictDead (zero PID short-circuits; thresholds and PIDIsLive are ignored)., TestDiagnose/dead_wins_when_both_thresholds_fire: v={PID:1234, LastCommitAt:now-700*time.Second, PIDIsLive:false} with deadAfter=120s, slowAfter=600s returns VerdictDead (dead wins over slow when both fire)., TestDiagnose/pid_live_silent_for_a_year_is_slow_not_dead: v={PID:1234, LastCommitAt:now-99999*time.Second, PIDIsLive:true} returns VerdictSlow (never VerdictDead while the process answers Signal(0))., Helper is pure — caller injects the clock (now) and the PIDIsLive result; the test file imports only `testing` and `time` from stdlib.
-- Source refs: internal/builderloop/run.go, internal/builderloop/run_health_test.go
-- Unblocks: Builder-loop self-improvement vs user-feature ratio metric
-- Why now: Unblocks Builder-loop self-improvement vs user-feature ratio metric.
-
-## 2. Azure Foundry probe — path sniffing
-
-- Phase: 4 / 4.A
-- Owner: `provider`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: TDD packet for a missing pure helper; create exactly two files and do not edit the already validated /models probe. First add internal/hermes/azure_foundry_path_sniff_test.go in package hermes with TestClassifyAzurePath table subtests named exact_anthropic, trailing_anthropic, nested_anthropic, mixed_case, bare_host_unknown, openai_path_unknown, substring_false_positives, and empty_and_malformed_unknown. Then add internal/hermes/azure_foundry_path_sniff.go exposing ClassifyAzurePath(rawURL string) AzureTransport that reuses the AzureTransport type/constants from internal/hermes/azure_foundry_models_probe.go. Algorithm: url.Parse; empty path or parse error => AzureTransportUnknown; lowercase and strings.TrimRight(parsed.Path, "/"); return AzureTransportAnthropic only when the path equals "/anthropic", ends with "/anthropic", or contains "/anthropic/". This slice never returns AzureTransportOpenAI and never opens HTTP, reads env/config, writes files, starts goroutines, or changes ProbeAzureFoundry.
-- Trust class: operator, system
-- Ready when: internal/hermes/azure_foundry_models_probe.go is complete and owns the AzureTransport type/constant values; this row only adds a path-sniff helper file plus a sibling _test.go., No upstream gating: this is a pure URL inspector with synthetic input., internal/hermes/azure_foundry_path_sniff.go and azure_foundry_path_sniff_test.go are absent on main; the worker's first edit is the focused failing test file., If ClassifyAzurePath already exists in the worker checkout, the worker should run the focused test and update this progress row instead of adding a second detector.
-- Not ready when: The slice opens HTTP connections, performs a /models probe, reads AZURE_FOUNDRY_BASE_URL or AZURE_FOUNDRY_API_KEY, or mutates config., The slice introduces detection of any third transport family (Bedrock, Vertex, etc.)., The worker needs to edit internal/hermes/azure_foundry_models_probe.go or any provider request builder to make the path-sniff tests pass.
-- Degraded mode: Probe status reports azure_path_sniff_unknown when no path heuristic matches, and azure_path_sniff_evidence with detected scheme/host/path otherwise.
-- Fixture: `internal/hermes/azure_foundry_path_sniff_test.go (new file)::TestClassifyAzurePath/substr_false_positive`
-- Write scope: `internal/hermes/azure_foundry_path_sniff.go`, `internal/hermes/azure_foundry_path_sniff_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/hermes -run '^TestClassifyAzurePath$' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/hermes/azure_foundry_path_sniff_test.go fixtures prove anthropic-path classification across suffix, mid-path, case variants, bare hosts, malformed URLs, and false-positive substrings without HTTP., internal/hermes/azure_foundry_models_probe.go remains untouched; ClassifyAzurePath only imports standard URL/string helpers and returns existing AzureTransport constants.
-- Acceptance: TestClassifyAzurePath_AnthropicSuffix: https://x.openai.azure.com/openai/deployments/y/anthropic returns AzureTransportAnthropic., TestClassifyAzurePath_AnthropicMidPath: https://x/openai/anthropic/v1/messages returns AzureTransportAnthropic., TestClassifyAzurePath_CaseInsensitive: /AnthrOPic and /ANTHROPIC both return AzureTransportAnthropic., TestClassifyAzurePath_OpenAIDefault: https://x.openai.azure.com/openai/v1/chat/completions returns AzureTransportUnknown (never AzureTransportOpenAI in this slice)., TestClassifyAzurePath_MalformedReturnsUnknown: empty string, "::garbage::", and rawURL="http://%zz" return AzureTransportUnknown., TestClassifyAzurePath_NotASubstringFalsePositive: /anthropicx and /anthropic-mirror return AzureTransportUnknown (substring guard requires "/anthropic" with a trailing path separator or end-of-path).
-- Source refs: ../hermes-agent/hermes_cli/azure_detect.py@9be83728:_looks_like_anthropic_path, internal/hermes/azure_foundry_models_probe.go:AzureTransport
-- Unblocks: Azure Foundry transport probe read model
-- Why now: Unblocks Azure Foundry transport probe read model.
-
-## 3. Provider rate guard — x-ratelimit header classification
+## 1. Provider rate guard — degraded-state + last-known-good evidence
 
 - Phase: 4 / 4.H
 - Owner: `provider`
 - Size: `small`
 - Status: `planned`
 - Priority: `P2`
-- Contract: TDD packet for a missing pure helper that matches Hermes 192e7eb2 reset-window semantics; create exactly two files and do not wire a provider breaker. STEP 1: cd into the repo root and run `ls internal/hermes/provider_rate_guard*.go` — both files must be absent before the worker writes them; if Classify429 already exists, the worker should run the focused test and update this row. STEP 2: write internal/hermes/provider_rate_guard_classification_test.go in package hermes with one TestClassify429 function holding a t.Run-driven table with named subtests genuine_quota_1h_reset, short_reset_upstream_capacity, healthy_remaining_upstream_capacity, missing_headers_insufficient, unknown_headers_ignored, malformed_values_ignored, and three_buckets_with_remaining_one_missing_returns_upstream_capacity. Each subtest builds an http.Header via h := http.Header{}; h.Set(...); h.Set(...). STEP 3: write internal/hermes/provider_rate_guard.go exposing type RateLimitClass string with constants RateLimitGenuineQuota="genuine_quota", RateLimitUpstreamCapacity="upstream_capacity", RateLimitInsufficientEvidence="insufficient_evidence" and func Classify429(headers http.Header) RateLimitClass. Algorithm: iterate the four Hermes Nous bucket tags ("requests", "requests-1h", "tokens", "tokens-1h") via the paired x-ratelimit-remaining-{tag} and x-ratelimit-reset-{tag} headers; use headers.Get, strings.TrimSpace, strconv.Atoi for remaining, strconv.ParseFloat for reset seconds. A bucket is exhausted only if remaining<=0 AND reset>=60 seconds (matches Hermes _MIN_RESET_FOR_BREAKER_SECONDS). If any bucket is exhausted, return RateLimitGenuineQuota. If at least one bucket parsed successfully and none are exhausted, return RateLimitUpstreamCapacity. Otherwise return RateLimitInsufficientEvidence. STEP 4: no shared breaker state, no time.Now, no sleeps, no retry policy, and no provider routing changes; imports are limited to net/http, strconv, and strings (plus testing in the test file).
+- Contract: TDD packet for a missing pure state-transition helper. The prerequisite (RateLimitClass + Classify429 in internal/hermes/provider_rate_guard.go) is shipped on main as of commit a1d7d928; do NOT stub or duplicate those constants. STEP 1: write internal/hermes/provider_rate_guard_degraded_test.go in package hermes (importing only `testing` and `time`). Define t0 and t1 once at the top of TestApplyClassification: `t0 := time.Date(2026,4,26,12,0,0,0,time.UTC); t1 := t0.Add(5*time.Minute)`. Add six t.Run subtests in this order — preserves_last_known_when_insufficient, treats_empty_class_as_insufficient, fresh_genuine_quota_clears_unavailable, fresh_upstream_capacity_clears_unavailable, input_immutability_via_struct_value, transitions_back_to_available_on_fresh_evidence — each calling ApplyClassification with explicit GuardState literals and asserting the returned struct field-by-field with t.Fatalf on mismatch. STEP 2: write internal/hermes/provider_rate_guard_degraded.go in package hermes (importing only `time`). Define `type GuardState struct { LastKnownClass RateLimitClass; LastKnownAt time.Time; Unavailable bool }` and `func ApplyClassification(state GuardState, now time.Time, class RateLimitClass) GuardState`. Algorithm: if class == RateLimitInsufficientEvidence OR class == RateLimitClass(""), return GuardState{LastKnownClass: state.LastKnownClass, LastKnownAt: state.LastKnownAt, Unavailable: true}. Otherwise return GuardState{LastKnownClass: class, LastKnownAt: now, Unavailable: false}. The helper takes its argument by value, never mutates it, never reads time.Now, never spawns a goroutine, and never touches retry/breaker code.
 - Trust class: system
-- Ready when: internal/hermes already compiles; the row creates a new file and a sibling _test.go., No upstream gate; pure header parsing with synthetic http.Header values., internal/hermes/provider_rate_guard.go and provider_rate_guard_classification_test.go are absent on main; the worker's first edit is the focused failing test file., If Classify429 or RateLimitClass already exists in the worker checkout, the worker should run the focused test and update this row instead of creating duplicate constants.
-- Not ready when: The slice changes retry timing, provider routing, or model fallback policy., The slice writes process-global breaker state in unit tests or sleeps to simulate reset windows., The worker needs to edit internal/hermes/client.go, internal/hermes/errors.go, internal/kernel/retry.go, or any provider routing code to make the tests pass.
-- Degraded mode: Provider status reports rate_guard_classified as one of {genuine_quota, upstream_capacity, insufficient_evidence}; reset-window evidence is parsed for the decision but detailed budget telemetry waits for the dependent row.
-- Fixture: `internal/hermes/provider_rate_guard_classification_test.go (new file)::TestClassify429/genuine_quota_1h_reset`
-- Write scope: `internal/hermes/provider_rate_guard.go`, `internal/hermes/provider_rate_guard_classification_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/hermes -run '^TestClassify429$' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/hermes/provider_rate_guard_classification_test.go fixtures prove genuine_quota / upstream_capacity / insufficient_evidence classification from the four current Hermes Nous bucket tags, including the >=60s reset-window guard., internal/hermes/provider_rate_guard.go contains only RateLimitClass constants plus Classify429; no provider client, retry, or routing file changes are required.
-- Acceptance: TestClassify429/genuine_quota_1h_reset (X-RateLimit-Remaining-Requests-1h=0 and X-RateLimit-Reset-Requests-1h=300) returns RateLimitGenuineQuota even when other present buckets are >0., TestClassify429/short_reset_upstream_capacity (remaining=0 and reset=30) returns RateLimitUpstreamCapacity, mirroring Hermes' <60s transient-throttle rule., TestClassify429/healthy_remaining_upstream_capacity covers any subset of the four buckets with remaining>0 (and none missing-and-parsed-as-zero) returning RateLimitUpstreamCapacity., TestClassify429/missing_headers_insufficient with no x-ratelimit-* headers returns RateLimitInsufficientEvidence and the returned string is non-empty., TestClassify429/unknown_headers_ignored (Retry-After, X-Custom-Foo) preserves the classification driven solely by the four x-ratelimit-remaining-* buckets., TestClassify429/malformed_values_ignored (X-RateLimit-Remaining-Tokens="abc") with no other rate headers returns RateLimitInsufficientEvidence rather than treating the malformed value as zero., TestClassify429/three_buckets_with_remaining_one_missing_returns_upstream_capacity proves a partial header set without any exhausted bucket still classifies as RateLimitUpstreamCapacity (not InsufficientEvidence).
-- Source refs: ../hermes-agent/agent/nous_rate_guard.py@192e7eb2:_MIN_RESET_FOR_BREAKER_SECONDS, ../hermes-agent/agent/nous_rate_guard.py@192e7eb2:_parse_buckets_from_headers, ../hermes-agent/agent/nous_rate_guard.py@192e7eb2:_has_exhausted_bucket, ../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2:TestIsGenuineNousRateLimit
-- Unblocks: Provider rate guard — degraded-state + last-known-good evidence
-- Why now: Unblocks Provider rate guard — degraded-state + last-known-good evidence.
+- Ready when: Provider rate guard — x-ratelimit header classification is complete on main (commit a1d7d928); RateLimitClass and the three RateLimit* constants are importable directly from package hermes., internal/hermes/provider_rate_guard_degraded.go and provider_rate_guard_degraded_test.go are absent on main; the worker's first edit is the focused failing test file.
+- Not ready when: The slice writes a process-global or cross-session breaker., The slice changes retry policy or treats every 429 as account-level quota exhaustion., The slice redeclares RateLimitGenuineQuota / RateLimitUpstreamCapacity / RateLimitInsufficientEvidence; reuse the constants from provider_rate_guard.go.
+- Degraded mode: Provider status reports last_known_good=present\|absent, plus rate_guard_unavailable or budget_header_missing when classification is unsafe; no retry amplification.
+- Fixture: `internal/hermes/provider_rate_guard_degraded_test.go (new file)::TestApplyClassification/preserves_last_known_when_insufficient`
+- Write scope: `internal/hermes/provider_rate_guard_degraded.go`, `internal/hermes/provider_rate_guard_degraded_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run '^TestApplyClassification$' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: internal/hermes/provider_rate_guard_degraded_test.go fixtures prove last-known-good preservation and degraded-mode transitions across all three RateLimitClass values., internal/hermes/provider_rate_guard_degraded.go contains only GuardState and ApplyClassification, reusing RateLimitClass from provider_rate_guard.go with no duplicated constants.
+- Acceptance: preserves_last_known_when_insufficient: ApplyClassification(GuardState{LastKnownClass: RateLimitGenuineQuota, LastKnownAt: t0, Unavailable: false}, t1, RateLimitInsufficientEvidence) == GuardState{RateLimitGenuineQuota, t0, true}; LastKnownAt is unchanged from t0, Unavailable flipped to true., treats_empty_class_as_insufficient: ApplyClassification(GuardState{LastKnownClass: RateLimitUpstreamCapacity, LastKnownAt: t0, Unavailable: false}, t1, RateLimitClass("")) preserves LastKnownClass=RateLimitUpstreamCapacity and LastKnownAt=t0 while setting Unavailable=true., fresh_genuine_quota_clears_unavailable: ApplyClassification(GuardState{}, t1, RateLimitGenuineQuota) == GuardState{RateLimitGenuineQuota, t1, false}., fresh_upstream_capacity_clears_unavailable: ApplyClassification(GuardState{}, t1, RateLimitUpstreamCapacity) == GuardState{RateLimitUpstreamCapacity, t1, false}., input_immutability_via_struct_value: declare `original := GuardState{LastKnownClass: RateLimitGenuineQuota, LastKnownAt: t0, Unavailable: true}`, call ApplyClassification(original, t1, RateLimitUpstreamCapacity), then assert original is unchanged via direct field comparison (LastKnownClass==RateLimitGenuineQuota, LastKnownAt==t0, Unavailable==true)., transitions_back_to_available_on_fresh_evidence: ApplyClassification(GuardState{LastKnownClass: RateLimitGenuineQuota, LastKnownAt: t0, Unavailable: true}, t1, RateLimitUpstreamCapacity) == GuardState{RateLimitUpstreamCapacity, t1, false}.
+- Source refs: ../hermes-agent/agent/nous_rate_guard.py@192e7eb2:record_nous_rate_limit, ../hermes-agent/agent/nous_rate_guard.py@192e7eb2:nous_rate_limit_remaining, internal/hermes/provider_rate_guard.go::RateLimitClass, internal/hermes/provider_rate_guard.go::Classify429
+- Unblocks: Provider rate guard + budget telemetry
+- Why now: Unblocks Provider rate guard + budget telemetry.
 
-## 4. TUI prompt-submit auto-title eligibility helper
-
-- Phase: 5 / 5.Q
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P3`
-- Contract: Pure helper internal/tui/auto_title.go exposes type AutoTitleInput struct{SessionKey string; FallbackSessionID string; Status string; UserText string; AssistantText string; Interrupted bool; HistoryCount int}, type AutoTitleRequest struct{SessionID string; UserText string; AssistantText string; HistoryCount int}, and BuildAutoTitleRequest(in AutoTitleInput) (AutoTitleRequest, bool). It returns ok=true only when Status=="complete", Interrupted is false, strings.TrimSpace(UserText) and strings.TrimSpace(AssistantText) are non-empty, and the resolved session ID is non-empty. Resolution prefers strings.TrimSpace(SessionKey) and falls back to strings.TrimSpace(FallbackSessionID). The returned request preserves the original UserText/AssistantText bytes and HistoryCount. No title generation, provider call, DB write, goroutine, clock lookup, or TUI transport change in this slice.
-- Trust class: operator, gateway, system
-- Ready when: internal/tui already owns pure helper files and tests; this row adds one helper without touching Bubble Tea update flow., The worker can table-test eligibility with synthetic strings and history counts; no title model, database, or live TUI session is required.
-- Not ready when: The slice calls an LLM/title generator, writes session metadata, starts goroutines, or changes kernel/TUI submit behavior., The slice ports Hermes Python session_key storage directly instead of adapting to Gormes SessionID metadata.
-- Degraded mode: TUI/session status can report auto_title_skipped with reason interrupted, empty_prompt, empty_response, non_complete, or missing_session before a later row wires title generation.
-- Fixture: `internal/tui/auto_title_test.go::TestBuildAutoTitleRequest`
-- Write scope: `internal/tui/auto_title.go`, `internal/tui/auto_title_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/tui -run TestBuildAutoTitleRequest -count=1`, `go test ./internal/tui -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/tui/auto_title_test.go fixtures prove complete-turn eligibility, interrupted/empty/non-complete skips, session-key fallback, and zero title generation side effects.
-- Acceptance: TestBuildAutoTitleRequest_CompletePromptReturnsRequest: status complete with session_key, non-empty user text, non-empty assistant text, and HistoryCount=2 returns ok=true and preserves the original texts., TestBuildAutoTitleRequest_FallbackSessionID: empty SessionKey with FallbackSessionID="sid" returns request.SessionID="sid"., TestBuildAutoTitleRequest_SkipsInterrupted: Interrupted=true returns ok=false even when texts are non-empty., TestBuildAutoTitleRequest_SkipsEmptyPromptOrResponse: whitespace-only UserText or AssistantText returns ok=false., TestBuildAutoTitleRequest_SkipsNonCompleteOrMissingSession: non-complete status or empty resolved session returns ok=false.
-- Source refs: ../hermes-agent/tui_gateway/server.py@9662e321:prompt.submit, ../hermes-agent/tests/test_tui_gateway_server.py@9662e321:test_prompt_submit_auto_titles_session_on_complete, ../hermes-agent/tests/test_tui_gateway_server.py@9662e321:test_prompt_submit_skips_auto_title_when_interrupted, ../hermes-agent/tests/test_tui_gateway_server.py@9662e321:test_prompt_submit_skips_auto_title_when_response_empty, internal/tui/update.go, internal/session/directory.go
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
-
-## 5. BlueBubbles iMessage bubble formatting parity
+## 2. BlueBubbles iMessage bubble formatting parity
 
 - Phase: 7 / 7.E
 - Owner: `gateway`
@@ -126,7 +64,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: BlueBubbles iMessage session-context prompt guidance
 - Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
 
-## 6. CLI profile name validator
+## 3. CLI profile name validator
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -146,7 +84,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: CLI active-profile store, CLI profile root resolver
 - Why now: Unblocks CLI active-profile store, CLI profile root resolver.
 
-## 7. doctorCustomEndpointReadiness check function
+## 4. doctorCustomEndpointReadiness check function
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -167,7 +105,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: CLI status summary over native stores
 - Why now: Unblocks CLI status summary over native stores.
 
-## 8. Custom provider model-switch credential preservation
+## 5. Custom provider model-switch credential preservation
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -188,7 +126,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: CLI command registry parity + active-turn busy policy
 - Why now: Unblocks CLI command registry parity + active-turn busy policy.
 
-## 9. [IMPORTANT:] prompt prefix for cron and skill commands
+## 6. [IMPORTANT:] prompt prefix for cron and skill commands
 
 - Phase: 5 / 5.F
 - Owner: `skills`
@@ -207,7 +145,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/cron/scheduler.py@d7a34682, ../hermes-agent/agent/skill_commands.py@d7a34682, ../hermes-agent/cli.py@20cb706e, ../hermes-agent/gateway/run.py@20cb706e, ../hermes-agent/tools/process_registry.py@20cb706e, internal/cron/heartbeat.go:CronHeartbeatPrefix, internal/cron/heartbeat_test.go, internal/skills/commands.go:BuildSkillSlashCommandMessage, internal/skills/preprocessing_commands_test.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 10. TUI TerminalNativeSelectionHelp constant + help-string fixture
+## 7. TUI TerminalNativeSelectionHelp constant + help-string fixture
 
 - Phase: 5 / 5.Q
 - Owner: `gateway`
