@@ -112,17 +112,17 @@ tests, and candidate policy. Keep those control-plane facts in
 - Size: `small`
 - Status: `planned`
 - Priority: `P2`
-- Contract: Pure helper internal/hermes/azure_foundry_path_sniff.go exposes type AzureTransport string (anthropic_messages, openai_chat_completions, unknown) and ClassifyAzurePath(rawURL string) (AzureTransport, string) where the second return is a human reason. Returns anthropic_messages when (case-insensitive) the URL path ends in /anthropic or contains /anthropic/, mirroring upstream _looks_like_anthropic_path (hermes_cli/azure_detect.py:114-124). Returns unknown for every other URL. No HTTP, no credential reads, no config writes.
+- Contract: Pure helper internal/hermes/azure_foundry_path_sniff.go exposes type AzureTransport string with constants AzureTransportAnthropic, AzureTransportOpenAI, AzureTransportUnknown, and one function ClassifyAzurePath(rawURL string) AzureTransport. Returns AzureTransportAnthropic when (case-insensitive) the URL path ends in /anthropic or contains /anthropic/. Every other URL returns AzureTransportUnknown. The OpenAI constant is reserved for the next slice; this slice never returns it. No HTTP, no env reads, no config writes. Use net/url + strings.ToLower; reject parse errors by returning Unknown.
 - Trust class: operator, system
-- Ready when: Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are validated; this slice classifies URLs into one of those two known transports., Pure-function table-driven tests with synthetic URLs are sufficient — no httptest server is required.
+- Ready when: internal/hermes already compiles and has no azure_foundry_path_sniff.go file yet — this row creates the file plus a sibling _test.go., No upstream gating: this is a pure URL inspector with synthetic input.
 - Not ready when: The slice opens HTTP connections, performs a /models probe, reads AZURE_FOUNDRY_BASE_URL or AZURE_FOUNDRY_API_KEY, or mutates config., The slice introduces detection of any third transport family (Bedrock, Vertex, etc.).
 - Degraded mode: Probe status reports azure_path_sniff_unknown when no path heuristic matches, and azure_path_sniff_evidence with detected scheme/host/path otherwise.
 - Fixture: `internal/hermes/azure_foundry_path_sniff_test.go`
 - Write scope: `internal/hermes/azure_foundry_path_sniff.go`, `internal/hermes/azure_foundry_path_sniff_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
 - Test commands: `go test ./internal/hermes -run TestClassifyAzurePath -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
 - Done signal: internal/hermes/azure_foundry_path_sniff_test.go fixtures prove anthropic-path classification across suffix, mid-path, and case variants without HTTP.
-- Acceptance: TestClassifyAzurePath_AnthropicSuffix recognises https://foo.openai.azure.com/openai/deployments/x/anthropic and …/anthropic/., TestClassifyAzurePath_AnthropicMidPath recognises https://foo/openai/anthropic/v1/messages., TestClassifyAzurePath_CaseInsensitive recognises /AnthrOPic and /ANTHROPIC., TestClassifyAzurePath_OpenAIDefaultReturnsUnknown for https://foo.openai.azure.com/openai/v1/chat/completions., TestClassifyAzurePath_MalformedReturnsUnknown for empty string and ::garbage::., Helper does not read os.Env, does not open files, does not call http.Client.
-- Source refs: ../hermes-agent/hermes_cli/azure_detect.py:_looks_like_anthropic_path:114, ../hermes-agent/hermes_cli/azure_detect.py:_strip_trailing_v1:109, ../hermes-agent/tests/hermes_cli/test_azure_detect.py, internal/hermes/azure_openai_transport_test.go, internal/hermes/azure_anthropic_transport_test.go
+- Acceptance: TestClassifyAzurePath_AnthropicSuffix: https://x.openai.azure.com/openai/deployments/y/anthropic returns AzureTransportAnthropic., TestClassifyAzurePath_AnthropicMidPath: https://x/openai/anthropic/v1/messages returns AzureTransportAnthropic., TestClassifyAzurePath_CaseInsensitive: /AnthrOPic and /ANTHROPIC both return AzureTransportAnthropic., TestClassifyAzurePath_OpenAIDefault: https://x.openai.azure.com/openai/v1/chat/completions returns AzureTransportUnknown., TestClassifyAzurePath_MalformedReturnsUnknown: empty string and "::garbage::" return AzureTransportUnknown.
+- Source refs: ../hermes-agent/hermes_cli/azure_detect.py:_looks_like_anthropic_path:114
 - Unblocks: Azure Foundry probe — /models classification + Anthropic fallback
 - Why now: Unblocks Azure Foundry probe — /models classification + Anthropic fallback.
 
@@ -154,80 +154,79 @@ tests, and candidate policy. Keep those control-plane facts in
 - Size: `small`
 - Status: `planned`
 - Priority: `P2`
-- Contract: Pure helper internal/hermes/provider_rate_guard.go exposes type RateLimitClass string (genuine_quota, upstream_capacity, insufficient_evidence), type Bucket struct{Tag string; Remaining int; ResetSeconds float64; HasReset bool} and Classify429(headers http.Header, now time.Time) (RateLimitClass, []Bucket, ResetEvidence). Parses x-ratelimit-remaining-{1h,1m,requests,tokens} and x-ratelimit-reset-{...} into typed Buckets; classifies genuine_quota when any bucket reports Remaining<=0 with a future reset; upstream_capacity when remaining looks normal but the 429 still fires; insufficient_evidence when no x-ratelimit-* headers were present. No sleeps, no shared state writes, no http.Get.
+- Contract: Pure helper internal/hermes/provider_rate_guard.go exposes type RateLimitClass string (RateLimitGenuineQuota, RateLimitUpstreamCapacity, RateLimitInsufficientEvidence) and Classify429(headers http.Header) RateLimitClass. Reads x-ratelimit-remaining-{1h,1m,requests,tokens} as integers; returns RateLimitGenuineQuota if any present remaining<=0, RateLimitUpstreamCapacity if all present are >0, RateLimitInsufficientEvidence if no x-ratelimit-* headers at all. No Bucket parsing, no reset evidence, no clock, no shared state. Bucket/reset detail is the next slice.
 - Trust class: system
-- Ready when: Provider-side resilience and classified provider-error taxonomy are validated, so this slice only adds a pure header-parsing classifier on top., Tests use synthetic headers and a fake clock; no live Nous Portal or wall-clock sleep is required.
+- Ready when: internal/hermes already compiles; the row creates a new file and a sibling _test.go., No upstream gate; pure header parsing with synthetic http.Header values.
 - Not ready when: The slice changes retry timing, provider routing, or model fallback policy., The slice writes process-global breaker state in unit tests or sleeps to simulate reset windows.
 - Degraded mode: Provider status reports rate_guard_classified as one of {genuine_quota, upstream_capacity, insufficient_evidence}, plus reset-window evidence when present, instead of silently tripping a global breaker.
 - Fixture: `internal/hermes/provider_rate_guard_classification_test.go`
 - Write scope: `internal/hermes/provider_rate_guard.go`, `internal/hermes/provider_rate_guard_classification_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
 - Test commands: `go test ./internal/hermes -run TestClassify429 -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
 - Done signal: internal/hermes/provider_rate_guard_classification_test.go fixtures prove genuine_quota / upstream_capacity / insufficient_evidence classification with redacted reset windows under a fake clock.
-- Acceptance: TestClassify429_GenuineQuotaWhenAnyBucketExhausted (Remaining-1h=0, reset=120s) returns RateLimitClassGenuineQuota., TestClassify429_UpstreamCapacityWhenAllBucketsHaveRemaining returns RateLimitClassUpstreamCapacity., TestClassify429_InsufficientEvidenceWhenNoRateHeaders returns RateLimitClassInsufficientEvidence and an empty Buckets slice., TestClassify429_ParsesPerBucketTags returns one Bucket per recognised tag (1h, 1m, requests, tokens)., TestClassify429_RedactsResetWindowsAtSecondGranularity returns ResetEvidence with seconds-precision values only., Helper does not access any global breaker state; caller threads the result.
-- Source refs: ../hermes-agent/agent/nous_rate_guard.py:_parse_buckets_from_headers:246, ../hermes-agent/agent/nous_rate_guard.py:is_genuine_nous_rate_limit:191, ../hermes-agent/agent/nous_rate_guard.py:_parse_reset_seconds:38, ../hermes-agent/tests/agent/test_nous_rate_guard.py, internal/hermes/errors.go
+- Acceptance: TestClassify429_GenuineQuotaWhenAnyBucketExhausted (remaining-1h=0) returns RateLimitGenuineQuota., TestClassify429_UpstreamCapacityWhenAllBucketsHaveRemaining returns RateLimitUpstreamCapacity., TestClassify429_InsufficientEvidenceWhenNoRateHeaders returns RateLimitInsufficientEvidence., TestClassify429_IgnoresUnknownHeaders preserves the classification when other headers are present.
+- Source refs: ../hermes-agent/agent/nous_rate_guard.py:is_genuine_nous_rate_limit:191
 - Unblocks: Provider rate guard — degraded-state + last-known-good evidence
 - Why now: Unblocks Provider rate guard — degraded-state + last-known-good evidence.
 
-## 8. Provider rate guard — degraded-state + last-known-good evidence
+## 8. Skills list — enabled/disabled status column + --enabled-only filter
 
-- Phase: 4 / 4.H
-- Owner: `provider`
+- Phase: 5 / 5.F
+- Owner: `skills`
 - Size: `small`
 - Status: `planned`
-- Priority: `P2`
-- Contract: Pure helper internal/hermes/provider_rate_guard_degraded.go composes the Classify429 result with persistent last-known-good state. Exposes type GuardState struct{LastKnownClass RateLimitClass; LastKnownAt time.Time; DegradeMode DegradeMode; ExhaustedBuckets []string} and ApplyClassification(state GuardState, now time.Time, class RateLimitClass, buckets []Bucket, ev ResetEvidence) GuardState. DegradeMode is one of {none, rate_guard_unavailable, budget_header_missing}. When buckets is empty (insufficient_evidence) the helper preserves LastKnownClass and bumps DegradeMode to rate_guard_unavailable for that turn. No retry timing changes, no shared mutable breaker.
-- Trust class: system
-- Ready when: Provider rate guard — x-ratelimit header classification is fixture-ready or validated, so this slice composes a typed classification result with last-known-good state.
-- Not ready when: The slice writes a process-global or cross-session breaker., The slice changes retry policy or treats every 429 as account-level quota exhaustion.
-- Degraded mode: Provider status reports last_known_good=present\|absent, plus rate_guard_unavailable or budget_header_missing when classification is unsafe; no retry amplification.
-- Fixture: `internal/hermes/provider_rate_guard_degraded_test.go`
-- Write scope: `internal/hermes/provider_rate_guard_degraded.go`, `internal/hermes/provider_rate_guard_degraded_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/hermes -run TestApplyClassification -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/hermes/provider_rate_guard_degraded_test.go fixtures prove last-known-good preservation and degraded-mode transitions across all three RateLimitClass values.
-- Acceptance: TestApplyClassification_RecordsExhaustedBuckets stores tag names from buckets where Remaining<=0., TestApplyClassification_PreservesLastKnownGoodOnInsufficientEvidence keeps prior LastKnownClass and sets DegradeMode=rate_guard_unavailable., TestApplyClassification_ClearsExhaustionOnUpstreamCapacity zeros ExhaustedBuckets and sets DegradeMode=none., TestApplyClassification_BudgetHeaderMissing detects a 429 with neither x-ratelimit-* nor a budget header and sets DegradeMode=budget_header_missing., TestApplyClassification_DoesNotMutateInputBuckets (defensive copy semantics)., Helper is pure and never sleeps, retries, or mutates a global breaker.
-- Source refs: ../hermes-agent/agent/nous_rate_guard.py:record_nous_rate_limit:70, ../hermes-agent/agent/nous_rate_guard.py:nous_rate_limit_remaining:138, ../hermes-agent/agent/nous_rate_guard.py:clear_nous_rate_limit:162, ../hermes-agent/tests/agent/test_nous_rate_guard.py, internal/hermes/errors.go, internal/hermes/client.go
-- Unblocks: Provider rate guard + budget telemetry
-- Why now: Unblocks Provider rate guard + budget telemetry.
-
-## 9. Gateway /reasoning session override command
-
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Gateway /reasoning command is dispatched through internal/gateway/commands.go to ParseReasoningCommand(args []string) (ReasoningCommand, error) and ApplyReasoningCommand(state SessionReasoningState, cmd ReasoningCommand, now time.Time) (SessionReasoningState, ReasoningReply). ReasoningCommand carries {Action: show\|set\|reset, Effort: high\|low\|medium\|empty, Global bool}. Default scope is the calling session; --global persists to config; reset clears only the calling session; reset --global is rejected with the upstream warning class. /new and /reset drop only the triggering session's reasoning override. No per-turn-propagation refactor here — that work is already complete in 4.D.
-- Trust class: operator, gateway
-- Ready when: Per-turn reasoning effort propagation is validated so a session override can affect the next native turn through typed request metadata., The existing gateway command registry can add one recognized command and focused fake-channel fixtures without porting the whole Hermes command tree.
-- Not ready when: The slice implements model switching, provider setup, interactive pickers, or broad command-registry parity in the same change., The slice persists reasoning changes without --global or clears other sessions' reasoning overrides on /new.
-- Degraded mode: Gateway replies report session-only override, global-save failure fallback, invalid effort, unsupported reset --global, and reasoning-display toggle state instead of treating /reasoning as ordinary prompt text.
-- Fixture: `internal/gateway/reasoning_command_test.go`
-- Write scope: `internal/gateway/commands.go`, `internal/gateway/reasoning_command.go`, `internal/gateway/reasoning_command_test.go`, `internal/gateway/manager.go`, `internal/config/config.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/gateway -run 'Test.*Reasoning.*Command\|Test.*Reset.*Reasoning' -count=1`, `go test ./internal/gateway ./internal/config -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/gateway/reasoning_command_test.go fixtures prove parser correctness, session-only default, --global persistence, reset rejection of --global, and session isolation under fake config-persist.
-- Acceptance: TestParseReasoningCommand_ShowFormReturnsActionShow (`/reasoning`) returns ReasoningCommand{Action: show}., TestParseReasoningCommand_SetSessionScoped (`/reasoning high`) returns Action=set, Effort=high, Global=false., TestParseReasoningCommand_GlobalPersistFlag (`/reasoning low --global`) returns Action=set, Effort=low, Global=true., TestParseReasoningCommand_ResetSession (`/reasoning reset`) returns Action=reset, Global=false., TestParseReasoningCommand_RejectGlobalReset (`/reasoning reset --global`) returns an error with the upstream warning class., TestApplyReasoningCommand_ShowReportsEffectiveScope returns ReasoningReply containing effective effort, scope, and display state from injected SessionReasoningState., TestApplyReasoningCommand_SetSessionEvictsRuntimeCache mutates only the matching session, preserving sibling sessions' overrides., TestApplyReasoningCommand_GlobalPersistFallback when persistence write fails, falls back to session-only state and surfaces the failure in ReasoningReply., TestNewOrResetClearsOnlyTriggeringSession verifies session isolation across /new and /reset., Helpers do not block on disk I/O — they accept a pluggable persistConfigFn that tests stub.
-- Source refs: ../hermes-agent/gateway/run.py:_parse_reasoning_command_args, ../hermes-agent/gateway/run.py:_handle_reasoning_command, ../hermes-agent/tests/gateway/test_reasoning_command.py, ../hermes-agent/tests/gateway/test_session_model_reset.py, internal/gateway/commands.go, internal/gateway/manager.go, internal/config/config.go, internal/hermes/reasoning_effort_request_test.go
-- Unblocks: CLI command registry parity + active-turn busy policy
-- Why now: Unblocks CLI command registry parity + active-turn busy policy.
-
-## 10. CLI log snapshot reader
-
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Contract: internal/cli/log_snapshot.go exposes type LogClass string (main, tool_audit), type LogSnapshotRoots struct{LogPath, ToolAuditPath string}, type SnapshotOpts struct{HeadBytes, TailBytes int64} (defaults 64 KiB + 16 KiB), type LogSection struct{Class LogClass; Path string; Head, Tail []byte; Missing, Truncated bool; Redacted int; Unreadable string} and type Snapshot struct{Sections []LogSection}. SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) (Snapshot, error) reads the two log paths (no XDG resolution inside the helper), applies head+tail truncation when files exceed HeadBytes+TailBytes, and runs RedactLine(line []byte) ([]byte, int) over each line. Redactor matches: bearer tokens (Bearer XXX), api_key=VALUE / x-api-key: VALUE, Telegram bot tokens (NN:XXXX-XXXX), Slack xoxb-/xoxp- tokens, and OpenAI sk-* keys. No network upload, no archive write, no live provider call.
+- Contract: internal/skills/list.go exposes type SkillStatus string ("enabled", "disabled"), extends SkillRow with a Status field and adds ListOptions{Source string; EnabledOnly bool}. ListInstalledSkills(opts ListOptions, disabled map[string]struct{}) []SkillRow returns every installed skill annotated with Status from the disabled set; when opts.EnabledOnly is true, disabled rows are filtered out. The CLI surface (gormes skills list --source <s> --enabled-only) calls this helper and prints a table with a Status column plus a summary "N enabled, M disabled" (or "K enabled shown" when --enabled-only). No platform-aware override read in this slice — disabled set comes from the active profile only, mirroring upstream do_list semantics.
 - Trust class: operator, system
-- Ready when: internal/config exposes LogPath() and ToolAuditLogPath() (already present at lines 791-794 and 872-875 of internal/config/config.go)., This slice is a pure local file reader; tests pass injected `LogSnapshotRoots{LogPath, ToolAuditPath}` with files written to t.TempDir() — no paste upload, support bundle archive, live provider status, or backup write behavior is exercised.
-- Not ready when: The slice adds a `gateway.log`, `errors.log`, or `builder-loop.log` file constant — those don't exist yet and are tracked under follow-up rows once the gateway/builderloop start emitting separate file logs., The slice uploads to paste.rs/dpaste, creates tar/zip backups, reads `~/.hermes/logs/` as authoritative state, or changes `gormes doctor` exit codes., The slice depends on regex packages outside the standard library or pulls in a YAML/JSON support-bundle layer.
-- Degraded mode: Per-class results carry MissingPrimary, RotatedFallbackUsed, BytesTruncated, LinesTruncated, RedactionsApplied, and Unreadable booleans/counters; the top-level call never returns an error for missing or unreadable files — it embeds the evidence so callers (doctor / status / backup-manifest) can render it without failing.
-- Fixture: `internal/cli/log_snapshot_test.go`
-- Write scope: `internal/cli/log_snapshot.go`, `internal/cli/log_snapshot_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/cli -run 'TestRedactLine\|TestSnapshotLogs' -count=1`, `go test ./internal/cli -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/cli/log_snapshot_test.go fixtures prove RedactLine coverage across all five secret shapes plus SnapshotLogs Missing/Truncated/Redacted/Unreadable evidence under t.TempDir() injection.
-- Acceptance: TestRedactLine_BearerToken returns redacted line and Count=1 for `Authorization: Bearer abc123`., TestRedactLine_ApiKeyEqualsValue covers `api_key=sk-prod-XYZ` and `x-api-key: sk-test-...`., TestRedactLine_TelegramBotToken redacts `12345:ABCDEFGHabcdefgh1234567890`., TestRedactLine_SlackTokens covers xoxb-…, xoxp-…, xoxs-…., TestRedactLine_OpenAIStyleKey redacts `sk-…` longer than 16 chars only (avoids false positives)., TestRedactLine_NoMatchPreservesInput returns input unchanged with Count=0., TestSnapshotLogs_MissingFileSetsMissingTrue records LogSection{Missing: true} without an error., TestSnapshotLogs_HeadAndTailTruncation produces Head and Tail with sizes equal to opts.HeadBytes and opts.TailBytes when the file is larger than their sum., TestSnapshotLogs_AppliesRedactorPerLine sums Redacted across head and tail., TestSnapshotLogs_UnreadableFileSetsUnreadableField records the io error message and continues with the other LogClass., Helpers do not call net.*, do not invoke os/exec, do not touch real XDG paths.
-- Source refs: ../hermes-agent/hermes_cli/logs.py:LOG_FILES,_TS_RE,_LEVEL_RE, ../hermes-agent/hermes_cli/debug.py, ../hermes-agent/tests/hermes_cli/test_logs.py, internal/config/config.go:LogPath:792,ToolAuditLogPath:874,xdgDataHome:770, cmd/gormes/doctor.go
-- Unblocks: CLI status summary over native stores, Backup manifest dry-run contract, Gateway/error log snapshot follow-up (once those files exist)
-- Why now: Unblocks CLI status summary over native stores, Backup manifest dry-run contract, Gateway/error log snapshot follow-up (once those files exist).
+- Ready when: internal/skills already lists installed skills (existing list.go or equivalent) and has a typed disabled-skill set the active-profile config exposes., CLI table rendering exists for skills already (status column is an additional column).
+- Not ready when: The slice plumbs a HERMES_PLATFORM-style platform override into list — upstream test_do_list_platform_env_is_ignored asserts the platform arg stays nil here., The slice rewrites do_check, do_install, or do_search behavior.
+- Degraded mode: Status column makes disabled skills visible without forcing the operator to read config; --enabled-only matches the upstream "what will load" introspection question.
+- Fixture: `internal/skills/list_test.go`
+- Write scope: `internal/skills/list.go`, `internal/skills/list_test.go`, `internal/cli/skills_command.go`, `internal/cli/skills_command_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/skills -run 'TestListInstalledSkills' -count=1`, `go test ./internal/cli -run 'TestSkillsListCommand' -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: internal/skills/list_test.go and internal/cli/skills_command_test.go fixtures prove the Status column, --enabled-only filter, and platform-arg guard.
+- Acceptance: TestListInstalledSkills_StatusColumnPopulated annotates every row with Status="enabled" when disabled is empty., TestListInstalledSkills_DisabledRowsCarryDisabledStatus marks rows whose name is in the disabled set as Status="disabled"., TestListInstalledSkills_EnabledOnlyFilter hides disabled rows when opts.EnabledOnly is true., TestListInstalledSkills_SourceFilterRespected restricts rows to the requested source ("hub"\|"builtin"\|"local")., TestSkillsListCommand_RendersStatusColumnAndSummary prints the Status column and "N enabled, M disabled" footer (or "K enabled shown" with --enabled-only)., TestSkillsListCommand_PlatformArgNotPropagated proves the disabled-set lookup does not pass a platform override.
+- Source refs: ../hermes-agent/hermes_cli/skills_hub.py:do_list@0e2a53ea, ../hermes-agent/hermes_cli/main.py:skills_list_parser@0e2a53ea, ../hermes-agent/tests/hermes_cli/test_skills_hub.py:test_do_list_renders_status_column, ../hermes-agent/tests/hermes_cli/test_skills_hub.py:test_do_list_marks_disabled_skills, ../hermes-agent/tests/hermes_cli/test_skills_hub.py:test_do_list_enabled_only_hides_disabled, internal/skills/store.go, internal/skills/list.go
+- Unblocks: Skills hub search read-model function over registry providers
+- Why now: Unblocks Skills hub search read-model function over registry providers.
+
+## 9. Gateway /reasoning command parser
+
+- Phase: 5 / 5.O
+- Owner: `tools`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: Pure parser internal/gateway/reasoning_command.go exposes type ReasoningAction int (ReasoningActionShow, ReasoningActionSet, ReasoningActionReset), type ReasoningEffort string (high\|low\|medium\|""), type ReasoningCommand struct{Action ReasoningAction; Effort ReasoningEffort; Global bool}, and ParseReasoningCommand(args []string) (ReasoningCommand, error). Empty args returns Action=Show. "high\|low\|medium" returns Action=Set with that Effort. Trailing "--global" sets Global=true. "reset" alone returns Action=Reset, Global=false. "reset --global" returns an error matching ErrResetGlobalUnsupported. Unknown effort returns ErrInvalidEffort. No state, no clock, no I/O.
+- Trust class: operator, gateway
+- Ready when: internal/gateway already compiles and has commands.go; this row adds a sibling reasoning_command.go and a _test.go., Pure-function table tests with synthetic []string args are sufficient.
+- Not ready when: The row touches manager.go, persists config, or wires gateway dispatch — those land in the follow-up apply/dispatch row.
+- Degraded mode: Parser surfaces typed errors (ErrInvalidEffort, ErrResetGlobalUnsupported) so the dispatcher can render the upstream warning class without re-parsing.
+- Fixture: `internal/gateway/reasoning_command_test.go`
+- Write scope: `internal/gateway/reasoning_command.go`, `internal/gateway/reasoning_command_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/gateway -run 'TestParseReasoningCommand' -count=1`, `go test ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: internal/gateway/reasoning_command_test.go fixtures prove parser correctness across show/set/global/reset/invalid forms.
+- Acceptance: TestParseReasoningCommand_ShowFormReturnsActionShow ([]) returns Action=Show., TestParseReasoningCommand_SetSessionScoped (["high"]) returns Action=Set, Effort=high, Global=false., TestParseReasoningCommand_SetGlobal (["low","--global"]) returns Action=Set, Effort=low, Global=true., TestParseReasoningCommand_ResetSession (["reset"]) returns Action=Reset, Global=false, no error., TestParseReasoningCommand_RejectGlobalReset (["reset","--global"]) returns ErrResetGlobalUnsupported., TestParseReasoningCommand_RejectInvalidEffort (["bogus"]) returns ErrInvalidEffort.
+- Source refs: ../hermes-agent/gateway/run.py:_parse_reasoning_command_args:1322
+- Unblocks: Gateway /reasoning apply + dispatch
+- Why now: Unblocks Gateway /reasoning apply + dispatch.
+
+## 10. CLI log redactor for known secret shapes
+
+- Phase: 5 / 5.O
+- Owner: `tools`
+- Size: `small`
+- Status: `planned`
+- Contract: internal/cli/log_redact.go exposes RedactLine(line []byte) ([]byte, int) where the int is the number of redactions applied. Matches and replaces with "[REDACTED]": (1) Bearer XXX in any header line, (2) api_key=VALUE or x-api-key: VALUE, (3) Telegram bot tokens NN:XXXXXXXX (digits + colon + >=20 alnum/_/-), (4) Slack xoxb-/xoxp-/xoxs- tokens, (5) OpenAI sk-* keys longer than 16 chars. Returns input unchanged with count=0 if no match. Pure: only regexp + bytes packages from stdlib.
+- Trust class: operator, system
+- Ready when: internal/cli already compiles; this row adds a sibling log_redact.go + _test.go., Tests use fixed []byte literals — no file I/O.
+- Not ready when: The slice reads files, walks XDG paths, or uploads anywhere., The slice adds new secret shapes beyond the five listed.
+- Degraded mode: Redactor counts replacements per line so the snapshot caller can attach a per-section Redacted field without re-scanning.
+- Fixture: `internal/cli/log_redact_test.go`
+- Write scope: `internal/cli/log_redact.go`, `internal/cli/log_redact_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/cli -run 'TestRedactLine' -count=1`, `go test ./internal/cli -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: internal/cli/log_redact_test.go fixtures prove redaction across the five secret shapes plus no-match preservation.
+- Acceptance: TestRedactLine_BearerToken returns redacted line and count=1 for "Authorization: Bearer abc123def456"., TestRedactLine_ApiKeyEqualsValue covers "api_key=sk-prod-XYZ" and "x-api-key: sk-test-..."., TestRedactLine_TelegramBotToken redacts "12345:ABCDEFGHabcdefgh1234567890"., TestRedactLine_SlackTokens covers xoxb-, xoxp-, xoxs- tokens., TestRedactLine_OpenAIStyleKey redacts sk-* longer than 16 chars only., TestRedactLine_NoMatchPreservesInput returns input unchanged with count=0.
+- Source refs: ../hermes-agent/hermes_cli/logs.py
+- Unblocks: CLI log snapshot reader using shared redactor
+- Why now: Unblocks CLI log snapshot reader using shared redactor.
 
 <!-- PROGRESS:END -->
