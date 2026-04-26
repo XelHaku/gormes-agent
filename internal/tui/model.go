@@ -31,6 +31,31 @@ type Options struct {
 	// `branch: store unavailable`); cmd/gormes wires the real
 	// session.Fork-backed implementation in main.go.
 	SessionBranch SessionBranchFunc
+	// BusyGuard, when set, is consulted before every Enter-driven submit
+	// or slash dispatch. While the underlying long-running CLI command
+	// (e.g. /compress) is active, overlapping user input is rejected with
+	// visible busy evidence so the kernel cannot receive a competing turn.
+	// nil disables the busy check (legacy callers, kernel-only tests).
+	BusyGuard BusyInputEvaluator
+}
+
+// BusyInputVerdict mirrors the cli.BusyInputVerdict shape for callers that
+// only depend on internal/tui. The TUI does not import cli to keep the
+// dependency one-way; instead it accepts any evaluator that produces this
+// result. cli.BusyCommandGuard returns the equivalent struct via its
+// EvaluateInput method.
+type BusyInputVerdict struct {
+	Rejected bool
+	Evidence string
+}
+
+// BusyInputEvaluator decides whether editor input should be rejected because
+// a long-running CLI command is currently executing. cli.BusyCommandGuard
+// implements this interface; TUI tests can supply a fake. A nil evaluator
+// disables the busy branch entirely so non-CLI surfaces (kernel-only tests)
+// continue to work unchanged.
+type BusyInputEvaluator interface {
+	EvaluateInput(input string) BusyInputVerdict
 }
 
 // Model is the Bubble Tea state. The only external dependency is the
@@ -53,6 +78,7 @@ type Model struct {
 	mouseTracking bool
 	mouseModeCmd  func(enabled bool) tea.Cmd
 	statusMessage string
+	busyGuard     BusyInputEvaluator
 
 	// sessionID, when non-empty, is the locally-tracked active session
 	// owned by a successful /branch fork. SessionID() prefers it over
@@ -87,6 +113,7 @@ func NewModelWithOptions(frames <-chan kernel.RenderFrame, submit Submitter, can
 		mouseTracking: opts.MouseTracking,
 		mouseModeCmd:  opts.MouseModeCmd,
 		sessionBranch: opts.SessionBranch,
+		busyGuard:     opts.BusyGuard,
 		slashRegistry: NewDefaultSlashRegistry(),
 	}
 }

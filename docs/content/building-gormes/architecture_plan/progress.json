@@ -9321,9 +9321,9 @@
             },
             {
               "name": "Busy command guard for compression and long CLI actions",
-              "status": "planned",
+              "status": "complete",
               "contract": "Long-running CLI commands set busy input state and reject overlapping user input until the command exits",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9350,10 +9350,13 @@
                 "User input during busy command execution returns a visible busy response.",
                 "The guard does not block gateway-safe commands that explicitly declare active-turn bypass."
               ],
-              "note": "Hermes now wraps `/compress` in a busy command guard. Track the behavior as a CLI policy slice so Gormes does not accept overlapping input while compression or other long-running commands mutate context.",
+              "note": "Complete: TDD landed `BusyCommandGuard` in `internal/cli/busy_command.go` with `Run(name, status, fn)` that sets command-busy state, defers a clearing closure so success, error, and panic exit paths all reset the flag, and rejects nested entries with `ErrBusyCommandActive` (empty names rejected with `ErrBusyCommandInvalid`). The guard exposes `IsBusy`, `Status`, `ActiveCommand`, and `EvaluateInput` for the input dispatcher; `EvaluateInput` consults `ResolveCommandPolicy` so any command declared `ActiveTurnPolicyBypass` (`/help`, `/stop`, `/restart`) passes through while the guard is busy, and every other input — plain text, recognized non-bypass slash, or unknown slash — gets a uniform `Gormes is busy — <status> — wait for it to finish or send /stop` notice that includes the active status label. `internal/tui/model.go` adds an `Options.BusyGuard BusyInputEvaluator` interface so the kernel package stays independent of `internal/cli`; `internal/tui/update.go` consults the guard in the `tea.KeyEnter` branch before slash dispatch and submit, so a rejected verdict resets the editor, surfaces the evidence as `statusMessage`, and skips both the slash registry and the Submitter callback. Tests cover idle baseline, busy-during-fn, success/error/panic clear, nested rejection, idle-accepts-anything, plain-text rejection, bypass allow-list (incl. mixed-case `/STOP`), non-bypass slash rejection, unknown slash rejection, evidence-mentions-status, concurrent EvaluateInput across goroutines, ActiveCommand reporting, and empty-name rejection. The TUI fixture asserts plain text is consumed without calling Submitter while busy, that idle evaluators preserve the existing submit path, and that bypass slash commands still dispatch through the slash registry while busy.",
               "write_scope": [
-                "internal/cli/",
-                "internal/tui/",
+                "internal/cli/busy_command.go",
+                "internal/cli/busy_command_test.go",
+                "internal/tui/model.go",
+                "internal/tui/update.go",
+                "internal/tui/busy_input_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
@@ -9361,7 +9364,12 @@
               ],
               "done_signal": [
                 "Busy-command fixtures prove overlapping input is rejected while long-running CLI commands execute and busy state clears on every exit path."
-              ]
+              ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T21:33:59Z",
+                "last_success": "2026-04-26T21:33:59Z"
+              }
             },
             {
               "name": "Config, profile, auth, and setup command surfaces",

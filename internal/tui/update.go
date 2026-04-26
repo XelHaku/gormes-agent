@@ -49,6 +49,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			text := m.editor.Value()
+			// Busy guard runs before slash dispatch and submit so that
+			// overlapping user input during a long-running CLI command is
+			// rejected uniformly. The evaluator itself decides which slash
+			// commands bypass the busy state (e.g. /stop, /help) so the
+			// operator can always abort the active command.
+			if text != "" && m.busyGuard != nil {
+				if v := m.busyGuard.EvaluateInput(text); v.Rejected {
+					m.editor.Reset()
+					if v.Evidence != "" {
+						m.statusMessage = v.Evidence
+					}
+					return m, tea.Batch(cmds...)
+				}
+			}
 			if m.slashRegistry != nil {
 				if res := m.slashRegistry.Dispatch(text, &m); res.Handled {
 					m.editor.Reset()
