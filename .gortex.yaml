@@ -1,0 +1,47 @@
+exclude:
+  # Local state and vendored snapshots — also in .gitignore
+  - ".codex/"
+  - ".worktrees/"
+  - ".superpowers/"
+  - ".gormes/"
+  - ".hermes/"
+  - ".plans/"
+
+  # Build outputs (Makefile and go build land here)
+  - "bin/"
+  - "/gormes"
+  - "/builder-loop"
+  - "/planner-loop"
+  - "*.exe"
+  - "*.dll"
+  - "*.so"
+  - "*.dylib"
+  - "*.a"
+
+  # Go test, coverage, profile artifacts
+  - "*.test"
+  - "*.out"
+  - "*.prof"
+  - "*.pprof"
+  - "coverage.html"
+
+  # Runtime logs and crash dumps
+  - "*.log"
+  - "logs/"
+  - "tmp/"
+  - "testlogs/"
+  - "crash-*.log"
+
+  # Agent / orchestrator scratch
+  - "scripts/.swarm/"
+
+  # Generated site / docs artifacts
+  - "docs/public/"
+  - "docs/www-tests/test-results/"
+  - "docs/www-tests/playwright-report/"
+  - "www.gormes.ai/data/"
+  - "www.gormes.ai/.claude-flow/"
+  - "www.gormes.ai/.swarm/"
+  - "www.gormes.ai/bin/"
+  - "www.gormes.ai/playwright-report/"
+  - "www.gormes.ai/test-results/"
