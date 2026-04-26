@@ -18,6 +18,7 @@ type Channel struct {
 
 	mu              sync.RWMutex
 	threadByChannel map[string]string
+	threadContext   *ThreadContextCache
 }
 
 var _ gateway.Channel = (*Channel)(nil)
@@ -30,6 +31,7 @@ func NewChannel(client Client, log *slog.Logger) *Channel {
 		client:          client,
 		log:             log,
 		threadByChannel: map[string]string{},
+		threadContext:   newThreadContextCache(""),
 	}
 }
 
@@ -41,6 +43,7 @@ func (c *Channel) Run(ctx context.Context, inbox chan<- gateway.InboundEvent) er
 		return err
 	}
 	c.selfUserID = selfID
+	c.threadContext.SetSelfUserID(selfID)
 
 	return c.client.Run(ctx, func(e Event) {
 		c.handleEvent(ctx, inbox, e)
@@ -75,6 +78,15 @@ func (c *Channel) toInboundEvent(e Event) (gateway.InboundEvent, bool) {
 
 	threadTS := strings.TrimSpace(e.ThreadTS)
 	c.rememberThread(channelID, threadTS)
+	ts := strings.TrimSpace(e.Timestamp)
+	replyToText := ""
+	if isSlackThreadReply(threadTS, ts) {
+		if len(e.ThreadReplies) > 0 {
+			replyToText = c.threadContext.Store(channelID, threadTS, e.TeamID, e.ThreadReplies).ParentText
+		} else {
+			replyToText = c.threadContext.ParentText(channelID, threadTS, e.TeamID)
+		}
+	}
 
 	kind, body := gateway.ParseInboundText(strings.TrimSpace(e.Text))
 	if kind == gateway.EventSubmit {
@@ -84,16 +96,16 @@ func (c *Channel) toInboundEvent(e Event) (gateway.InboundEvent, bool) {
 			c.log.Warn(slackRichTextUnavailableCode, "source", ev.Source, "reason", ev.Reason)
 		}
 	}
-	ts := strings.TrimSpace(e.Timestamp)
 	return gateway.InboundEvent{
-		Platform:  "slack",
-		ChatID:    channelID,
-		UserID:    userID,
-		ThreadID:  threadTS,
-		MsgID:     ts,
-		MessageID: ts,
-		Kind:      kind,
-		Text:      body,
+		Platform:    "slack",
+		ChatID:      channelID,
+		UserID:      userID,
+		ThreadID:    threadTS,
+		MsgID:       ts,
+		MessageID:   ts,
+		ReplyToText: replyToText,
+		Kind:        kind,
+		Text:        body,
 	}, true
 }
 
@@ -115,4 +127,8 @@ func (c *Channel) threadForChannel(channelID string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.threadByChannel[channelID]
+}
+
+func isSlackThreadReply(threadTS, ts string) bool {
+	return strings.TrimSpace(threadTS) != "" && strings.TrimSpace(threadTS) != strings.TrimSpace(ts)
 }

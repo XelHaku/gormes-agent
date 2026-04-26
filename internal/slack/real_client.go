@@ -153,6 +153,7 @@ func (c *realClient) handleEventsAPI(evt socketmode.Event, fn func(Event)) {
 	fn(Event{
 		RequestID: requestID,
 		ChannelID: msg.Channel,
+		TeamID:    eventsAPIEvent.TeamID,
 		UserID:    msg.User,
 		Text:      msg.Text,
 		Timestamp: msg.TimeStamp,
@@ -181,6 +182,7 @@ func (c *realClient) handleSlashCommand(evt socketmode.Event, fn func(Event)) {
 	fn(Event{
 		RequestID: requestID,
 		ChannelID: cmd.ChannelID,
+		TeamID:    cmd.TeamID,
 		UserID:    cmd.UserID,
 		Text:      strings.TrimSpace(cmd.Command + " " + cmd.Text),
 	})

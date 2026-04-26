@@ -375,6 +375,53 @@ func TestSlackChannel_QuotedSlashDoesNotRouteAsCommand(t *testing.T) {
 	}
 }
 
+func TestSlackChannel_ReplyToText(t *testing.T) {
+	ch := NewChannel(newMockClient(), nil)
+	ch.selfUserID = "UBOT"
+
+	ev, ok := ch.toInboundEvent(Event{
+		ChannelID: "C123",
+		TeamID:    "T_A",
+		UserID:    "U1",
+		Text:      "please show details",
+		Timestamp: "1000.5",
+		ThreadTS:  "1000.0",
+		ThreadReplies: []ThreadMessage{
+			{Timestamp: "1000.0", TeamID: "T_A", BotID: "B_CRON", Text: "cron summary: 3 new emails"},
+			{Timestamp: "1000.1", TeamID: "T_A", UserID: "UBOT", BotID: "B_GORMES", Text: "self bot child echo"},
+		},
+	})
+	if !ok {
+		t.Fatal("toInboundEvent dropped thread reply, want submit")
+	}
+	if ev.ReplyToText != "cron summary: 3 new emails" {
+		t.Fatalf("ReplyToText = %q, want raw parent text", ev.ReplyToText)
+	}
+	if ev.ThreadID != "1000.0" {
+		t.Fatalf("ThreadID = %q, want thread timestamp", ev.ThreadID)
+	}
+	if ev.MessageID != "1000.5" {
+		t.Fatalf("MessageID = %q, want triggering Slack message timestamp", ev.MessageID)
+	}
+
+	top, ok := ch.toInboundEvent(Event{
+		ChannelID: "C123",
+		TeamID:    "T_A",
+		UserID:    "U1",
+		Text:      "top-level",
+		Timestamp: "2000.0",
+		ThreadReplies: []ThreadMessage{
+			{Timestamp: "2000.0", TeamID: "T_A", BotID: "B_CRON", Text: "top-level parent"},
+		},
+	})
+	if !ok {
+		t.Fatal("toInboundEvent dropped top-level message, want submit")
+	}
+	if top.ReplyToText != "" {
+		t.Fatalf("top-level ReplyToText = %q, want empty", top.ReplyToText)
+	}
+}
+
 func waitForSlackCondition(t *testing.T, timeout time.Duration, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)

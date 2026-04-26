@@ -171,6 +171,51 @@ func TestManager_Inbound_AppendsAttachmentsToSubmittedText(t *testing.T) {
 	}
 }
 
+func TestManager_Inbound_SubmitInjectsReplyToText(t *testing.T) {
+	sl := newFakeChannel("slack")
+	fk := &fakeKernel{}
+
+	m := NewManagerWithSubmitter(ManagerConfig{
+		AllowedChats: map[string]string{"slack": "C123"},
+	}, fk, slog.Default())
+	if err := m.Register(sl); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = m.Run(ctx) }()
+
+	sl.pushInbound(InboundEvent{
+		Platform:    "slack",
+		ChatID:      "C123",
+		UserID:      "U1",
+		ThreadID:    "1000.0",
+		MsgID:       "1000.5",
+		MessageID:   "1000.5",
+		Kind:        EventSubmit,
+		Text:        "please show details",
+		ReplyToText: "cron summary: 3 new emails",
+	})
+
+	waitFor(t, 200*time.Millisecond, func() bool {
+		return len(fk.submitsSnapshot()) == 1
+	})
+	got := fk.submitsSnapshot()[0]
+	want := "[Replying to: \"cron summary: 3 new emails\"]\n\nplease show details"
+	if got.Text != want {
+		t.Fatalf("submitted text = %q, want %q", got.Text, want)
+	}
+	for _, wantContext := range []string{
+		"**Thread ID:** `1000.0`",
+		"**Message ID:** `1000.5`",
+	} {
+		if !strings.Contains(got.SessionContext, wantContext) {
+			t.Fatalf("SessionContext missing %q in:\n%s", wantContext, got.SessionContext)
+		}
+	}
+}
+
 func TestManager_Inbound_BlockedChat_NoSubmit(t *testing.T) {
 	tg := newFakeChannel("telegram")
 	fk := &fakeKernel{}

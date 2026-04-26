@@ -86,8 +86,11 @@ type InboundEvent struct {
 	// MessageID is source-context metadata for the triggering platform message.
 	// MsgID remains the gateway's existing hook/reaction field.
 	MessageID string
-	Kind      EventKind
-	Text      string
+	// ReplyToText carries optional text from the platform message this event is
+	// replying to. Adapters may leave it empty when parent lookup degrades.
+	ReplyToText string
+	Kind        EventKind
+	Text        string
 
 	ThreadLifecycle *ThreadLifecycleEvent
 
@@ -131,6 +134,14 @@ func (e InboundEvent) PairingUserID() string {
 // deterministic attachment references when a channel supplied inbound media.
 func (e InboundEvent) SubmitText() string {
 	text := strings.TrimSpace(e.Text)
+	if reply := strings.TrimSpace(e.ReplyToText); reply != "" {
+		prefix := `[Replying to: "` + truncateRunes(reply, 500) + `"]`
+		if text == "" {
+			text = prefix
+		} else {
+			text = prefix + "\n\n" + text
+		}
+	}
 	if len(e.Attachments) == 0 {
 		return text
 	}
@@ -146,6 +157,19 @@ func (e InboundEvent) SubmitText() string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func truncateRunes(s string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	for i := range s {
+		if limit == 0 {
+			return s[:i]
+		}
+		limit--
+	}
+	return s
 }
 
 // Attachment is the channel-neutral media descriptor attached to an inbound
