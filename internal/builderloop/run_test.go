@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -56,6 +57,54 @@ func TestDryRunSelectsCandidatesWithoutRunningBackend(t *testing.T) {
 	}
 	if len(runner.Commands) != 0 {
 		t.Fatalf("Commands length = %d, want 0", len(runner.Commands))
+	}
+}
+
+func TestRunOnceRefusesToStartWhilePlannerRunLockHeld(t *testing.T) {
+	dir := t.TempDir()
+	progressPath := writeProgressJSON(t, `{"phases": {}}`)
+	runRoot := filepath.Join(dir, "builder-loop")
+	plannerRoot := filepath.Join(dir, "planner-loop")
+	if err := os.MkdirAll(plannerRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(plannerRoot, "run.lock")
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lockFile.Close()
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
+	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+
+	_, err = RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:              dir,
+			ProgressJSON:          progressPath,
+			RunRoot:               runRoot,
+			Backend:               "codexu",
+			Mode:                  "safe",
+			MaxAgents:             1,
+			MergeOpenPullRequests: false,
+			PlannerTriggersPath:   filepath.Join(plannerRoot, "triggers.jsonl"),
+		},
+		Runner: &FakeRunner{},
+	})
+	if !errors.Is(err, ErrControlPlaneRunInProgress) {
+		t.Fatalf("RunOnce() error = %v, want ErrControlPlaneRunInProgress", err)
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	if len(events) != 1 {
+		t.Fatalf("ledger events = %d, want 1: %#v", len(events), events)
+	}
+	if got := events[0].Event + ":" + events[0].Status; got != "run_blocked:control_plane_locked" {
+		t.Fatalf("ledger event = %q, want run_blocked:control_plane_locked", got)
+	}
+	if !strings.Contains(events[0].Detail, lockPath) {
+		t.Fatalf("ledger detail = %q, want lock path %q", events[0].Detail, lockPath)
 	}
 }
 

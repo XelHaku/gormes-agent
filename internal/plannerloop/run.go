@@ -588,12 +588,13 @@ func plannerBackendCommand(backend, mode, rawReportPath string) ([]string, error
 }
 
 func runValidation(ctx context.Context, runner cmdrunner.Runner, repoRoot, logPath string) error {
+	env := validationCommandEnv()
 	commands := []cmdrunner.Command{
-		{Name: "go", Args: []string{"run", "./cmd/builder-loop", "progress", "write"}, Dir: repoRoot},
-		{Name: "go", Args: []string{"run", "./cmd/builder-loop", "progress", "validate"}, Dir: repoRoot},
-		{Name: "go", Args: []string{"test", "./internal/progress", "-count=1"}, Dir: repoRoot},
-		{Name: "go", Args: []string{"test", "./docs", "-count=1"}, Dir: repoRoot},
-		{Name: "go", Args: []string{"test", "./...", "-count=1"}, Dir: filepath.Join(repoRoot, "www.gormes.ai")},
+		{Name: "go", Args: []string{"run", "./cmd/builder-loop", "progress", "write"}, Dir: repoRoot, Env: env},
+		{Name: "go", Args: []string{"run", "./cmd/builder-loop", "progress", "validate"}, Dir: repoRoot, Env: env},
+		{Name: "go", Args: []string{"test", "./internal/progress", "-count=1"}, Dir: repoRoot, Env: env},
+		{Name: "go", Args: []string{"test", "./docs", "-count=1"}, Dir: repoRoot, Env: env},
+		{Name: "go", Args: []string{"test", "./...", "-count=1"}, Dir: filepath.Join(repoRoot, "www.gormes.ai"), Env: env},
 	}
 
 	var log strings.Builder
@@ -608,6 +609,33 @@ func runValidation(ctx context.Context, runner cmdrunner.Runner, repoRoot, logPa
 		}
 	}
 	return os.WriteFile(logPath, []byte(log.String()), 0o644)
+}
+
+func validationCommandEnv() []string {
+	path := os.Getenv("PATH")
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		goBin := filepath.Join(home, "go", "bin")
+		if !pathContains(path, goBin) {
+			if path == "" {
+				path = goBin
+			} else {
+				path = goBin + string(os.PathListSeparator) + path
+			}
+		}
+	}
+	if path == "" {
+		return nil
+	}
+	return []string{"PATH=" + path}
+}
+
+func pathContains(pathValue, dir string) bool {
+	for _, entry := range filepath.SplitList(pathValue) {
+		if filepath.Clean(entry) == filepath.Clean(dir) {
+			return true
+		}
+	}
+	return false
 }
 
 func writeReport(path, rawPath string, result cmdrunner.Result, bundle ContextBundle, now time.Time) error {

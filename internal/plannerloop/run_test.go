@@ -457,6 +457,8 @@ func TestRunOnceAppliesBackendTimeoutAndRecordsErrDetail(t *testing.T) {
 
 func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 	repoRoot := writePlannerFixture(t)
+	home := filepath.Join(t.TempDir(), "home")
+	t.Setenv("HOME", home)
 	runner := &cmdrunner.FakeRunner{
 		Results: []cmdrunner.Result{{}, {}, {}, {}, {}, {}, {}, {}, {}},
 	}
@@ -490,6 +492,10 @@ func TestRunOnceRunsValidationAfterBackend(t *testing.T) {
 	}
 	if got, want := runner.Commands[8].Dir, filepath.Join(repoRoot, "www.gormes.ai"); got != want {
 		t.Fatalf("landing validation dir = %q, want %q", got, want)
+	}
+	docsEnv := strings.Join(runner.Commands[7].Env, "\n")
+	if !strings.Contains(docsEnv, filepath.Join(home, "go", "bin")) {
+		t.Fatalf("docs validation env = %#v, want HOME/go/bin on PATH", runner.Commands[7].Env)
 	}
 }
 

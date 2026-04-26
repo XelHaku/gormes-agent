@@ -2231,7 +2231,7 @@
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
               "contract": "Registry-owned active-turn steering command",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -4012,16 +4012,19 @@
               "source_refs": [
                 "../hermes-agent/run_agent.py@ad0ac894:_copy_reasoning_content_for_api",
                 "../hermes-agent/tests/run_agent/test_deepseek_reasoning_content_echo.py@ad0ac894",
+                ".codex/orchestrator/state/runs.jsonl:20260426T011416Z-162546173 pre_promotion_repair_succeeded",
                 "internal/hermes/http_client.go:openAICompatibleReasoningContent",
                 "internal/hermes/reasoning_content_echo_test.go"
               ],
               "ready_when": [
                 "DeepSeek/Kimi cross-provider reasoning isolation is validated, so provider detection and storage-only reasoning isolation already exist.",
-                "The existing captureRequestHTTPClient fixture can inspect serialized OpenAI-compatible request messages without live provider credentials."
+                "The existing captureRequestHTTPClient fixture can inspect serialized OpenAI-compatible request messages without live provider credentials.",
+                "The prior worker branch reached provider implementation and only needed the known asynchronous memory test wait helper stabilization during pre-promotion repair."
               ],
               "not_ready_when": [
                 "The slice forwards storage-only Message.Reasoning from a prior provider to DeepSeek/Kimi/Moonshot instead of using provider-native ReasoningContent or an empty placeholder.",
-                "The slice changes non-thinking provider payloads, provider routing, or Codex/Bedrock/Gemini request builders."
+                "The slice changes non-thinking provider payloads, provider routing, or Codex/Bedrock/Gemini request builders.",
+                "Full-suite instability requires memory behavior changes beyond stabilizing internal/memory/interrupted_sync_test.go asynchronous waits; split a separate memory-stability row instead of widening this provider row."
               ],
               "blocked_by": [
                 "DeepSeek/Kimi cross-provider reasoning isolation"
@@ -4036,15 +4039,17 @@
                 "Explicit provider-native ReasoningContent is preserved on plain and tool-call assistant turns.",
                 "Storage-only Message.Reasoning is not serialized to thinking providers, and non-thinking providers remain unchanged."
               ],
-              "note": "Hermes ad0ac894 tightened the earlier tool-call-only fix: DeepSeek V4/Kimi thinking mode now requires reasoning_content on every assistant message. Gormes already has tool-call padding and cross-provider isolation, so this follow-up should change only the OpenAI-compatible request serializer and focused fixtures.",
+              "note": "Hermes ad0ac894 tightened the earlier tool-call-only fix: DeepSeek V4/Kimi thinking mode now requires reasoning_content on every assistant message. A prior worker branch reached the provider implementation, then pre-promotion repair stabilized only the asynchronous memory wait helper in internal/memory/interrupted_sync_test.go before promotion failed. Keep this slice limited to the OpenAI-compatible request serializer, reasoning echo fixtures, and that exact memory test fixture stabilization; do not change memory behavior or broaden provider routing.",
               "write_scope": [
                 "internal/hermes/http_client.go",
                 "internal/hermes/reasoning_content_echo_test.go",
+                "internal/memory/interrupted_sync_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
                 "go test ./internal/hermes -run 'TestReasoningContentEcho.*AllAssistant|TestReasoningContentEcho.*Plain|TestReasoningContentEcho.*Preserves|TestReasoningContentEcho.*Untouched' -count=1",
                 "go test ./internal/hermes -count=1",
+                "go test ./internal/memory -run 'TestInterruptedTurnSkipsMemorySyncAndExtractor|TestCompletedTurnMemorySyncsAndExtractorStillRuns' -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
@@ -4074,6 +4079,189 @@
               "name": "Anthropic",
               "status": "complete",
               "note": "TDD landed in `internal/hermes`: direct Anthropic Messages API request shaping now preserves cache-control metadata on system/tool-result blocks, streams `thinking`/`text`/`input_json_delta` events into the shared event model, maps Anthropic stop reasons to continuation-safe finish reasons, and covers 429/rate-limit fixtures with `httptest` instead of live credentials."
+            },
+            {
+              "name": "Azure OpenAI query/default_query transport contract",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "OpenAI-compatible Azure endpoints preserve api-version query parameters and keep GPT-5.x deployments on chat/completions with max_completion_tokens semantics instead of upgrading to Codex Responses",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system",
+                "operator"
+              ],
+              "degraded_mode": "Provider status reports azure_query_preserved, azure_chat_completions, or azure_transport_unavailable evidence instead of silently dropping api-version or switching GPT-5.x to Responses.",
+              "fixture": "internal/hermes/azure_openai_transport_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/auxiliary_client.py@24b4b24d:_extract_url_query_params",
+                "../hermes-agent/run_agent.py@ac571142:_is_azure_openai_url",
+                "../hermes-agent/tests/run_agent/test_run_agent.py@ac571142:TestAzureOpenAIRouting",
+                "internal/hermes/http_client.go",
+                "internal/hermes/unsupported_parameter_retry_test.go"
+              ],
+              "ready_when": [
+                "Provider interface + stream fixture harness, generic unsupported-parameter retry, and Codex Responses conversion fixtures are validated on main.",
+                "The slice can use httptest to inspect request URLs and bodies; no Azure account, deployment, or live provider credential is required."
+              ],
+              "not_ready_when": [
+                "The slice implements the Azure Foundry setup wizard, Anthropic Messages transport, live model discovery, or credential storage instead of only freezing OpenAI-compatible request construction.",
+                "The slice removes the existing generic unsupported-parameter retry instead of adding Azure-specific first-request and routing fixtures."
+              ],
+              "unblocks": [
+                "Azure Foundry endpoint autodetect + model context read model"
+              ],
+              "acceptance": [
+                "A legacy Azure base URL with ?api-version=... sends POST requests to a clean /v1/chat/completions path while preserving the query parameters.",
+                "openai.azure.com GPT-5.x provider/model fixtures remain on chat_completions and never call the Codex Responses conversion path.",
+                "Azure OpenAI o-series and GPT-5 fixtures emit or retry to max_completion_tokens without changing non-Azure generic providers.",
+                "All Azure OpenAI transport tests run through httptest with no network access or live Azure credentials."
+              ],
+              "note": "Hermes 24b4b24d and ac571142 fixed Azure OpenAI request construction after custom/Azure base URLs lost api-version query parameters and GPT-5.x deployments were routed as Codex Responses. Gormes lacks Azure-specific request fixtures, so this first Azure slice should freeze only request URL, API-mode, and token-parameter semantics.",
+              "write_scope": [
+                "internal/hermes/http_client.go",
+                "internal/hermes/azure_openai_transport_test.go",
+                "internal/hermes/unsupported_parameter_retry_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestAzureOpenAI|TestUnsupportedParameterRetry' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Azure OpenAI fixtures prove api-version query preservation, GPT-5.x chat/completions routing, max_completion_tokens behavior, and zero live Azure dependency."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:24b4b24d agent/auxiliary_client.py",
+                "note": "Hermes fixed Azure/custom endpoint query preservation and GPT-5.x Azure routing; Gormes should port the equivalent provider request contract as pure fixtures."
+              }
+            },
+            {
+              "name": "Azure Anthropic Messages endpoint contract",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Azure Anthropic endpoints use static Azure API keys, strip trailing /v1 before Messages requests, and pass api-version through query parameters without invoking Anthropic OAuth refresh",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system",
+                "operator"
+              ],
+              "degraded_mode": "Provider status reports azure_anthropic_key_missing, azure_api_version_query, or azure_oauth_bypassed evidence before any live Messages request is attempted.",
+              "fixture": "internal/hermes/azure_anthropic_transport_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/anthropic_adapter.py@c15064fa",
+                "../hermes-agent/hermes_cli/runtime_provider.py@7bfa9442",
+                "../hermes-agent/hermes_cli/runtime_provider.py@d8e4c721",
+                "../hermes-agent/website/docs/guides/azure-foundry.md@7c50ed70",
+                "internal/hermes/anthropic_client.go"
+              ],
+              "ready_when": [
+                "Direct Anthropic Messages adapter fixtures are validated and can be exercised with httptest.",
+                "The slice can inject fake Azure keys and base URLs through config/request helpers; no Claude Code OAuth store or live Azure endpoint is required."
+              ],
+              "not_ready_when": [
+                "The slice ports the full Azure Foundry wizard, OpenAI-style Azure transport, or XDG token vault in the same change.",
+                "The slice reads or mutates ~/.claude, ~/.hermes, or hosted Anthropic OAuth state in unit tests."
+              ],
+              "unblocks": [
+                "Azure Foundry endpoint autodetect + model context read model"
+              ],
+              "acceptance": [
+                "A https://.../anthropic/v1 base URL stores and uses the Azure Anthropic base stripped to /anthropic before appending /v1/messages.",
+                "Azure Anthropic requests include api-version=2025-04-15 as query/default_query and never produce /anthropic?api-version=.../v1/messages.",
+                "Azure Anthropic auth uses AZURE_ANTHROPIC_KEY or a configured static key before any Anthropic OAuth refresh path and reports missing keys clearly.",
+                "Non-Azure Anthropic requests keep existing x-api-key and bearer behavior."
+              ],
+              "note": "Hermes c15064fa, 7bfa9442, d8e4c721, and 6ef3a47c split Azure Anthropic away from hosted Anthropic OAuth and fixed api-version/base-URL handling. Gormes should freeze request/auth behavior before adding broader Azure resolver or setup flows.",
+              "write_scope": [
+                "internal/hermes/anthropic_client.go",
+                "internal/hermes/azure_anthropic_transport_test.go",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestAzureAnthropic|TestAnthropic' -count=1",
+                "go test ./internal/hermes ./internal/config -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Azure Anthropic fixtures prove base-URL cleanup, api-version query handling, static Azure-key auth, hosted-OAuth bypass, and no regression to normal Anthropic requests."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:c15064fa agent/anthropic_adapter.py",
+                "note": "Hermes fixed Azure Anthropic request construction and auth resolution; Gormes should preserve the behavior through native Anthropic adapter fixtures."
+              }
+            },
+            {
+              "name": "Azure Foundry endpoint autodetect + model context read model",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Azure Foundry setup/runtime resolution records endpoint transport, advisory model list, and context-length evidence from deterministic probes while keeping manual fallback usable",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Setup and status report azure_detect_manual_required, azure_models_probe_failed, azure_context_unknown, and azure_transport_detected evidence without blocking manual endpoint configuration.",
+              "fixture": "internal/cli/azure_foundry_detect_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
+                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
+                "../hermes-agent/hermes_cli/main.py@731e1ef8:_model_flow_azure_foundry",
+                "../hermes-agent/hermes_cli/runtime_provider.py@731e1ef8:_resolve_azure_foundry_runtime",
+                "../hermes-agent/website/docs/guides/azure-foundry.md@7c50ed70",
+                "internal/config/config.go",
+                "internal/hermes/model_context_resolver.go"
+              ],
+              "ready_when": [
+                "Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are fixture-ready or validated so detected transport modes have request-builder contracts.",
+                "Provider-enforced context-length resolver is validated and can resolve model context from pure registry fixtures."
+              ],
+              "not_ready_when": [
+                "The slice requires ARM deployment-list credentials, live Azure network calls, browser auth, or hosted provider credentials in unit tests.",
+                "The slice treats failed probes as fatal instead of preserving manual API mode and deployment-name entry."
+              ],
+              "blocked_by": [
+                "Azure OpenAI query/default_query transport contract",
+                "Azure Anthropic Messages endpoint contract",
+                "Provider-enforced context-length resolver"
+              ],
+              "acceptance": [
+                "Path sniffing detects /anthropic endpoints as anthropic_messages without HTTP.",
+                "A fake /models OpenAI-shaped response selects chat_completions and records advisory model IDs.",
+                "Failed /models plus a fake Anthropic error shape selects anthropic_messages; total probe failure returns manual-required evidence, not a fatal error.",
+                "Context-length lookup records a known length when resolver metadata exists and explicit unknown evidence when fallback/default metadata is all that exists.",
+                "Resolver config honors AZURE_FOUNDRY_BASE_URL and AZURE_FOUNDRY_API_KEY without storing plaintext secrets in status output."
+              ],
+              "note": "Hermes 731e1ef8 added Azure Foundry endpoint transport detection, advisory model discovery, deployment/context handling, and manual fallback; 7c50ed70 documents the operator flow and environment variables. Gormes should add a pure read-model/probe contract after the request builders are fixture-backed, not a live Azure setup wizard first.",
+              "write_scope": [
+                "internal/cli/azure_foundry_detect.go",
+                "internal/cli/azure_foundry_detect_test.go",
+                "internal/config/",
+                "internal/hermes/model_context_resolver.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli ./internal/config ./internal/hermes -run 'TestAzureFoundry|TestModelContext' -count=1",
+                "go test ./internal/cli ./internal/config ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Azure Foundry fixtures prove deterministic transport detection, advisory model/context evidence, manual fallback, env-var resolution, and redacted status with no live Azure dependency."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:731e1ef8 hermes_cli/azure_detect.py",
+                "note": "Hermes now has an Azure Foundry setup/runtime detection surface; Gormes should port the behavior as a pure native read-model before live setup UX."
+              }
             },
             {
               "name": "Bedrock",
@@ -4487,8 +4675,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T01:01:44Z",
-            "origin_decision": "Hermes ad0ac894 widened DeepSeek/Kimi thinking-mode replay from assistant tool-call turns to all assistant turns after the earlier f93d4624 cross-provider isolation row landed in Gormes. Gormes still trails that all-assistant replay edge, so this subphase remains upstream-led until the small all-assistant reasoning_content row is validated; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
+            "last_upstream_check": "2026-04-26T02:10:57Z",
+            "origin_decision": "Hermes ad0ac894 widened DeepSeek/Kimi thinking-mode replay from assistant tool-call turns to all assistant turns after the earlier f93d4624 cross-provider isolation row landed in Gormes. Hermes 24b4b24d/ac571142/c15064fa/7bfa9442/d8e4c721/731e1ef8/7c50ed70 also moved Azure OpenAI, Azure Anthropic, and Azure Foundry provider behavior ahead of Gormes. Gormes still trails those provider edges, so this subphase remains upstream-led until the all-assistant reasoning_content row and the three Azure fixture rows validate; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
           }
         },
         "4.B": {
