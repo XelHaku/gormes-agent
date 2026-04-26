@@ -576,19 +576,33 @@ func runAutoloopWithRuntime(ctx context.Context, deps cliDeps, cfg builderloop.C
 		}
 		summary, err := runtime.runBuilder(ctx, cfg, opts.dryRun)
 		if err != nil {
-			return err
-		}
-		printAutoloopSummary(deps.stdout, summary)
-		if !opts.loop {
-			return nil
+			if !opts.loop {
+				return err
+			}
+			logLoopFailure(deps.stderr, "builder", err)
+		} else {
+			printAutoloopSummary(deps.stdout, summary)
+			if !opts.loop {
+				return nil
+			}
 		}
 		if err := runtime.runPlanner(ctx); err != nil {
-			return err
+			logLoopFailure(deps.stderr, "planner", err)
 		}
 		if err := runtime.sleep(ctx, interval); err != nil {
-			return err
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return err
+			}
+			logLoopFailure(deps.stderr, "sleep", err)
 		}
 	}
+}
+
+func logLoopFailure(w io.Writer, phase string, err error) {
+	if w == nil || err == nil {
+		return
+	}
+	fmt.Fprintf(w, "builder-loop: %s cycle failed; continuing loop: %v\n", phase, err)
 }
 
 func printAutoloopSummary(w io.Writer, summary builderloop.RunSummary) {

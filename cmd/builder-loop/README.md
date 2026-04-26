@@ -26,9 +26,10 @@ Non-dry-run builder cycles take the shared planner-loop `run.lock` before
 checkpointing, PR intake, worker claims, promotions, or health writes. If the
 planner loop is already regenerating the control plane, builder emits
 `run_blocked:control_plane_locked` and exits before touching the queue.
-In `run --loop` mode, the builder waits for its cycle to finish and release the
-shared lock before invoking `go run ./cmd/planner-loop run`. The next builder
-cycle starts only after that planner run exits successfully.
+In `run --loop` mode, each cycle attempts a builder run, releases the shared
+lock, then invokes `go run ./cmd/planner-loop run` before sleeping and starting
+the next builder cycle. Builder or planner failures are logged but do not stop
+loop mode; only cancellation stops the loop.
 
 ## Run Modes
 
