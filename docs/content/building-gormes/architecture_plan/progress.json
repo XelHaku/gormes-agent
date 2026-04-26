@@ -11409,6 +11409,20 @@
               "done_signal": [
                 "All 3 TestRunningPlaceholder_* fixtures pass; the placeholder transitions on PhaseIdle frames; no Hermes /queue or /bg implementation is added by this slice."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T21:43:06Z",
+                "last_failure": {
+                  "run_id": "20260426T213359Z-993884799",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "command 3 failed: exit status 1"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:eaa7e2db cli.py running_placeholder",
