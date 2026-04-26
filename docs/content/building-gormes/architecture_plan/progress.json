@@ -10361,9 +10361,9 @@
             },
             {
               "name": "CLI log snapshot reader using shared redactor",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli/log_snapshot.go exposes type LogClass string with constants LogClassMain=\"main\" and LogClassToolAudit=\"tool_audit\", type LogSnapshotRoots struct{LogPath, ToolAuditPath string}, type SnapshotOpts struct{HeadBytes, TailBytes int64} (zero or negative HeadBytes/TailBytes default to 64*1024 and 16*1024 respectively), type LogSection struct{Class LogClass; Path string; Head, Tail []byte; Missing, Truncated bool; Redacted int; Unreadable string} and type Snapshot struct{Sections []LogSection}. SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) Snapshot returns Sections in order [LogClassMain, LogClassToolAudit] and ALWAYS includes both sections even when both files are absent. For each path: if os.Stat fails with os.IsNotExist, set Missing=true and skip read. If os.ReadFile fails for any other reason, set Unreadable to err.Error() and continue. If file size <= HeadBytes+TailBytes, set Head to the entire file content, Tail to nil, Truncated=false. If file size > HeadBytes+TailBytes, set Head to the first HeadBytes bytes, Tail to the last TailBytes bytes, Truncated=true. Then split each of Head and Tail by '\\n' (bytes.Split), pass each non-empty line through RedactLine, sum the returned counts into LogSection.Redacted, and write the redacted lines back joined by '\\n' into Head/Tail. The function never returns an error and never panics.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
