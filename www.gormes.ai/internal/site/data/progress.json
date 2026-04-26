@@ -4259,9 +4259,9 @@
                 "Azure Foundry fixtures prove deterministic transport detection, advisory model/context evidence, manual fallback, env-var resolution, and redacted status with no live Azure dependency."
               ],
               "health": {
-                "attempt_count": 64,
-                "last_attempt": "2026-04-26T06:10:43Z",
-                "last_success": "2026-04-26T06:10:43Z"
+                "attempt_count": 65,
+                "last_attempt": "2026-04-26T06:11:51Z",
+                "last_success": "2026-04-26T06:11:51Z"
               },
               "provenance": {
                 "origin_type": "upstream",
