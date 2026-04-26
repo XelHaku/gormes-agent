@@ -7963,9 +7963,9 @@
             {
               "name": "Native TUI bundle independence check",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes TUI startup and install/update status stay Go-native and never depend on Hermes' Node/Ink dist bundle freshness checks",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -7993,7 +7993,7 @@
                 "Offline doctor or startup status describes the TUI as native Go/Bubble Tea and does not require `HERMES_TUI_DIR`, `package-lock.json`, `node_modules`, or `ink-bundle.js`.",
                 "Landing/docs install messaging continues to state no runtime npm/Node dependency and does not inherit Hermes first-launch TUI rebuild instructions."
               ],
-              "note": "Hermes ee0728c6 fixed a Python/Node first-launch regression by rebuilding when the bundled Ink dist file is stale. Gormes should not port that rebuild path; freeze the intentional divergence with a fixture so future CLI/TUI work does not reintroduce npm or Hermes Ink bundle checks.",
+              "note": "Complete: TDD landed `cmd/gormes/tui_bundle_independence_test.go` plus native startup/status seams. The focused fixture starts the real Cobra TUI path from a Hermes-shaped temp workdir with `ui-tui/dist/entry.js` and `node_modules/ink` but no Hermes Ink bundle, traps node/npm/pnpm/yarn/corepack on PATH, and proves no package-manager command runs before the Bubble Tea program launches. Doctor status now reports a compiled Go-native Bubble Tea TUI without asking for Hermes TUI env or bundle files, and landing copy explicitly promises no runtime Node or npm dependency.",
               "write_scope": [
                 "cmd/gormes/",
                 "internal/tui/",

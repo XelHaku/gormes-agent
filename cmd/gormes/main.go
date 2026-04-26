@@ -52,6 +52,7 @@ type rootRuntime struct {
 	runOneshot             func(*cobra.Command, oneshotInvocation) error
 	newOneshotClient       oneshotClientFactory
 	configureOneshotKernel oneshotKernelConfigurer
+	tuiProgramFactory      tuiProgramFactory
 }
 
 type oneshotInvocation struct {
@@ -62,7 +63,9 @@ type oneshotInvocation struct {
 
 func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
 	if runtime.runTUI == nil {
-		runtime.runTUI = runTUI
+		runtime.runTUI = func(cmd *cobra.Command, args []string) error {
+			return runTUIWithRuntime(cmd, args, runtime)
+		}
 	}
 	if runtime.newOneshotClient == nil {
 		runtime.newOneshotClient = newOneshotHTTPClient
@@ -251,6 +254,26 @@ func finalAssistantContent(history []hermes.Message) (string, bool) {
 }
 
 func runTUI(cmd *cobra.Command, _ []string) error {
+	return runTUIWithRuntime(cmd, nil, rootRuntime{})
+}
+
+type tuiProgram interface {
+	Run() (tea.Model, error)
+	Quit()
+}
+
+type tuiProgramFactory func(tea.Model, ...tea.ProgramOption) tuiProgram
+
+func defaultTUIProgramFactory(model tea.Model, options ...tea.ProgramOption) tuiProgram {
+	return tea.NewProgram(model, options...)
+}
+
+func runTUIWithRuntime(cmd *cobra.Command, _ []string, runtime rootRuntime) error {
+	runNativeTUIStartupPreflight(context.Background(), tuiStartupPreflightOptions{})
+	if runtime.tuiProgramFactory == nil {
+		runtime.tuiProgramFactory = defaultTUIProgramFactory
+	}
+
 	cfg, err := config.Load(nil)
 	if err != nil {
 		return err
@@ -359,13 +382,15 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 	if cfg.TUI.MouseTracking {
 		programOptions = append(programOptions, tea.WithMouseAllMotion())
 	}
-	prog := tea.NewProgram(model, programOptions...)
+	prog := runtime.tuiProgramFactory(model, programOptions...)
 
 	// Signal → shutdown-budget force-exit watcher.
+	programDone := make(chan struct{})
 	go func() {
 		<-rootCtx.Done()
 		prog.Quit()
 		select {
+		case <-programDone:
 		case <-time.After(kernel.ShutdownBudget):
 			slog.Error("shutdown budget exceeded; forcing exit")
 			os.Exit(3)
@@ -373,6 +398,7 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 	}()
 
 	_, err = prog.Run()
+	close(programDone)
 	return err
 }
 

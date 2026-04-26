@@ -48,6 +48,8 @@ var doctorCmd = &cobra.Command{
 			fmt.Println("[SKIP] api_server: skipped (--offline)")
 		}
 
+		fmt.Print(doctorTUIStatus().Format())
+
 		// Toolbox section — inspect the built-in registry. Runs in both modes.
 		reg := buildDefaultRegistry(context.Background(), cfg.Delegation, cfg.SkillsRoot(), nil, cfg.Hermes.Model)
 		result := doctor.CheckTools(reg)

@@ -162,7 +162,7 @@ func DefaultPage() LandingPage {
 		},
 		FeatureCards: []FeatureCard{
 			{Title: "Single Static Binary", Body: "Zero CGO. ~" + binarySizeMB() + " MB. scp it to Termux, Alpine, a fresh VPS — it runs. No Python, no virtualenv, no Nix."},
-			{Title: "No Runtime Drift", Body: "Pure Go. No pip, no npm, no env activation. The binary you tested is the binary that deploys."},
+			{Title: "No Runtime Drift", Body: "Pure Go. No runtime Node or npm, no pip, no env activation. The binary you tested is the binary that deploys."},
 			{Title: "Streams That Don't Drop", Body: "Route-B reconnect treats SSE drops as recoverable, not fatal. Your agent doesn't lose work to a flaky network."},
 			{Title: "Local Validation", Body: "gormes doctor --offline checks tool schemas before you burn tokens. Catch bad wiring before a model round-trip."},
 		},
