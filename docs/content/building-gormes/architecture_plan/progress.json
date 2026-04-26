@@ -9425,9 +9425,9 @@
             },
             {
               "name": "CLI profile root resolver",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds a pure function `ResolveProfileRoot(name string, gormesXDGConfigHome string) (string, error)` that returns gormesXDGConfigHome+'/gormes' for name=='default' and gormesXDGConfigHome+'/gormes/profiles/'+name for any other valid profile name; it rejects invalid names by returning the same sentinel errors as ValidateProfileName and never touches the filesystem",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
