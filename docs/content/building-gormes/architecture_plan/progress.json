@@ -11772,9 +11772,9 @@
             },
             {
               "name": "Dashboard PTY chat sidecar contract",
-              "status": "planned",
+              "status": "complete",
               "contract": "Dashboard chat sidecar bridges PTY bytes and structured tool events without merging terminal transport into API server state",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -11803,7 +11803,7 @@
                 "Sidecar publish failures do not kill the PTY session.",
                 "Dashboard chat can degrade to API-only mode when PTY is unavailable."
               ],
-              "note": "Upstream dashboard chat now combines PTY-over-WebSocket with sidecar tool-event publication. Track that as a later contract after PTY and TUI gateway streaming are individually stable.",
+              "note": "Complete: TDD landed Config.ChatTransport plus pty_chat/chat_sidecar dashboard panels and a non-blocking PtyChatSidecar publisher in internal/cli that keeps PTY byte transport and structured tool-event publication independently steerable. Sidecar sink failures mark the publisher unhealthy without ever reaching the PTY adapter, and the API server reports PTY/sidecar/chat panels with non-overlapping endpoint hints so the dashboard can degrade to API-only chat when PTY is unavailable.",
               "write_scope": [
                 "internal/apiserver/",
                 "internal/cli/",

@@ -146,6 +146,8 @@ func (s *Server) handleDashboardStatus(w http.ResponseWriter, r *http.Request) {
 		"oauth":         enabledPanel(dashboardPanelOptional, "/api/providers/oauth"),
 		"tool_progress": enabledPanel(dashboardPanelBuiltIn, "/v1/runs/{run_id}/events"),
 		"plugins":       disabledPanel(dashboardPanelOptionalExtension, dashboardPluginPanelReason(s.pluginInventory)),
+		"pty_chat":      dashboardPtyChatPanel(s.chatTransport),
+		"chat_sidecar":  dashboardChatSidecarPanel(s.chatTransport),
 	}
 	if s.loop == nil {
 		panels["chat"] = disabledPanel(dashboardPanelBuiltIn, "native turn loop is not configured")
@@ -310,6 +312,39 @@ func enabledPanel(category string, endpoints ...string) dashboardPanelStatus {
 
 func disabledPanel(category, reason string) dashboardPanelStatus {
 	return dashboardPanelStatus{State: "disabled", Category: category, Reason: reason}
+}
+
+// dashboardPtyChatPanel renders the dashboard's PTY chat transport panel.
+// The panel deliberately stays separate from the API-only `chat` panel so a
+// PTY outage degrades to API-only chat instead of taking the whole tab down.
+func dashboardPtyChatPanel(t ChatTransportStatus) dashboardPanelStatus {
+	if !t.PTYAvailable {
+		reason := strings.TrimSpace(t.PTYReason)
+		if reason == "" {
+			reason = "PTY chat transport is not configured"
+		}
+		return disabledPanel(dashboardPanelOptional, reason)
+	}
+	return enabledPanel(dashboardPanelOptional, "/api/pty")
+}
+
+// dashboardChatSidecarPanel renders the structured tool-event sidecar panel.
+// The sidecar can degrade independently of PTY (a publish failure must not
+// kill the PTY session), but it cannot run without PTY as its host process,
+// so an unavailable PTY cascades into a sidecar-disabled panel with a
+// PTY-anchored reason.
+func dashboardChatSidecarPanel(t ChatTransportStatus) dashboardPanelStatus {
+	if !t.PTYAvailable {
+		return disabledPanel(dashboardPanelOptional, "chat sidecar requires PTY transport")
+	}
+	if !t.SidecarAvailable {
+		reason := strings.TrimSpace(t.SidecarReason)
+		if reason == "" {
+			reason = "chat sidecar publisher is not configured"
+		}
+		return disabledPanel(dashboardPanelOptional, reason)
+	}
+	return enabledPanel(dashboardPanelOptional, "/api/pub", "/api/events")
 }
 
 func dashboardPluginPanelReason(inventory pluginmeta.Inventory) string {

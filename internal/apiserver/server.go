@@ -36,6 +36,18 @@ type Config struct {
 	ModelProviders  []DashboardModelProvider
 	OAuthProviders  []DashboardOAuthProvider
 	PluginInventory pluginmeta.Inventory
+	ChatTransport   ChatTransportStatus
+}
+
+// ChatTransportStatus describes the dashboard's embedded chat transports
+// (PTY-over-WebSocket plus the structured tool-event sidecar). The two
+// channels are intentionally separate so a sidecar publication failure can
+// be reported without taking the PTY session down with it.
+type ChatTransportStatus struct {
+	PTYAvailable     bool
+	PTYReason        string
+	SidecarAvailable bool
+	SidecarReason    string
 }
 
 // Server exposes the OpenAI-compatible HTTP routes that can be mounted by the
@@ -51,6 +63,7 @@ type Server struct {
 	modelProviders         []DashboardModelProvider
 	oauthProviders         []DashboardOAuthProvider
 	pluginInventory        pluginmeta.Inventory
+	chatTransport          ChatTransportStatus
 	statusMu               sync.Mutex
 	previousResponseMisses int
 	now                    func() time.Time
@@ -154,6 +167,7 @@ func NewServer(cfg Config) *Server {
 		modelProviders:  cloneDashboardModelProviders(cfg.ModelProviders),
 		oauthProviders:  cloneDashboardOAuthProviders(cfg.OAuthProviders),
 		pluginInventory: clonePluginInventory(cfg.PluginInventory),
+		chatTransport:   cfg.ChatTransport,
 		now:             time.Now,
 		mux:             http.NewServeMux(),
 	}
