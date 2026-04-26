@@ -28,8 +28,12 @@ import (
 var ErrEventMailboxFull = errors.New("kernel: event mailbox full")
 
 type Config struct {
-	Model             string
-	Endpoint          string
+	Model    string
+	Endpoint string
+	// ReasoningEffort, when non-empty, is the resident request default sent
+	// on each supported provider request. Empty leaves reasoning to the
+	// provider default and emits explicit default evidence in RenderFrame.
+	ReasoningEffort   string
 	Admission         Admission
 	Tools             *tools.Registry // nil → tool_calls are treated as fatal
 	MaxToolIterations int             // default 10 when zero
@@ -95,14 +99,15 @@ type Kernel struct {
 	// All fields below this line are OWNED EXCLUSIVELY by the Run goroutine.
 	// No other goroutine may read or write them without a channel-based
 	// handshake. Violating this invariant is a race.
-	phase       Phase
-	draft       string
-	history     []hermes.Message
-	soul        []SoulEntry
-	sessionID   string
-	activeModel string
-	lastError   string
-	retryStatus RetryStatus
+	phase           Phase
+	draft           string
+	history         []hermes.Message
+	soul            []SoulEntry
+	sessionID       string
+	activeModel     string
+	activeReasoning hermes.ReasoningEffortEvidence
+	lastError       string
+	retryStatus     RetryStatus
 }
 
 func New(cfg Config, c hermes.Client, s store.Store, tm telemetry.Telemetry, log *slog.Logger) *Kernel {
@@ -195,7 +200,7 @@ func (k *Kernel) Run(ctx context.Context) error {
 						k.sessionID = e.SessionID
 						defer func() { k.sessionID = prevSessionID }()
 					}
-					k.runTurn(ctx, e.Text, e.SessionContext, e.CronJobID, selectTurnModel(k.cfg.Model, e.Model))
+					k.runTurn(ctx, e.Text, e.SessionContext, e.CronJobID, selectTurnModel(k.cfg.Model, e.Model), e.ReasoningEffort)
 				}()
 			case PlatformEventCancel:
 				// No active turn; ignore (cancel during a turn is handled
@@ -231,10 +236,12 @@ func (k *Kernel) Run(ctx context.Context) error {
 // goroutine — this is part of the single-owner invariant.
 // cronJobID is non-empty for Phase 2.D cron-fired turns; it is passed through
 // to the store.Command payload and is otherwise opaque to the kernel.
-func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID, model string) {
+func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID, model, reasoningOverride string) {
 	prov := newProvenance(k.cfg.Endpoint)
 	turnKey := prov.LocalRunID
 	model = selectTurnModel(k.cfg.Model, model)
+	providerStatus := hermes.ProviderStatusOf(k.client)
+	reasoningEvidence := selectTurnReasoningEffort(k.cfg.ReasoningEffort, reasoningOverride, providerStatus)
 
 	// 1. Admission. Reject locally before any HTTP.
 	if err := k.cfg.Admission.Validate(text); err != nil {
@@ -272,6 +279,7 @@ func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID, m
 	k.lastError = ""
 	k.retryStatus = NewRetryStatus()
 	k.activeModel = model
+	k.activeReasoning = reasoningEvidence
 	k.phase = PhaseConnecting
 	k.emitFrame("connecting")
 	prov.LogPOSTSent(k.log)
@@ -325,6 +333,10 @@ func (k *Kernel) runTurn(ctx context.Context, text, sessionContext, cronJobID, m
 		SessionID: k.sessionID,
 		Stream:    true,
 		Messages:  msgs,
+	}
+	if reasoningEvidence.Forwarded {
+		effort := reasoningEvidence.Effort
+		request.ReasoningEffort = &effort
 	}
 	if k.cfg.Tools != nil {
 		descs := k.cfg.Tools.Descriptors()
@@ -393,6 +405,7 @@ toolLoop:
 				k.phase = PhaseFailed
 				k.lastError = err.Error()
 				k.activeModel = k.cfg.Model
+				k.activeReasoning = hermes.ReasoningEffortEvidence{}
 				k.emitFrame("open stream failed")
 				return
 			}
@@ -462,6 +475,7 @@ toolLoop:
 			k.phase = PhaseFailed
 			k.lastError = fmt.Sprintf("tool iteration limit exceeded (%d)", maxIter)
 			k.activeModel = k.cfg.Model
+			k.activeReasoning = hermes.ReasoningEffortEvidence{}
 			k.emitFrame(k.lastError)
 			return
 		}
@@ -514,6 +528,7 @@ toolLoop:
 		k.phase = PhaseFailed
 		k.lastError = fatalErr.Error()
 		k.activeModel = k.cfg.Model
+		k.activeReasoning = hermes.ReasoningEffortEvidence{}
 		k.emitFrame("stream error")
 		return
 	}
@@ -566,6 +581,7 @@ toolLoop:
 	prov.LogDone(k.log)
 	k.phase = PhaseIdle
 	k.activeModel = k.cfg.Model
+	k.activeReasoning = hermes.ReasoningEffortEvidence{}
 	k.emitFrame("idle")
 }
 
@@ -819,20 +835,22 @@ func (k *Kernel) emitFrame(status string) {
 		snapshot := k.cfg.ContextEngine.Status()
 		contextStatus = &snapshot
 	}
+	providerStatus := hermes.ProviderStatusOf(k.client)
 	frame := RenderFrame{
-		Seq:            k.seq.Add(1),
-		Phase:          k.phase,
-		DraftText:      k.draft,
-		History:        append([]hermes.Message(nil), k.history...),
-		Telemetry:      k.tm.Snapshot(),
-		StatusText:     status,
-		SessionID:      k.sessionID,
-		Model:          k.displayModel(),
-		ProviderStatus: hermes.ProviderStatusOf(k.client),
-		RetryStatus:    k.retryStatus.snapshot(),
-		LastError:      k.lastError,
-		SoulEvents:     append([]SoulEntry(nil), k.soul...),
-		ContextStatus:  contextStatus,
+		Seq:             k.seq.Add(1),
+		Phase:           k.phase,
+		DraftText:       k.draft,
+		History:         append([]hermes.Message(nil), k.history...),
+		Telemetry:       k.tm.Snapshot(),
+		StatusText:      status,
+		SessionID:       k.sessionID,
+		Model:           k.displayModel(),
+		ReasoningEffort: k.displayReasoningEffort(providerStatus),
+		ProviderStatus:  providerStatus,
+		RetryStatus:     k.retryStatus.snapshot(),
+		LastError:       k.lastError,
+		SoulEvents:      append([]SoulEntry(nil), k.soul...),
+		ContextStatus:   contextStatus,
 	}
 	// Drain old frame if present, then enqueue new.
 	select {
@@ -853,11 +871,25 @@ func (k *Kernel) displayModel() string {
 	return k.cfg.Model
 }
 
+func (k *Kernel) displayReasoningEffort(status hermes.ProviderStatus) hermes.ReasoningEffortEvidence {
+	if k.activeReasoning.State != "" {
+		return k.activeReasoning
+	}
+	return hermes.ResolveReasoningEffort(k.cfg.ReasoningEffort, hermes.ReasoningEffortSourceConfigDefault, status)
+}
+
 func selectTurnModel(residentModel, override string) string {
 	if model := strings.TrimSpace(override); model != "" {
 		return model
 	}
 	return residentModel
+}
+
+func selectTurnReasoningEffort(residentEffort, override string, status hermes.ProviderStatus) hermes.ReasoningEffortEvidence {
+	if effort := strings.TrimSpace(override); effort != "" {
+		return hermes.ResolveReasoningEffort(effort, hermes.ReasoningEffortSourceTurnOverride, status)
+	}
+	return hermes.ResolveReasoningEffort(residentEffort, hermes.ReasoningEffortSourceConfigDefault, status)
 }
 
 // cronFlag returns 1 when the turn carries a cron_job_id (Phase 2.D),

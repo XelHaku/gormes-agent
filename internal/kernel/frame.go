@@ -38,18 +38,19 @@ func (p Phase) String() string {
 // RenderFrame is the only TUI input. The TUI never assembles assistant text
 // from raw provider events; it renders this frame, full stop.
 type RenderFrame struct {
-	Seq            uint64
-	Phase          Phase
-	DraftText      string
-	History        []hermes.Message
-	Telemetry      telemetry.Snapshot
-	StatusText     string
-	SessionID      string
-	Model          string
-	ProviderStatus hermes.ProviderStatus
-	RetryStatus    RetryStatus
-	LastError      string
-	SoulEvents     []SoulEntry
+	Seq             uint64
+	Phase           Phase
+	DraftText       string
+	History         []hermes.Message
+	Telemetry       telemetry.Snapshot
+	StatusText      string
+	SessionID       string
+	Model           string
+	ReasoningEffort hermes.ReasoningEffortEvidence
+	ProviderStatus  hermes.ProviderStatus
+	RetryStatus     RetryStatus
+	LastError       string
+	SoulEvents      []SoulEntry
 	// ContextStatus snapshots the active ContextEngine status, when one is
 	// configured. Nil means no context engine has been wired for this kernel.
 	ContextStatus *hermes.ContextStatus
@@ -91,6 +92,11 @@ type PlatformEvent struct {
 	// mutated, so following turns fall back to Config.Model unless they carry
 	// their own override.
 	Model string
+	// ReasoningEffort, when non-empty after trimming whitespace, overrides
+	// Config.ReasoningEffort for this submit event only. The resident kernel
+	// configuration is not mutated, so following turns fall back to the
+	// configured/provider default unless they carry their own override.
+	ReasoningEffort string
 	// SessionID, when non-empty, overrides k.sessionID for this turn
 	// only. Used by the Phase 2.D cron executor so each cron fire has
 	// an isolated "cron:<job_id>:<unix_ts>" session. A non-cron event
