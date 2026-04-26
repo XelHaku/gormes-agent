@@ -11384,9 +11384,9 @@
             },
             {
               "name": "SSE streaming to Bubble Tea TUI",
-              "status": "planned",
+              "status": "complete",
               "contract": "Remote Bubble Tea clients can consume native Gormes turn events over SSE without the Python tui_gateway process",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "gateway",
               "trust_class": [
@@ -11423,7 +11423,7 @@
                 "NewGatewayMux or equivalent exposes submit/cancel/resize/platform-event endpoints over native Go HTTP handlers.",
                 "`--remote <url>` startup threading is fixture-covered without starting api_server, Python, Node, or a live provider."
               ],
-              "note": "TDD: port only the transport/lifecycle wiring after helper rows land. This slice owns DialSSE/NewRemoteClient/NewGatewayMux/JSONRPC-style dispatch/PostPlatformEvent and `--remote <url>` threading through runTUI; helper primitives and TUI launch model semantics stay in their own rows.",
+              "note": "Complete: internal/tuigateway/sse_stream.go ports DialSSE/NewRemoteClient with reconnect, cancellation, and POST helpers (Submit/Cancel/Resize/PostPlatformEvent) covered by sse_stream_test.go fixtures. internal/tuigateway/gateway_mux.go exposes /events SSE plus /submit /cancel /resize /platform-event endpoints, dispatched into a KernelHandle and covered by gateway_mux_test.go. cmd/gormes/remote_tui.go wires --remote <url> through runResolvedTUIWithRuntime, bypassing api_server health, hermes HTTP, and the kernel; remote_tui_test.go proves no Python/Node/api_server contact at startup. doctor TUI status surfaces remote streaming evidence so the degraded path is visible without --remote.",
               "write_scope": [
                 "internal/tuigateway/",
                 "cmd/gormes/",

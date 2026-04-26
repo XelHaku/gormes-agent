@@ -36,6 +36,11 @@ func doctorTUIStatus() doctor.CheckResult {
 				Status: doctor.StatusPass,
 				Note:   "offline mode keeps the same native TUI path without a JavaScript bundle build step",
 			},
+			{
+				Name:   "remote",
+				Status: doctor.StatusPass,
+				Note:   "remote streaming via --remote <url> consumes native Gormes turn events over SSE; without --remote the local Bubble Tea path remains the runtime",
+			},
 		},
 	}
 }

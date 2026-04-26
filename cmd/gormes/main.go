@@ -57,6 +57,13 @@ type rootRuntime struct {
 type tuiInvocation struct {
 	Inference config.TUIInferenceResolution
 	Config    config.Config
+	// RemoteURL, when non-empty, switches startup to remote-TUI mode:
+	// gormes connects to the gateway's SSE event stream instead of
+	// instantiating a local kernel + hermes HTTP client. The api_server
+	// health check is skipped because the operator's brain lives on
+	// the remote side. Empty leaves Phase-1 local Bubble Tea behavior
+	// intact.
+	RemoteURL string
 }
 
 type oneshotInvocation struct {
@@ -105,6 +112,7 @@ func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
 	root.Flags().String("provider", "", "provider override for --oneshot or TUI startup; also settable via GORMES_INFERENCE_PROVIDER")
 	root.Flags().Bool("offline", false, "skip startup api_server health check (dev only — turns the TUI into a cosmetic smoke-tester)")
 	root.Flags().String("resume", "", "override persisted session_id for the TUI's default key")
+	root.Flags().String("remote", "", "connect the TUI to a remote Gormes gateway over SSE (consumes /events; bypasses api_server, kernel, and provider setup)")
 	root.AddCommand(doctorCmd, versionCmd, telegramCmd, gatewayCmd, sessionCmd, memoryCmd, gonchoCmd)
 	return root
 }
@@ -153,10 +161,11 @@ func resolveOneshotInvocation(cmd *cobra.Command) (oneshotInvocation, error) {
 func resolveTUIInvocation(cmd *cobra.Command) (tuiInvocation, error) {
 	modelFlag, _ := cmd.Flags().GetString("model")
 	providerFlag, _ := cmd.Flags().GetString("provider")
+	remoteFlag, _ := cmd.Flags().GetString("remote")
 
 	cfg, err := config.Load(nil)
 	if err != nil {
-		return tuiInvocation{}, err
+		return tuiInvocation{RemoteURL: remoteFlag}, err
 	}
 	resolution, err := config.ResolveTUIInference(config.TUIInferenceRequest{
 		Config:       cfg,
@@ -167,6 +176,7 @@ func resolveTUIInvocation(cmd *cobra.Command) (tuiInvocation, error) {
 	invocation := tuiInvocation{
 		Inference: resolution,
 		Config:    cfg,
+		RemoteURL: remoteFlag,
 	}
 	if err != nil {
 		return invocation, newExitCodeError(2, err)
@@ -342,6 +352,13 @@ func runResolvedTUIWithRuntime(cmd *cobra.Command, invocation tuiInvocation, run
 	runNativeTUIStartupPreflight(context.Background(), tuiStartupPreflightOptions{})
 	if runtime.tuiProgramFactory == nil {
 		runtime.tuiProgramFactory = defaultTUIProgramFactory
+	}
+
+	// --remote <url> bypasses kernel/hermes/api_server entirely and runs
+	// the SSE-backed remote TUI instead. Local Bubble Tea behaviour is
+	// preserved when --remote is empty.
+	if invocation.RemoteURL != "" {
+		return runRemoteTUIWithRuntime(cmd, invocation, runtime)
 	}
 
 	cfg := invocation.Config
