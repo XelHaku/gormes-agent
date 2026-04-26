@@ -6764,9 +6764,9 @@
             },
             {
               "name": "CLI banner/output formatting helpers",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure CLI banner and output formatting helpers match upstream deterministic text behavior without terminal or command-registry coupling",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -6795,7 +6795,7 @@
                 "Output helpers return strings or writer-bound functions with deterministic newline and prompt behavior.",
                 "Tests run without terminal/TTY detection, clock access, config files, or network calls."
               ],
-              "note": "Split from the prior all-helper 5.O row so workers can land the banner/output foundation without colliding with tips, webhook, dump, or command registry work.",
+              "note": "Complete: TDD added pure internal/cli banner and output formatting helpers without command wiring. Fixtures prove Hermes-compatible context length rounding, toolset display normalization, injected banner version labels, plain output lines, writer-bound newline behavior, and prompt/default parsing without TTY detection, config files, clock access, or network calls.",
               "write_scope": [
                 "internal/cli/banner.go",
                 "internal/cli/banner_output_test.go",
