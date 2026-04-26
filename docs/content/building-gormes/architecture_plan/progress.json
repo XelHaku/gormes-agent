@@ -8940,9 +8940,9 @@
             },
             {
               "name": "CLI webhook URL normalizer",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds a pure function `NormalizeWebhookURL(raw string) (string, error)` that trims whitespace, requires scheme http or https, strips trailing slashes from the path, lowercases the host, rejects userinfo (raw URLs containing '@' before the host) with a sentinel error, and returns the canonicalized URL string; no network call is made",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
