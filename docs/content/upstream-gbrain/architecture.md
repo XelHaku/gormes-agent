@@ -140,6 +140,7 @@ query
   -> optional embedding and vector search
   -> Reciprocal Rank Fusion
   -> compiled-truth boost
+  -> source-aware curated/bulk weighting
   -> cosine re-score
   -> backlink boost
   -> dedup
@@ -157,6 +158,7 @@ FTS5 lexical seeds
   + graph traversal
   + local semantic seeds
   + recency/freshness weighting
+  + source-tier boosts/excludes with temporal bypass
   -> deterministic fusion
   -> context fence
 ```
