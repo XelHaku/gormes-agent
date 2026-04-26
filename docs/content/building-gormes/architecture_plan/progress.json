@@ -11226,9 +11226,9 @@
             {
               "name": "Native TUI /branch session fork + transcript target switch",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Native Bubble Tea TUI adds a `/branch [name]` slash handler using an injected SessionBranchFunc(ctx context.Context, req BranchRequest) (BranchResult, error). BranchRequest carries ParentSessionID, Title, and HistoryCount; BranchResult carries SessionID, ParentSessionID, Title, and TranscriptCopied. The handler refuses empty conversation history, never submits `/branch` to the kernel, calls the injected function with the current frame SessionID, updates the model's active SessionID to the returned branch SessionID, clears per-session pending UI state, and ensures subsequent turns persist under the branch session rather than the parent. The backing session/transcript helper copies persisted turns from parent to child and writes session.Metadata with ParentSessionID=parent and LineageKind=session.LineageKindFork; ResolveLineageTip must continue ignoring fork children.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "medium",
               "execution_owner": "gateway",
               "trust_class": [
@@ -11266,7 +11266,7 @@
                 "TestSlashBranch_HappyPathSwitchesSessionIDAndDoesNotSubmit wires a fake SessionBranchFunc, asserts the model SessionID changes to the child, the fake sees the parent ID, and kernel.Submit is not called.",
                 "TestSlashBranch_CustomNamePreserved passes `/branch refactor path` and asserts BranchRequest.Title=`refactor path`."
               ],
-              "note": "Tracks Hermes 0824ba6a, which fixed /branch so post-branch writes target the branch session log and branch sessions remain visible in session lists while delegate/compression children stay hidden. Gormes adapts this to native session IDs, transcript copying, and fork lineage rather than Python session_log_file paths.",
+              "note": "Complete: internal/session.Fork orchestrates a fork via an injected TurnCopier and writes Metadata{ParentSessionID, LineageKindFork}; internal/transcript.ForkTurns runs a single INSERT…SELECT to duplicate parent rows under the child session_id without rewriting the parent; internal/tui adds a /branch slash handler wired through SessionBranchFunc on Options, exposes Model.SessionID() that prefers the locally-tracked branch session over the kernel frame, and keeps the slash text from ever reaching kernel.Submit. Tracks Hermes 0824ba6a, which fixed /branch so post-branch writes target the branch session log and branch sessions remain visible in session lists while delegate/compression children stay hidden. Gormes adapts this to native session IDs, transcript copying, and fork lineage rather than Python session_log_file paths.",
               "write_scope": [
                 "internal/session/fork.go",
                 "internal/session/fork_test.go",

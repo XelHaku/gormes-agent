@@ -26,6 +26,11 @@ type Canceller func()
 type Options struct {
 	MouseTracking bool
 	MouseModeCmd  func(enabled bool) tea.Cmd
+	// SessionBranch is the injected fork helper invoked by the /branch
+	// slash command. nil disables /branch (handler returns
+	// `branch: store unavailable`); cmd/gormes wires the real
+	// session.Fork-backed implementation in main.go.
+	SessionBranch SessionBranchFunc
 }
 
 // Model is the Bubble Tea state. The only external dependency is the
@@ -48,6 +53,13 @@ type Model struct {
 	mouseTracking bool
 	mouseModeCmd  func(enabled bool) tea.Cmd
 	statusMessage string
+
+	// sessionID, when non-empty, is the locally-tracked active session
+	// owned by a successful /branch fork. SessionID() prefers it over
+	// frame.SessionID so subsequent UI reads see the branch session even
+	// before the kernel acks the switch on its next render frame.
+	sessionID     string
+	sessionBranch SessionBranchFunc
 
 	slashRegistry *SlashRegistry
 }
@@ -74,8 +86,20 @@ func NewModelWithOptions(frames <-chan kernel.RenderFrame, submit Submitter, can
 		cancel:        cancel,
 		mouseTracking: opts.MouseTracking,
 		mouseModeCmd:  opts.MouseModeCmd,
+		sessionBranch: opts.SessionBranch,
 		slashRegistry: NewDefaultSlashRegistry(),
 	}
+}
+
+// SessionID returns the model's active session identifier. A locally-tracked
+// branch session (set by the /branch slash handler) takes precedence over the
+// kernel-supplied frame.SessionID so the TUI surfaces the fork target even
+// before the next render frame arrives.
+func (m *Model) SessionID() string {
+	if m.sessionID != "" {
+		return m.sessionID
+	}
+	return m.frame.SessionID
 }
 
 // frameMsg wraps an incoming kernel.RenderFrame as a Bubble Tea message so
