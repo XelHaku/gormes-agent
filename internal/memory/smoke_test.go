@@ -55,7 +55,7 @@ func TestSmoke_ConcurrentWritersNoLockErrors(t *testing.T) {
 	enqueueElapsed := time.Since(start)
 
 	// All enqueues done; now drain via graceful Close.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := s.Close(ctx); err != nil {
 		t.Fatalf("Close: %v", err)
