@@ -26,6 +26,9 @@ Non-dry-run builder cycles take the shared planner-loop `run.lock` before
 checkpointing, PR intake, worker claims, promotions, or health writes. If the
 planner loop is already regenerating the control plane, builder emits
 `run_blocked:control_plane_locked` and exits before touching the queue.
+In `run --loop` mode, the builder waits for its cycle to finish and release the
+shared lock before invoking `go run ./cmd/planner-loop run`. The next builder
+cycle starts only after that planner run exits successfully.
 
 ## Run Modes
 
@@ -39,6 +42,13 @@ Run the selected work through the configured backend:
 
 ```sh
 go run ./cmd/builder-loop run
+```
+
+Run continuously, scheduling one planner refresh after each completed builder
+cycle:
+
+```sh
+go run ./cmd/builder-loop run --loop
 ```
 
 Validate or regenerate the progress control plane:
@@ -64,6 +74,8 @@ Useful environment variables:
 - `BUILDER_LOOP_BACKEND_TIMEOUT`: cap each worker or repair backend invocation
   so a stuck agent cannot park the infinite loop forever. Defaults to `30m`.
   The legacy `AUTOLOOP_BACKEND_TIMEOUT` is read as a fallback for back-compat.
+- `BUILDER_LOOP_SLEEP`: delay between a successful planner refresh and the next
+  builder cycle in `run --loop` mode. Defaults to `30s`.
 - `MAX_AGENTS`: cap selected rows for one run. If fewer rows are metadata-ready,
   the builder loop runs fewer workers instead of choosing filler or random work. In a
   git checkout, selected workers run concurrently when this is greater than

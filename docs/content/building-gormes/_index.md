@@ -82,6 +82,12 @@ it emits `run_completed` or `health_updated`. If the suite fails, the builder lo
 one backend repair attempt by default, requires the checkout to be clean, reruns
 the suite, and records final health only after the repaired integration passes.
 
+For long-running operation, `cmd/builder-loop run --loop` is the steady-state
+cadence owner: one builder cycle completes, run health and promotions are
+recorded, the shared planner lock is released, one synchronous
+`cmd/planner-loop run` refreshes the control plane, and then the next builder
+cycle starts from the updated `progress.json`.
+
 ## Contributor path
 
 Use the planning docs in this order:
