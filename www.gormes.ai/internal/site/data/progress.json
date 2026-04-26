@@ -4259,9 +4259,19 @@
                 "Azure Foundry fixtures prove deterministic transport detection, advisory model/context evidence, manual fallback, env-var resolution, and redacted status with no live Azure dependency."
               ],
               "health": {
-                "attempt_count": 83,
-                "last_attempt": "2026-04-26T06:37:27Z",
-                "last_success": "2026-04-26T06:37:27Z"
+                "attempt_count": 84,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T07:00:28Z",
+                "last_success": "2026-04-26T06:37:27Z",
+                "last_failure": {
+                  "run_id": "20260426T070020Z-039354392",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry endpoint autodetect + model context read model"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
               },
               "provenance": {
                 "origin_type": "upstream",
