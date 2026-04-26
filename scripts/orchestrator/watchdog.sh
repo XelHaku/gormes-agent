@@ -46,16 +46,25 @@ checkpoint_dirty() {
   last_subject=$(git log -1 --pretty=%s 2>/dev/null || true)
   case "$last_subject" in
     "builder-loop: watchdog checkpoint "*|"builder-loop: checkpoint dirty worktree "*)
-      if ! git -c user.name="Gormes Builder Loop" -c user.email="builder-loop@gormes.local" -c commit.gpgsign=false commit --amend --no-edit; then
-        log "git commit failed or had nothing to commit during watchdog checkpoint"
+      if ! head_published_to_upstream; then
+        if ! git -c user.name="Gormes Builder Loop" -c user.email="builder-loop@gormes.local" -c commit.gpgsign=false commit --amend --no-edit; then
+          log "git commit failed or had nothing to commit during watchdog checkpoint"
+        fi
+        return 0
       fi
-      return 0
       ;;
   esac
 
   if ! git -c user.name="Gormes Builder Loop" -c user.email="builder-loop@gormes.local" -c commit.gpgsign=false commit -m "builder-loop: watchdog checkpoint $ts"; then
     log "git commit failed or had nothing to commit during watchdog checkpoint"
   fi
+}
+
+head_published_to_upstream() {
+  if ! git rev-parse --verify '@{upstream}' >/dev/null 2>&1; then
+    return 1
+  fi
+  git merge-base --is-ancestor HEAD '@{upstream}' >/dev/null 2>&1
 }
 
 restart_service() {
