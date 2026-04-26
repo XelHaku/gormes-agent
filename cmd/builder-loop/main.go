@@ -158,7 +158,7 @@ func run(ctx context.Context, deps cliDeps, args []string) error {
 		if err != nil {
 			return err
 		}
-		return runAutoloop(ctx, deps, cfg, runOpts.dryRun)
+		return runAutoloop(ctx, deps, root, cfg, runOpts)
 	case args[0] == "progress":
 		if wantsHelp(args[1:]) {
 			key := "progress"
@@ -519,25 +519,85 @@ func digestRunRoot(root string) string {
 	return filepath.Join(root, ".codex", "orchestrator")
 }
 
-func runAutoloop(ctx context.Context, deps cliDeps, cfg builderloop.Config, dryRun bool) error {
-	summary, err := builderloop.RunOnce(ctx, builderloop.RunOptions{
-		Config: cfg,
-		DryRun: dryRun,
-	})
-	if err != nil {
-		return err
-	}
+type autoloopRuntime struct {
+	runBuilder func(context.Context, builderloop.Config, bool) (builderloop.RunSummary, error)
+	runPlanner func(context.Context) error
+	sleep      func(context.Context, time.Duration) error
+}
 
-	fmt.Fprintf(deps.stdout, "candidates: %d\nselected: %d\n", summary.Candidates, len(summary.Selected))
+func defaultAutoloopRuntime(deps cliDeps, root string) autoloopRuntime {
+	runner := deps.runner
+	if runner == nil {
+		runner = cmdrunner.ExecRunner{}
+	}
+	return autoloopRuntime{
+		runBuilder: func(ctx context.Context, cfg builderloop.Config, dryRun bool) (builderloop.RunSummary, error) {
+			return builderloop.RunOnce(ctx, builderloop.RunOptions{
+				Config: cfg,
+				Runner: runner,
+				DryRun: dryRun,
+			})
+		},
+		runPlanner: func(ctx context.Context) error {
+			result := runner.Run(ctx, cmdrunner.Command{
+				Name: "go",
+				Args: []string{"run", "./cmd/planner-loop", "run"},
+				Dir:  root,
+			})
+			if result.Err != nil {
+				detail := strings.TrimSpace(result.Stderr)
+				if detail != "" {
+					return fmt.Errorf("planner command go run ./cmd/planner-loop run failed: %w: %s", result.Err, detail)
+				}
+				return fmt.Errorf("planner command go run ./cmd/planner-loop run failed: %w", result.Err)
+			}
+			return nil
+		},
+		sleep: sleepContext,
+	}
+}
+
+func runAutoloop(ctx context.Context, deps cliDeps, root string, cfg builderloop.Config, opts runOptions) error {
+	interval := time.Duration(0)
+	if opts.loop {
+		interval = 30 * time.Second
+	}
+	return runAutoloopWithRuntime(ctx, deps, cfg, opts, interval, defaultAutoloopRuntime(deps, root))
+}
+
+func runAutoloopWithRuntime(ctx context.Context, deps cliDeps, cfg builderloop.Config, opts runOptions, interval time.Duration, runtime autoloopRuntime) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		summary, err := runtime.runBuilder(ctx, cfg, opts.dryRun)
+		if err != nil {
+			return err
+		}
+		printAutoloopSummary(deps.stdout, summary)
+		if !opts.loop {
+			return nil
+		}
+		if err := runtime.runPlanner(ctx); err != nil {
+			return err
+		}
+		if err := runtime.sleep(ctx, interval); err != nil {
+			return err
+		}
+	}
+}
+
+func printAutoloopSummary(w io.Writer, summary builderloop.RunSummary) {
+	fmt.Fprintf(w, "candidates: %d\nselected: %d\n", summary.Candidates, len(summary.Selected))
 	if summary.MaxPhaseFiltered > 0 {
-		fmt.Fprintf(deps.stdout, "max_phase_filtered: %d\nnext_max_phase: %d\nhint: rerun with MAX_PHASE=%d to include the next queued phase\n",
+		fmt.Fprintf(w, "max_phase_filtered: %d\nnext_max_phase: %d\nhint: rerun with MAX_PHASE=%d to include the next queued phase\n",
 			summary.MaxPhaseFiltered,
 			summary.NextFilteredMaxPhase,
 			summary.NextFilteredMaxPhase,
 		)
 	}
 	for _, candidate := range summary.Selected {
-		fmt.Fprintf(deps.stdout, "- %s/%s %s [%s] owner=%s size=%s reason=%s\n",
+		fmt.Fprintf(w, "- %s/%s %s [%s] owner=%s size=%s reason=%s\n",
 			candidate.PhaseID,
 			candidate.SubphaseID,
 			candidate.ItemName,
@@ -547,8 +607,25 @@ func runAutoloop(ctx context.Context, deps cliDeps, cfg builderloop.Config, dryR
 			dashIfEmpty(candidate.SelectionReason()),
 		)
 	}
+}
 
-	return nil
+func sleepContext(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			return nil
+		}
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func dashIfEmpty(value string) string {
