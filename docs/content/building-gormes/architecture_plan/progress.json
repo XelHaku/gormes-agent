@@ -7422,9 +7422,9 @@
             },
             {
               "name": "Skills list — enabled/disabled status column + --enabled-only filter",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/skills/list.go exposes type SkillStatus string (\"enabled\", \"disabled\"), extends SkillRow with a Status field and adds ListOptions{Source string; EnabledOnly bool}. ListInstalledSkills(opts ListOptions, disabled map[string]struct{}) []SkillRow returns every installed skill annotated with Status from the disabled set; when opts.EnabledOnly is true, disabled rows are filtered out. The CLI surface (gormes skills list --source <s> --enabled-only) calls this helper and prints a table with a Status column plus a summary \"N enabled, M disabled\" (or \"K enabled shown\" when --enabled-only). No platform-aware override read in this slice — disabled set comes from the active profile only, mirroring upstream do_list semantics.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "skills",
               "trust_class": [
