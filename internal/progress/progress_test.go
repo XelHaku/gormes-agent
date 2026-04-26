@@ -57,9 +57,9 @@ func TestLoad_RealFile(t *testing.T) {
 	if err := Validate(p); err != nil {
 		t.Fatalf("Validate() = %v, want nil", err)
 	}
-	// Phase 1 has all dashboard and automation-reliability rows shipped.
-	if got := p.Phases["1"].DerivedStatus(); got != StatusComplete {
-		t.Errorf("Phase 1 = %q, want complete", got)
+	// Phase 1 has shipped dashboard rows plus planned loop-reliability rows.
+	if got := p.Phases["1"].DerivedStatus(); got != StatusInProgress {
+		t.Errorf("Phase 1 = %q, want in_progress", got)
 	}
 	// Phase 2 has 2.A, 2.B.1, 2.C complete and more planned -> in_progress.
 	if got := p.Phases["2"].DerivedStatus(); got != StatusInProgress {
