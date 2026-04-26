@@ -5316,9 +5316,9 @@
             },
             {
               "name": "Bedrock stale-client eviction + retry classification",
-              "status": "planned",
+              "status": "complete",
               "contract": "Bedrock runtime clients evict stale transport state without hiding request or validation failures",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -5355,7 +5355,7 @@
                 "TestBedrockRuntimeCache_DoesNotEvictValidationOrAuthFailures leaves the region client cached when the error class is validation, auth, missing credential, or malformed request.",
                 "TestBedrockRuntimeCache_EvictsOnConverseAndConverseStreamStaleFailures proves both fake call paths evict only after a stale classification and return the original error to the caller."
               ],
-              "note": "Refined 2026-04-26T22:45:56Z after making the SigV4 blocker executable. The row now names the exact fake cache/classifier tests and forbids AWS SDK or live network work; it should land after the signing/credential seam, not before.",
+              "note": "Complete: TDD added a fakeable Bedrock runtime client cache and stale-error classifier in internal/hermes/bedrock_client_cache.go and internal/hermes/bedrock_stale_error.go. Fixtures prove per-region eviction, transport sentinel classification, urllib3/botocore assertion gating, non-retryable validation/auth/missing-credential/malformed-request status, and Converse/ConverseStream stale-error eviction while returning the original error. The slice imports no AWS SDK, opens no network, reads no AWS profile files, and does not change Bedrock request or stream payload mapping.",
               "write_scope": [
                 "internal/hermes/bedrock_client_cache.go",
                 "internal/hermes/bedrock_client_cache_test.go",
@@ -5371,6 +5371,11 @@
               "done_signal": [
                 "Bedrock fake-cache fixtures prove per-region eviction, stale transport classification, library-assertion gating, and no eviction for validation/auth/missing-credential failures."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T23:31:29Z",
+                "last_success": "2026-04-26T23:31:29Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:755a2804 agent/bedrock_adapter.py",
