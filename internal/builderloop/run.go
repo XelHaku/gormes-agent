@@ -3,6 +3,7 @@ package builderloop
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -113,25 +114,25 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 					return RunSummary{}, err
 				}
 			} else {
-			result := runLoggedOperation(opts.Config, runID, jobSpec{
-				ID:            fmt.Sprintf("%s/pr-intake/1", runID),
-				Kind:          "pr_intake",
-				Command:       "MergeOpenPullRequests",
-				Dir:           opts.Config.RepoRoot,
-				FailureStatus: "pr_intake_failed",
-			}, func() Result {
-				_, err := MergeOpenPullRequests(ctx, PullRequestIntakeOptions{
-					Runner:         runner,
-					RepoRoot:       opts.Config.RepoRoot,
-					RunRoot:        opts.Config.RunRoot,
-					RunID:          runID,
-					ConflictAction: opts.Config.PRConflictAction,
+				result := runLoggedOperation(opts.Config, runID, jobSpec{
+					ID:            fmt.Sprintf("%s/pr-intake/1", runID),
+					Kind:          "pr_intake",
+					Command:       "MergeOpenPullRequests",
+					Dir:           opts.Config.RepoRoot,
+					FailureStatus: "pr_intake_failed",
+				}, func() Result {
+					_, err := MergeOpenPullRequests(ctx, PullRequestIntakeOptions{
+						Runner:         runner,
+						RepoRoot:       opts.Config.RepoRoot,
+						RunRoot:        opts.Config.RunRoot,
+						RunID:          runID,
+						ConflictAction: opts.Config.PRConflictAction,
+					})
+					return Result{Err: err}
 				})
-				return Result{Err: err}
-			})
-			if result.Err != nil {
-				return RunSummary{}, result.Err
-			}
+				if result.Err != nil {
+					return RunSummary{}, result.Err
+				}
 			}
 		}
 	}
@@ -1664,6 +1665,75 @@ func appendRunLedgerEvent(cfg Config, event LedgerEvent) error {
 		return nil
 	}
 	return AppendLedgerEvent(filepath.Join(cfg.RunRoot, "state", "runs.jsonl"), event)
+}
+
+func runHealthMixDetail(selected []Candidate) string {
+	var selfImprovement, userFeature, unknown int
+	for _, candidate := range selected {
+		switch classifyRunHealthWork(candidate) {
+		case "self_improvement":
+			selfImprovement++
+		case "user_feature":
+			userFeature++
+		default:
+			unknown++
+		}
+	}
+
+	ratio := 0.0
+	if denom := selfImprovement + userFeature; denom > 0 {
+		ratio = float64(selfImprovement) / float64(denom)
+	}
+	return fmt.Sprintf("self_improvement=%d user_feature=%d unknown=%d self_ratio=%.2f basis=selected",
+		selfImprovement,
+		userFeature,
+		unknown,
+		ratio,
+	)
+}
+
+func classifyRunHealthWork(candidate Candidate) string {
+	if candidateTouchesLoopControlPlane(candidate) {
+		return "self_improvement"
+	}
+	switch strings.ToLower(strings.TrimSpace(candidate.ExecutionOwner)) {
+	case "orchestrator":
+		return "self_improvement"
+	case "":
+		if len(candidate.WriteScope) == 0 {
+			return "unknown"
+		}
+	}
+	return "user_feature"
+}
+
+func candidateTouchesLoopControlPlane(candidate Candidate) bool {
+	values := []string{
+		candidate.ItemName,
+		candidate.Contract,
+		candidate.Fixture,
+		candidate.Note,
+	}
+	values = append(values, candidate.SourceRefs...)
+	values = append(values, candidate.WriteScope...)
+	values = append(values, candidate.TestCommands...)
+
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		switch {
+		case strings.Contains(value, "cmd/builder-loop"),
+			strings.Contains(value, "cmd/planner-loop"),
+			strings.Contains(value, "internal/builderloop"),
+			strings.Contains(value, "internal/plannerloop"),
+			strings.Contains(value, "scripts/orchestrator"),
+			strings.Contains(value, "docs/content/building-gormes/builder-loop"),
+			strings.Contains(value, "docs/content/building-gormes/planner-loop"),
+			strings.Contains(value, "builder-loop"),
+			strings.Contains(value, "planner-loop"):
+			return true
+		}
+	}
+	return false
 }
 
 func shouldBackOffPullRequestIntake(cfg Config, now time.Time) (bool, string) {
