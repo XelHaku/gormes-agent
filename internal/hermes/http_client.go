@@ -54,6 +54,13 @@ func NewHTTPClientWithProvider(baseURL, apiKey, provider string) Client {
 
 func (c *httpClient) ProviderStatus() ProviderStatus {
 	status := openAICompatibleProviderStatus(c.provider, c.baseURL)
+	if openAICompatibleIsAzureOpenAI(c.provider, c.baseURL) {
+		evidence := []string{"azure_chat_completions"}
+		if openAICompatibleBaseURLHasQuery(c.baseURL) {
+			evidence = append([]string{"azure_query_preserved"}, evidence...)
+		}
+		status.Capabilities.BudgetTelemetry.Reason = appendProviderStatusEvidence(status.Capabilities.BudgetTelemetry.Reason, evidence...)
+	}
 	c.mu.Lock()
 	status.TemperatureRetry = c.temperatureRetry
 	status.UnsupportedParameterRetry = c.parameterRetry
@@ -108,12 +115,13 @@ type orToolDescriptor struct {
 }
 
 type orChatRequest struct {
-	Model       string             `json:"model"`
-	Messages    []orMessage        `json:"messages"`
-	Stream      bool               `json:"stream"`
-	MaxTokens   int                `json:"max_tokens,omitempty"`
-	Temperature *float64           `json:"temperature,omitempty"`
-	Tools       []orToolDescriptor `json:"tools,omitempty"`
+	Model               string             `json:"model"`
+	Messages            []orMessage        `json:"messages"`
+	Stream              bool               `json:"stream"`
+	MaxTokens           int                `json:"max_tokens,omitempty"`
+	MaxCompletionTokens int                `json:"max_completion_tokens,omitempty"`
+	Temperature         *float64           `json:"temperature,omitempty"`
+	Tools               []orToolDescriptor `json:"tools,omitempty"`
 }
 
 func (c *httpClient) OpenStream(ctx context.Context, req ChatRequest) (Stream, error) {
@@ -186,13 +194,15 @@ func (c *httpClient) buildOpenAICompatibleChatRequestBody(req ChatRequest) ([]by
 			}{Name: t.Name, Description: t.Description, Parameters: t.Schema},
 		}
 	}
+	maxTokens, maxCompletionTokens := openAICompatibleMaxTokenFields(req.MaxTokens, c.provider, c.baseURL, req.Model)
 	body, err := json.Marshal(orChatRequest{
-		Model:       req.Model,
-		Messages:    msgs,
-		Stream:      true,
-		MaxTokens:   req.MaxTokens,
-		Temperature: req.Temperature,
-		Tools:       tools,
+		Model:               req.Model,
+		Messages:            msgs,
+		Stream:              true,
+		MaxTokens:           maxTokens,
+		MaxCompletionTokens: maxCompletionTokens,
+		Temperature:         req.Temperature,
+		Tools:               tools,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -227,7 +237,7 @@ func (c *httpClient) doChatCompletions(ctx context.Context, req ChatRequest, bod
 	// Header-phase budget enforced by Transport.ResponseHeaderTimeout (5s).
 	// The request ctx governs the full response lifetime including body reads —
 	// do NOT cancel it after Do returns or streaming breaks.
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+defaultChatCompletionsPath, bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.openAICompatibleURL(defaultChatCompletionsPath), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +255,84 @@ func (c *httpClient) doChatCompletions(ctx context.Context, req ChatRequest, bod
 		return nil, err
 	}
 	return resp, nil
+}
+
+func (c *httpClient) openAICompatibleURL(endpointPath string) string {
+	rawBaseURL := strings.TrimSpace(c.baseURL)
+	if rawBaseURL == "" {
+		return endpointPath
+	}
+	parsed, err := url.Parse(rawBaseURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return rawBaseURL + endpointPath
+	}
+
+	basePath := strings.TrimRight(parsed.Path, "/")
+	endpointPath = "/" + strings.TrimLeft(endpointPath, "/")
+	if basePath == "" {
+		parsed.Path = endpointPath
+	} else {
+		parsed.Path = basePath + endpointPath
+	}
+	parsed.RawPath = ""
+	return parsed.String()
+}
+
+func openAICompatibleMaxTokenFields(maxTokens int, provider, baseURL, model string) (int, int) {
+	if maxTokens <= 0 {
+		return 0, 0
+	}
+	if openAICompatibleIsAzureOpenAI(provider, baseURL) && openAICompatibleUsesMaxCompletionTokens(model) {
+		return 0, maxTokens
+	}
+	return maxTokens, 0
+}
+
+func openAICompatibleIsAzureOpenAI(provider, baseURL string) bool {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	switch strings.ReplaceAll(provider, "_", "-") {
+	case "azure", "azure-openai", "openai-azure":
+		return true
+	}
+	return strings.Contains(strings.ToLower(baseURL), "openai.azure.com")
+}
+
+func openAICompatibleUsesMaxCompletionTokens(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	if slash := strings.LastIndex(model, "/"); slash >= 0 {
+		model = model[slash+1:]
+	}
+	return strings.HasPrefix(model, "gpt-5") || openAICompatibleIsOSeriesModel(model)
+}
+
+func openAICompatibleIsOSeriesModel(model string) bool {
+	for _, prefix := range []string{"o1", "o3", "o4", "o5"} {
+		if model == prefix || strings.HasPrefix(model, prefix+"-") {
+			return true
+		}
+	}
+	return false
+}
+
+func openAICompatibleBaseURLHasQuery(baseURL string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(baseURL))
+	return err == nil && parsed.RawQuery != ""
+}
+
+func appendProviderStatusEvidence(reason string, evidence ...string) string {
+	reason = strings.TrimSpace(reason)
+	for _, item := range evidence {
+		item = strings.TrimSpace(item)
+		if item == "" || strings.Contains(reason, item) {
+			continue
+		}
+		if reason == "" {
+			reason = item
+			continue
+		}
+		reason += "; " + item
+	}
+	return reason
 }
 
 func (c *httpClient) recordTemperatureRetry(model string, err *HTTPError) {

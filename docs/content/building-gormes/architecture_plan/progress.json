@@ -4083,9 +4083,9 @@
             {
               "name": "Azure OpenAI query/default_query transport contract",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "OpenAI-compatible Azure endpoints preserve api-version query parameters and keep GPT-5.x deployments on chat/completions with max_completion_tokens semantics instead of upgrading to Codex Responses",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4118,7 +4118,7 @@
                 "Azure OpenAI o-series and GPT-5 fixtures emit or retry to max_completion_tokens without changing non-Azure generic providers.",
                 "All Azure OpenAI transport tests run through httptest with no network access or live Azure credentials."
               ],
-              "note": "Hermes 24b4b24d and ac571142 fixed Azure OpenAI request construction after custom/Azure base URLs lost api-version query parameters and GPT-5.x deployments were routed as Codex Responses. Gormes lacks Azure-specific request fixtures, so this first Azure slice should freeze only request URL, API-mode, and token-parameter semantics.",
+              "note": "Complete: TDD landed internal/hermes/azure_openai_transport_test.go. Httptest fixtures prove base URLs with api-version query parameters send POST requests to /v1/chat/completions with the query preserved, Azure OpenAI GPT-5.x and o-series requests stay on chat_completions with messages-shaped bodies and max_completion_tokens, ProviderStatus reports azure_query_preserved and azure_chat_completions evidence, and generic non-Azure GPT-5 plus unsupported-parameter retry behavior keep their existing max_tokens first-request contract. No Azure account, deployment, or live provider credential is required.",
               "write_scope": [
                 "internal/hermes/http_client.go",
                 "internal/hermes/azure_openai_transport_test.go",
