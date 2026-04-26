@@ -7392,9 +7392,9 @@
             },
             {
               "name": "Skills hub search read-model function over registry providers",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/skills exposes Search(ctx, query, providers []HubRegistryProvider, opts) (HubSearchResponse, error) returning sorted results plus typed degraded evidence (HubSearchEvidenceEmptyQuery, HubSearchEvidenceRegistryUnavailable, HubSearchEvidenceRateLimited, HubSearchEvidenceNoResults) without touching the active/inactive skill store or any HTTP client",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "skills",
               "trust_class": [
