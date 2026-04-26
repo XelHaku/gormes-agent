@@ -71,7 +71,7 @@ The handler can remain ordinary Go.
 | `OperationContext.remote` | gateway, child, local operator, cron callers | Promote to typed `TrustClass`; enforce centrally. |
 | `BrainEngine` | `internal/memory` SQLite store and GONCHO service | Define a narrower knowledge read/write interface before adding more providers. |
 | `pages` plus `links` provenance | entities, relationships, USER.md mirror | Add relationship evidence/provenance fields and reviewed promotion. |
-| hybrid search | FTS5, graph traversal, semantic recall | Add a retrieval eval harness and stable score breakdown. |
+| hybrid search + source-aware ranking | FTS5, graph traversal, semantic recall, source-tier evidence | Add a retrieval eval harness, stable score breakdown, curated/reviewed boosts, bulk-source damping, hard-exclude evidence, and temporal-query bypass. |
 | Code Cathedral II call graph + two-pass retrieval | optional code-context evidence for skill/retrieval explanations | Start with synthetic parent-scope/call-edge fixtures and capped high-fan-out behavior; do not embed GBrain's TypeScript indexer or tree-sitter WASM in the runtime. |
 | Minions SQL queue | subagent manager, cron, audit logs | Add a durable job ledger for long work and child runs. |
 | `subagent_messages` and tool ledger | run logs and transcript export | Persist child-agent messages/tool calls enough to resume or replay. |
@@ -173,6 +173,13 @@ Minimum local harness:
 - include cross-chat privacy negative tests
 
 This turns "memory feels better" into a testable contract.
+
+GBrain v0.22.0 adds another retrieval lesson: source quality should participate
+in scoring before bulky transcripts swamp curated knowledge. Gormes should keep
+that as visible evidence, not hidden rank magic. A result should be able to say
+whether it was boosted because it came from reviewed/curated memory, dampened
+because it came from bulk chat/raw imports, excluded by a configured prefix, or
+allowed through because the query was a high-detail temporal/history lookup.
 
 ### 5. Treat Skills As Code
 
