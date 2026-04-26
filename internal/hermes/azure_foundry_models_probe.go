@@ -30,7 +30,7 @@ const (
 // the /models probe returned an OpenAI-shaped catalog (possibly empty).
 // Reason is a short human summary suitable for display in the wizard.
 // Evidence captures the URLs probed, status codes, and any model IDs
-// surfaced — the wizard renders these to the operator so they can audit
+// surfaced. The wizard renders these to the operator so they can audit
 // the auto-detection result.
 type AzureProbeResult struct {
 	Transport AzureTransport
@@ -42,11 +42,11 @@ type AzureProbeResult struct {
 // ProbeAzureFoundry classifies an Azure Foundry endpoint by issuing two
 // fixed probes:
 //
-//  1. GET <base>/models. On 200 + OpenAI-shaped JSON ({"data":[...]}}, the
+//  1. GET <base>/models. On 200 + OpenAI-shaped JSON ({"data":[...]}), the
 //     transport is openai_chat_completions and the model IDs are returned
 //     in Models. A 200 with an empty data list still classifies as OpenAI
 //     ("shape OK, empty list").
-//  2. POST <base>/v1/messages with a zero-token Anthropic Messages
+//  2. POST <base>/v1/messages with a minimal Anthropic Messages
 //     payload. Any 4xx whose body mentions "messages" or "model"
 //     classifies as anthropic_messages.
 //
@@ -150,12 +150,12 @@ func probeAzureOpenAIModels(ctx context.Context, client *http.Client, base, apiK
 	}
 
 	if len(ids) == 0 {
-		reason := "shape OK, empty list — OpenAI-style endpoint with no listed deployments"
+		reason := "shape OK, empty list - OpenAI-style endpoint with no listed deployments"
 		evidence = append(evidence, "models_probe_empty_list")
 		return AzureTransportOpenAI, []string{}, reason, evidence, nil
 	}
 
-	reason := fmt.Sprintf("GET /models returned %d model(s) — OpenAI-style endpoint", len(ids))
+	reason := fmt.Sprintf("GET /models returned %d model(s) - OpenAI-style endpoint", len(ids))
 	for _, id := range ids {
 		evidence = append(evidence, "model_id="+id)
 	}
@@ -193,7 +193,7 @@ func probeAzureAnthropicMessages(ctx context.Context, client *http.Client, base,
 
 	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 		if strings.Contains(lowered, "messages") || strings.Contains(lowered, "model") || strings.Contains(lowered, "anthropic") {
-			reason := fmt.Sprintf("POST /v1/messages returned %d with Anthropic-shaped error — Anthropic Messages endpoint", resp.StatusCode)
+			reason := fmt.Sprintf("POST /v1/messages returned %d with Anthropic-shaped error - Anthropic Messages endpoint", resp.StatusCode)
 			evidence = append(evidence, "anthropic_probe_shape_match")
 			return true, reason, evidence, nil
 		}

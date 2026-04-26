@@ -147,7 +147,7 @@ func TestProbeAzureFoundry_AnthropicMessages400ValidShape(t *testing.T) {
 
 // TestProbeAzureFoundry_BothFailReturnUnknown verifies that when neither
 // probe yields a recognisable shape, the helper falls back to
-// AzureTransportUnknown with Reason="manual_required" — the wizard's
+// AzureTransportUnknown with Reason="manual_required" - the wizard's
 // signal to ask the operator for an api_mode value.
 func TestProbeAzureFoundry_BothFailReturnUnknown(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
