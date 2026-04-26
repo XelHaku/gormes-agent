@@ -28,7 +28,7 @@ func TestRenderServiceUnitInjectsPaths(t *testing.T) {
 		"Environment=MAX_AGENTS=4",
 		"Environment=MODE=safe",
 		"WorkingDirectory=/srv/gormes",
-		"ExecStart=/opt/gormes/bin/autoloop run",
+		"ExecStart=/opt/gormes/bin/autoloop run --loop",
 		"Restart=always",
 		"RestartPreventExitStatus=2 30",
 		"RestartSec=30s",
@@ -48,7 +48,7 @@ func TestRenderServiceUnitInjectsPaths(t *testing.T) {
 	})
 	for _, want := range []string{
 		`WorkingDirectory="/tmp/gormes repo/work%%dir\"\\subdir"`,
-		`ExecStart="/tmp/gormes repo/bin/auto%%loop\"\\bin" run`,
+		`ExecStart="/tmp/gormes repo/bin/auto%%loop\"\\bin" run --loop`,
 	} {
 		if !strings.Contains(quoted, want) {
 			t.Fatalf("RenderServiceUnit() = %q, want %q", quoted, want)
@@ -61,7 +61,7 @@ func TestRenderServiceUnitInjectsPaths(t *testing.T) {
 	})
 	for _, want := range []string{
 		`WorkingDirectory="/tmp/gormes\trepo"`,
-		`ExecStart="/tmp/gormes\nrepo/bin/autoloop" run`,
+		`ExecStart="/tmp/gormes\nrepo/bin/autoloop" run --loop`,
 	} {
 		if !strings.Contains(controlEscaped, want) {
 			t.Fatalf("RenderServiceUnit() = %q, want %q", controlEscaped, want)
@@ -117,7 +117,7 @@ func TestInstallServiceWritesUnitAndReloadsSystemd(t *testing.T) {
 	unit := string(raw)
 	for _, want := range []string{
 		"WorkingDirectory=/srv/gormes",
-		"ExecStart=/opt/gormes/bin/autoloop run",
+		"ExecStart=/opt/gormes/bin/autoloop run --loop",
 	} {
 		if !strings.Contains(unit, want) {
 			t.Fatalf("installed unit = %q, want %q", unit, want)

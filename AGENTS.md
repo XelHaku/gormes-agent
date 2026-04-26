@@ -39,6 +39,12 @@ other in real time through a shared progress representation.
                 +---------------------+
 ```
 
+In steady-state service mode, `cmd/builder-loop run --loop` owns the cadence:
+each successful builder cycle releases the shared control-plane lock, runs one
+synchronous `cmd/planner-loop run`, then starts the next builder cycle from the
+planner-refreshed `progress.json`. Independent planner timer/path triggers may
+still fire, but the shared `run.lock` prevents concurrent control-plane writes.
+
 ### Two loops, one shared contract
 
 | Loop | Command | Internal package | Owns |

@@ -20,7 +20,7 @@ type ServiceUnitOptions struct {
 func RenderServiceUnit(opts ServiceUnitOptions) string {
 	execArgs := opts.ExecArgs
 	if execArgs == nil {
-		execArgs = []string{"run"}
+		execArgs = []string{"run", "--loop"}
 	}
 	execStart := systemdPathValue(opts.AutoloopPath)
 	for _, arg := range execArgs {
