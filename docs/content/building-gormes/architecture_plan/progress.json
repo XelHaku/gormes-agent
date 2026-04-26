@@ -6841,18 +6841,26 @@
                 "MCP OAuth fixtures prove state persistence, refresh/expiry handling, 401 recovery, secret redaction, and noninteractive auth-required errors."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T14:29:55Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T14:31:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142936Z-986783975",
+                  "run_id": "20260426T143133Z-783778276",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.G/MCP OAuth state store + noninteractive auth errors"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T14:31:50Z",
+                  "after_run_id": "20260426T143133Z-783778276",
+                  "threshold": 3,
+                  "spec_hash": "a24ae869bf0cf9b5cff91b5877b9da7a7b0b95134748dbafb138110bcc2e6745",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -7713,11 +7721,11 @@
                 "Pure helper fixtures prove tips, dump, and webhook output from fixed inputs with no filesystem, clock, random, or network dependency."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:29:55Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:31:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142936Z-986783975",
+                  "run_id": "20260426T143133Z-783778276",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.O/CLI tips/dump/webhook deterministic helpers"
@@ -8448,11 +8456,11 @@
                 "Gateway management fixtures prove read-only status/pairing/runtime evidence, explicit unavailable mutating commands, and no live service-manager dependency."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:30:50Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:31:50Z",
                 "last_failure": {
-                  "run_id": "20260426T143037Z-508753512",
+                  "run_id": "20260426T143133Z-783778276",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.O/Gateway management CLI read-model closeout"
@@ -8659,18 +8667,26 @@
                 "Doctor fixtures prove custom endpoint/provider-style settings are accepted with explicit readiness evidence and no live provider or legacy Hermes config dependency."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T14:30:50Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T14:31:50Z",
                 "last_failure": {
-                  "run_id": "20260426T143037Z-508753512",
+                  "run_id": "20260426T143133Z-783778276",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.O/Doctor custom endpoint provider readiness"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T14:31:50Z",
+                  "after_run_id": "20260426T143133Z-783778276",
+                  "threshold": 3,
+                  "spec_hash": "9f84a4eec753c414cef103595aa0266e1390214288705335df96a348db30fa86",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -8740,18 +8756,26 @@
                 "Custom-provider model-switch fixtures prove named provider resolution, configured-model override, and secret-reference preservation without live provider calls or command UI."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T14:29:55Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T14:31:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142936Z-986783975",
+                  "run_id": "20260426T143133Z-783778276",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.O/Custom provider model-switch credential preservation"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T14:31:50Z",
+                  "after_run_id": "20260426T143133Z-783778276",
+                  "threshold": 3,
+                  "spec_hash": "74fd31587022dce406138740010e929be95918e8f0c4a254633d60a3ef0cbd3e",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -8992,11 +9016,11 @@
                 "Pure internal/tuigateway fixtures prove progress mode, completion path, and tool-summary helpers without transport or Bubble Tea dependencies."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:29:55Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:31:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142936Z-986783975",
+                  "run_id": "20260426T143133Z-783778276",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.Q/TUI gateway progress/completion helpers"
@@ -9291,18 +9315,26 @@
                 "Native TUI fixtures and docs prove Gormes advertises terminal-native selection honestly and remains independent from Hermes Ink/Node clipboard behavior."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T14:28:54Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T14:31:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142840Z-771787827",
+                  "run_id": "20260426T143133Z-783778276",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.Q/Native TUI terminal-selection divergence contract"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T14:31:50Z",
+                  "after_run_id": "20260426T143133Z-783778276",
+                  "threshold": 3,
+                  "spec_hash": "163852a187e6cd3f324727c2f2333a4110ec83788be9127a9e1377f0b66e61ec",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -9364,11 +9396,11 @@
                 "Native TUI fixtures prove /save uses canonical persisted session export, handles empty/no-session/failure states, and never submits /save to the model."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:30:50Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:31:50Z",
                 "last_failure": {
-                  "run_id": "20260426T143037Z-508753512",
+                  "run_id": "20260426T143133Z-783778276",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.Q/Native TUI /save canonical session export"
