@@ -477,6 +477,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Skill registries
 - [x] Skill preprocessing + dynamic slash commands
 - [ ] [IMPORTANT:] prompt prefix for cron and skill commands
+- [ ] Skills list — enabled/disabled status column + --enabled-only filter
 
 ### 5.G — MCP Integration 🔨
 
@@ -545,7 +546,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] CLI dump support-summary helper
 - [x] PTY bridge protocol adapter
 - [ ] CLI command registry parity + active-turn busy policy
-- [ ] Gateway /reasoning session override command
+- [ ] Gateway /reasoning command parser
+- [ ] Gateway /reasoning apply + dispatch
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
 - [ ] CLI profile name validator
@@ -565,7 +567,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Diagnostics, backup, logs, and status CLI
 - [ ] doctorCustomEndpointReadiness check function
 - [ ] Custom provider model-switch credential preservation
-- [ ] CLI log snapshot reader
+- [ ] CLI log redactor for known secret shapes
+- [ ] CLI log snapshot reader using shared redactor
 
 ### 5.P — Docker / Packaging ⏳
 
@@ -579,7 +582,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.Q — API Server + TUI Gateway Streaming 🔨
 
 - [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
-- [ ] TUI gateway tool-progress mode normalizer
+- [x] TUI gateway tool-progress mode normalizer
 - [ ] TUI gateway completion path normalizer
 - [ ] TUI gateway tool summary formatter
 - [ ] TUI gateway image/personality/platform-event helpers
