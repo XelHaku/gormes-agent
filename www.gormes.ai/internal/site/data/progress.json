@@ -588,8 +588,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 8,
-                "last_reshape": "2026-04-26T18:25:41Z",
+                "reshape_count": 9,
+                "last_reshape": "2026-04-26T18:21:26Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -676,8 +676,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 7,
-                "last_reshape": "2026-04-26T18:25:41Z",
+                "reshape_count": 8,
+                "last_reshape": "2026-04-26T18:21:26Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -4673,8 +4673,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 10,
-                "last_reshape": "2026-04-26T18:25:41Z",
+                "reshape_count": 11,
+                "last_reshape": "2026-04-26T18:21:26Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -6698,8 +6698,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 10,
-                "last_reshape": "2026-04-26T18:25:41Z",
+                "reshape_count": 11,
+                "last_reshape": "2026-04-26T18:21:26Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -6787,8 +6787,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 10,
-                "last_reshape": "2026-04-26T18:25:41Z",
+                "reshape_count": 11,
+                "last_reshape": "2026-04-26T18:21:26Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {

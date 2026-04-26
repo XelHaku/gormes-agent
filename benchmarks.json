@@ -1,9 +1,9 @@
 {
   "binary": {
     "build_flags": "CGO_ENABLED=0 -trimpath -ldflags=\"-s -w\"",
-    "commit": "b4318c95",
+    "commit": "da89227e",
     "go_version": "1.25+",
-    "last_measured": "2026-04-25",
+    "last_measured": "2026-04-26",
     "linker": "static",
     "name": "gormes",
     "path": "bin/gormes",
@@ -12,6 +12,13 @@
     "stripped": true
   },
   "history": [
+    {
+      "commit": "da89227e",
+      "date": "2026-04-26",
+      "phase": "Phase 1 — The Dashboard",
+      "size_bytes": 18530466,
+      "size_mb": 17.7
+    },
     {
       "commit": "90d30c29",
       "date": "2026-04-25",
