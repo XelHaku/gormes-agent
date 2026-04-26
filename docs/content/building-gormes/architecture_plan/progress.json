@@ -7775,9 +7775,9 @@
             },
             {
               "name": "MCP HTTP transport + tool/list discovery",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools/mcp_http.go exposes an HTTP MCP client (NewHTTPClient(def MCPServerDefinition, opts HTTPClientOpts) (*HTTPClient, error); (*HTTPClient).Initialize(ctx) error; (*HTTPClient).ListTools(ctx) ([]MCPRawTool, error); (*HTTPClient).Close() error) that speaks JSON-RPC over an injectable http.RoundTripper — deterministic over httptest.Server in unit tests with no real network egress",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
