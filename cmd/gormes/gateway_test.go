@@ -31,10 +31,11 @@ func TestGatewaySignalLoopDrainsBeforeCancel(t *testing.T) {
 	}
 
 	done := make(chan struct{})
+	forceExit := make(chan int, 1)
 	go func() {
 		defer close(done)
 		runGatewaySignalLoop(sigCh, 200*time.Millisecond, mgr, cancel, slog.Default(), func(code int) {
-			t.Fatalf("unexpected force exit: %d", code)
+			forceExit <- code
 		})
 	}()
 
@@ -64,5 +65,11 @@ func TestGatewaySignalLoopDrainsBeforeCancel(t *testing.T) {
 	case <-done:
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("signal loop did not return")
+	}
+
+	select {
+	case code := <-forceExit:
+		t.Fatalf("unexpected force exit: %d", code)
+	default:
 	}
 }
