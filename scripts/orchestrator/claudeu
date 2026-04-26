@@ -103,7 +103,7 @@ prompt=""
 
 while (( $# > 0 )); do
   case "$1" in
-    exec|--json)
+    exec|--json|--ephemeral)
       shift
       ;;
     -c|--sandbox|--model|-m)
