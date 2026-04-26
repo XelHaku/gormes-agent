@@ -362,9 +362,9 @@
             {
               "name": "Watchdog checkpoint coalescing",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure helper internal/builderloop/watchdog_coalesce.go exposes type Decision string with constants DecisionFirst=\"first\", DecisionAmend=\"amend\", DecisionNoop=\"noop\"; type CheckpointState struct{LastCheckpointAt time.Time; LastSubject string; WindowID string}; type CoalesceConfig struct{WindowSeconds int; Dirty bool; NextWindowID func() string} and one function DecideCheckpoint(now time.Time, st CheckpointState, cfg CoalesceConfig) (Decision, CheckpointState). Window math: windowSeconds <= 0 falls back to 600. Algorithm: when cfg.Dirty is false, return DecisionNoop and the input state unchanged. When cfg.Dirty is true and (st.WindowID == \"\" OR now.Sub(st.LastCheckpointAt) >= window), return DecisionFirst with state {LastCheckpointAt: now, LastSubject: st.LastSubject (caller fills), WindowID: cfg.NextWindowID()}. Otherwise (cfg.Dirty and inside the window) return DecisionAmend with state {LastCheckpointAt: now, LastSubject: st.LastSubject, WindowID: st.WindowID} (preserve the existing WindowID). No git invocation, no shell-script change, no live filesystem mutation in this slice; cfg.NextWindowID is the only source of new IDs and is supplied by the caller (typically a small monotonic counter or a uuid stub in tests).",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -397,7 +397,7 @@
                 "TestDecideCheckpoint_DefaultWindowWhenZeroOrNegative: cfg.WindowSeconds=0 and cfg.WindowSeconds=-5 both behave like windowSeconds=600.",
                 "Helper is a pure function with no time.Now, no git invocation, no os.* calls — caller passes both the clock (now) and the dirty flag (cfg.Dirty) and the WindowID generator (cfg.NextWindowID)."
               ],
-              "note": "Reshape #2 (2026-04-26): prior reshape hashed identical contract+write_scope+fixture so Quarantine.spec_hash never changed. This pass pins the typed Decision constants, the CoalesceConfig struct shape (Dirty + NextWindowID injection), the windowSeconds<=0 fallback, and adds an acceptance case for the default-window fallback. Worker quarantine on this row was caused by an empty-prompt window 2026-04-26 15:08-15:09 (claudeu shim received --ephemeral with no task body); the underlying contract was already correct so this reshape is the minimum material change needed to clear ItemSpecHash. Pure-Go decider only — shell-script wiring at scripts/orchestrator/watchdog.sh is OUT of scope and will be a separate row that imports DecideCheckpoint via a small stub binary. Overnight 2026-04-25 → 2026-04-26 builder-loop run produced 74 dirty-worktree checkpoint commits in a 28-min stuck window — this helper is the brain that collapses them.",
+              "note": "Complete: TDD landed the pure DecideCheckpoint helper and fake-clock fixtures for first checkpoint, in-window amend, post-window rotation, no-dirty noop, and the 600-second fallback for zero/negative window sizes. Pure-Go decider only — shell-script wiring at scripts/orchestrator/watchdog.sh is OUT of scope and will be a separate row that imports DecideCheckpoint via a small stub binary.",
               "write_scope": [
                 "internal/builderloop/watchdog_coalesce.go",
                 "internal/builderloop/watchdog_coalesce_test.go",
@@ -412,9 +412,9 @@
                 "internal/builderloop/watchdog_coalesce_test.go fixtures prove first/amend/first-after-rotation/noop decisions across a fake clock with no live git or systemd."
               ],
               "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T15:09:51Z",
+                "attempt_count": 4,
+                "last_attempt": "2026-04-26T17:33:11Z",
+                "last_success": "2026-04-26T17:33:11Z",
                 "last_failure": {
                   "run_id": "20260426T150941Z-113448856",
                   "category": "no_progress",
@@ -423,15 +423,7 @@
                 },
                 "backends_tried": [
                   "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T15:09:51Z",
-                  "after_run_id": "20260426T150941Z-113448856",
-                  "threshold": 3,
-                  "spec_hash": "2bf4f1e1a34cc697eba235d10e8ef9bc11fdcfb90928967c72e03cb612fc6615",
-                  "last_category": "no_progress"
-                }
+                ]
               },
               "planner_verdict": {
                 "reshape_count": 2,
