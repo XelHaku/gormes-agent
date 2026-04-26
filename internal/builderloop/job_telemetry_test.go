@@ -146,6 +146,36 @@ func TestRunLoggedJobFailureIncludesBoundedRedactedEvidence(t *testing.T) {
 	}
 }
 
+func TestRunLoggedJobFailureKeepsFailureMarkerWhenTailIsNoisy(t *testing.T) {
+	runRoot := t.TempDir()
+	cfg := Config{RunRoot: runRoot}
+	runner := runnerFunc(func(_ context.Context, _ Command) Result {
+		return Result{
+			Stdout: "--- FAIL: TestImportant (0.01s)\n    important_test.go:42: real failure\n" + strings.Repeat("ok  \tgithub.com/example/package\t0.001s\n", 200),
+			Err:    errors.New("exit status 1"),
+		}
+	})
+
+	result := runLoggedJob(context.Background(), cfg, runner, "run-1", jobSpec{
+		ID:      "run-1/post-verify/1/1",
+		Kind:    "post_verify_command",
+		Command: "go test ./...",
+		Dir:     "/repo",
+	}, Command{Name: "sh", Args: []string{"-lc", "go test ./..."}, Dir: "/repo"})
+	if result.Err == nil {
+		t.Fatal("runLoggedJob() error = nil, want command failure")
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	finished := events[len(events)-1]
+	if !strings.Contains(finished.StdoutTail, "--- FAIL: TestImportant") || !strings.Contains(finished.StdoutTail, "important_test.go:42") {
+		t.Fatalf("stdout evidence missing failure marker:\n%s", finished.StdoutTail)
+	}
+	if len(finished.StdoutTail) > maxJobOutputTailBytes {
+		t.Fatalf("stdout evidence too long: %d", len(finished.StdoutTail))
+	}
+}
+
 func TestRunLoggedJobTelemetryFailureDoesNotFailJob(t *testing.T) {
 	dir := t.TempDir()
 	runRootFile := filepath.Join(dir, "runroot-file")

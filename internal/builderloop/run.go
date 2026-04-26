@@ -1079,6 +1079,16 @@ func postPromotionCommandEnv(cfg Config) []string {
 		"COMPANION_PLANNER_CMD=:",
 		"COMPANION_DOC_IMPROVER_CMD=:",
 		"COMPANION_LANDINGPAGE_CMD=:",
+		"INTEGRATION_BRANCH=",
+		"FAIL_FAST_ON_WORKER_FAILURE=",
+		"PAUSE_ON_RUN_FAILURE=",
+		"SKIP_COMPANIONS_ON_RUN_FAILURE=",
+		"PHASE_FLOOR=",
+		"PHASE_PRIORITY_BOOST=",
+		"PHASE_SKIP_SUBPHASES=",
+		"MAX_RETRIES=",
+		"CANDIDATE_LOW_WATERMARK=",
+		"MIN_MEM_PER_WORKER_MB=",
 	}
 	if len(cfg.PriorityBoost) > 0 {
 		env = append(env, "PRIORITY_BOOST="+strings.Join(cfg.PriorityBoost, ","))

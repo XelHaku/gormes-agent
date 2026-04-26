@@ -15,6 +15,17 @@ var secretTelemetryPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)((?:api[_-]?key|token|secret|password)\s*=\s*)[^\s]+`),
 }
 
+var failureEvidenceMarkers = []string{
+	"--- FAIL:",
+	"\nFAIL\t",
+	"\nFAIL ",
+	"\nFAIL\n",
+	"panic:",
+	"undefined:",
+	"Error:",
+	"error:",
+}
+
 type jobSpec struct {
 	ID            string
 	Kind          string
@@ -142,7 +153,7 @@ func tailString(value string, limit int) string {
 }
 
 func boundedRedactedTail(value string) string {
-	return tailString(redactTelemetry(tailString(value, maxJobOutputTailBytes)), maxJobOutputTailBytes)
+	return tailString(failureEvidenceWindow(redactTelemetry(value), maxJobOutputTailBytes), maxJobOutputTailBytes)
 }
 
 func redactTelemetry(value string) string {
@@ -151,4 +162,49 @@ func redactTelemetry(value string) string {
 		out = pattern.ReplaceAllString(out, "${1}[REDACTED]")
 	}
 	return out
+}
+
+func failureEvidenceWindow(value string, limit int) string {
+	if limit <= 0 || len(value) <= limit {
+		return value
+	}
+	idx := firstFailureEvidenceMarker(value)
+	if idx < 0 {
+		return tailString(value, limit)
+	}
+
+	start := idx - 200
+	if start < 0 {
+		start = 0
+	}
+	prefix := ""
+	if start > 0 {
+		prefix = "... [head elided]\n"
+	}
+	suffix := "\n... [tail elided]"
+	budget := limit - len(prefix) - len(suffix)
+	if budget < 1 {
+		budget = limit - len(prefix)
+		suffix = ""
+	}
+	end := start + budget
+	if end > len(value) {
+		end = len(value)
+		suffix = ""
+	}
+	return tailString(prefix+value[start:end]+suffix, limit)
+}
+
+func firstFailureEvidenceMarker(value string) int {
+	first := -1
+	for _, marker := range failureEvidenceMarkers {
+		idx := strings.Index(value, marker)
+		if idx < 0 {
+			continue
+		}
+		if first < 0 || idx < first {
+			first = idx
+		}
+	}
+	return first
 }
