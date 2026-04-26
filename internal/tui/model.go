@@ -48,6 +48,8 @@ type Model struct {
 	mouseTracking bool
 	mouseModeCmd  func(enabled bool) tea.Cmd
 	statusMessage string
+
+	slashRegistry *SlashRegistry
 }
 
 // NewModel constructs the Bubble Tea model. frames is the kernel's Render()
@@ -72,6 +74,7 @@ func NewModelWithOptions(frames <-chan kernel.RenderFrame, submit Submitter, can
 		cancel:        cancel,
 		mouseTracking: opts.MouseTracking,
 		mouseModeCmd:  opts.MouseModeCmd,
+		slashRegistry: NewDefaultSlashRegistry(),
 	}
 }
 

@@ -7097,9 +7097,9 @@
           "items": [
             {
               "name": "Skills hub search result types + in-memory registry provider",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/skills declares HubSearchResult{Name,Description,Source,InstallID,Score}, HubRegistryProvider interface{ Snapshot(ctx) ([]HubSearchResult, error) }, and an in-memory fake provider used by tests; no Search() function, gateway dispatch, or active-store mutation is added in this slice",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "skills",
               "trust_class": [
@@ -7694,9 +7694,9 @@
             },
             {
               "name": "MCP OAuth state store + noninteractive auth errors",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools adds a pure in-memory MCPOAuthStore with methods Get(server string) (MCPOAuthToken, bool), Set(server string, tok MCPOAuthToken) error, Clear(server string), and StatusFor(server string, now time.Time) MCPOAuthStatus where MCPOAuthToken has fields {AccessToken, RefreshToken, Scope, Issuer string; ExpiresAt time.Time}, MCPOAuthStatus has fields {Server, State, Evidence string} with State in {'absent','valid','expired','noninteractive_required'}; the store never logs or returns AccessToken/RefreshToken in its String()/Status output",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8156,9 +8156,9 @@
             },
             {
               "name": "Hardline command pattern table + DetectHardline function",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools declares HardlinePattern{Regex, Description}, a HardlinePatterns []HardlinePattern table seeded from Hermes HARDLINE_PATTERNS, and DetectHardline(cmd string) (matched bool, description string) that compiles patterns once via sync.Once and is pure (no I/O, no globals besides the compiled list)",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8635,9 +8635,9 @@
             },
             {
               "name": "CLI deterministic tip selector",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds a fixed exported corpus `Tips []string` of at least 30 non-empty entries (each unique, none containing newlines) and a pure function `TipFor(seed int64) string` that returns Tips[(seed mod len(Tips))]; tip text is owned by Gormes and does not need to mirror upstream tip strings",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8752,9 +8752,9 @@
             },
             {
               "name": "CLI dump support-summary helper",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds a pure function `RenderDumpSummary(in DumpInput) string` where DumpInput has fields {Version, OS, Arch, ProfileName string; Toolsets []string; SecretsLikeKeys []string} that returns a deterministic multi-line summary; the function never reads files, clock, env, or network and redacts every entry of SecretsLikeKeys (replaces literal occurrences with '[redacted]') in the output text",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8971,6 +8971,20 @@
               "done_signal": [
                 "internal/gateway/reasoning_command_test.go fixtures prove parser correctness across show/set/global/reset/invalid forms."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T17:01:23Z",
+                "last_failure": {
+                  "run_id": "20260426T165159Z-793740952",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "git cherry-pick failed: exit status 128: error: Your local changes to the following files would be overwritten by merge:\n\tdocs/content/building-gormes/architecture_plan/progress.json\nPlease commit your changes or stash them before you merge.\nAborting\nfatal: cherry-pick failed"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "split",
                 "upstream_ref": "hermes:25ba6a4a gateway/run.py:_parse_reasoning_command_args",
@@ -8980,9 +8994,9 @@
             {
               "name": "Gateway /reasoning apply + dispatch",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/gateway/reasoning_command.go also exposes type SessionReasoningState struct{Effort ReasoningEffort; Source string} where Source is \"session\"|\"global\"|\"unset\", type ReasoningReply struct{Effort ReasoningEffort; Scope string; PersistFailed bool}, and ApplyReasoningCommand(state SessionReasoningState, cmd ReasoningCommand, persistGlobal func(ReasoningEffort) error) (SessionReasoningState, ReasoningReply). Action=Show returns current state unchanged. Action=Set with Global=false mutates session-only. Action=Set with Global=true calls persistGlobal; on failure falls back to session-only and sets PersistFailed=true. Action=Reset clears the session override. Internal/gateway/manager.go wires \"/reasoning\" through the existing command registry to ParseReasoningCommand + ApplyReasoningCommand for the calling session.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9018,7 +9032,7 @@
                 "TestApplyReasoningCommand_ResetClearsSessionState sets Source=\"unset\" and Effort=\"\".",
                 "TestGatewayManagerDispatchesReasoning verifies that the existing command registry routes \"/reasoning\" through Parse + Apply for the calling session only."
               ],
-              "note": "Apply + dispatch slice. Depends on the parser slice landing first so this row only needs to add the state-mutator and one wiring point in manager.go. The persistGlobal func is a callback so the test can stub config persistence without disk I/O.",
+              "note": "Complete: TDD landed `SessionReasoningState`, `ReasoningReply`, and `ApplyReasoningCommand` in `internal/gateway/reasoning_command.go` with `Source`/`Scope` tags `unset|session|global`. Show returns the injected state unchanged; session-only Set mutates without invoking persistGlobal; global Set calls persistGlobal once with the requested effort and pins Source=global on success; persistGlobal failure falls back to session-only state with PersistFailed=true; Reset clears Source to unset and Effort to \"\". `internal/gateway/manager.go` adds `ManagerConfig.PersistReasoningGlobal` plus `Manager.DispatchReasoning(sessionKey, args)` keyed by chat key, so per-session reasoning state is isolated and a missing callback degrades to the session-only fallback path. `TestGatewayManagerDispatchesReasoning` covers session-only set, show, cross-session isolation, --global persist, post-global isolation, reset, and invalid-effort error propagation; `TestGatewayManagerDispatchReasoningGlobalPersistFallback` proves a callback error becomes PersistFailed without surfacing the error to the caller.",
               "write_scope": [
                 "internal/gateway/reasoning_command.go",
                 "internal/gateway/reasoning_command_test.go",
@@ -10742,9 +10756,9 @@
             {
               "name": "Native TUI slash-command dispatch table",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tui exposes a generic slash-command registry — a single dispatch helper checks editor input on Enter, routes any registered slash to a handler that returns (handled bool, statusMessage string, cmd tea.Cmd), and short-circuits the normal kernel.Submit path; the existing /mouse handler migrates onto the registry, and `/save` registers as an explicit no-op stub that emits `save not yet implemented` so a follow-up row can wire the export call",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -10781,11 +10795,12 @@
               ],
               "note": "Reshaped 2026-04-26 (split from `Native TUI /save canonical session export`). Original /save row was quarantined no_progress x3 because Gormes TUI has no slash-command dispatch at all — only parseMouseTrackingSlash hardcoded in update.go. Workers couldn't decide where to register a new handler. This prerequisite row introduces a generic registry and a /save no-op stub; the follow-up row replaces the stub with the export call.",
               "write_scope": [
+                "docs/content/building-gormes/architecture_plan/progress.json",
+                "internal/tui/model.go",
+                "internal/tui/mouse_tracking.go",
                 "internal/tui/slash_dispatch.go",
                 "internal/tui/slash_dispatch_test.go",
-                "internal/tui/update.go",
-                "internal/tui/mouse_tracking.go",
-                "docs/content/building-gormes/architecture_plan/progress.json"
+                "internal/tui/update.go"
               ],
               "test_commands": [
                 "go test ./internal/tui -run 'TestSlashRegistry_|TestModelMouseTracking' -count=1",

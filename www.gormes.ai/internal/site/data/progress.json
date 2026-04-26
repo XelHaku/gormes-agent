@@ -434,7 +434,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z"
+                "last_reshape": "2026-04-26T16:17:18Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -506,7 +507,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z"
+                "last_reshape": "2026-04-26T16:17:18Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -588,7 +590,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z"
+                "last_reshape": "2026-04-26T16:17:18Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -668,7 +671,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z"
+                "last_reshape": "2026-04-26T16:17:18Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -4656,8 +4660,9 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-26T16:50:00Z"
+                "reshape_count": 3,
+                "last_reshape": "2026-04-26T16:42:22Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "split",
@@ -4735,7 +4740,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z"
+                "last_reshape": "2026-04-26T16:17:18Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "split",
@@ -6600,8 +6606,9 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-26T16:50:00Z"
+                "reshape_count": 3,
+                "last_reshape": "2026-04-26T16:42:22Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "split",
@@ -6631,6 +6638,9 @@
               "not_ready_when": [
                 "The slice writes a process-global or cross-session breaker.",
                 "The slice changes retry policy or treats every 429 as account-level quota exhaustion."
+              ],
+              "blocked_by": [
+                "Provider rate guard — x-ratelimit header classification"
               ],
               "unblocks": [
                 "Provider rate guard + budget telemetry"
@@ -6678,16 +6688,14 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-26T16:50:00Z"
+                "reshape_count": 3,
+                "last_reshape": "2026-04-26T16:42:22Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "split",
                 "note": "Degraded-mode + last-known-good slice; depends on the classification slice landing first."
-              },
-              "blocked_by": [
-                "Provider rate guard — x-ratelimit header classification"
-              ]
+              }
             }
           ],
           "drift_state": {
@@ -7089,9 +7097,9 @@
           "items": [
             {
               "name": "Skills hub search result types + in-memory registry provider",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/skills declares HubSearchResult{Name,Description,Source,InstallID,Score}, HubRegistryProvider interface{ Snapshot(ctx) ([]HubSearchResult, error) }, and an in-memory fake provider used by tests; no Search() function, gateway dispatch, or active-store mutation is added in this slice",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "skills",
               "trust_class": [
@@ -7686,9 +7694,9 @@
             },
             {
               "name": "MCP OAuth state store + noninteractive auth errors",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools adds a pure in-memory MCPOAuthStore with methods Get(server string) (MCPOAuthToken, bool), Set(server string, tok MCPOAuthToken) error, Clear(server string), and StatusFor(server string, now time.Time) MCPOAuthStatus where MCPOAuthToken has fields {AccessToken, RefreshToken, Scope, Issuer string; ExpiresAt time.Time}, MCPOAuthStatus has fields {Server, State, Evidence string} with State in {'absent','valid','expired','noninteractive_required'}; the store never logs or returns AccessToken/RefreshToken in its String()/Status output",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8148,9 +8156,9 @@
             },
             {
               "name": "Hardline command pattern table + DetectHardline function",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools declares HardlinePattern{Regex, Description}, a HardlinePatterns []HardlinePattern table seeded from Hermes HARDLINE_PATTERNS, and DetectHardline(cmd string) (matched bool, description string) that compiles patterns once via sync.Once and is pure (no I/O, no globals besides the compiled list)",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8627,9 +8635,9 @@
             },
             {
               "name": "CLI deterministic tip selector",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds a fixed exported corpus `Tips []string` of at least 30 non-empty entries (each unique, none containing newlines) and a pure function `TipFor(seed int64) string` that returns Tips[(seed mod len(Tips))]; tip text is owned by Gormes and does not need to mirror upstream tip strings",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8744,9 +8752,9 @@
             },
             {
               "name": "CLI dump support-summary helper",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds a pure function `RenderDumpSummary(in DumpInput) string` where DumpInput has fields {Version, OS, Arch, ProfileName string; Toolsets []string; SecretsLikeKeys []string} that returns a deterministic multi-line summary; the function never reads files, clock, env, or network and redacts every entry of SecretsLikeKeys (replaces literal occurrences with '[redacted]') in the output text",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -10493,7 +10501,8 @@
               ],
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z"
+                "last_reshape": "2026-04-26T16:17:18Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -10733,9 +10742,9 @@
             {
               "name": "Native TUI slash-command dispatch table",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tui exposes a generic slash-command registry — a single dispatch helper checks editor input on Enter, routes any registered slash to a handler that returns (handled bool, statusMessage string, cmd tea.Cmd), and short-circuits the normal kernel.Submit path; the existing /mouse handler migrates onto the registry, and `/save` registers as an explicit no-op stub that emits `save not yet implemented` so a follow-up row can wire the export call",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -10772,11 +10781,12 @@
               ],
               "note": "Reshaped 2026-04-26 (split from `Native TUI /save canonical session export`). Original /save row was quarantined no_progress x3 because Gormes TUI has no slash-command dispatch at all — only parseMouseTrackingSlash hardcoded in update.go. Workers couldn't decide where to register a new handler. This prerequisite row introduces a generic registry and a /save no-op stub; the follow-up row replaces the stub with the export call.",
               "write_scope": [
+                "docs/content/building-gormes/architecture_plan/progress.json",
+                "internal/tui/model.go",
+                "internal/tui/mouse_tracking.go",
                 "internal/tui/slash_dispatch.go",
                 "internal/tui/slash_dispatch_test.go",
-                "internal/tui/update.go",
-                "internal/tui/mouse_tracking.go",
-                "docs/content/building-gormes/architecture_plan/progress.json"
+                "internal/tui/update.go"
               ],
               "test_commands": [
                 "go test ./internal/tui -run 'TestSlashRegistry_|TestModelMouseTracking' -count=1",

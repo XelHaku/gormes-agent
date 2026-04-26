@@ -37,7 +37,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 35/74 subphases shipped · 16 in progress · 23 planned
+**Overall:** 35/74 subphases shipped · 17 in progress · 22 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -472,7 +472,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ### 5.F — Skills System (Remaining) 🔨
 
-- [ ] Skills hub search result types + in-memory registry provider
+- [x] Skills hub search result types + in-memory registry provider
 - [ ] Skills hub search read-model function over registry providers
 - [ ] Skill registries
 - [x] Skill preprocessing + dynamic slash commands
@@ -486,7 +486,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] MCP stdio transport + tool/list discovery
 - [ ] MCP HTTP transport + tool/list discovery
 - [ ] MCP schema normalization + structured-content adapter
-- [ ] MCP OAuth state store + noninteractive auth errors
+- [x] MCP OAuth state store + noninteractive auth errors
 - [ ] MCP OAuth refresh + 401 session-expired recovery
 - [ ] Managed tool gateway bridge
 
@@ -502,10 +502,10 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Third-party extensions
 - [x] First-party Spotify plugin fixture
 
-### 5.J — Approval / Security Guards ⏳
+### 5.J — Approval / Security Guards 🔨
 
 - [ ] Dangerous action gating
-- [ ] Hardline command pattern table + DetectHardline function
+- [x] Hardline command pattern table + DetectHardline function
 - [ ] Recoverable dangerous patterns + blocked-result schema
 - [ ] Approval mode config normalization
 - [ ] Subagent dangerous-command non-interactive approval policy
@@ -541,9 +541,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] 49-file CLI tree port
 - [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
 - [x] CLI banner/output formatting helpers
-- [ ] CLI deterministic tip selector
+- [x] CLI deterministic tip selector
 - [ ] CLI webhook URL normalizer
-- [ ] CLI dump support-summary helper
+- [x] CLI dump support-summary helper
 - [x] PTY bridge protocol adapter
 - [ ] CLI command registry parity + active-turn busy policy
 - [ ] Gateway /reasoning command parser
@@ -590,7 +590,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Native TUI bundle independence check
 - [x] TUI launch model override + static alias resolver
 - [ ] TUI TerminalNativeSelectionHelp constant + help-string fixture
-- [ ] Native TUI slash-command dispatch table
+- [x] Native TUI slash-command dispatch table
 - [ ] Native TUI /save canonical session export
 - [ ] TUI running-agent placeholder surfaces interrupt + queued slash actions
 - [ ] SSE streaming to Bubble Tea TUI

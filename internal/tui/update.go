@@ -49,22 +49,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			text := m.editor.Value()
-			mouse := parseMouseTrackingSlash(text, m.mouseTracking)
-			if mouse.handled {
-				m.editor.Reset()
-				if !mouse.valid {
-					m.statusMessage = mouse.message
+			if m.slashRegistry != nil {
+				if res := m.slashRegistry.Dispatch(text, &m); res.Handled {
+					m.editor.Reset()
+					if res.StatusMessage != "" {
+						m.statusMessage = res.StatusMessage
+					}
+					if res.Cmd != nil {
+						cmds = append(cmds, res.Cmd)
+					}
 					return m, tea.Batch(cmds...)
 				}
-				m.statusMessage = "mouse tracking on"
-				if !mouse.next {
-					m.statusMessage = "mouse tracking off"
-				}
-				if mouse.next != m.mouseTracking {
-					m.mouseTracking = mouse.next
-					cmds = append(cmds, m.emitMouseModeCmd(mouse.next))
-				}
-				return m, tea.Batch(cmds...)
 			}
 			if text != "" && !m.inFlight {
 				m.editor.Reset()

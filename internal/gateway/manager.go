@@ -60,6 +60,11 @@ type ManagerConfig struct {
 	Restart        RestartConfig
 	SessionExpiry  SessionExpiryConfig
 	Now            func() time.Time
+	// PersistReasoningGlobal is invoked by /reasoning ... --global to persist
+	// the requested effort beyond the calling session. A nil callback or one
+	// that returns an error causes the command to fall back to a session-only
+	// override and surface PersistFailed=true to the caller.
+	PersistReasoningGlobal func(ReasoningEffort) error
 }
 
 type kernelSubmitter interface {
@@ -87,6 +92,9 @@ type Manager struct {
 	turnCancelled  bool
 	shuttingDown   bool
 	followUps      []InboundEvent
+
+	reasoningMu    sync.Mutex
+	reasoningState map[string]SessionReasoningState
 
 	renderChan <-chan kernel.RenderFrame
 }
@@ -184,11 +192,43 @@ func newManagerInternal(cfg ManagerConfig, k kernelSubmitter, log *slog.Logger) 
 		cfg.AllowDiscovery = map[string]bool{}
 	}
 	return &Manager{
-		cfg:      cfg,
-		kernel:   k,
-		log:      log,
-		channels: map[string]Channel{},
+		cfg:            cfg,
+		kernel:         k,
+		log:            log,
+		channels:       map[string]Channel{},
+		reasoningState: map[string]SessionReasoningState{},
 	}
+}
+
+// DispatchReasoning routes a /reasoning invocation through ParseReasoningCommand
+// and ApplyReasoningCommand for the calling session only. The session is
+// identified by sessionKey (typically "<platform>:<chat_id>"). Each session
+// keeps its own SessionReasoningState — mutations are isolated per key. The
+// persistGlobal callback configured on ManagerConfig is invoked only when
+// /reasoning <effort> --global succeeds; otherwise the call is session-only
+// and the resulting reply.PersistFailed surfaces global-save errors without
+// changing other sessions' state.
+func (m *Manager) DispatchReasoning(sessionKey string, args []string) (ReasoningReply, error) {
+	cmd, err := ParseReasoningCommand(args)
+	if err != nil {
+		return ReasoningReply{}, err
+	}
+	persist := m.cfg.PersistReasoningGlobal
+	if persist == nil {
+		persist = func(ReasoningEffort) error {
+			return errors.New("gateway: PersistReasoningGlobal not configured")
+		}
+	}
+
+	m.reasoningMu.Lock()
+	defer m.reasoningMu.Unlock()
+	state, ok := m.reasoningState[sessionKey]
+	if !ok {
+		state = SessionReasoningState{Source: ReasoningSourceUnset}
+	}
+	newState, reply := ApplyReasoningCommand(state, cmd, persist)
+	m.reasoningState[sessionKey] = newState
+	return reply, nil
 }
 
 func (m *Manager) now() time.Time {
