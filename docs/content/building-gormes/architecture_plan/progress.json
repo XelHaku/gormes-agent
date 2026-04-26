@@ -8925,9 +8925,9 @@
             {
               "name": "Gateway /reasoning command parser",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure parser internal/gateway/reasoning_command.go exposes type ReasoningAction int (ReasoningActionShow, ReasoningActionSet, ReasoningActionReset), type ReasoningEffort string (high|low|medium|\"\"), type ReasoningCommand struct{Action ReasoningAction; Effort ReasoningEffort; Global bool}, and ParseReasoningCommand(args []string) (ReasoningCommand, error). Empty args returns Action=Show. \"high|low|medium\" returns Action=Set with that Effort. Trailing \"--global\" sets Global=true. \"reset\" alone returns Action=Reset, Global=false. \"reset --global\" returns an error matching ErrResetGlobalUnsupported. Unknown effort returns ErrInvalidEffort. No state, no clock, no I/O.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8957,7 +8957,7 @@
                 "TestParseReasoningCommand_RejectGlobalReset ([\"reset\",\"--global\"]) returns ErrResetGlobalUnsupported.",
                 "TestParseReasoningCommand_RejectInvalidEffort ([\"bogus\"]) returns ErrInvalidEffort."
               ],
-              "note": "Split off from the larger /reasoning row. Worker can land the parser as 6 deterministic table tests in one cycle without any session/config wiring. The apply + dispatch slice depends on this row.",
+              "note": "Complete: TDD landed pure parser `internal/gateway/reasoning_command.go` and table tests in `internal/gateway/reasoning_command_test.go`. ParseReasoningCommand recognizes the show form on empty args, the set form for high|low|medium, the trailing --global modifier, and the reset form (session-scoped only). Unknown effort tokens return ErrInvalidEffort and `reset --global` returns ErrResetGlobalUnsupported, both wrapped via fmt.Errorf so dispatchers can errors.Is them without re-parsing. The parser stays pure: no manager.go, no config persistence, no gateway dispatch — the apply + dispatch slice consumes these typed errors next.",
               "write_scope": [
                 "internal/gateway/reasoning_command.go",
                 "internal/gateway/reasoning_command_test.go",
