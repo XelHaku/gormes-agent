@@ -4937,7 +4937,7 @@
               "name": "Bedrock stale-client eviction + retry classification",
               "status": "planned",
               "contract": "Bedrock runtime clients evict stale transport state without hiding request or validation failures",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -11153,7 +11153,7 @@
                 "internal/tui/model.go",
                 "internal/tui/mouse_tracking.go",
                 "internal/tui/slash_dispatch.go",
-                "internal/tui/slash_dispatch_test.go",
+                "internal/tui/slash_dispatch_test.go:TestSlashRegistry_SaveStubReturnsNotImplemented",
                 "internal/tui/update.go"
               ],
               "test_commands": [
@@ -11207,39 +11207,45 @@
               ],
               "ready_when": [
                 "`Native TUI slash-command dispatch table` is complete (the registry and /save stub already exist).",
-                "internal/transcript.ExportMarkdown is the canonical persisted-transcript reader — `cmd/gormes/session.go` already proves it works over a sql.DB pointing at config.MemoryDBPath()."
+                "internal/transcript.ExportMarkdown is the canonical persisted-transcript reader — `cmd/gormes/session.go` already proves it works over a sql.DB pointing at config.MemoryDBPath().",
+                "The existing TestSlashRegistry_SaveStubReturnsNotImplemented assertion in internal/tui/slash_dispatch_test.go is the only test the prior dispatch row required to assert /save was a no-op; replacing the stub means that one named test must be deleted or rewritten in the same slice (no test outside internal/tui asserts the stub message)."
               ],
               "not_ready_when": [
                 "The slice writes UI-shaped Model.frame.History rows directly instead of going through internal/transcript.ExportMarkdown.",
                 "The slice opens a network connection, starts SSE/api_server transport, or treats /save as a normal model prompt.",
-                "The slice changes kernel.Submit signatures or the registry shape introduced by the prior row."
+                "The slice changes kernel.Submit signatures or the registry shape introduced by the prior row.",
+                "The slice modifies any internal/tui file other than slash_dispatch.go, slash_dispatch_test.go, slash_save.go, slash_save_test.go, or model.go (in particular: update.go, view.go, mouse_tracking.go, and auto_title.go must be untouched).",
+                "The slice modifies cmd/gormes/* — wiring config.MemoryDBPath() into a real SessionExportFunc lives in a follow-up cmd-level row, not here."
               ],
               "blocked_by": [
                 "Native TUI slash-command dispatch table"
               ],
               "acceptance": [
                 "internal/tui declares: type SessionExportFunc func(ctx context.Context, sessionID string) (path string, err error); Options gains a SessionExport SessionExportFunc field; NewModelWithOptions stores it on Model; the registry's `save` handler invokes it with the active session id from m.frame.SessionID (or returns `save: no active session` when empty).",
+                "internal/tui/slash_dispatch.go's saveStubHandler is removed and NewDefaultSlashRegistry registers the new saveSlashHandler from internal/tui/slash_save.go in its place.",
+                "internal/tui/slash_dispatch_test.go's TestSlashRegistry_SaveStubReturnsNotImplemented is deleted (or renamed and rewritten) so the build does not assert the old `save not yet implemented` StatusMessage against the new handler.",
                 "TestSlashSave_NoConversationReturnsStatus runs /save against a Model with empty frame.History and asserts StatusMessage=`save: no conversation` with no SessionExportFunc call.",
                 "TestSlashSave_NoActiveSessionReturnsStatus runs /save with non-empty history but empty SessionID and asserts StatusMessage=`save: no active session`.",
                 "TestSlashSave_HappyPathReturnsWrittenPath wires a fake SessionExportFunc returning `/tmp/sess-export-fixture.md` and asserts StatusMessage contains that path, exactly one fake invocation, and no kernel.Submit call.",
                 "TestSlashSave_ExportFailureRemovesPartialFile wires a fake that writes a partial file then returns an error; asserts the partial file is removed (os.Stat ENOENT) and StatusMessage starts with `save: write failed:`.",
                 "TestSlashSave_ErrSessionNotFoundReturnsStoreUnavailable wires a fake returning transcript.ErrSessionNotFound; asserts StatusMessage=`save: store unavailable`."
               ],
-              "note": "Reshaped 2026-04-26 (continuation of `Native TUI slash-command dispatch table`). Wires the no-op /save stub to internal/transcript.ExportMarkdown via an injected function so unit tests do not need a real SQLite DB. cmd/gormes/main.go is responsible for binding the real implementation (open MemoryDBPath, call ExportMarkdown) when constructing the Model — that wiring lives outside this row's write_scope.",
+              "note": "Reshaped 2026-04-26 (continuation of `Native TUI slash-command dispatch table`). Wires the no-op /save stub to internal/transcript.ExportMarkdown via an injected function so unit tests do not need a real SQLite DB. cmd/gormes/main.go is responsible for binding the real implementation (open MemoryDBPath, call ExportMarkdown) when constructing the Model — that wiring lives outside this row's write_scope. 2026-04-26T20:30Z reshape: prior attempt failed report_validation_failed because the worker needed to delete TestSlashRegistry_SaveStubReturnsNotImplemented from internal/tui/slash_dispatch_test.go but that file was not in write_scope; this reshape adds slash_dispatch_test.go to write_scope, names the deletion explicitly in acceptance, and tightens not_ready_when to forbid touching any other internal/tui file.",
               "write_scope": [
                 "internal/tui/slash_dispatch.go",
+                "internal/tui/slash_dispatch_test.go",
                 "internal/tui/slash_save.go",
                 "internal/tui/slash_save_test.go",
                 "internal/tui/model.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/tui -run 'TestSlashSave_' -count=1",
+                "go test ./internal/tui -run 'TestSlashSave_|TestSlashRegistry_' -count=1",
                 "go test ./internal/tui ./internal/transcript -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "All 5 TestSlashSave_* fixtures pass; the existing TestSlashRegistry_SaveStubReturnsNotImplemented assertion is updated or removed because the stub is replaced; no test in internal/tui opens a real network or DB connection."
+                "All 5 TestSlashSave_* fixtures pass; TestSlashRegistry_SaveStubReturnsNotImplemented is no longer present in internal/tui/slash_dispatch_test.go (it has been deleted because the stub it asserted is gone); no test in internal/tui opens a real network or DB connection; `go test ./internal/tui ./internal/transcript -count=1` is green."
               ],
               "health": {
                 "attempt_count": 1,
