@@ -128,7 +128,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway stream consumer for agent-event fan-out
 - [x] Non-editable gateway progress/commentary send fallback
 - [x] Slack rich-text quotes/lists + link-unfurl ingress
-- [ ] Slack thread-parent context + team-scoped cache key
+- [x] Slack thread-parent context + team-scoped cache key
 
 ### 2.B.10 — WeChat Adapter ✅
 
