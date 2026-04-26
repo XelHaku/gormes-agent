@@ -8994,9 +8994,9 @@
             {
               "name": "Gateway /reasoning apply + dispatch",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/gateway/reasoning_command.go also exposes type SessionReasoningState struct{Effort ReasoningEffort; Source string} where Source is \"session\"|\"global\"|\"unset\", type ReasoningReply struct{Effort ReasoningEffort; Scope string; PersistFailed bool}, and ApplyReasoningCommand(state SessionReasoningState, cmd ReasoningCommand, persistGlobal func(ReasoningEffort) error) (SessionReasoningState, ReasoningReply). Action=Show returns current state unchanged. Action=Set with Global=false mutates session-only. Action=Set with Global=true calls persistGlobal; on failure falls back to session-only and sets PersistFailed=true. Action=Reset clears the session override. Internal/gateway/manager.go wires \"/reasoning\" through the existing command registry to ParseReasoningCommand + ApplyReasoningCommand for the calling session.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9032,7 +9032,7 @@
                 "TestApplyReasoningCommand_ResetClearsSessionState sets Source=\"unset\" and Effort=\"\".",
                 "TestGatewayManagerDispatchesReasoning verifies that the existing command registry routes \"/reasoning\" through Parse + Apply for the calling session only."
               ],
-              "note": "Apply + dispatch slice. Depends on the parser slice landing first so this row only needs to add the state-mutator and one wiring point in manager.go. The persistGlobal func is a callback so the test can stub config persistence without disk I/O.",
+              "note": "Complete: TDD landed `SessionReasoningState`, `ReasoningReply`, and `ApplyReasoningCommand` in `internal/gateway/reasoning_command.go` with `Source`/`Scope` tags `unset|session|global`. Show returns the injected state unchanged; session-only Set mutates without invoking persistGlobal; global Set calls persistGlobal once with the requested effort and pins Source=global on success; persistGlobal failure falls back to session-only state with PersistFailed=true; Reset clears Source to unset and Effort to \"\". `internal/gateway/manager.go` adds `ManagerConfig.PersistReasoningGlobal` plus `Manager.DispatchReasoning(sessionKey, args)` keyed by chat key, so per-session reasoning state is isolated and a missing callback degrades to the session-only fallback path. `TestGatewayManagerDispatchesReasoning` covers session-only set, show, cross-session isolation, --global persist, post-global isolation, reset, and invalid-effort error propagation; `TestGatewayManagerDispatchReasoningGlobalPersistFallback` proves a callback error becomes PersistFailed without surfacing the error to the caller.",
               "write_scope": [
                 "internal/gateway/reasoning_command.go",
                 "internal/gateway/reasoning_command_test.go",

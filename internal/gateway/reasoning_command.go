@@ -46,6 +46,66 @@ var ErrInvalidEffort = errors.New("reasoning: invalid effort")
 // gateway rejects this combination too.
 var ErrResetGlobalUnsupported = errors.New("reasoning: reset --global unsupported")
 
+// Reasoning scope tags surfaced in ReasoningReply.Scope and stored in
+// SessionReasoningState.Source. They distinguish session overrides from the
+// persisted global default and the default-unset state.
+const (
+	ReasoningSourceUnset   = "unset"
+	ReasoningSourceSession = "session"
+	ReasoningSourceGlobal  = "global"
+)
+
+// SessionReasoningState is the per-session reasoning effort the manager keeps
+// alongside each chat. The empty value (Effort=="" and Source==unset) is the
+// "no override yet" baseline used when a session has never run /reasoning.
+type SessionReasoningState struct {
+	Effort ReasoningEffort
+	Source string
+}
+
+// ReasoningReply is the apply-step result the manager renders back to the
+// caller. Scope mirrors the post-apply state's source so callers don't need to
+// know about the session-vs-global distinction beyond the reply.
+type ReasoningReply struct {
+	Effort        ReasoningEffort
+	Scope         string
+	PersistFailed bool
+}
+
+// ApplyReasoningCommand mutates the supplied SessionReasoningState according
+// to a parsed ReasoningCommand. persistGlobal is invoked only for Set actions
+// with Global=true; on failure the slice falls back to a session-only override
+// and surfaces PersistFailed=true so the caller can warn the user.
+func ApplyReasoningCommand(
+	state SessionReasoningState,
+	cmd ReasoningCommand,
+	persistGlobal func(ReasoningEffort) error,
+) (SessionReasoningState, ReasoningReply) {
+	switch cmd.Action {
+	case ReasoningActionShow:
+		return state, ReasoningReply{Effort: state.Effort, Scope: state.Source}
+	case ReasoningActionReset:
+		next := SessionReasoningState{Source: ReasoningSourceUnset}
+		return next, ReasoningReply{Scope: ReasoningSourceUnset}
+	case ReasoningActionSet:
+		if cmd.Global {
+			if err := persistGlobal(cmd.Effort); err != nil {
+				next := SessionReasoningState{Effort: cmd.Effort, Source: ReasoningSourceSession}
+				return next, ReasoningReply{
+					Effort:        cmd.Effort,
+					Scope:         ReasoningSourceSession,
+					PersistFailed: true,
+				}
+			}
+			next := SessionReasoningState{Effort: cmd.Effort, Source: ReasoningSourceGlobal}
+			return next, ReasoningReply{Effort: cmd.Effort, Scope: ReasoningSourceGlobal}
+		}
+		next := SessionReasoningState{Effort: cmd.Effort, Source: ReasoningSourceSession}
+		return next, ReasoningReply{Effort: cmd.Effort, Scope: ReasoningSourceSession}
+	}
+	return state, ReasoningReply{Effort: state.Effort, Scope: state.Source}
+}
+
 // ParseReasoningCommand turns the raw split arguments of /reasoning into a
 // typed ReasoningCommand. It is pure: no I/O, no clock, no state.
 func ParseReasoningCommand(args []string) (ReasoningCommand, error) {
