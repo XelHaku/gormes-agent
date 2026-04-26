@@ -37,7 +37,8 @@ Type=simple
 %s
 WorkingDirectory=%s
 ExecStart=%s
-Restart=on-failure
+Restart=always
+RestartPreventExitStatus=2 30
 RestartSec=30s
 TimeoutStopSec=60s
 KillMode=mixed
