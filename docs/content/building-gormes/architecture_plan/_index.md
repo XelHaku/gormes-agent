@@ -37,11 +37,11 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 36/74 subphases shipped · 15 in progress · 23 planned
+**Overall:** 35/74 subphases shipped · 16 in progress · 23 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
-| Phase 1 — The Dashboard | ✅ | 3/3 subphases |
+| Phase 1 — The Dashboard | 🔨 | 2/3 subphases |
 | Phase 2 — The Gateway | 🔨 | 16/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
@@ -51,7 +51,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ---
 
-## Phase 1 — The Dashboard ✅
+## Phase 1 — The Dashboard 🔨
 
 *Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary*
 
@@ -65,7 +65,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Offline tool validation
 
-### 1.C — Automation Reliability ✅
+### 1.C — Automation Reliability 🔨
 
 - [x] Orchestrator failure-row stabilization for 4-8 workers
 - [x] Soft-success-nonzero bats coverage
@@ -73,6 +73,10 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Autoloop row health and quarantine contract
 - [x] Planner self-healing verdict loop
 - [x] Planner divergence and provenance awareness
+- [ ] Watchdog checkpoint coalescing
+- [ ] PR-intake idle backoff
+- [ ] Watchdog dead-process vs slow-progress separation
+- [ ] Builder-loop self-improvement vs user-feature ratio metric
 
 ## Phase 2 — The Gateway 🔨
 

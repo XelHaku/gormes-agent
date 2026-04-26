@@ -22,7 +22,90 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. Azure Foundry probe — path sniffing
+## 1. Watchdog checkpoint coalescing
+
+- Phase: 1 / 1.C
+- Owner: `orchestrator`
+- Size: `small`
+- Status: `planned`
+- Priority: `P1`
+- Contract: When a worker stalls, the watchdog produces at most one dirty-worktree checkpoint commit per stall window — successive stuck ticks amend or no-op instead of stacking new commits
+- Trust class: operator, system
+- Ready when: Watchdog dirty-worktree checkpointing is in place (commit ff96a5d94) and emits a record_run_health event we can key off of., Tests can use a fake clock and an in-memory git repo or a synthetic commit-recorder seam — no live system clock or systemd is required.
+- Not ready when: The slice changes the watchdog stall threshold, the dead-process detection, or the planner cadence., The slice silently drops the dirty-worktree checkpoint when a stall is real — the first tick of every distinct stall window must still produce a single observable checkpoint.
+- Degraded mode: Watchdog status reports checkpoint_coalesce_active, checkpoint_coalesce_window_seconds, and the existing dirty-worktree checkpoint commit ID instead of emitting a fresh commit on every tick.
+- Fixture: `internal/builderloop/watchdog_coalesce_test.go`
+- Write scope: `internal/builderloop/run.go`, `internal/builderloop/watchdog_coalesce.go`, `internal/builderloop/watchdog_coalesce_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/builderloop -run TestWatchdogCoalesce -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: watchdog_coalesce_test fixtures prove first-tick-commits, later-ticks-noop-or-amend, fresh-window-allowed, and a coalesce_decision field in record_run_health.
+- Acceptance: Within one stall window (default 10 min, configurable), only the first watchdog tick produces a new commit; later ticks no-op or amend so `git log --oneline` shows at most one checkpoint per window., When the worker resumes (commits or exits cleanly) and a fresh stall begins later, the next stall window is allowed a new checkpoint commit., The coalesce decision is logged as record_run_health with a coalesce_decision field (`first\|amend\|noop`) so post-mortems can verify the behavior., No test in this slice runs systemd, sleeps wall-clock, or mutates the live .codex worktree.
+- Source refs: internal/builderloop/run.go, docs/superpowers/specs/2026-04-25-builder-owned-planner-cycle-design.md
+- Unblocks: Watchdog dead-process vs slow-progress separation
+- Why now: Unblocks Watchdog dead-process vs slow-progress separation.
+
+## 2. PR-intake idle backoff
+
+- Phase: 1 / 1.C
+- Owner: `orchestrator`
+- Size: `small`
+- Status: `planned`
+- Priority: `P1`
+- Contract: When pr_intake list returns zero PRs N consecutive times, the next poll backs off to a configurable idle interval (default 5 min) instead of running on every loop cycle; the first non-empty list resets the backoff to baseline cadence
+- Trust class: system
+- Ready when: pr_intake already emits pr_intake_started and pr_intake_completed ledger events, and pr_intake_completed carries listed=N evidence., A fake clock and a stub gh-list backend make backoff state observable without live network calls.
+- Not ready when: The slice changes how PRs are merged, classified, or evicted — only the schedule of intake runs is in scope., The slice removes pr_intake calls entirely or makes them event-driven (gh webhook); event-driven is a separate row.
+- Degraded mode: pr_intake_started/completed events carry an idle_backoff field with the active interval and the consecutive-empty count so dashboards can distinguish "intake was suppressed" from "intake ran and found nothing".
+- Fixture: `internal/builderloop/pr_intake_backoff_test.go`
+- Write scope: `internal/builderloop/pr_intake.go`, `internal/builderloop/pr_intake_backoff.go`, `internal/builderloop/pr_intake_backoff_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/builderloop -run TestPRIntakeBackoff -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: pr_intake backoff fixtures prove suppression after consecutive empties, reset on first non-empty result, and idle_backoff evidence in pr_intake_completed events.
+- Acceptance: After N (default 3) consecutive listed=0 results, the next pr_intake poll is suppressed until the idle interval (default 5 min) elapses., A non-zero listed result on any subsequent poll resets the consecutive-empty counter and restores baseline cadence on the next cycle., pr_intake_completed events carry idle_backoff={active: bool, interval_seconds: int, consecutive_empty: int} so the suppression is observable., No test in this slice talks to GitHub, runs gh, or sleeps wall-clock; tests inject a fake list backend and a controllable clock.
+- Source refs: internal/builderloop/pr_intake.go
+- Unblocks: Builder-loop self-improvement vs user-feature ratio metric
+- Why now: Unblocks Builder-loop self-improvement vs user-feature ratio metric.
+
+## 3. Watchdog dead-process vs slow-progress separation
+
+- Phase: 1 / 1.C
+- Owner: `orchestrator`
+- Size: `medium`
+- Status: `planned`
+- Priority: `P1`
+- Contract: The watchdog distinguishes a dead worker (no PID, exited, or PID gone from os.findprocess) from a slow worker (PID alive but no commits) and applies independently configurable thresholds, with the dead-process check firing in <2 minutes
+- Trust class: operator, system
+- Ready when: Existing watchdog timer (commit f96a5d94) emits stall events at a single threshold; this slice carves the threshold into two independent ones., Watchdog checkpoint coalescing is fixture-ready or validated, so the dead-process tick does not amplify the commit storm.
+- Not ready when: The slice changes how worker output is rejected or how dirty worktrees are committed — only worker liveness detection is in scope., The slice introduces process-group signal sending or container-aware death detection (those belong to a separate sandboxing row).
+- Degraded mode: Watchdog status reports worker_state ∈ {alive_progressing, alive_silent, dead, unknown} and the threshold each one tripped; record_run_health carries the worker_state and which threshold (dead_after_seconds, silent_after_seconds) fired.
+- Fixture: `internal/builderloop/watchdog_state_test.go`
+- Write scope: `internal/builderloop/run.go`, `internal/builderloop/watchdog_state.go`, `internal/builderloop/watchdog_state_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/builderloop -run TestWatchdogState -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: watchdog_state fixtures prove dead-fast, silent-slow, recovery, and worker_state evidence on record_run_health are all reachable with synthetic PIDs and a fake clock.
+- Acceptance: Watcher with worker PID=0 or worker_pid_gone reports worker_state=dead within dead_after_seconds (default 90s)., Watcher with PID alive but zero commits in silent_after_seconds (default 600s) reports worker_state=alive_silent — independently of the dead threshold., A worker that recovers (commits) before dead_after_seconds resets both timers and reports worker_state=alive_progressing., record_run_health carries worker_state and the threshold that fired; no test in this slice runs a real subprocess or signal.
+- Source refs: internal/builderloop/run.go, internal/builderloop/run_health_test.go
+- Unblocks: Builder-loop self-improvement vs user-feature ratio metric
+- Why now: Unblocks Builder-loop self-improvement vs user-feature ratio metric.
+
+## 4. Builder-loop self-improvement vs user-feature ratio metric
+
+- Phase: 1 / 1.C
+- Owner: `orchestrator`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: record_run_health carries a self_improvement vs user_feature ship ratio over a configurable window, classifying each shipped row by which subphase prefix it landed under, so post-mortems can detect when the loop is mostly working on itself
+- Trust class: system
+- Ready when: record_run_health is the canonical health signal already (commit 2653a7b6 etc.) and runs.jsonl carries shipped row evidence., A subphase classifier mapping (e.g., 1.C, 5.* operator-tools, etc. → self_improvement; 4.*, 6.*, 7.* → user_feature) can live in a small in-package table for now.
+- Not ready when: The slice changes ship-detection or ledger-write semantics — only adds a derived counter., The slice depends on a yet-unbuilt classifier service or external store.
+- Degraded mode: When the ship_ratio cannot be computed (insufficient history, classification ambiguous), record_run_health carries ship_ratio=null and reports ship_ratio_evidence with the reason instead of fabricating zero.
+- Fixture: `internal/builderloop/ship_ratio_test.go`
+- Write scope: `internal/builderloop/ship_ratio.go`, `internal/builderloop/ship_ratio_test.go`, `internal/builderloop/health_writer.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/builderloop -run TestShipRatio -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: ship_ratio fixtures prove self_improvement vs user_feature classification, unclassified bucketing, null evidence on insufficient history, and ratio computed against synthetic ship events.
+- Acceptance: Over a configurable window (default last 24h), record_run_health carries ship_ratio={self_improvement_count, user_feature_count, ratio, window_seconds}., A subphase prefix table (initially: 1.C/5.N/5.O = self_improvement; 4.*/6.*/7.* = user_feature; everything else = unclassified) determines the bucket per shipped row., Unclassified rows are visible as ship_ratio.unclassified_count, never silently bucketed., No test in this slice reads runs.jsonl from disk; tests inject synthetic ship events.
+- Source refs: internal/builderloop/run.go, internal/builderloop/health_writer.go, internal/progress/health.go
+- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
+
+## 5. Azure Foundry probe — path sniffing
 
 - Phase: 4 / 4.A
 - Owner: `provider`
@@ -43,7 +126,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Azure Foundry probe — /models classification + Anthropic fallback
 - Why now: Unblocks Azure Foundry probe — /models classification + Anthropic fallback.
 
-## 2. Azure Foundry probe — /models classification + Anthropic fallback
+## 6. Azure Foundry probe — /models classification + Anthropic fallback
 
 - Phase: 4 / 4.A
 - Owner: `provider`
@@ -64,7 +147,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Azure Foundry transport probe read model
 - Why now: Unblocks Azure Foundry transport probe read model.
 
-## 3. Provider rate guard — x-ratelimit header classification
+## 7. Provider rate guard — x-ratelimit header classification
 
 - Phase: 4 / 4.H
 - Owner: `provider`
@@ -85,7 +168,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Provider rate guard — degraded-state + last-known-good evidence
 - Why now: Unblocks Provider rate guard — degraded-state + last-known-good evidence.
 
-## 4. Provider rate guard — degraded-state + last-known-good evidence
+## 8. Provider rate guard — degraded-state + last-known-good evidence
 
 - Phase: 4 / 4.H
 - Owner: `provider`
@@ -106,7 +189,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Provider rate guard + budget telemetry
 - Why now: Unblocks Provider rate guard + budget telemetry.
 
-## 5. Native TUI terminal-selection divergence contract
+## 9. Native TUI terminal-selection divergence contract
 
 - Phase: 5 / 5.Q
 - Owner: `gateway`
@@ -125,7 +208,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.ts@edc78e25, ../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.test.ts@edc78e25, ../hermes-agent/ui-tui/src/lib/platform.ts@edc78e25, ../hermes-agent/ui-tui/src/app/useInputHandlers.ts@edc78e25, ../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.ts@31d7f195, internal/tui/, docs/content/upstream-hermes/user-guide/tui.md
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 6. BlueBubbles iMessage bubble formatting parity
+## 10. BlueBubbles iMessage bubble formatting parity
 
 - Phase: 7 / 7.E
 - Owner: `gateway`
@@ -145,86 +228,5 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/gateway/platforms/bluebubbles.py@f731c2c2, ../hermes-agent/tests/gateway/test_bluebubbles.py@f731c2c2, internal/channels/bluebubbles/bot.go, internal/gateway/channel.go
 - Unblocks: BlueBubbles iMessage session-context prompt guidance
 - Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
-
-## 7. CLI profile path and active-profile store
-
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Contract: Gormes models Hermes profile names, active-profile selection, and profile-root resolution as pure XDG-scoped helpers before command UI, alias wrappers, cloning, or export/import behavior is ported
-- Trust class: operator, system
-- Ready when: This slice only defines validation, path resolution, active-profile read/write, and environment resolution helpers., No command UI, alias wrapper, service file, tar export/import, clone-all copy, or provider credential migration is required.
-- Not ready when: The slice creates shell wrapper scripts, copies profile directories, mutates provider credentials, or changes runtime config loading for non-profile commands.
-- Degraded mode: Profile commands report invalid profile names, missing profiles, reserved-name collisions, and unset active profile state without writing outside the selected Gormes config/data roots.
-- Fixture: `internal/cli/profile_store_test.go`
-- Write scope: `internal/cli/profile_store.go`, `internal/cli/profile_store_test.go`, `internal/config/`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/cli ./internal/config -run 'Test.*Profile.*Store\|Test.*Profile.*Path\|Test.*Active.*Profile' -count=1`, `go test ./internal/cli ./internal/config -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Profile helper fixtures prove validation, path resolution, active-profile persistence, environment resolution, and no writes outside selected Gormes roots.
-- Acceptance: Profile name validation accepts lowercase alphanumeric, underscore, and hyphen names up to 64 characters, keeps default as a special alias, and rejects uppercase, spaces, leading punctuation, empty names, and reserved subcommand names., Default and named profile directories resolve under Gormes XDG roots without reading or writing legacy Hermes profile directories., Active-profile read/write helpers persist only the selected name plus explicit missing/unset evidence., Profile environment resolution returns the effective GORMES profile root for default and named profiles without mutating process-wide environment variables in tests.
-- Source refs: ../hermes-agent/hermes_cli/profiles.py@edc78e25, ../hermes-agent/tests/hermes_cli/test_profiles.py@edc78e25, internal/config/config.go, cmd/gormes/main.go
-- Unblocks: CLI auth status read model before provider setup, Setup/uninstall dry-run command contracts
-- Why now: Unblocks CLI auth status read model before provider setup, Setup/uninstall dry-run command contracts.
-
-## 8. Gateway management CLI read-model closeout
-
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Contract: Gateway management CLI exposes read-only status, pairing, runtime-validation, and channel-availability evidence over existing Gormes stores before mutating start/stop/restart commands widen the surface
-- Trust class: operator, gateway, system
-- Ready when: `gormes gateway status` already reads the native runtime status and pairing stores., This slice is read-only; it must not start, stop, restart, install, or supervise live gateway services.
-- Not ready when: The slice invokes systemd/sc.exe, opens live channel clients, changes service restart polling, or creates another gateway state file.
-- Degraded mode: Gateway CLI reports missing runtime state, invalid PID/process evidence, missing pairing store, disabled channels, and unsupported mutating commands instead of inventing a second management state model.
-- Fixture: `cmd/gormes/gateway_management_cli_test.go`
-- Write scope: `cmd/gormes/gateway_status.go`, `cmd/gormes/gateway_management_cli_test.go`, `internal/gateway/`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./cmd/gormes ./internal/gateway -run 'Test.*Gateway.*Management\|Test.*Gateway.*Status\|Test.*Pairing\|Test.*Runtime.*Validation' -count=1`, `go test ./cmd/gormes ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Gateway management fixtures prove read-only status/pairing/runtime evidence, explicit unavailable mutating commands, and no live service-manager dependency.
-- Acceptance: A gateway management fixture renders configured channels, pairing status, runtime validation, Slack/Discord/Telegram availability, and missing-state evidence from fake stores., Unsupported mutating management commands return a stable unavailable error with a pointer to the existing service/restart helper rows., PID validation output reuses the existing runtime status validation model and never shells out to a live service manager in tests., The fixture proves no duplicate management state file or Python Hermes command path is read.
-- Source refs: ../hermes-agent/hermes_cli/gateway.py@edc78e25, ../hermes-agent/hermes_cli/pairing.py@edc78e25, ../hermes-agent/hermes_cli/status.py@edc78e25, ../hermes-agent/tests/hermes_cli/test_gateway_runtime_health.py@edc78e25, cmd/gormes/gateway_status.go, internal/gateway/status.go, internal/gateway/pairing_store.go
-- Unblocks: Webhook/platform management CLI helpers, Cron management CLI over native store
-- Why now: Unblocks Webhook/platform management CLI helpers, Cron management CLI over native store.
-
-## 9. Doctor custom endpoint provider readiness
-
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: gormes doctor accepts custom endpoint/provider-style configuration as operator intent and reports credential/readiness evidence without requiring a named provider registry match
-- Trust class: operator, system
-- Ready when: Gormes doctor already has --offline, API server health, tool registry, Goncho config, and gateway diagnostics., The slice can use temp XDG config and fake endpoint/provider metadata without network calls.
-- Not ready when: The slice introduces a live provider catalog lookup, reads legacy Hermes config.yaml as authoritative state, or changes non-custom provider routing behavior., The slice ports Hermes setup/auth prompts instead of doctor readiness reporting.
-- Degraded mode: Doctor output reports custom-endpoint configured, missing API key, offline-skip, or provider-registry-unavailable evidence instead of failing bare custom provider settings as unknown.
-- Fixture: `cmd/gormes/doctor_custom_provider_test.go`
-- Write scope: `cmd/gormes/doctor.go`, `cmd/gormes/doctor_custom_provider_test.go`, `internal/config/`, `internal/hermes/status.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./cmd/gormes -run TestDoctorCustomProvider -count=1`, `go test ./cmd/gormes ./internal/config ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Doctor fixtures prove custom endpoint/provider-style settings are accepted with explicit readiness evidence and no live provider or legacy Hermes config dependency.
-- Acceptance: A config shaped as a custom endpoint with model and no named provider registry entry does not produce an unknown-provider doctor failure., Doctor output distinguishes missing credentials from unknown provider and remains usable in --offline mode., Known-provider validation, if present, remains deterministic and local-testdata backed., No test opens provider network calls, Hermes config.yaml, or live auth stores.
-- Source refs: ../hermes-agent/hermes_cli/doctor.py@b2d3308f, ../hermes-agent/tests/hermes_cli/test_doctor.py@b2d3308f:test_run_doctor_accepts_bare_custom_provider, cmd/gormes/doctor.go, internal/config/config.go, internal/hermes/status.go
-- Unblocks: CLI status summary over native stores
-- Why now: Unblocks CLI status summary over native stores.
-
-## 10. CLI log snapshot reader
-
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Contract: Gormes captures redacted local log snapshots for agent, gateway, error, tool-audit, and builder-loop logs from XDG paths without network upload or archive creation
-- Trust class: operator, system
-- Ready when: This slice is a pure local file reader with injected root paths and fixture log files., No paste upload, support bundle archive, live provider status, or backup write behavior is required.
-- Not ready when: The slice uploads to paste.rs/dpaste, creates tar/zip backups, reads legacy Hermes logs as authoritative state, or changes `gormes doctor` exit codes.
-- Degraded mode: Diagnostics report missing logs, rotated-log fallback, truncation, redaction, and unreadable-file evidence without failing the whole doctor/status command.
-- Fixture: `internal/cli/log_snapshot_test.go`
-- Write scope: `internal/cli/log_snapshot.go`, `internal/cli/log_snapshot_test.go`, `internal/config/`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/cli ./internal/config -run 'Test.*Log.*Snapshot\|Test.*Diagnostic.*Log\|Test.*Redact' -count=1`, `go test ./internal/cli ./internal/config -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Log snapshot fixtures prove local log capture, rotated fallback, truncation evidence, redaction, and no network/archive side effects.
-- Acceptance: Fixtures read small log files and return full plus tail text for agent, gateway, error, tool-audit, and builder-loop log classes., Missing primary logs fall back to rotated log names when available and otherwise emit file-not-found evidence., Large logs are capped by byte and line limits with truncation evidence., Secrets shaped like API keys, bearer tokens, and configured proxy keys are redacted before rendering.
-- Source refs: ../hermes-agent/hermes_cli/debug.py@edc78e25, ../hermes-agent/hermes_cli/logs.py@edc78e25, ../hermes-agent/tests/hermes_cli/test_debug.py@edc78e25, ../hermes-agent/tests/hermes_cli/test_logs.py@edc78e25, internal/cli/, internal/config/config.go, cmd/gormes/doctor.go
-- Unblocks: CLI status summary over native stores, Backup manifest dry-run contract
-- Why now: Unblocks CLI status summary over native stores, Backup manifest dry-run contract.
 
 <!-- PROGRESS:END -->

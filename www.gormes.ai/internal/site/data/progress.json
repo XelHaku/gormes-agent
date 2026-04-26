@@ -358,6 +358,277 @@
                 "owned_since": "2026-04-25T11:02:16Z",
                 "note": "Divergence awareness exists to protect Gormes-owned surfaces from upstream-led planning assumptions."
               }
+            },
+            {
+              "name": "Watchdog checkpoint coalescing",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "When a worker stalls, the watchdog produces at most one dirty-worktree checkpoint commit per stall window — successive stuck ticks amend or no-op instead of stacking new commits",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Watchdog status reports checkpoint_coalesce_active, checkpoint_coalesce_window_seconds, and the existing dirty-worktree checkpoint commit ID instead of emitting a fresh commit on every tick.",
+              "fixture": "internal/builderloop/watchdog_coalesce_test.go",
+              "source_refs": [
+                "internal/builderloop/run.go",
+                "docs/superpowers/specs/2026-04-25-builder-owned-planner-cycle-design.md"
+              ],
+              "ready_when": [
+                "Watchdog dirty-worktree checkpointing is in place (commit ff96a5d94) and emits a record_run_health event we can key off of.",
+                "Tests can use a fake clock and an in-memory git repo or a synthetic commit-recorder seam — no live system clock or systemd is required."
+              ],
+              "not_ready_when": [
+                "The slice changes the watchdog stall threshold, the dead-process detection, or the planner cadence.",
+                "The slice silently drops the dirty-worktree checkpoint when a stall is real — the first tick of every distinct stall window must still produce a single observable checkpoint."
+              ],
+              "unblocks": [
+                "Watchdog dead-process vs slow-progress separation"
+              ],
+              "acceptance": [
+                "Within one stall window (default 10 min, configurable), only the first watchdog tick produces a new commit; later ticks no-op or amend so `git log --oneline` shows at most one checkpoint per window.",
+                "When the worker resumes (commits or exits cleanly) and a fresh stall begins later, the next stall window is allowed a new checkpoint commit.",
+                "The coalesce decision is logged as record_run_health with a coalesce_decision field (`first|amend|noop`) so post-mortems can verify the behavior.",
+                "No test in this slice runs systemd, sleeps wall-clock, or mutates the live .codex worktree."
+              ],
+              "note": "Overnight builder-loop run produced 74 dirty-worktree checkpoint commits in a 28-min stuck window — one every ~30s. This collapses that into ≤1 commit per window without losing the observability signal.",
+              "write_scope": [
+                "internal/builderloop/run.go",
+                "internal/builderloop/watchdog_coalesce.go",
+                "internal/builderloop/watchdog_coalesce_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run TestWatchdogCoalesce -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "watchdog_coalesce_test fixtures prove first-tick-commits, later-ticks-noop-or-amend, fresh-window-allowed, and a coalesce_decision field in record_run_health."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:08:07Z",
+                "last_failure": {
+                  "run_id": "20260426T150755Z-091361099",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 1/1.C/Watchdog checkpoint coalescing"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
+              "provenance": {
+                "origin_type": "operator_audit",
+                "note": "Reduces the 74-commit/28-min checkpoint storm observed overnight 2026-04-25 → 2026-04-26 to ≤1 commit per stall window."
+              }
+            },
+            {
+              "name": "PR-intake idle backoff",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "When pr_intake list returns zero PRs N consecutive times, the next poll backs off to a configurable idle interval (default 5 min) instead of running on every loop cycle; the first non-empty list resets the backoff to baseline cadence",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "pr_intake_started/completed events carry an idle_backoff field with the active interval and the consecutive-empty count so dashboards can distinguish \"intake was suppressed\" from \"intake ran and found nothing\".",
+              "fixture": "internal/builderloop/pr_intake_backoff_test.go",
+              "source_refs": [
+                "internal/builderloop/pr_intake.go"
+              ],
+              "ready_when": [
+                "pr_intake already emits pr_intake_started and pr_intake_completed ledger events, and pr_intake_completed carries listed=N evidence.",
+                "A fake clock and a stub gh-list backend make backoff state observable without live network calls."
+              ],
+              "not_ready_when": [
+                "The slice changes how PRs are merged, classified, or evicted — only the schedule of intake runs is in scope.",
+                "The slice removes pr_intake calls entirely or makes them event-driven (gh webhook); event-driven is a separate row."
+              ],
+              "unblocks": [
+                "Builder-loop self-improvement vs user-feature ratio metric"
+              ],
+              "acceptance": [
+                "After N (default 3) consecutive listed=0 results, the next pr_intake poll is suppressed until the idle interval (default 5 min) elapses.",
+                "A non-zero listed result on any subsequent poll resets the consecutive-empty counter and restores baseline cadence on the next cycle.",
+                "pr_intake_completed events carry idle_backoff={active: bool, interval_seconds: int, consecutive_empty: int} so the suppression is observable.",
+                "No test in this slice talks to GitHub, runs gh, or sleeps wall-clock; tests inject a fake list backend and a controllable clock."
+              ],
+              "note": "Overnight ledger showed 654 pr_intake_completed events of which 3 actually merged — the other 651 were idle polls. This row only changes the schedule, not the policy.",
+              "write_scope": [
+                "internal/builderloop/pr_intake.go",
+                "internal/builderloop/pr_intake_backoff.go",
+                "internal/builderloop/pr_intake_backoff_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run TestPRIntakeBackoff -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "pr_intake backoff fixtures prove suppression after consecutive empties, reset on first non-empty result, and idle_backoff evidence in pr_intake_completed events."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:08:07Z",
+                "last_failure": {
+                  "run_id": "20260426T150755Z-091361099",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 1/1.C/PR-intake idle backoff"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
+              "provenance": {
+                "origin_type": "operator_audit",
+                "note": "Cuts the 99.5% idle-poll rate observed overnight (651/654 polls were listed=0) without changing PR-merge policy."
+              }
+            },
+            {
+              "name": "Watchdog dead-process vs slow-progress separation",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "The watchdog distinguishes a dead worker (no PID, exited, or PID gone from os.findprocess) from a slow worker (PID alive but no commits) and applies independently configurable thresholds, with the dead-process check firing in <2 minutes",
+              "contract_status": "fixture_ready",
+              "slice_size": "medium",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Watchdog status reports worker_state ∈ {alive_progressing, alive_silent, dead, unknown} and the threshold each one tripped; record_run_health carries the worker_state and which threshold (dead_after_seconds, silent_after_seconds) fired.",
+              "fixture": "internal/builderloop/watchdog_state_test.go",
+              "source_refs": [
+                "internal/builderloop/run.go",
+                "internal/builderloop/run_health_test.go"
+              ],
+              "ready_when": [
+                "Existing watchdog timer (commit f96a5d94) emits stall events at a single threshold; this slice carves the threshold into two independent ones.",
+                "Watchdog checkpoint coalescing is fixture-ready or validated, so the dead-process tick does not amplify the commit storm."
+              ],
+              "not_ready_when": [
+                "The slice changes how worker output is rejected or how dirty worktrees are committed — only worker liveness detection is in scope.",
+                "The slice introduces process-group signal sending or container-aware death detection (those belong to a separate sandboxing row)."
+              ],
+              "unblocks": [
+                "Builder-loop self-improvement vs user-feature ratio metric"
+              ],
+              "acceptance": [
+                "Watcher with worker PID=0 or worker_pid_gone reports worker_state=dead within dead_after_seconds (default 90s).",
+                "Watcher with PID alive but zero commits in silent_after_seconds (default 600s) reports worker_state=alive_silent — independently of the dead threshold.",
+                "A worker that recovers (commits) before dead_after_seconds resets both timers and reports worker_state=alive_progressing.",
+                "record_run_health carries worker_state and the threshold that fired; no test in this slice runs a real subprocess or signal."
+              ],
+              "note": "Overnight 05:28→06:19 dead-air gap took ~50 min before the watchdog reacted. Splitting the threshold into dead-process (fast) vs slow-progress (slow) prevents that recurrence.",
+              "write_scope": [
+                "internal/builderloop/run.go",
+                "internal/builderloop/watchdog_state.go",
+                "internal/builderloop/watchdog_state_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run TestWatchdogState -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "watchdog_state fixtures prove dead-fast, silent-slow, recovery, and worker_state evidence on record_run_health are all reachable with synthetic PIDs and a fake clock."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:08:07Z",
+                "last_failure": {
+                  "run_id": "20260426T150755Z-091361099",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 1/1.C/Watchdog dead-process vs slow-progress separation"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
+              "provenance": {
+                "origin_type": "operator_audit",
+                "note": "Closes the 50-min dead-air gap from 05:28→06:19 local on 2026-04-26 by separating fast (dead-process) and slow (no-progress) thresholds."
+              }
+            },
+            {
+              "name": "Builder-loop self-improvement vs user-feature ratio metric",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "record_run_health carries a self_improvement vs user_feature ship ratio over a configurable window, classifying each shipped row by which subphase prefix it landed under, so post-mortems can detect when the loop is mostly working on itself",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "When the ship_ratio cannot be computed (insufficient history, classification ambiguous), record_run_health carries ship_ratio=null and reports ship_ratio_evidence with the reason instead of fabricating zero.",
+              "fixture": "internal/builderloop/ship_ratio_test.go",
+              "source_refs": [
+                "internal/builderloop/run.go",
+                "internal/builderloop/health_writer.go",
+                "internal/progress/health.go"
+              ],
+              "ready_when": [
+                "record_run_health is the canonical health signal already (commit 2653a7b6 etc.) and runs.jsonl carries shipped row evidence.",
+                "A subphase classifier mapping (e.g., 1.C, 5.* operator-tools, etc. → self_improvement; 4.*, 6.*, 7.* → user_feature) can live in a small in-package table for now."
+              ],
+              "not_ready_when": [
+                "The slice changes ship-detection or ledger-write semantics — only adds a derived counter.",
+                "The slice depends on a yet-unbuilt classifier service or external store."
+              ],
+              "acceptance": [
+                "Over a configurable window (default last 24h), record_run_health carries ship_ratio={self_improvement_count, user_feature_count, ratio, window_seconds}.",
+                "A subphase prefix table (initially: 1.C/5.N/5.O = self_improvement; 4.*/6.*/7.* = user_feature; everything else = unclassified) determines the bucket per shipped row.",
+                "Unclassified rows are visible as ship_ratio.unclassified_count, never silently bucketed.",
+                "No test in this slice reads runs.jsonl from disk; tests inject synthetic ship events."
+              ],
+              "note": "Overnight, 9 ships were almost entirely 1.C/5.* loop self-improvement. This metric makes that observable so a sustained skew toward self-improvement triggers operator review.",
+              "write_scope": [
+                "internal/builderloop/ship_ratio.go",
+                "internal/builderloop/ship_ratio_test.go",
+                "internal/builderloop/health_writer.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run TestShipRatio -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "ship_ratio fixtures prove self_improvement vs user_feature classification, unclassified bucketing, null evidence on insufficient history, and ratio computed against synthetic ship events."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:08:07Z",
+                "last_failure": {
+                  "run_id": "20260426T150755Z-091361099",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 1/1.C/Builder-loop self-improvement vs user-feature ratio metric"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
+              "provenance": {
+                "origin_type": "operator_audit",
+                "note": "Surfaces the self-improvement vs user-feature skew observed in the overnight 2026-04-26 post-mortem (9 ships, almost all on the loop itself)."
+              }
             }
           ],
           "drift_state": {
@@ -4320,11 +4591,11 @@
                 "azure_foundry_path_sniff fixtures prove anthropic-path, openai-deployment-path, and unknown-host classifications are deterministic and side-effect-free."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T15:05:29Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T15:08:07Z",
                 "last_failure": {
-                  "run_id": "20260426T150517Z-045212879",
+                  "run_id": "20260426T150755Z-091361099",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe — path sniffing"
@@ -4391,11 +4662,11 @@
                 "azure_foundry_models_probe fixtures prove OpenAI-shape detection, Anthropic-shape fallback, and manual-required all return typed evidence with no credential/config side effects."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T15:05:29Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T15:08:07Z",
                 "last_failure": {
-                  "run_id": "20260426T150517Z-045212879",
+                  "run_id": "20260426T150755Z-091361099",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe — /models classification + Anthropic fallback"
@@ -6247,11 +6518,11 @@
                 "rate_guard classification fixtures prove genuine_quota, upstream_capacity, and insufficient_evidence outcomes are all reachable from synthetic headers with no side effects."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T15:05:29Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T15:08:07Z",
                 "last_failure": {
-                  "run_id": "20260426T150517Z-045212879",
+                  "run_id": "20260426T150755Z-091361099",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard — x-ratelimit header classification"
@@ -6316,11 +6587,11 @@
                 "rate_guard degraded fixtures prove last-known-good composition, rate_guard_unavailable, and budget_header_missing evidence are all reachable without shared state or retry timing changes."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T15:05:29Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T15:08:07Z",
                 "last_failure": {
-                  "run_id": "20260426T150517Z-045212879",
+                  "run_id": "20260426T150755Z-091361099",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard — degraded-state + last-known-good evidence"
