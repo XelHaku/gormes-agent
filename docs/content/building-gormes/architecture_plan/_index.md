@@ -543,7 +543,6 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] CLI deterministic tip selector
 - [ ] CLI webhook URL normalizer
 - [ ] CLI dump support-summary helper
-- [x] CLI tips/dump/webhook deterministic helpers (deprecated umbrella)
 - [x] PTY bridge protocol adapter
 - [ ] CLI command registry parity + active-turn busy policy
 - [ ] Gateway /reasoning session override command
@@ -580,7 +579,9 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.Q — API Server + TUI Gateway Streaming 🔨
 
 - [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
-- [ ] TUI gateway progress/completion helpers
+- [ ] TUI gateway tool-progress mode normalizer
+- [ ] TUI gateway completion path normalizer
+- [ ] TUI gateway tool summary formatter
 - [ ] TUI gateway image/personality/platform-event helpers
 - [x] TUI mouse tracking config + slash toggle
 - [x] Native TUI bundle independence check

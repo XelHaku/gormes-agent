@@ -363,7 +363,7 @@
               "name": "Watchdog checkpoint coalescing",
               "priority": "P1",
               "status": "planned",
-              "contract": "When a worker stalls, the watchdog produces at most one dirty-worktree checkpoint commit per stall window — successive stuck ticks amend or no-op instead of stacking new commits",
+              "contract": "Pure helper internal/builderloop/watchdog_coalesce.go exposes DecideCheckpoint(now time.Time, st CheckpointState, cfg CoalesceConfig) (Decision, CheckpointState) where Decision is one of {first, amend, noop} and CheckpointState records {LastCheckpointAt, LastSubject, WindowID}; given the current state and a coalesce window (default 600s), the helper returns first on the first dirty tick of a window, amend while still inside the window with the same WindowID, and noop when no fresh state is needed. No git invocation, no shell-script change, no live filesystem mutation in this slice.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "orchestrator",
@@ -374,7 +374,8 @@
               "degraded_mode": "Watchdog status reports checkpoint_coalesce_active, checkpoint_coalesce_window_seconds, and the existing dirty-worktree checkpoint commit ID instead of emitting a fresh commit on every tick.",
               "fixture": "internal/builderloop/watchdog_coalesce_test.go",
               "source_refs": [
-                "internal/builderloop/run.go",
+                "internal/builderloop/run.go:CheckpointDirtyWorktree,lastCommitIsBuilderLoopCheckpoint,isBuilderLoopCheckpointSubject",
+                "scripts/orchestrator/watchdog.sh:checkpoint_dirty",
                 "docs/superpowers/specs/2026-04-25-builder-owned-planner-cycle-design.md"
               ],
               "ready_when": [
@@ -389,25 +390,25 @@
                 "Watchdog dead-process vs slow-progress separation"
               ],
               "acceptance": [
-                "Within one stall window (default 10 min, configurable), only the first watchdog tick produces a new commit; later ticks no-op or amend so `git log --oneline` shows at most one checkpoint per window.",
-                "When the worker resumes (commits or exits cleanly) and a fresh stall begins later, the next stall window is allowed a new checkpoint commit.",
-                "The coalesce decision is logged as record_run_health with a coalesce_decision field (`first|amend|noop`) so post-mortems can verify the behavior.",
-                "No test in this slice runs systemd, sleeps wall-clock, or mutates the live .codex worktree."
+                "TestDecideCheckpoint_FirstTickInFreshWindowReturnsFirst seeded with empty state returns Decision=first and a CheckpointState with WindowID assigned and LastCheckpointAt=now.",
+                "TestDecideCheckpoint_LaterTickInsideWindowReturnsAmend with prior state inside windowSeconds returns Decision=amend and the same WindowID.",
+                "TestDecideCheckpoint_LaterTickPastWindowReturnsFirst rotates WindowID and LastCheckpointAt=now when now-prior > windowSeconds.",
+                "TestDecideCheckpoint_NoopWhenNotDirty (helper exposes DecideCheckpointDirty=false) returns Decision=noop and unchanged state.",
+                "Helper is a pure function with no time.Now, no git invocation, no os.* calls — caller passes both the clock and the dirty flag."
               ],
-              "note": "Overnight builder-loop run produced 74 dirty-worktree checkpoint commits in a 28-min stuck window — one every ~30s. This collapses that into ≤1 commit per window without losing the observability signal.",
+              "note": "Pure-Go decider only. Shell-script wiring at scripts/orchestrator/watchdog.sh is OUT of scope for this slice and will be a separate row that imports DecideCheckpoint via a small stub binary. Overnight 2026-04-25 → 2026-04-26 builder-loop run produced 74 dirty-worktree checkpoint commits in a 28-min stuck window — this helper is the brain that collapses them.",
               "write_scope": [
-                "internal/builderloop/run.go",
                 "internal/builderloop/watchdog_coalesce.go",
                 "internal/builderloop/watchdog_coalesce_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/builderloop -run TestWatchdogCoalesce -count=1",
+                "go test ./internal/builderloop -run TestDecideCheckpoint -count=1",
                 "go test ./internal/builderloop -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "watchdog_coalesce_test fixtures prove first-tick-commits, later-ticks-noop-or-amend, fresh-window-allowed, and a coalesce_decision field in record_run_health."
+                "internal/builderloop/watchdog_coalesce_test.go fixtures prove first/amend/first-after-rotation/noop decisions across a fake clock with no live git or systemd."
               ],
               "health": {
                 "attempt_count": 3,
@@ -440,7 +441,7 @@
               "name": "PR-intake idle backoff",
               "priority": "P1",
               "status": "planned",
-              "contract": "When pr_intake list returns zero PRs N consecutive times, the next poll backs off to a configurable idle interval (default 5 min) instead of running on every loop cycle; the first non-empty list resets the backoff to baseline cadence",
+              "contract": "Pure helper internal/builderloop/pr_intake_backoff.go exposes type BackoffState struct{ConsecutiveEmpty int; SuppressUntil time.Time; Threshold int; Baseline, Idle time.Duration} and methods (s BackoffState) ShouldPoll(now time.Time) bool and (s BackoffState) RecordResult(now time.Time, listed int) BackoffState. After Threshold consecutive listed=0 results, ShouldPoll returns false until now >= SuppressUntil; any listed > 0 result resets ConsecutiveEmpty and clears SuppressUntil. No GitHub API calls, no goroutines, no live clock in this slice.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "orchestrator",
@@ -450,7 +451,8 @@
               "degraded_mode": "pr_intake_started/completed events carry an idle_backoff field with the active interval and the consecutive-empty count so dashboards can distinguish \"intake was suppressed\" from \"intake ran and found nothing\".",
               "fixture": "internal/builderloop/pr_intake_backoff_test.go",
               "source_refs": [
-                "internal/builderloop/pr_intake.go"
+                "internal/builderloop/pr_intake.go",
+                "internal/builderloop/pr_intake_test.go"
               ],
               "ready_when": [
                 "pr_intake already emits pr_intake_started and pr_intake_completed ledger events, and pr_intake_completed carries listed=N evidence.",
@@ -464,25 +466,26 @@
                 "Builder-loop self-improvement vs user-feature ratio metric"
               ],
               "acceptance": [
-                "After N (default 3) consecutive listed=0 results, the next pr_intake poll is suppressed until the idle interval (default 5 min) elapses.",
-                "A non-zero listed result on any subsequent poll resets the consecutive-empty counter and restores baseline cadence on the next cycle.",
-                "pr_intake_completed events carry idle_backoff={active: bool, interval_seconds: int, consecutive_empty: int} so the suppression is observable.",
-                "No test in this slice talks to GitHub, runs gh, or sleeps wall-clock; tests inject a fake list backend and a controllable clock."
+                "TestBackoffState_ShouldPollWhenNotSuppressed (fresh state, now=t0) returns true.",
+                "TestBackoffState_RecordEmptyBelowThreshold accumulates ConsecutiveEmpty without suppressing.",
+                "TestBackoffState_RecordEmptyAtThreshold sets SuppressUntil=now+Idle and ShouldPoll=false until SuppressUntil elapses.",
+                "TestBackoffState_RecordNonEmptyResetsState restores baseline (ConsecutiveEmpty=0, SuppressUntil zero).",
+                "TestBackoffState_ShouldPollAfterSuppressionElapsed flips back to true when now >= SuppressUntil even if ConsecutiveEmpty is still at threshold.",
+                "Helper is a pure function — caller injects the clock and the listed result count."
               ],
-              "note": "Overnight ledger showed 654 pr_intake_completed events of which 3 actually merged — the other 651 were idle polls. This row only changes the schedule, not the policy.",
+              "note": "Pure-Go state machine only. Wiring into pr_intake.go is a separate downstream row. Overnight ledger showed 654 pr_intake_completed events of which only 3 actually merged — this helper is the gate that suppresses 651 idle polls.",
               "write_scope": [
-                "internal/builderloop/pr_intake.go",
                 "internal/builderloop/pr_intake_backoff.go",
                 "internal/builderloop/pr_intake_backoff_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/builderloop -run TestPRIntakeBackoff -count=1",
+                "go test ./internal/builderloop -run TestBackoffState -count=1",
                 "go test ./internal/builderloop -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "pr_intake backoff fixtures prove suppression after consecutive empties, reset on first non-empty result, and idle_backoff evidence in pr_intake_completed events."
+                "internal/builderloop/pr_intake_backoff_test.go fixtures prove threshold/suppress/reset/reactivation behavior under a fake clock with no GitHub API and no goroutines."
               ],
               "health": {
                 "attempt_count": 3,
@@ -515,9 +518,9 @@
               "name": "Watchdog dead-process vs slow-progress separation",
               "priority": "P1",
               "status": "planned",
-              "contract": "The watchdog distinguishes a dead worker (no PID, exited, or PID gone from os.findprocess) from a slow worker (PID alive but no commits) and applies independently configurable thresholds, with the dead-process check firing in <2 minutes",
+              "contract": "Pure helper internal/builderloop/watchdog_state.go exposes type WorkerVitals struct{PID int; LastCommitAt time.Time; PIDIsLive bool} and Diagnose(now time.Time, v WorkerVitals, deadAfter, slowAfter time.Duration) Verdict where Verdict is one of {healthy, slow, dead}. dead fires when v.PIDIsLive is false and (PID == 0 OR now-LastCommitAt >= deadAfter). slow fires when v.PIDIsLive is true and now-LastCommitAt >= slowAfter. healthy otherwise. Caller injects PIDIsLive (it should wrap os.FindProcess + Signal(0)) so the helper can be tested without forking processes.",
               "contract_status": "fixture_ready",
-              "slice_size": "medium",
+              "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
                 "operator",
@@ -541,25 +544,26 @@
                 "Builder-loop self-improvement vs user-feature ratio metric"
               ],
               "acceptance": [
-                "Watcher with worker PID=0 or worker_pid_gone reports worker_state=dead within dead_after_seconds (default 90s).",
-                "Watcher with PID alive but zero commits in silent_after_seconds (default 600s) reports worker_state=alive_silent — independently of the dead threshold.",
-                "A worker that recovers (commits) before dead_after_seconds resets both timers and reports worker_state=alive_progressing.",
-                "record_run_health carries worker_state and the threshold that fired; no test in this slice runs a real subprocess or signal."
+                "TestDiagnose_HealthyWhenRecentCommitAndAlive returns Verdict=healthy.",
+                "TestDiagnose_SlowWhenAliveButOverSlowThreshold returns Verdict=slow.",
+                "TestDiagnose_DeadWhenPIDNotLiveAndOverDeadThreshold returns Verdict=dead.",
+                "TestDiagnose_DeadWhenPIDIsZero returns Verdict=dead even with v.PIDIsLive=true (zero PID treated as missing process).",
+                "TestDiagnose_SlowDoesNotMaskDead when both thresholds elapsed and PID not live, dead wins.",
+                "Helper is pure — caller injects the clock and the PIDIsLive result."
               ],
-              "note": "Overnight 05:28→06:19 dead-air gap took ~50 min before the watchdog reacted. Splitting the threshold into dead-process (fast) vs slow-progress (slow) prevents that recurrence.",
+              "note": "Two independent thresholds: deadAfter (default 120s) and slowAfter (default 600s). deadAfter must be <= slowAfter. Pure-Go decider only — no os.FindProcess, no signal delivery, no system clock in this slice.",
               "write_scope": [
-                "internal/builderloop/run.go",
                 "internal/builderloop/watchdog_state.go",
                 "internal/builderloop/watchdog_state_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/builderloop -run TestWatchdogState -count=1",
+                "go test ./internal/builderloop -run TestDiagnose -count=1",
                 "go test ./internal/builderloop -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "watchdog_state fixtures prove dead-fast, silent-slow, recovery, and worker_state evidence on record_run_health are all reachable with synthetic PIDs and a fake clock."
+                "internal/builderloop/watchdog_state_test.go fixtures prove healthy/slow/dead verdicts including the dead-vs-slow precedence rule with no os.FindProcess or signal calls."
               ],
               "health": {
                 "attempt_count": 3,
@@ -592,7 +596,7 @@
               "name": "Builder-loop self-improvement vs user-feature ratio metric",
               "priority": "P2",
               "status": "planned",
-              "contract": "record_run_health carries a self_improvement vs user_feature ship ratio over a configurable window, classifying each shipped row by which subphase prefix it landed under, so post-mortems can detect when the loop is mostly working on itself",
+              "contract": "Pure helper internal/builderloop/ship_ratio.go exposes ClassifySubphase(subphaseID string) RowKind (kinds: self_improvement, user_feature, unclassified) and ComputeShipRatio(events []ShippedRowEvent, window time.Duration, now time.Time) ShipRatio where ShipRatio counts each kind in the [now-window, now] band. The classifier table maps 1.C/control-plane/* and 5.O operator-tooling rows to self_improvement, and 4.*/6.*/7.* to user_feature, with everything else as unclassified. No file I/O, no record_run_health emission.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "orchestrator",
@@ -604,7 +608,8 @@
               "source_refs": [
                 "internal/builderloop/run.go",
                 "internal/builderloop/health_writer.go",
-                "internal/progress/health.go"
+                "internal/progress/health.go",
+                "internal/builderloop/ledger.go"
               ],
               "ready_when": [
                 "record_run_health is the canonical health signal already (commit 2653a7b6 etc.) and runs.jsonl carries shipped row evidence.",
@@ -615,25 +620,26 @@
                 "The slice depends on a yet-unbuilt classifier service or external store."
               ],
               "acceptance": [
-                "Over a configurable window (default last 24h), record_run_health carries ship_ratio={self_improvement_count, user_feature_count, ratio, window_seconds}.",
-                "A subphase prefix table (initially: 1.C/5.N/5.O = self_improvement; 4.*/6.*/7.* = user_feature; everything else = unclassified) determines the bucket per shipped row.",
-                "Unclassified rows are visible as ship_ratio.unclassified_count, never silently bucketed.",
-                "No test in this slice reads runs.jsonl from disk; tests inject synthetic ship events."
+                "TestClassifySubphase_KnownSelfImprovement covers '1.C', 'control-plane/backend', '5.O/CLI log snapshot reader' returning RowKindSelfImprovement.",
+                "TestClassifySubphase_KnownUserFeature covers '4.A', '4.H', '6.A', '7.B' returning RowKindUserFeature.",
+                "TestClassifySubphase_UnknownReturnsUnclassified (e.g., '99.X') returns RowKindUnclassified.",
+                "TestComputeShipRatio_FiltersByWindow excludes events older than now-window.",
+                "TestComputeShipRatio_CountsAllKinds returns SelfImprovement, UserFeature, Unclassified counts and a Total.",
+                "Helper is a pure function — caller injects the events slice and the clock."
               ],
-              "note": "Overnight, 9 ships were almost entirely 1.C/5.* loop self-improvement. This metric makes that observable so a sustained skew toward self-improvement triggers operator review.",
+              "note": "Pure-Go classifier and aggregator only. Wiring into health_writer.go to emit ratios on record_run_health is a separate row. Goal: post-mortems can detect when the loop is mostly fixing itself instead of shipping user features.",
               "write_scope": [
                 "internal/builderloop/ship_ratio.go",
                 "internal/builderloop/ship_ratio_test.go",
-                "internal/builderloop/health_writer.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/builderloop -run TestShipRatio -count=1",
+                "go test ./internal/builderloop -run 'TestClassifySubphase|TestComputeShipRatio' -count=1",
                 "go test ./internal/builderloop -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "ship_ratio fixtures prove self_improvement vs user_feature classification, unclassified bucketing, null evidence on insufficient history, and ratio computed against synthetic ship events."
+                "internal/builderloop/ship_ratio_test.go fixtures prove classifier coverage of self_improvement/user_feature/unclassified plus windowed aggregation with no record_run_health writes."
               ],
               "health": {
                 "attempt_count": 3,
@@ -4575,7 +4581,7 @@
               "name": "Azure Foundry probe — path sniffing",
               "priority": "P2",
               "status": "planned",
-              "contract": "Azure Foundry endpoint URLs are classified into anthropic_messages, openai_chat_completions, or unknown solely by URL path/host inspection, with no HTTP, no credential reads, and no config writes",
+              "contract": "Pure helper internal/hermes/azure_foundry_path_sniff.go exposes type AzureTransport string (anthropic_messages, openai_chat_completions, unknown) and ClassifyAzurePath(rawURL string) (AzureTransport, string) where the second return is a human reason. Returns anthropic_messages when (case-insensitive) the URL path ends in /anthropic or contains /anthropic/, mirroring upstream _looks_like_anthropic_path (hermes_cli/azure_detect.py:114-124). Returns unknown for every other URL. No HTTP, no credential reads, no config writes.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -4586,8 +4592,9 @@
               "degraded_mode": "Probe status reports azure_path_sniff_unknown when no path heuristic matches, and azure_path_sniff_evidence with detected scheme/host/path otherwise.",
               "fixture": "internal/hermes/azure_foundry_path_sniff_test.go",
               "source_refs": [
-                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
-                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
+                "../hermes-agent/hermes_cli/azure_detect.py:_looks_like_anthropic_path:114",
+                "../hermes-agent/hermes_cli/azure_detect.py:_strip_trailing_v1:109",
+                "../hermes-agent/tests/hermes_cli/test_azure_detect.py",
                 "internal/hermes/azure_openai_transport_test.go",
                 "internal/hermes/azure_anthropic_transport_test.go"
               ],
@@ -4603,24 +4610,26 @@
                 "Azure Foundry probe — /models classification + Anthropic fallback"
               ],
               "acceptance": [
-                "URLs whose path contains /anthropic/ classify as anthropic_messages with the matched-token evidence preserved.",
-                "URLs whose path contains /openai/deployments/.../chat/completions classify as openai_chat_completions with deployment-name evidence preserved.",
-                "Other URLs classify as unknown without panicking and surface the host/path that was inspected.",
-                "No test in this slice creates an httptest.Server or reads OS env."
+                "TestClassifyAzurePath_AnthropicSuffix recognises https://foo.openai.azure.com/openai/deployments/x/anthropic and …/anthropic/.",
+                "TestClassifyAzurePath_AnthropicMidPath recognises https://foo/openai/anthropic/v1/messages.",
+                "TestClassifyAzurePath_CaseInsensitive recognises /AnthrOPic and /ANTHROPIC.",
+                "TestClassifyAzurePath_OpenAIDefaultReturnsUnknown for https://foo.openai.azure.com/openai/v1/chat/completions.",
+                "TestClassifyAzurePath_MalformedReturnsUnknown for empty string and ::garbage::.",
+                "Helper does not read os.Env, does not open files, does not call http.Client."
               ],
-              "note": "Split 1/2 of quarantined Azure Foundry probe row. Path-sniffing-only keeps the surface tiny so a worker can land deterministic table tests in one cycle.",
+              "note": "First half of the Azure Foundry probe split. Caller will fall back to /models classification when this returns unknown. Pure URL inspection only — table-driven tests with synthetic URLs.",
               "write_scope": [
                 "internal/hermes/azure_foundry_path_sniff.go",
                 "internal/hermes/azure_foundry_path_sniff_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/hermes -run TestAzureFoundryPathSniff -count=1",
+                "go test ./internal/hermes -run TestClassifyAzurePath -count=1",
                 "go test ./internal/hermes -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "azure_foundry_path_sniff fixtures prove anthropic-path, openai-deployment-path, and unknown-host classifications are deterministic and side-effect-free."
+                "internal/hermes/azure_foundry_path_sniff_test.go fixtures prove anthropic-path classification across suffix, mid-path, and case variants without HTTP."
               ],
               "health": {
                 "attempt_count": 3,
@@ -4653,7 +4662,7 @@
               "name": "Azure Foundry probe — /models classification + Anthropic fallback",
               "priority": "P2",
               "status": "planned",
-              "contract": "Given a fake /models response (or its absence), classify an Azure Foundry deployment as openai_chat_completions, anthropic_messages, or manual-required, with explicit probe evidence and zero credential or config writes",
+              "contract": "Pure helper internal/hermes/azure_foundry_models_probe.go exposes type AzureProbeResult struct{Transport AzureTransport; Models []string; Reason string; Evidence []string} and ProbeAzureFoundry(ctx, client *http.Client, base, apiKey string) (AzureProbeResult, error). Probes <base>/models first; on 200 + OpenAI-shaped JSON returns openai_chat_completions with the model IDs. On non-200 or shape mismatch, probes <base>/v1/messages with a zero-token Anthropic Messages payload and classifies anthropic_messages on any 4xx that mentions 'messages' or 'model'. Otherwise returns Transport=unknown and Reason=manual_required. Tests use httptest.Server fakes only — no live Azure call, no credential storage, no config writes.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -4664,8 +4673,10 @@
               "degraded_mode": "Probe status reports azure_models_probe_failed, azure_anthropic_probe_failed, or azure_detect_manual_required when classification cannot be made; manual api_mode entry remains available.",
               "fixture": "internal/hermes/azure_foundry_models_probe_test.go",
               "source_refs": [
-                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
-                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
+                "../hermes-agent/hermes_cli/azure_detect.py:_probe_openai_models:143",
+                "../hermes-agent/hermes_cli/azure_detect.py:_probe_anthropic_messages:175",
+                "../hermes-agent/hermes_cli/azure_detect.py:detect:221",
+                "../hermes-agent/tests/hermes_cli/test_azure_detect.py",
                 "internal/hermes/http_client.go",
                 "internal/hermes/azure_openai_transport_test.go",
                 "internal/hermes/azure_anthropic_transport_test.go"
@@ -4682,24 +4693,26 @@
                 "Azure Foundry transport probe read model"
               ],
               "acceptance": [
-                "A fake /models OpenAI-shaped response selects openai_chat_completions and records advisory model IDs without persisting them.",
-                "A failed /models call followed by a fake Anthropic Messages-shaped error selects anthropic_messages with explicit probe evidence.",
-                "Total probe failure returns manual-required evidence rather than a fatal error, and does not hide manual api_mode selection.",
-                "No test in this slice writes to AZURE_FOUNDRY_API_KEY, real config files, or a live Azure host."
+                "TestProbeAzureFoundry_OpenAIModels200WithList classifies as openai_chat_completions with the model list captured in Evidence.",
+                "TestProbeAzureFoundry_OpenAIModels200EmptyList still classifies as openai_chat_completions with empty Models and a 'shape OK, empty list' Reason.",
+                "TestProbeAzureFoundry_AnthropicMessages400ValidShape classifies as anthropic_messages when /models 404s but /v1/messages returns 400 with body containing 'messages'.",
+                "TestProbeAzureFoundry_BothFailReturnUnknown returns Transport=unknown with Reason=manual_required when both probes fail.",
+                "TestProbeAzureFoundry_RespectsContextCancel cancels mid-probe and returns ctx.Err.",
+                "Helper does not write to disk, does not mutate config, does not retry beyond the two named probes."
               ],
-              "note": "Split 2/2 of quarantined Azure Foundry probe row. Composes the path-sniff slice into deterministic /models + Anthropic fallback classification.",
+              "note": "Second half of the Azure Foundry probe split. Composes ClassifyAzurePath upstream — only invoked when path sniffing returns unknown. Mirrors hermes_cli/azure_detect.py:_probe_openai_models (line 143) and _probe_anthropic_messages (line 175).",
               "write_scope": [
                 "internal/hermes/azure_foundry_models_probe.go",
                 "internal/hermes/azure_foundry_models_probe_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/hermes -run TestAzureFoundryModelsProbe -count=1",
+                "go test ./internal/hermes -run TestProbeAzureFoundry -count=1",
                 "go test ./internal/hermes -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "azure_foundry_models_probe fixtures prove OpenAI-shape detection, Anthropic-shape fallback, and manual-required all return typed evidence with no credential/config side effects."
+                "internal/hermes/azure_foundry_models_probe_test.go fixtures prove openai/anthropic/unknown classifications via httptest.Server fakes with no live Azure traffic."
               ],
               "health": {
                 "attempt_count": 3,
@@ -6520,7 +6533,7 @@
               "name": "Provider rate guard — x-ratelimit header classification",
               "priority": "P2",
               "status": "planned",
-              "contract": "Pure functions parse x-ratelimit-* headers and classify a 429 as genuine_quota, upstream_capacity, or insufficient_evidence with redacted reset windows, no sleeps, and no shared breaker writes",
+              "contract": "Pure helper internal/hermes/provider_rate_guard.go exposes type RateLimitClass string (genuine_quota, upstream_capacity, insufficient_evidence), type Bucket struct{Tag string; Remaining int; ResetSeconds float64; HasReset bool} and Classify429(headers http.Header, now time.Time) (RateLimitClass, []Bucket, ResetEvidence). Parses x-ratelimit-remaining-{1h,1m,requests,tokens} and x-ratelimit-reset-{...} into typed Buckets; classifies genuine_quota when any bucket reports Remaining<=0 with a future reset; upstream_capacity when remaining looks normal but the 429 still fires; insufficient_evidence when no x-ratelimit-* headers were present. No sleeps, no shared state writes, no http.Get.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -6530,8 +6543,10 @@
               "degraded_mode": "Provider status reports rate_guard_classified as one of {genuine_quota, upstream_capacity, insufficient_evidence}, plus reset-window evidence when present, instead of silently tripping a global breaker.",
               "fixture": "internal/hermes/provider_rate_guard_classification_test.go",
               "source_refs": [
-                "../hermes-agent/agent/nous_rate_guard.py@192e7eb2",
-                "../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2",
+                "../hermes-agent/agent/nous_rate_guard.py:_parse_buckets_from_headers:246",
+                "../hermes-agent/agent/nous_rate_guard.py:is_genuine_nous_rate_limit:191",
+                "../hermes-agent/agent/nous_rate_guard.py:_parse_reset_seconds:38",
+                "../hermes-agent/tests/agent/test_nous_rate_guard.py",
                 "internal/hermes/errors.go"
               ],
               "ready_when": [
@@ -6546,24 +6561,26 @@
                 "Provider rate guard — degraded-state + last-known-good evidence"
               ],
               "acceptance": [
-                "Headers with remaining=0 and reset window >=60s classify as genuine_quota with redacted reset evidence.",
-                "429 responses with healthy x-ratelimit buckets classify as upstream_capacity and do not trip cross-session breaker state.",
-                "Missing or unparseable headers classify as insufficient_evidence and surface which header(s) failed parsing.",
-                "No test in this slice opens a network connection or calls time.Sleep."
+                "TestClassify429_GenuineQuotaWhenAnyBucketExhausted (Remaining-1h=0, reset=120s) returns RateLimitClassGenuineQuota.",
+                "TestClassify429_UpstreamCapacityWhenAllBucketsHaveRemaining returns RateLimitClassUpstreamCapacity.",
+                "TestClassify429_InsufficientEvidenceWhenNoRateHeaders returns RateLimitClassInsufficientEvidence and an empty Buckets slice.",
+                "TestClassify429_ParsesPerBucketTags returns one Bucket per recognised tag (1h, 1m, requests, tokens).",
+                "TestClassify429_RedactsResetWindowsAtSecondGranularity returns ResetEvidence with seconds-precision values only.",
+                "Helper does not access any global breaker state; caller threads the result."
               ],
-              "note": "Split 1/2 of quarantined Provider rate guard row. Header parsing + classification is deterministic and table-testable.",
+              "note": "First half of the Nous rate guard split. Mirrors agent/nous_rate_guard.py _parse_buckets_from_headers (line 246) and is_genuine_nous_rate_limit (line 191). Test fixtures use synthetic http.Header values and a fake clock.",
               "write_scope": [
                 "internal/hermes/provider_rate_guard.go",
                 "internal/hermes/provider_rate_guard_classification_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/hermes -run TestProviderRateGuardClassification -count=1",
+                "go test ./internal/hermes -run TestClassify429 -count=1",
                 "go test ./internal/hermes -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "rate_guard classification fixtures prove genuine_quota, upstream_capacity, and insufficient_evidence outcomes are all reachable from synthetic headers with no side effects."
+                "internal/hermes/provider_rate_guard_classification_test.go fixtures prove genuine_quota / upstream_capacity / insufficient_evidence classification with redacted reset windows under a fake clock."
               ],
               "health": {
                 "attempt_count": 3,
@@ -6596,7 +6613,7 @@
               "name": "Provider rate guard — degraded-state + last-known-good evidence",
               "priority": "P2",
               "status": "planned",
-              "contract": "Last-known-good bucket state distinguishes bare 429s; degraded modes (rate_guard_unavailable, budget_header_missing) are reported as visible provider status evidence without retry timing changes or shared mutable breaker state",
+              "contract": "Pure helper internal/hermes/provider_rate_guard_degraded.go composes the Classify429 result with persistent last-known-good state. Exposes type GuardState struct{LastKnownClass RateLimitClass; LastKnownAt time.Time; DegradeMode DegradeMode; ExhaustedBuckets []string} and ApplyClassification(state GuardState, now time.Time, class RateLimitClass, buckets []Bucket, ev ResetEvidence) GuardState. DegradeMode is one of {none, rate_guard_unavailable, budget_header_missing}. When buckets is empty (insufficient_evidence) the helper preserves LastKnownClass and bumps DegradeMode to rate_guard_unavailable for that turn. No retry timing changes, no shared mutable breaker.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -6606,9 +6623,10 @@
               "degraded_mode": "Provider status reports last_known_good=present|absent, plus rate_guard_unavailable or budget_header_missing when classification is unsafe; no retry amplification.",
               "fixture": "internal/hermes/provider_rate_guard_degraded_test.go",
               "source_refs": [
-                "../hermes-agent/agent/nous_rate_guard.py@192e7eb2",
-                "../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2",
-                "../hermes-agent/run_agent.py@192e7eb2",
+                "../hermes-agent/agent/nous_rate_guard.py:record_nous_rate_limit:70",
+                "../hermes-agent/agent/nous_rate_guard.py:nous_rate_limit_remaining:138",
+                "../hermes-agent/agent/nous_rate_guard.py:clear_nous_rate_limit:162",
+                "../hermes-agent/tests/agent/test_nous_rate_guard.py",
                 "internal/hermes/errors.go",
                 "internal/hermes/client.go"
               ],
@@ -6623,24 +6641,26 @@
                 "Provider rate guard + budget telemetry"
               ],
               "acceptance": [
-                "A bare 429 with last-known-good=exhausted classifies as genuine_quota; with last-known-good=healthy classifies as upstream_capacity.",
-                "A bare 429 with no last-known-good record classifies as insufficient_evidence and reports rate_guard_unavailable.",
-                "Malformed budget headers degrade visibly with budget_header_missing evidence and do not amplify retries or block unrelated models.",
-                "No test in this slice writes process-global state or sleeps."
+                "TestApplyClassification_RecordsExhaustedBuckets stores tag names from buckets where Remaining<=0.",
+                "TestApplyClassification_PreservesLastKnownGoodOnInsufficientEvidence keeps prior LastKnownClass and sets DegradeMode=rate_guard_unavailable.",
+                "TestApplyClassification_ClearsExhaustionOnUpstreamCapacity zeros ExhaustedBuckets and sets DegradeMode=none.",
+                "TestApplyClassification_BudgetHeaderMissing detects a 429 with neither x-ratelimit-* nor a budget header and sets DegradeMode=budget_header_missing.",
+                "TestApplyClassification_DoesNotMutateInputBuckets (defensive copy semantics).",
+                "Helper is pure and never sleeps, retries, or mutates a global breaker."
               ],
-              "note": "Split 2/2 of quarantined Provider rate guard row. Composes the classification slice with last-known-good state and degraded-mode reporting.",
+              "note": "Second half of the Nous rate guard split. Composes Classify429 results with last-known-good state so consumer code can render visible degraded-mode evidence without retry policy changes. Mirrors agent/nous_rate_guard.py:record_nous_rate_limit (line 70) and nous_rate_limit_remaining (line 138).",
               "write_scope": [
                 "internal/hermes/provider_rate_guard_degraded.go",
                 "internal/hermes/provider_rate_guard_degraded_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/hermes -run TestProviderRateGuardDegraded -count=1",
+                "go test ./internal/hermes -run TestApplyClassification -count=1",
                 "go test ./internal/hermes -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "rate_guard degraded fixtures prove last-known-good composition, rate_guard_unavailable, and budget_header_missing evidence are all reachable without shared state or retry timing changes."
+                "internal/hermes/provider_rate_guard_degraded_test.go fixtures prove last-known-good preservation and degraded-mode transitions across all three RateLimitClass values."
               ],
               "health": {
                 "attempt_count": 3,
@@ -8701,43 +8721,6 @@
               }
             },
             {
-              "name": "CLI tips/dump/webhook deterministic helpers (deprecated umbrella)",
-              "status": "complete",
-              "slice_size": "umbrella",
-              "execution_owner": "tools",
-              "not_ready_when": [
-                "The row is selected at all — execute the three sibling rows above (CLI deterministic tip selector, CLI webhook URL normalizer, CLI dump support-summary helper) instead."
-              ],
-              "note": "Closed 2026-04-26 (superseded). The original tips+dump+webhook umbrella was repeatedly quarantined (no_progress x3) because workers could not land three concept layers atomically. Three smaller sibling rows now own the work: `CLI deterministic tip selector`, `CLI webhook URL normalizer`, `CLI dump support-summary helper`. Marked complete so the candidate selector stops surfacing this stale umbrella; the row remains in inventory only so historical references resolve.",
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T14:32:48Z",
-                "last_failure": {
-                  "run_id": "20260426T143235Z-044472064",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 5/5.O/CLI tips/dump/webhook deterministic helpers"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T14:32:48Z",
-                  "after_run_id": "20260426T143235Z-044472064",
-                  "threshold": 3,
-                  "spec_hash": "990bc231f32a2a8afc67a07115a50d72d4a9cd098a582f0e9eb0a573b3aa65f3",
-                  "last_category": "no_progress"
-                }
-              },
-              "provenance": {
-                "origin_type": "hybrid",
-                "upstream_ref": "hermes:edc78e25 hermes_cli/tips.py",
-                "note": "Superseded 2026-04-26 by three sibling rows. Health block preserved per RowHealth invariant."
-              }
-            },
-            {
               "name": "PTY bridge protocol adapter",
               "status": "complete",
               "contract": "Dashboard/TUI PTY sessions expose bounded read, write, resize, close, and unavailable-state behavior through a testable adapter",
@@ -8857,8 +8840,8 @@
               "name": "Gateway /reasoning session override command",
               "priority": "P2",
               "status": "planned",
-              "contract": "Gateway /reasoning changes reasoning effort for the current session by default, persists only with --global, and clears only the current session on reset",
-              "contract_status": "draft",
+              "contract": "Gateway /reasoning command is dispatched through internal/gateway/commands.go to ParseReasoningCommand(args []string) (ReasoningCommand, error) and ApplyReasoningCommand(state SessionReasoningState, cmd ReasoningCommand, now time.Time) (SessionReasoningState, ReasoningReply). ReasoningCommand carries {Action: show|set|reset, Effort: high|low|medium|empty, Global bool}. Default scope is the calling session; --global persists to config; reset clears only the calling session; reset --global is rejected with the upstream warning class. /new and /reset drop only the triggering session's reasoning override. No per-turn-propagation refactor here — that work is already complete in 4.D.",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8868,13 +8851,14 @@
               "degraded_mode": "Gateway replies report session-only override, global-save failure fallback, invalid effort, unsupported reset --global, and reasoning-display toggle state instead of treating /reasoning as ordinary prompt text.",
               "fixture": "internal/gateway/reasoning_command_test.go",
               "source_refs": [
-                "../hermes-agent/gateway/run.py@25ba6a4a:_parse_reasoning_command_args",
-                "../hermes-agent/gateway/run.py@25ba6a4a:_handle_reasoning_command",
-                "../hermes-agent/tests/gateway/test_reasoning_command.py@25ba6a4a",
-                "../hermes-agent/tests/gateway/test_session_model_reset.py@25ba6a4a",
+                "../hermes-agent/gateway/run.py:_parse_reasoning_command_args",
+                "../hermes-agent/gateway/run.py:_handle_reasoning_command",
+                "../hermes-agent/tests/gateway/test_reasoning_command.py",
+                "../hermes-agent/tests/gateway/test_session_model_reset.py",
                 "internal/gateway/commands.go",
                 "internal/gateway/manager.go",
-                "internal/config/config.go"
+                "internal/config/config.go",
+                "internal/hermes/reasoning_effort_request_test.go"
               ],
               "ready_when": [
                 "Per-turn reasoning effort propagation is validated so a session override can affect the next native turn through typed request metadata.",
@@ -8884,24 +8868,28 @@
                 "The slice implements model switching, provider setup, interactive pickers, or broad command-registry parity in the same change.",
                 "The slice persists reasoning changes without --global or clears other sessions' reasoning overrides on /new."
               ],
-              "blocked_by": [
-                "Per-turn reasoning effort propagation"
-              ],
+              "blocked_by": [],
               "unblocks": [
                 "CLI command registry parity + active-turn busy policy"
               ],
               "acceptance": [
-                "/reasoning with no args reports effective effort, scope, and display state from fake config/session state.",
-                "/reasoning high stores a session-only override and evicts only that session's cached runtime before the next turn.",
-                "/reasoning low --global writes the configured default and clears the session override; save failure falls back to session-only state with visible evidence.",
-                "/reasoning reset clears only the current session override, while reset --global is rejected with the upstream warning class.",
-                "/new or /reset clears model and reasoning overrides only for the triggering session."
+                "TestParseReasoningCommand_ShowFormReturnsActionShow (`/reasoning`) returns ReasoningCommand{Action: show}.",
+                "TestParseReasoningCommand_SetSessionScoped (`/reasoning high`) returns Action=set, Effort=high, Global=false.",
+                "TestParseReasoningCommand_GlobalPersistFlag (`/reasoning low --global`) returns Action=set, Effort=low, Global=true.",
+                "TestParseReasoningCommand_ResetSession (`/reasoning reset`) returns Action=reset, Global=false.",
+                "TestParseReasoningCommand_RejectGlobalReset (`/reasoning reset --global`) returns an error with the upstream warning class.",
+                "TestApplyReasoningCommand_ShowReportsEffectiveScope returns ReasoningReply containing effective effort, scope, and display state from injected SessionReasoningState.",
+                "TestApplyReasoningCommand_SetSessionEvictsRuntimeCache mutates only the matching session, preserving sibling sessions' overrides.",
+                "TestApplyReasoningCommand_GlobalPersistFallback when persistence write fails, falls back to session-only state and surfaces the failure in ReasoningReply.",
+                "TestNewOrResetClearsOnlyTriggeringSession verifies session isolation across /new and /reset.",
+                "Helpers do not block on disk I/O — they accept a pluggable persistConfigFn that tests stub."
               ],
-              "note": "Hermes 25ba6a4a changed /reasoning from global-by-default to session-by-default. Keep this as a focused gateway command slice so workers do not mix it with /model pickers or the broad CLI command registry row.",
+              "note": "Hermes 25ba6a4a changed /reasoning from global-by-default to session-by-default. The 4.D Per-turn reasoning effort propagation row is complete, so this slice can land as a focused gateway command port without re-doing transport work. Keep parser, state mutator, and manager-wiring all in this slice — the contract is small enough.",
               "write_scope": [
                 "internal/gateway/commands.go",
-                "internal/gateway/manager.go",
+                "internal/gateway/reasoning_command.go",
                 "internal/gateway/reasoning_command_test.go",
+                "internal/gateway/manager.go",
                 "internal/config/config.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
@@ -8911,7 +8899,7 @@
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Gateway reasoning command fixtures prove session-only default scope, --global persistence behavior, reset cleanup, and no ordinary prompt leakage for /reasoning."
+                "internal/gateway/reasoning_command_test.go fixtures prove parser correctness, session-only default, --global persistence, reset rejection of --global, and session isolation under fake config-persist."
               ],
               "health": {
                 "attempt_count": 3,
@@ -9936,8 +9924,8 @@
             {
               "name": "CLI log snapshot reader",
               "status": "planned",
-              "contract": "internal/cli/log_snapshot.go exposes SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) (Snapshot, error) that reads existing Gormes log files (config.LogPath() + config.ToolAuditLogPath()) from injectable XDG roots, redacts secrets shaped like bearer tokens / api_key=values / Telegram-bot / Slack tokens, caps each file at 64 KiB head + 16 KiB tail, and returns a typed Snapshot per LogClass with explicit Missing/Truncated/Redacted/Unreadable evidence — no network upload, no archive write, no live provider call",
-              "contract_status": "draft",
+              "contract": "internal/cli/log_snapshot.go exposes type LogClass string (main, tool_audit), type LogSnapshotRoots struct{LogPath, ToolAuditPath string}, type SnapshotOpts struct{HeadBytes, TailBytes int64} (defaults 64 KiB + 16 KiB), type LogSection struct{Class LogClass; Path string; Head, Tail []byte; Missing, Truncated bool; Redacted int; Unreadable string} and type Snapshot struct{Sections []LogSection}. SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) (Snapshot, error) reads the two log paths (no XDG resolution inside the helper), applies head+tail truncation when files exceed HeadBytes+TailBytes, and runs RedactLine(line []byte) ([]byte, int) over each line. Redactor matches: bearer tokens (Bearer XXX), api_key=VALUE / x-api-key: VALUE, Telegram bot tokens (NN:XXXX-XXXX), Slack xoxb-/xoxp- tokens, and OpenAI sk-* keys. No network upload, no archive write, no live provider call.",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9947,10 +9935,10 @@
               "degraded_mode": "Per-class results carry MissingPrimary, RotatedFallbackUsed, BytesTruncated, LinesTruncated, RedactionsApplied, and Unreadable booleans/counters; the top-level call never returns an error for missing or unreadable files — it embeds the evidence so callers (doctor / status / backup-manifest) can render it without failing.",
               "fixture": "internal/cli/log_snapshot_test.go",
               "source_refs": [
-                "../hermes-agent/hermes_cli/logs.py@edc78e25:LOG_FILES,_TS_RE,_LEVEL_RE",
-                "../hermes-agent/hermes_cli/debug.py@edc78e25",
-                "../hermes-agent/tests/hermes_cli/test_logs.py@edc78e25",
-                "internal/config/config.go:LogPath,ToolAuditLogPath,xdgDataHome",
+                "../hermes-agent/hermes_cli/logs.py:LOG_FILES,_TS_RE,_LEVEL_RE",
+                "../hermes-agent/hermes_cli/debug.py",
+                "../hermes-agent/tests/hermes_cli/test_logs.py",
+                "internal/config/config.go:LogPath:792,ToolAuditLogPath:874,xdgDataHome:770",
                 "cmd/gormes/doctor.go"
               ],
               "ready_when": [
@@ -9968,27 +9956,31 @@
                 "Gateway/error log snapshot follow-up (once those files exist)"
               ],
               "acceptance": [
-                "internal/cli/log_snapshot.go declares: type LogClass string with constants LogClassAgent (\"agent\") and LogClassToolAudit (\"tool_audit\"); type LogSnapshotRoots struct{ AgentLogPath, ToolAuditLogPath string }; type SnapshotOpts struct{ MaxHeadBytes, MaxTailBytes, MaxLines int }; type FileResult struct{ Class LogClass, Path string, Head, Tail string, Missing, RotatedFallbackUsed, BytesTruncated, LinesTruncated, Unreadable bool, RedactionsApplied int }; type Snapshot struct{ Files []FileResult }; func SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) (Snapshot, error).",
-                "Default opts (zero values) cap each file at 64 KiB head + 16 KiB tail and 1000 lines; explicit zero `MaxLines` disables the line cap.",
-                "TestSnapshotLogs_MissingPrimary_FallsBackToRotated writes only `<path>.1` and asserts RotatedFallbackUsed=true; missing both primary and `.1` rotation produces Missing=true (no error).",
-                "TestSnapshotLogs_RedactsBearerAndApiKey writes log lines containing `Authorization: Bearer abcd1234abcd1234`, `api_key=\"sk-live-1234567890\"`, `1234567890:AABBCC-DDEE_FFGGHHII` (Telegram), and `xoxb-12345-67890-abcdef` (Slack) and asserts the rendered Head/Tail does not contain the secret payload, RedactionsApplied >= 4, and the line count is preserved.",
-                "TestSnapshotLogs_TruncatesLargeFiles writes a 256 KiB log, asserts Head len ~64 KiB, Tail len ~16 KiB, BytesTruncated=true, and Head/Tail boundaries do not split a UTF-8 rune.",
-                "TestSnapshotLogs_UnreadableFile sets file mode to 0 (POSIX) and asserts Unreadable=true with no panic and no global error from SnapshotLogs.",
-                "Test process never opens a network socket: assert via net.Listen-on-test-fail or by structure (only os.ReadFile / os.OpenFile are called; verified by `grep -L 'net\\.\\|http\\.' internal/cli/log_snapshot.go`)."
+                "TestRedactLine_BearerToken returns redacted line and Count=1 for `Authorization: Bearer abc123`.",
+                "TestRedactLine_ApiKeyEqualsValue covers `api_key=sk-prod-XYZ` and `x-api-key: sk-test-...`.",
+                "TestRedactLine_TelegramBotToken redacts `12345:ABCDEFGHabcdefgh1234567890`.",
+                "TestRedactLine_SlackTokens covers xoxb-…, xoxp-…, xoxs-….",
+                "TestRedactLine_OpenAIStyleKey redacts `sk-…` longer than 16 chars only (avoids false positives).",
+                "TestRedactLine_NoMatchPreservesInput returns input unchanged with Count=0.",
+                "TestSnapshotLogs_MissingFileSetsMissingTrue records LogSection{Missing: true} without an error.",
+                "TestSnapshotLogs_HeadAndTailTruncation produces Head and Tail with sizes equal to opts.HeadBytes and opts.TailBytes when the file is larger than their sum.",
+                "TestSnapshotLogs_AppliesRedactorPerLine sums Redacted across head and tail.",
+                "TestSnapshotLogs_UnreadableFileSetsUnreadableField records the io error message and continues with the other LogClass.",
+                "Helpers do not call net.*, do not invoke os/exec, do not touch real XDG paths."
               ],
-              "note": "Reshaped 2026-04-26 after 3 quarantined no_progress runs. Original contract listed five log classes (agent/gateway/error/tool-audit/builder-loop) but only LogPath() + ToolAuditLogPath() exist as constants today. Workers couldn't decide what to do for the absent classes and exited without changes. New contract pins to the two existing classes, names the exact Go API (LogClass enum, LogSnapshotRoots struct, SnapshotOpts, FileResult, Snapshot, SnapshotLogs func), names 4 redaction patterns by example, and names 4 specific test functions. Gateway/error/builder-loop log classes are deferred to a follow-up row tracked under unblocks.",
+              "note": "Pure local file reader + redactor only. Caller is responsible for resolving config.LogPath() and config.ToolAuditLogPath() (already exposed at internal/config/config.go:792 and 874). Tests must use t.TempDir() and inject the synthesized roots — no XDG_* env writes, no live provider status, no support-bundle behavior.",
               "write_scope": [
                 "internal/cli/log_snapshot.go",
                 "internal/cli/log_snapshot_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/cli -run 'TestSnapshotLogs_' -count=1",
+                "go test ./internal/cli -run 'TestRedactLine|TestSnapshotLogs' -count=1",
                 "go test ./internal/cli -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "TestSnapshotLogs_MissingPrimary_FallsBackToRotated, TestSnapshotLogs_RedactsBearerAndApiKey, TestSnapshotLogs_TruncatesLargeFiles, and TestSnapshotLogs_UnreadableFile all pass; SnapshotLogs imports only os/io/bufio/regexp/utf8 (no net/http) per `grep -L 'net\\.\\|http\\.' internal/cli/log_snapshot.go`."
+                "internal/cli/log_snapshot_test.go fixtures prove RedactLine coverage across all five secret shapes plus SnapshotLogs Missing/Truncated/Redacted/Unreadable evidence under t.TempDir() injection."
               ],
               "health": {
                 "attempt_count": 3,
@@ -10131,77 +10123,188 @@
               "note": "Umbrella only: repeated worker attempts showed this combined helper surface was too broad. Execute through `TUI gateway progress/completion helpers` first, then `TUI gateway image/personality/platform-event helpers`; no HTTP, SSE, JSON-RPC, or Bubble Tea program belongs in this umbrella row."
             },
             {
-              "name": "TUI gateway progress/completion helpers",
+              "name": "TUI gateway tool-progress mode normalizer",
+              "priority": "P2",
               "status": "planned",
-              "contract": "Pure TUI gateway helper functions normalize tool-progress mode, completion paths, and tool summary formatting from fixed inputs",
-              "contract_status": "draft",
+              "contract": "Pure helper internal/tuigateway/tool_progress_mode.go exposes NormalizeToolProgressMode(raw any) string returning one of {off, new, all, verbose}. Mirrors upstream tui_gateway/server.py:_load_tool_progress_mode (line 661). Boolean false → off, boolean true → all, string is lowercased and trimmed; any value outside the recognised set defaults to all. No config file reads, no session state.",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
-                "system"
+                "gateway"
               ],
-              "degraded_mode": "Remote TUI streaming remains unavailable while status can report missing progress/completion helper coverage.",
-              "fixture": "internal/tuigateway/progress_completion_test.go",
+              "degraded_mode": "TUI gateway falls back to all-progress until this normalizer is fixture-backed.",
+              "fixture": "internal/tuigateway/tool_progress_mode_test.go",
               "source_refs": [
-                "../hermes-agent/tui_gateway/server.py@edc78e25",
-                "../hermes-agent/tui_gateway/render.py@edc78e25",
-                "../hermes-agent/tests/test_tui_gateway_server.py@edc78e25",
+                "../hermes-agent/tui_gateway/server.py:_load_tool_progress_mode:661",
+                "../hermes-agent/tui_gateway/server.py:_session_tool_progress_mode:690",
+                "../hermes-agent/tui_gateway/server.py:_tool_progress_enabled:694",
+                "../hermes-agent/tests/test_tui_gateway_server.py",
                 "internal/tui/"
               ],
               "ready_when": [
-                "No transport or lifecycle code is required; helpers can be implemented as pure functions under internal/tuigateway with table tests."
+                "Pure helper only — table-driven tests with synthetic raw values are sufficient. No transport wiring, no session map, no config file read in this slice.",
+                "internal/tuigateway/ does not yet exist; this row creates the package with one helper file and one test file."
               ],
               "not_ready_when": [
-                "The slice opens HTTP/SSE connections, starts a Bubble Tea program, adds a remote client, or ports image/personality/platform-event helpers."
+                "The slice creates NewRemoteClient, registers an http handler, opens a session map, or reads from the live config file.",
+                "The slice ports completion-path or tool-summary helpers in the same change."
+              ],
+              "blocked_by": [],
+              "unblocks": [
+                "TUI gateway completion path normalizer",
+                "TUI gateway tool summary formatter",
+                "TUI gateway image/personality/platform-event helpers"
+              ],
+              "acceptance": [
+                "TestNormalizeToolProgressMode_RecognizedValues maps off/new/all/verbose verbatim.",
+                "TestNormalizeToolProgressMode_BooleanFalseToOff and BooleanTrueToAll handle Python-style truthy values arriving as Go bool.",
+                "TestNormalizeToolProgressMode_LowercasesAndTrims accepts ` ALL ` and `New`.",
+                "TestNormalizeToolProgressMode_UnknownDefaultsToAll for `loud`, empty string, nil.",
+                "Helper has no side effects; package internal/tuigateway exists after this row lands."
+              ],
+              "note": "First TUI gateway pure-helper slice — also creates the internal/tuigateway package directory.",
+              "write_scope": [
+                "internal/tuigateway/tool_progress_mode.go",
+                "internal/tuigateway/tool_progress_mode_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tuigateway -run TestNormalizeToolProgressMode -count=1",
+                "go test ./internal/tuigateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/tuigateway/tool_progress_mode_test.go fixtures prove off/new/all/verbose normalization including bool and unknown-defaults paths."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:eaa7e2db tui_gateway/server.py:_load_tool_progress_mode",
+                "note": "Hermes defines the four-mode invariant; Gormes ports it as a pure Go helper before transport."
+              }
+            },
+            {
+              "name": "TUI gateway completion path normalizer",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Pure helper internal/tuigateway/completion_path.go exposes NormalizeCompletionPath(in string, isWindows bool) string. Mirrors upstream tui_gateway/server.py:_normalize_completion_path (line 428): expands a leading ~ to the operator's home dir (caller injects the home value via a small stubbable hook), and on non-Windows callers also rewrites Windows-style C:/foo into /mnt/c/foo. No filesystem stat, no os.UserHomeDir inside the helper — caller threads a HomeFn or homeDir string.",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway"
+              ],
+              "degraded_mode": "Remote-TUI completion menus echo the raw path until this normalizer is fixture-backed.",
+              "fixture": "internal/tuigateway/completion_path_test.go",
+              "source_refs": [
+                "../hermes-agent/tui_gateway/server.py:_normalize_completion_path:428",
+                "../hermes-agent/tests/test_tui_gateway_server.py"
+              ],
+              "ready_when": [
+                "TUI gateway tool-progress mode normalizer is fixture-ready or validated, so the internal/tuigateway package directory already exists.",
+                "Pure-string transformation only — table tests with synthetic inputs."
+              ],
+              "not_ready_when": [
+                "The slice opens a real home directory, calls os.Stat, or talks to the live filesystem.",
+                "The slice adds remote completion transport or a JSON-RPC handler."
+              ],
+              "blocked_by": [
+                "TUI gateway tool-progress mode normalizer"
               ],
               "unblocks": [
                 "TUI gateway image/personality/platform-event helpers"
               ],
               "acceptance": [
-                "Tool-progress mode parsing and enabled/disabled decisions match upstream fixtures.",
-                "Completion paths normalize consistently for empty, relative, absolute, and home-directory-shaped inputs.",
-                "Tool duration/count/list summary helpers are deterministic and side-effect free."
+                "TestNormalizeCompletionPath_TildeExpansion converts ~/projects/x to /home/operator/projects/x with injected home.",
+                "TestNormalizeCompletionPath_WindowsToMntOnLinux converts C:/Users/x to /mnt/c/Users/x when isWindows=false.",
+                "TestNormalizeCompletionPath_NoExpansionOnWindows leaves C:/Users/x as C:/Users/x when isWindows=true.",
+                "TestNormalizeCompletionPath_EmptyInputReturnsEmpty without panic.",
+                "TestNormalizeCompletionPath_NoSlashConversionWithoutDriveColon leaves /usr/bin unchanged on Linux.",
+                "Helper does not call os.UserHomeDir, os.Stat, or runtime.GOOS — caller injects."
               ],
-              "note": "First split from the prior 5.Q helper umbrella so workers can land progress and completion primitives before any remote TUI transport or media/personality helper work.",
+              "note": "Second TUI gateway pure-helper slice. Mirrors upstream behavior including the WSL drive-mount rewrite.",
               "write_scope": [
-                "internal/tuigateway/",
+                "internal/tuigateway/completion_path.go",
+                "internal/tuigateway/completion_path_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/tuigateway -run 'Test.*Progress|Test.*Completion|Test.*ToolSummary' -count=1",
+                "go test ./internal/tuigateway -run TestNormalizeCompletionPath -count=1",
                 "go test ./internal/tuigateway -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Pure internal/tuigateway fixtures prove progress mode, completion path, and tool-summary helpers without transport or Bubble Tea dependencies."
+                "internal/tuigateway/completion_path_test.go fixtures prove tilde expansion and Windows→/mnt rewrite without runtime.GOOS or os.UserHomeDir calls."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T14:32:48Z",
-                "last_failure": {
-                  "run_id": "20260426T143235Z-044472064",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 5/5.Q/TUI gateway progress/completion helpers"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T14:32:48Z",
-                  "after_run_id": "20260426T143235Z-044472064",
-                  "threshold": 3,
-                  "spec_hash": "366b0b6b801c058822f0a37592f0daf804911654ef8af1b46a49b829057d7b38",
-                  "last_category": "no_progress"
-                }
-              },
               "provenance": {
                 "origin_type": "hybrid",
-                "upstream_ref": "hermes:edc78e25 tui_gateway/server.py",
-                "note": "Hermes defines the remote TUI helper semantics; Gormes keeps the first port as pure Go helpers."
+                "upstream_ref": "hermes:eaa7e2db tui_gateway/server.py:_normalize_completion_path",
+                "note": "Hermes defines the WSL-friendly path normalization; Gormes ports it as an inert helper before completion transport."
+              }
+            },
+            {
+              "name": "TUI gateway tool summary formatter",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Pure helper internal/tuigateway/tool_summary.go exposes FormatToolSummary(name string, resultJSON []byte, durationSeconds *float64) (string, bool). Mirrors upstream tui_gateway/server.py:_tool_summary (line 996): for web_search returns 'Did N searches' (or 'Did 1 search'); for web_extract returns 'Extracted N pages'; for any other tool returns 'Completed' if duration is set, else (\"\", false). The duration suffix ' in 1.2s' is appended whenever durationSeconds is non-nil. Caller decides whether to emit; this helper never logs or writes.",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway"
+              ],
+              "degraded_mode": "TUI tool-complete bubbles fall back to the raw tool name until this formatter is fixture-backed.",
+              "fixture": "internal/tuigateway/tool_summary_test.go",
+              "source_refs": [
+                "../hermes-agent/tui_gateway/server.py:_tool_summary:996",
+                "../hermes-agent/tui_gateway/server.py:_count_list:976",
+                "../hermes-agent/tui_gateway/server.py:_fmt_tool_duration",
+                "../hermes-agent/tests/test_tui_gateway_server.py"
+              ],
+              "ready_when": [
+                "TUI gateway tool-progress mode normalizer is fixture-ready or validated, so the internal/tuigateway package directory already exists.",
+                "Pure JSON-shape formatting only — table tests with synthetic resultJSON values."
+              ],
+              "not_ready_when": [
+                "The slice depends on a tool registry or a live tool-complete event hook.",
+                "The slice ports diff-snapshot rendering (capture_local_edit_snapshot / render_edit_diff_with_delta) — those are separate rows."
+              ],
+              "blocked_by": [
+                "TUI gateway tool-progress mode normalizer"
+              ],
+              "unblocks": [
+                "SSE streaming to Bubble Tea TUI"
+              ],
+              "acceptance": [
+                "TestFormatToolSummary_WebSearchPlural with `{\"data\":{\"web\":[{},{},{}]}}` returns 'Did 3 searches in 1.2s'.",
+                "TestFormatToolSummary_WebSearchSingular with one-result JSON returns 'Did 1 search'.",
+                "TestFormatToolSummary_WebExtractPlural with `{\"results\":[{},{}]}` returns 'Extracted 2 pages in 0.5s'.",
+                "TestFormatToolSummary_UnknownToolWithDuration returns 'Completed in 0.3s' and ok=true.",
+                "TestFormatToolSummary_UnknownToolNoDuration returns ('', false).",
+                "TestFormatToolSummary_InvalidJSONFallsBackToCompleted treats malformed result as no-data.",
+                "Helper does not depend on time.Now or external services."
+              ],
+              "note": "Third TUI gateway pure-helper slice. Mirrors the upstream summary contract for web_search and web_extract; future tools can be added incrementally.",
+              "write_scope": [
+                "internal/tuigateway/tool_summary.go",
+                "internal/tuigateway/tool_summary_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tuigateway -run TestFormatToolSummary -count=1",
+                "go test ./internal/tuigateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/tuigateway/tool_summary_test.go fixtures prove web_search singular/plural, web_extract plural, unknown-tool-with-duration, and unknown-tool-no-duration paths with no live tool registry."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:eaa7e2db tui_gateway/server.py:_tool_summary",
+                "note": "Hermes defines the tool-summary text behavior; Gormes ports it as a pure JSON-shape formatter before tool-complete transport."
               }
             },
             {
@@ -10232,7 +10335,7 @@
                 "The slice creates NewRemoteClient, NewGatewayMux, SSE dialers, JSON-RPC dispatchers, or live image reads outside temp fixtures."
               ],
               "blocked_by": [
-                "TUI gateway progress/completion helpers"
+                "TUI gateway completion path normalizer"
               ],
               "unblocks": [
                 "SSE streaming to Bubble Tea TUI"
@@ -10546,6 +10649,20 @@
               "done_signal": [
                 "All 5 TestSlashRegistry_* fixtures pass and the existing mouse-tracking tests still pass after parseMouseTrackingSlash is migrated behind the registry."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T16:17:18Z",
+                "last_failure": {
+                  "run_id": "20260426T161040Z-908697454",
+                  "category": "report_validation_failed",
+                  "backend": "codexu",
+                  "stderr_tail": "worker changed paths outside declared write scope: internal/tui/model.go (allowed: internal/tui/slash_dispatch.go, internal/tui/slash_dispatch_test.go, internal/tui/update.go, internal/tui/mouse_tracking.go, docs/content/building-gormes/architecture_plan/progress.json)"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "gormes",
                 "note": "Gormes-owned dispatch primitive that doesn't exist in upstream (Hermes uses an Ink/TS slash registry). Reshaped 2026-04-26 from the prior `Native TUI /save canonical session export` quarantine — the original row was split into this dispatch prerequisite + the /save wiring follow-up below; the original RowHealth block was dropped per the planner split convention."

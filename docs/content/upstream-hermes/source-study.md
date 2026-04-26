@@ -13,10 +13,49 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `b2d3308f`
+- Upstream commit: `eaa7e2db`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `b56a81ef`
+- Gormes commit: `af646b52`
 - Date: 2026-04-26
+
+## 2026-04-26 (later) Drift Check
+
+The synchronized Hermes head moved from `b2d3308f` to `eaa7e2db` (25 new
+commits). Honcho and GBrain were unchanged in this sync. The drift is mostly
+small CLI/gateway polish but a few items deserve roadmap rows in a future
+planner cycle:
+
+- `eaa7e2db` surfaces `/queue`, `/bg`, `/steer` in the agent-running
+  placeholder. Gormes already tracks placeholder behavior under Phase 5.Q
+  "TUI running-agent placeholder surfaces interrupt + queued slash actions";
+  the row should grow an explicit fixture per slash action.
+- `de243159` and its fixup `4e356098` preserve the inactivity clock across
+  interrupt-recursive cached-agent turns. Gormes' Phase 2.F.3 covers session
+  expiry finalization but not inactivity-tick preservation across nested
+  interrupts. Worth a small follow-up row.
+- `d7a34682` and `20cb706e` rename `[SYSTEM:` to `[IMPORTANT:` in operator
+  prompts so Azure content filters stop tripping. A small fixture row under
+  Phase 3.E.* would guard the prefix invariant against drift.
+- `f2d65552`, `27f4dba5`, `8443998d` resolve API keys from `~/.hermes/.env`
+  before falling back to a credential pool. Gormes auth lives in
+  `internal/auth`; the equivalent contract needs an env-fallback row that
+  doesn't assume a Hermes config layout.
+- `35c57cc4` suppresses tool-progress bubbles after an interrupt. Gormes'
+  newly split Phase 5.Q tool-summary formatter row should grow one
+  synthesized interrupt-suppression case.
+- `7fa70b6c` aliases `/btw` to `/background` and `70f56e76` lets `/btw`
+  dispatch mid-turn. Phase 5.O should pick up the alias contract after the
+  `/reasoning` row lands.
+- `1e37ddc9` adds a `hermes fallback` CLI command. Gormes already has
+  fallback policy under provider routing but no operator-facing CLI;
+  warrants a future Phase 5.O row, low priority.
+- `63bf7a29` prevents reasoning_content regression in DeepSeek/Kimi tool-call
+  replay; reinforces the existing Phase 4.A fixture rather than needing a
+  new row.
+
+For the autoloop the immediate priority remains the 12 quarantined rows.
+Nothing on this drift list is load-bearing for the next several builder
+cycles, so the new rows above stay deferred until quarantine clears.
 
 ## 2026-04-26 Drift Check
 
