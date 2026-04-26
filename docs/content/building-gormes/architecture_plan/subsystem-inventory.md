@@ -110,7 +110,7 @@ The biggest single file upstream is `run_agent.py` at **12,113 lines** — the `
 | Subsystem | Upstream | Target phase | Status |
 |---|---|---|---|
 | Anthropic adapter | `agent/anthropic_adapter.py` | 4.A | ✅ complete |
-| Bedrock adapter | `agent/bedrock_adapter.py`, `tests/agent/test_bedrock_adapter.py` | 4.A | ⏳ planned — five codexu/* worker branches on 2026-04-23 landed candidate Bedrock adapter commits, but none merged to main; no `bedrock_*.go` file is tracked in `internal/hermes/`, and `grep -i bedrock\|converse[sS]tream` over that package returns zero matches. Plan keeps this split into small TDD slices: payload mapping, stream event decoding, SigV4/credential seam, then stale-client eviction/retry classification |
+| Bedrock adapter | `agent/bedrock_adapter.py`, `tests/agent/test_bedrock_adapter.py` | 4.A | 🔨 partial — the pure Converse request-body mapping is landed in `internal/hermes/bedrock_converse.go` with golden fixtures. Remaining Bedrock work stays split into small TDD slices: stream event decoding, SigV4/credential seam, then stale-client eviction/retry classification. Do not attempt another full adapter rewrite until those rows validate |
 | Gemini Cloud Code adapter | `agent/gemini_cloudcode_adapter.py` | 4.A | ⏳ planned |
 | OpenRouter client | `tools/openrouter_client.py`, `agent/auxiliary_client.py`, `agent/model_metadata.py`, `agent/usage_pricing.py`, `hermes_cli/runtime_provider.py` | 4.A | ⏳ planned — not a standalone upstream adapter; it is an OpenAI-compatible resolver/client path with attribution headers, model-family detection, error mapping, and pricing metadata |
 | Google Code Assist | `agent/google_code_assist.py` | 4.A | ⏳ planned |

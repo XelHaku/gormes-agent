@@ -37,7 +37,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 36/74 subphases shipped · 20 in progress · 18 planned
+**Overall:** 37/74 subphases shipped · 19 in progress · 18 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -45,7 +45,7 @@ machine-readable queue for developing the full `gormes-agent`.
 | Phase 2 — The Gateway | 🔨 | 16/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
-| Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
+| Phase 5 — The Final Purge | 🔨 | 2/18 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 | Phase 7 — Paused Channel Backlog | 🔨 | 2/5 subphases |
 
@@ -485,9 +485,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] [IMPORTANT:] prompt prefix for cron and skill commands
 - [x] Skills list — enabled/disabled status column + --enabled-only filter
 
-### 5.G — MCP Integration 🔨
+### 5.G — MCP Integration ✅
 
-- [ ] MCP client
+- [x] MCP client
 - [x] MCP server config/env resolver
 - [x] MCP stdio transport + tool/list discovery
 - [x] MCP HTTP transport + tool/list discovery

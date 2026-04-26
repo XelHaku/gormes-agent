@@ -22,7 +22,27 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. BlueBubbles iMessage bubble formatting parity
+## 1. Bedrock stream event decoding (SSE fixtures)
+
+- Phase: 4 / 4.A
+- Owner: `provider`
+- Size: `small`
+- Status: `planned`
+- Contract: internal/hermes/bedrock_stream.go decodes synthetic Bedrock ConverseStream event maps into the shared hermes.Event model without AWS SDK clients: text deltas emit EventToken, reasoningContent.text deltas emit EventReasoning, contentBlockStart/contentBlockDelta/contentBlockStop toolUse chunks accumulate one ToolCall, messageStop maps stopReason to FinishReason, and metadata.usage maps inputTokens/outputTokens to the final EventDone
+- Trust class: system
+- Ready when: Bedrock Converse payload mapping (no AWS SDK) is complete and internal/hermes/bedrock_converse.go defines the request-side Bedrock types., The row can use literal []map[string]any or small typed fixture structs in tests; no boto3, AWS SDK, network, SigV4, credential, or provider registration code is needed., The first edit should be internal/hermes/bedrock_stream_test.go with RED tests for text stream, reasoning delta, tool-use split chunks, empty stream, interrupt stop, and usage propagation.
+- Not ready when: The slice imports an AWS SDK, signs requests, opens HTTP, registers a Bedrock provider, or changes buildBedrockConversePayload., The slice rewrites the shared Stream interface or kernel event loop instead of returning []Event from a pure decoder helper., The slice handles stale client eviction or credential discovery; those belong to the dependent rows.
+- Degraded mode: Provider status reports bedrock_stream_unavailable until fixtures prove text, reasoning, tool-use, interrupt, and usage event decoding; Bedrock remains request-mapping-only before this row lands.
+- Fixture: `internal/hermes/bedrock_stream_test.go`
+- Write scope: `internal/hermes/bedrock_stream.go`, `internal/hermes/bedrock_stream_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run 'TestDecodeBedrockStream_' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: internal/hermes/bedrock_stream_test.go proves text, reasoning, tool-use chunking, empty stream, interrupt stop, and usage propagation through shared hermes.Event values with no AWS SDK import.
+- Acceptance: TestDecodeBedrockStream_TextAndUsage feeds messageStart, contentBlockDelta{text:'Hello'}, contentBlockStop, messageStop{end_turn}, metadata{inputTokens:5,outputTokens:3}; it returns EventToken('Hello') followed by EventDone{FinishReason:'stop', TokensIn:5, TokensOut:3}., TestDecodeBedrockStream_ReasoningDelta emits EventReasoning with Reasoning='Let me think...' and does not include the reasoning text in EventToken., TestDecodeBedrockStream_ToolUseChunks accumulates two toolUse input chunks into ToolCall{ID:'call_1', Name:'read_file', Arguments:{"path":"/tmp/f"}} and final EventDone{FinishReason:'tool_calls'}., TestDecodeBedrockStream_MixedTextAndToolPreservesText emits the pre-tool text token and still returns the tool call in final EventDone., TestDecodeBedrockStream_EmptyStreamReturnsStop returns exactly one EventDone with FinishReason='stop' and zero tokens., TestDecodeBedrockStream_InterruptStopsBeforeRemainingEvents accepts a callback or limit hook and proves later deltas are not emitted after interruption., go test ./internal/hermes -run 'TestDecodeBedrockStream_' -count=1 passes without network, AWS SDK, or credential imports.
+- Source refs: ../hermes-agent/agent/bedrock_adapter.py:651:normalize_converse_stream_events, ../hermes-agent/agent/bedrock_adapter.py:673:stream_converse_with_callbacks, ../hermes-agent/tests/agent/test_bedrock_adapter.py:457:TestNormalizeConverseStreamEvents, ../hermes-agent/tests/agent/test_bedrock_adapter.py:868:TestStreamConverseWithCallbacks, internal/hermes/client.go:Event,EventToken,EventReasoning,EventDone, internal/hermes/bedrock_converse.go
+- Unblocks: Bedrock SigV4 + credential seam
+- Why now: Unblocks Bedrock SigV4 + credential seam.
+
+## 2. BlueBubbles iMessage bubble formatting parity
 
 - Phase: 7 / 7.E
 - Owner: `gateway`

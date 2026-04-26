@@ -5050,7 +5050,7 @@
             {
               "name": "Bedrock",
               "status": "planned",
-              "note": "Umbrella only: not landed on main. Five codexu/* worker attempts on 2026-04-23 produced candidate Bedrock adapters (`feat(phase4): add bedrock provider adapter` x2, `feat(provider): add bedrock client`, `feat(provider): add native Bedrock adapter`, `feat(gormes): add native bedrock provider adapter`) but none merged — no `bedrock_*.go` file is tracked in `internal/hermes/` and `grep -i bedrock|converse[sS]tream` over that package returns zero matches. Execute via the three dependency-ordered TDD slices below (payload mapping -> stream decoding -> SigV4/credential seam) before another full-rewrite attempt."
+              "note": "Umbrella only: do not assign directly. Five codexu/* worker attempts on 2026-04-23 produced broad Bedrock adapters that did not merge, but the pure request-body mapping has since landed as internal/hermes/bedrock_converse.go and internal/hermes/bedrock_converse_mapping_test.go. Remaining work is dependency-ordered: stream event decoding -> SigV4/credential seam -> stale-client eviction/retry classification. No worker should attempt a full Bedrock adapter until those three rows are validated."
             },
             {
               "name": "Bedrock Converse payload mapping (no AWS SDK)",
@@ -5104,12 +5104,129 @@
             {
               "name": "Bedrock stream event decoding (SSE fixtures)",
               "status": "planned",
-              "note": "TDD second slice: decode Bedrock stream reasoning/text/tool-use deltas and stop reasons into the shared `hermes.Event` model from captured SSE fixtures, reusing the Anthropic stream harness where possible. No AWS SDK dependency — the fixture set must cover empty-stream, retry-safe finish, truncated-stream, and tool-call-split events before the SigV4 slice lands."
+              "contract": "internal/hermes/bedrock_stream.go decodes synthetic Bedrock ConverseStream event maps into the shared hermes.Event model without AWS SDK clients: text deltas emit EventToken, reasoningContent.text deltas emit EventReasoning, contentBlockStart/contentBlockDelta/contentBlockStop toolUse chunks accumulate one ToolCall, messageStop maps stopReason to FinishReason, and metadata.usage maps inputTokens/outputTokens to the final EventDone",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports bedrock_stream_unavailable until fixtures prove text, reasoning, tool-use, interrupt, and usage event decoding; Bedrock remains request-mapping-only before this row lands.",
+              "fixture": "internal/hermes/bedrock_stream_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/bedrock_adapter.py:651:normalize_converse_stream_events",
+                "../hermes-agent/agent/bedrock_adapter.py:673:stream_converse_with_callbacks",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py:457:TestNormalizeConverseStreamEvents",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py:868:TestStreamConverseWithCallbacks",
+                "internal/hermes/client.go:Event,EventToken,EventReasoning,EventDone",
+                "internal/hermes/bedrock_converse.go"
+              ],
+              "ready_when": [
+                "Bedrock Converse payload mapping (no AWS SDK) is complete and internal/hermes/bedrock_converse.go defines the request-side Bedrock types.",
+                "The row can use literal []map[string]any or small typed fixture structs in tests; no boto3, AWS SDK, network, SigV4, credential, or provider registration code is needed.",
+                "The first edit should be internal/hermes/bedrock_stream_test.go with RED tests for text stream, reasoning delta, tool-use split chunks, empty stream, interrupt stop, and usage propagation."
+              ],
+              "not_ready_when": [
+                "The slice imports an AWS SDK, signs requests, opens HTTP, registers a Bedrock provider, or changes buildBedrockConversePayload.",
+                "The slice rewrites the shared Stream interface or kernel event loop instead of returning []Event from a pure decoder helper.",
+                "The slice handles stale client eviction or credential discovery; those belong to the dependent rows."
+              ],
+              "unblocks": [
+                "Bedrock SigV4 + credential seam"
+              ],
+              "acceptance": [
+                "TestDecodeBedrockStream_TextAndUsage feeds messageStart, contentBlockDelta{text:'Hello'}, contentBlockStop, messageStop{end_turn}, metadata{inputTokens:5,outputTokens:3}; it returns EventToken('Hello') followed by EventDone{FinishReason:'stop', TokensIn:5, TokensOut:3}.",
+                "TestDecodeBedrockStream_ReasoningDelta emits EventReasoning with Reasoning='Let me think...' and does not include the reasoning text in EventToken.",
+                "TestDecodeBedrockStream_ToolUseChunks accumulates two toolUse input chunks into ToolCall{ID:'call_1', Name:'read_file', Arguments:{\"path\":\"/tmp/f\"}} and final EventDone{FinishReason:'tool_calls'}.",
+                "TestDecodeBedrockStream_MixedTextAndToolPreservesText emits the pre-tool text token and still returns the tool call in final EventDone.",
+                "TestDecodeBedrockStream_EmptyStreamReturnsStop returns exactly one EventDone with FinishReason='stop' and zero tokens.",
+                "TestDecodeBedrockStream_InterruptStopsBeforeRemainingEvents accepts a callback or limit hook and proves later deltas are not emitted after interruption.",
+                "go test ./internal/hermes -run 'TestDecodeBedrockStream_' -count=1 passes without network, AWS SDK, or credential imports."
+              ],
+              "note": "Planner split 2026-04-26T22:45:56Z: prior Bedrock stream row was a note-only blocker, so stale-client work was blocked by a non-executable SigV4 row and workers had no TDD entry point. This row now owns only pure event decoding over synthetic ConverseStream fixtures.",
+              "write_scope": [
+                "internal/hermes/bedrock_stream.go",
+                "internal/hermes/bedrock_stream_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestDecodeBedrockStream_' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/hermes/bedrock_stream_test.go proves text, reasoning, tool-use chunking, empty stream, interrupt stop, and usage propagation through shared hermes.Event values with no AWS SDK import."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:755a2804 agent/bedrock_adapter.py",
+                "note": "Hermes defines ConverseStream decoding and callback behavior; Gormes ports the decoder as a pure Go helper before signing or client-cache work."
+              }
             },
             {
               "name": "Bedrock SigV4 + credential seam",
               "status": "planned",
-              "note": "TDD third slice: land minimal SigV4 signing plus a narrow credential seam behind a dep-isolated helper so regional/error handling and eventual full AWS SDK adoption stay off the kernel hot path. Requires the payload-mapping and stream-decoding fixtures to be green first; unit tests must cover signing-determinism, missing-credential failure, and region-override selection without network calls."
+              "contract": "internal/hermes/bedrock_sigv4.go exposes a transport-free Bedrock credential and signing seam: ResolveBedrockAuth(env map[string]string) BedrockAuthEvidence classifies AWS_BEARER_TOKEN_BEDROCK, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, AWS_PROFILE, AWS_CONTAINER_CREDENTIALS_RELATIVE_URI, AWS_WEB_IDENTITY_TOKEN_FILE, or missing credentials; ResolveBedrockRegion(env) chooses AWS_REGION, AWS_DEFAULT_REGION, then us-east-1; SignBedrockRequest(req *http.Request, creds StaticAWSCredentials, now time.Time) error adds deterministic SigV4 Authorization, X-Amz-Date, and X-Amz-Content-Sha256 headers for bedrock-runtime without opening the network",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Provider status reports bedrock_credentials_missing, bedrock_profile_selected, bedrock_bearer_selected, bedrock_static_key_selected, or bedrock_sigv4_unavailable without logging secret values.",
+              "fixture": "internal/hermes/bedrock_sigv4_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/bedrock_adapter.py:260:has_aws_credentials",
+                "../hermes-agent/agent/bedrock_adapter.py:291:resolve_bedrock_region",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py:94:TestHasAWSCredentials",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py:109:TestResolveBedrockRegion",
+                "../hermes-agent/tests/agent/test_bedrock_integration.py:135:test_bedrock_runtime_resolution",
+                "internal/hermes/bedrock_stream.go"
+              ],
+              "ready_when": [
+                "Bedrock stream event decoding (SSE fixtures) is complete so request mapping and response decoding are fixture-backed before signing is introduced.",
+                "The slice can use a fixed http.Request, fixed time `2026-04-26T22:45:56Z`, and literal fake credentials; no AWS SDK, boto3, IMDS, profile-file read, or network call is required.",
+                "Secrets must appear only in local test literals and never in evidence strings, errors, or status output."
+              ],
+              "not_ready_when": [
+                "The slice reads ~/.aws/credentials, calls IMDS/ECS credential endpoints, imports an AWS SDK, discovers models, or registers a provider adapter.",
+                "The slice implements stale-client eviction or retry classification; that depends on this seam and belongs to the next row.",
+                "The slice changes internal/config schema or global provider routing."
+              ],
+              "blocked_by": [
+                "Bedrock stream event decoding (SSE fixtures)"
+              ],
+              "unblocks": [
+                "Bedrock stale-client eviction + retry classification"
+              ],
+              "acceptance": [
+                "TestResolveBedrockAuth_BearerTokenWins returns Evidence{Source:'AWS_BEARER_TOKEN_BEDROCK', State:'present'} when the bearer token is set, even if static key env vars are also present; evidence omits the token value.",
+                "TestResolveBedrockAuth_StaticKeyPairRequiresSecret returns State='present', Source='AWS_ACCESS_KEY_ID' only when both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are non-empty; missing secret returns State='missing'.",
+                "TestResolveBedrockAuth_ProfileAndContainerSources classifies AWS_PROFILE, AWS_CONTAINER_CREDENTIALS_RELATIVE_URI, and AWS_WEB_IDENTITY_TOKEN_FILE without reading external files or endpoints.",
+                "TestResolveBedrockRegionPriority checks AWS_REGION > AWS_DEFAULT_REGION > us-east-1.",
+                "TestSignBedrockRequest_DeterministicHeaders signs a fixed POST /model/x/converse request with a fixed body/time/creds and asserts Authorization starts with `AWS4-HMAC-SHA256 Credential=AKIA_TEST/20260426/us-east-1/bedrock/aws4_request`, X-Amz-Date=`20260426T224556Z`, and X-Amz-Content-Sha256 equals the request body SHA-256.",
+                "TestBedrockAuthEvidence_RedactsSecrets asserts Evidence.String() and error text contain none of the fake access key, secret key, session token, or bearer token."
+              ],
+              "note": "Planner split 2026-04-26T22:45:56Z: this was previously note-only and blocked stale-client work. It now defines a narrow fake-env + deterministic SigV4 seam so no worker has to invent credential scope or pull in AWS SDK behavior.",
+              "write_scope": [
+                "internal/hermes/bedrock_sigv4.go",
+                "internal/hermes/bedrock_sigv4_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestResolveBedrockAuth_|TestResolveBedrockRegion|TestSignBedrockRequest_|TestBedrockAuthEvidence_' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/hermes/bedrock_sigv4_test.go proves env-source classification, region priority, deterministic SigV4 headers, and redacted evidence without AWS SDK or network calls."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:755a2804 agent/bedrock_adapter.py",
+                "note": "Hermes relies on boto3's credential chain; Gormes first freezes a narrow fake-env and deterministic signing seam before deciding whether to adopt an AWS SDK."
+              }
             },
             {
               "name": "Bedrock stale-client eviction + retry classification",
@@ -5124,35 +5241,55 @@
               "degraded_mode": "Provider logs and status distinguish stale transport recovery from non-retryable Bedrock request failures.",
               "fixture": "internal/hermes/bedrock_stale_client_test.go",
               "source_refs": [
-                "../hermes-agent/agent/bedrock_adapter.py",
-                "../hermes-agent/tests/agent/test_bedrock_adapter.py",
-                "../hermes-agent/tests/agent/test_bedrock_integration.py"
+                "../hermes-agent/agent/bedrock_adapter.py:84:reset_client_cache",
+                "../hermes-agent/agent/bedrock_adapter.py:90:invalidate_runtime_client",
+                "../hermes-agent/agent/bedrock_adapter.py:142:is_stale_connection_error",
+                "../hermes-agent/agent/bedrock_adapter.py:882:call_converse",
+                "../hermes-agent/agent/bedrock_adapter.py:923:call_converse_stream",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py:1236:TestInvalidateRuntimeClient",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py:1265:TestIsStaleConnectionError",
+                "../hermes-agent/tests/agent/test_bedrock_adapter.py:1334:TestCallConverseInvalidatesOnStaleError",
+                "internal/hermes/bedrock_sigv4.go"
               ],
               "ready_when": [
-                "A Bedrock client/cache seam exists behind the provider adapter and can be exercised without live AWS credentials."
+                "Bedrock SigV4 + credential seam is complete, so a fake runtime client/cache seam can be exercised without live AWS credentials.",
+                "This slice only needs a tiny in-memory region->client cache and a stale-error classifier; it must not implement request signing, stream decoding, model discovery, or provider registration."
               ],
               "not_ready_when": [
-                "Non-stale validation/auth failures are retried or evicted as if they were transport-pool corruption."
+                "Non-stale validation/auth failures are retried or evicted as if they were transport-pool corruption.",
+                "The slice imports AWS SDK, opens network, reads ~/.aws, or changes Bedrock request/stream payload mapping."
               ],
               "blocked_by": [
                 "Bedrock SigV4 + credential seam"
               ],
               "acceptance": [
-                "ConnectionClosed/ProtocolError-style failures evict only the affected region client.",
-                "Library-internal assertion failures from transport stacks are classified as stale, while application assertions are not.",
-                "Validation/auth failures leave the cache intact and surface as provider errors."
+                "TestBedrockRuntimeCache_EvictsOnlyTargetRegion seeds us-east-1 and us-west-2 fake clients, evicts us-east-1, and proves us-west-2 remains.",
+                "TestClassifyBedrockStaleError_TransportFailures treats `connection closed`, `protocol error`, `read timeout`, and `unexpected EOF` sentinel errors as stale transport failures.",
+                "TestClassifyBedrockStaleError_LibraryAssertionOnly treats an AssertionError-style sentinel with SourcePackage `urllib3.connectionpool` or `botocore.httpsession` as stale, but SourcePackage `internal/hermes` as non-stale.",
+                "TestBedrockRuntimeCache_DoesNotEvictValidationOrAuthFailures leaves the region client cached when the error class is validation, auth, missing credential, or malformed request.",
+                "TestBedrockRuntimeCache_EvictsOnConverseAndConverseStreamStaleFailures proves both fake call paths evict only after a stale classification and return the original error to the caller."
               ],
-              "note": "Upstream Hermes now evicts cached Bedrock runtime clients on stale boto3/botocore/urllib3 transport failures. Gormes should port the behavior only after its Bedrock credential/client seam exists, keeping stale-client recovery separate from payload and stream decoding.",
+              "note": "Refined 2026-04-26T22:45:56Z after making the SigV4 blocker executable. The row now names the exact fake cache/classifier tests and forbids AWS SDK or live network work; it should land after the signing/credential seam, not before.",
               "write_scope": [
-                "internal/hermes/",
+                "internal/hermes/bedrock_client_cache.go",
+                "internal/hermes/bedrock_client_cache_test.go",
+                "internal/hermes/bedrock_stale_error.go",
+                "internal/hermes/bedrock_stale_client_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/hermes -count=1"
+                "go test ./internal/hermes -run 'TestBedrockRuntimeCache_|TestClassifyBedrockStaleError_' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Bedrock stale-client tests prove stale transport errors evict cached clients and non-stale provider errors do not."
-              ]
+                "Bedrock fake-cache fixtures prove per-region eviction, stale transport classification, library-assertion gating, and no eviction for validation/auth/missing-credential failures."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:755a2804 agent/bedrock_adapter.py",
+                "note": "Hermes evicts cached boto3 Bedrock runtime clients on stale transport errors; Gormes ports the cache/error-classification behavior only after request mapping, stream decoding, and signing seams are fixture-backed."
+              }
             },
             {
               "name": "Gemini",
@@ -5459,8 +5596,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T18:14:51Z",
-            "origin_decision": "Hermes ad0ac894 widened DeepSeek/Kimi thinking-mode replay from assistant tool-call turns to all assistant turns, and the Gormes provider fixtures now validate the DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, and Azure Foundry /models probe edges. Azure Foundry remains upstream-led: /models probing landed first, so the path-sniff row now reuses the existing AzureTransport constants before the combined transport read model can close. Later Hermes 192e7eb2 provider-rate drift is tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
+            "last_upstream_check": "2026-04-26T22:45:56Z",
+            "origin_decision": "Hermes 755a2804 is current after the 2026-04-26 sync. Gormes provider fixtures now validate DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, Azure Foundry probing, Codex Responses conversion/repair, and Bedrock request-body mapping. Bedrock remains upstream-led but no longer blank: the next safe executable slice is pure ConverseStream event decoding, followed by a blocked SigV4/credential seam and then stale-client cache eviction. Azure Foundry remains upstream-led for runtime env/config read-model closeout. Later Hermes 192e7eb2 provider-rate drift is tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
           }
         },
         "4.B": {
@@ -7881,7 +8018,7 @@
           "items": [
             {
               "name": "MCP client",
-              "status": "planned",
+              "status": "complete",
               "slice_size": "umbrella",
               "execution_owner": "tools",
               "not_ready_when": [
@@ -7895,7 +8032,7 @@
                 "MCP OAuth state store + noninteractive auth errors",
                 "Managed tool gateway bridge"
               ],
-              "note": "Umbrella only: Hermes' MCP surface spans config persistence, stdio/HTTP transports, dynamic discovery, OAuth, sampling, and managed tool gateways. Execute the dependency-ordered rows below; do not assign this umbrella row directly."
+              "note": "Complete as an umbrella closeout: the dependency-ordered rows below now validate config/env parsing, stdio and HTTP tool/list discovery, schema normalization/structured content, OAuth state and refresh recovery, and the managed gateway bridge. Future Hermes MCP drift should become new small rows rather than reopening this inventory row."
             },
             {
               "name": "MCP server config/env resolver",
@@ -8368,9 +8505,9 @@
             }
           ],
           "drift_state": {
-            "status": "porting",
-            "last_upstream_check": "2026-04-25T22:23:30Z",
-            "origin_decision": "Hermes still leads MCP runtime behavior across stdio/HTTP discovery, OAuth, and managed gateways. Honcho 51497f1 adds self-hosted MCP Worker HONCHO_API_URL config, so Gormes tracks that drift in the first config/env slice while keeping internal Goncho memory local."
+            "status": "converged",
+            "last_upstream_check": "2026-04-26T22:45:56Z",
+            "origin_decision": "Hermes 755a2804 and Honcho e659b6b/51497f1 were checked on 2026-04-26. Gormes now has validated Go-native MCP config/env parsing, stdio and HTTP tool/list discovery, schema normalization/structured content, OAuth state/refresh recovery, and managed gateway bridge slices. Honcho MCP HONCHO_API_URL remains server-local MCP config and does not change internal Goncho memory naming. Future upstream MCP drift should become new small rows rather than keeping this subphase porting."
           }
         },
         "5.H": {
