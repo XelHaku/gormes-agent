@@ -33,7 +33,7 @@
   },
   "phases": {
     "1": {
-      "name": "Phase 1 — The Dashboard",
+      "name": "Phase 1 \u2014 The Dashboard",
       "deliverable": "Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary",
       "subphases": {
         "1.A": {
@@ -358,6 +358,230 @@
                 "owned_since": "2026-04-25T11:02:16Z",
                 "note": "Divergence awareness exists to protect Gormes-owned surfaces from upstream-led planning assumptions."
               }
+            },
+            {
+              "name": "Watchdog checkpoint coalescing",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "When a worker stalls, the watchdog produces at most one dirty-worktree checkpoint commit per stall window \u2014 successive stuck ticks amend or no-op instead of stacking new commits",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Watchdog status reports checkpoint_coalesce_active, checkpoint_coalesce_window_seconds, and the existing dirty-worktree checkpoint commit ID instead of emitting a fresh commit on every tick.",
+              "fixture": "internal/builderloop/watchdog_coalesce_test.go",
+              "source_refs": [
+                "internal/builderloop/run.go",
+                "docs/superpowers/specs/2026-04-25-builder-owned-planner-cycle-design.md"
+              ],
+              "ready_when": [
+                "Watchdog dirty-worktree checkpointing is in place (commit ff96a5d94) and emits a record_run_health event we can key off of.",
+                "Tests can use a fake clock and an in-memory git repo or a synthetic commit-recorder seam \u2014 no live system clock or systemd is required."
+              ],
+              "not_ready_when": [
+                "The slice changes the watchdog stall threshold, the dead-process detection, or the planner cadence.",
+                "The slice silently drops the dirty-worktree checkpoint when a stall is real \u2014 the first tick of every distinct stall window must still produce a single observable checkpoint."
+              ],
+              "unblocks": [
+                "Watchdog dead-process vs slow-progress separation"
+              ],
+              "acceptance": [
+                "Within one stall window (default 10 min, configurable), only the first watchdog tick produces a new commit; later ticks no-op or amend so `git log --oneline` shows at most one checkpoint per window.",
+                "When the worker resumes (commits or exits cleanly) and a fresh stall begins later, the next stall window is allowed a new checkpoint commit.",
+                "The coalesce decision is logged as record_run_health with a coalesce_decision field (`first|amend|noop`) so post-mortems can verify the behavior.",
+                "No test in this slice runs systemd, sleeps wall-clock, or mutates the live .codex worktree."
+              ],
+              "note": "Overnight builder-loop run produced 74 dirty-worktree checkpoint commits in a 28-min stuck window \u2014 one every ~30s. This collapses that into \u22641 commit per window without losing the observability signal.",
+              "write_scope": [
+                "internal/builderloop/run.go",
+                "internal/builderloop/watchdog_coalesce.go",
+                "internal/builderloop/watchdog_coalesce_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run TestWatchdogCoalesce -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "watchdog_coalesce_test fixtures prove first-tick-commits, later-ticks-noop-or-amend, fresh-window-allowed, and a coalesce_decision field in record_run_health."
+              ],
+              "provenance": {
+                "origin_type": "operator_audit",
+                "audit_run": "2026-04-26 overnight builder-loop post-mortem",
+                "note": "Reduces the 74-commit/28-min checkpoint storm observed overnight 2026-04-25 \u2192 2026-04-26 to \u22641 commit per stall window.",
+                "added_at": "2026-04-26T15:07:30Z"
+              }
+            },
+            {
+              "name": "PR-intake idle backoff",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "When pr_intake list returns zero PRs N consecutive times, the next poll backs off to a configurable idle interval (default 5 min) instead of running on every loop cycle; the first non-empty list resets the backoff to baseline cadence",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "pr_intake_started/completed events carry an idle_backoff field with the active interval and the consecutive-empty count so dashboards can distinguish \"intake was suppressed\" from \"intake ran and found nothing\".",
+              "fixture": "internal/builderloop/pr_intake_backoff_test.go",
+              "source_refs": [
+                "internal/builderloop/pr_intake.go"
+              ],
+              "ready_when": [
+                "pr_intake already emits pr_intake_started and pr_intake_completed ledger events, and pr_intake_completed carries listed=N evidence.",
+                "A fake clock and a stub gh-list backend make backoff state observable without live network calls."
+              ],
+              "not_ready_when": [
+                "The slice changes how PRs are merged, classified, or evicted \u2014 only the schedule of intake runs is in scope.",
+                "The slice removes pr_intake calls entirely or makes them event-driven (gh webhook); event-driven is a separate row."
+              ],
+              "unblocks": [
+                "Builder-loop self-improvement vs user-feature ratio metric"
+              ],
+              "acceptance": [
+                "After N (default 3) consecutive listed=0 results, the next pr_intake poll is suppressed until the idle interval (default 5 min) elapses.",
+                "A non-zero listed result on any subsequent poll resets the consecutive-empty counter and restores baseline cadence on the next cycle.",
+                "pr_intake_completed events carry idle_backoff={active: bool, interval_seconds: int, consecutive_empty: int} so the suppression is observable.",
+                "No test in this slice talks to GitHub, runs gh, or sleeps wall-clock; tests inject a fake list backend and a controllable clock."
+              ],
+              "note": "Overnight ledger showed 654 pr_intake_completed events of which 3 actually merged \u2014 the other 651 were idle polls. This row only changes the schedule, not the policy.",
+              "write_scope": [
+                "internal/builderloop/pr_intake.go",
+                "internal/builderloop/pr_intake_backoff.go",
+                "internal/builderloop/pr_intake_backoff_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run TestPRIntakeBackoff -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "pr_intake backoff fixtures prove suppression after consecutive empties, reset on first non-empty result, and idle_backoff evidence in pr_intake_completed events."
+              ],
+              "provenance": {
+                "origin_type": "operator_audit",
+                "audit_run": "2026-04-26 overnight builder-loop post-mortem",
+                "note": "Cuts the 99.5% idle-poll rate observed overnight (651/654 polls were listed=0) without changing PR-merge policy.",
+                "added_at": "2026-04-26T15:07:30Z"
+              }
+            },
+            {
+              "name": "Watchdog dead-process vs slow-progress separation",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "The watchdog distinguishes a dead worker (no PID, exited, or PID gone from os.findprocess) from a slow worker (PID alive but no commits) and applies independently configurable thresholds, with the dead-process check firing in <2 minutes",
+              "contract_status": "fixture_ready",
+              "slice_size": "medium",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Watchdog status reports worker_state \u2208 {alive_progressing, alive_silent, dead, unknown} and the threshold each one tripped; record_run_health carries the worker_state and which threshold (dead_after_seconds, silent_after_seconds) fired.",
+              "fixture": "internal/builderloop/watchdog_state_test.go",
+              "source_refs": [
+                "internal/builderloop/run.go",
+                "internal/builderloop/run_health_test.go"
+              ],
+              "ready_when": [
+                "Existing watchdog timer (commit f96a5d94) emits stall events at a single threshold; this slice carves the threshold into two independent ones.",
+                "Watchdog checkpoint coalescing is fixture-ready or validated, so the dead-process tick does not amplify the commit storm."
+              ],
+              "not_ready_when": [
+                "The slice changes how worker output is rejected or how dirty worktrees are committed \u2014 only worker liveness detection is in scope.",
+                "The slice introduces process-group signal sending or container-aware death detection (those belong to a separate sandboxing row)."
+              ],
+              "unblocks": [
+                "Builder-loop self-improvement vs user-feature ratio metric"
+              ],
+              "acceptance": [
+                "Watcher with worker PID=0 or worker_pid_gone reports worker_state=dead within dead_after_seconds (default 90s).",
+                "Watcher with PID alive but zero commits in silent_after_seconds (default 600s) reports worker_state=alive_silent \u2014 independently of the dead threshold.",
+                "A worker that recovers (commits) before dead_after_seconds resets both timers and reports worker_state=alive_progressing.",
+                "record_run_health carries worker_state and the threshold that fired; no test in this slice runs a real subprocess or signal."
+              ],
+              "note": "Overnight 05:28\u219206:19 dead-air gap took ~50 min before the watchdog reacted. Splitting the threshold into dead-process (fast) vs slow-progress (slow) prevents that recurrence.",
+              "write_scope": [
+                "internal/builderloop/run.go",
+                "internal/builderloop/watchdog_state.go",
+                "internal/builderloop/watchdog_state_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run TestWatchdogState -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "watchdog_state fixtures prove dead-fast, silent-slow, recovery, and worker_state evidence on record_run_health are all reachable with synthetic PIDs and a fake clock."
+              ],
+              "provenance": {
+                "origin_type": "operator_audit",
+                "audit_run": "2026-04-26 overnight builder-loop post-mortem",
+                "note": "Closes the 50-min dead-air gap from 05:28\u219206:19 local on 2026-04-26 by separating fast (dead-process) and slow (no-progress) thresholds.",
+                "added_at": "2026-04-26T15:07:30Z"
+              }
+            },
+            {
+              "name": "Builder-loop self-improvement vs user-feature ratio metric",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "record_run_health carries a self_improvement vs user_feature ship ratio over a configurable window, classifying each shipped row by which subphase prefix it landed under, so post-mortems can detect when the loop is mostly working on itself",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "When the ship_ratio cannot be computed (insufficient history, classification ambiguous), record_run_health carries ship_ratio=null and reports ship_ratio_evidence with the reason instead of fabricating zero.",
+              "fixture": "internal/builderloop/ship_ratio_test.go",
+              "source_refs": [
+                "internal/builderloop/run.go",
+                "internal/builderloop/health_writer.go",
+                "internal/progress/health.go"
+              ],
+              "ready_when": [
+                "record_run_health is the canonical health signal already (commit 2653a7b6 etc.) and runs.jsonl carries shipped row evidence.",
+                "A subphase classifier mapping (e.g., 1.C, 5.* operator-tools, etc. \u2192 self_improvement; 4.*, 6.*, 7.* \u2192 user_feature) can live in a small in-package table for now."
+              ],
+              "not_ready_when": [
+                "The slice changes ship-detection or ledger-write semantics \u2014 only adds a derived counter.",
+                "The slice depends on a yet-unbuilt classifier service or external store."
+              ],
+              "unblocks": [],
+              "acceptance": [
+                "Over a configurable window (default last 24h), record_run_health carries ship_ratio={self_improvement_count, user_feature_count, ratio, window_seconds}.",
+                "A subphase prefix table (initially: 1.C/5.N/5.O = self_improvement; 4.*/6.*/7.* = user_feature; everything else = unclassified) determines the bucket per shipped row.",
+                "Unclassified rows are visible as ship_ratio.unclassified_count, never silently bucketed.",
+                "No test in this slice reads runs.jsonl from disk; tests inject synthetic ship events."
+              ],
+              "note": "Overnight, 9 ships were almost entirely 1.C/5.* loop self-improvement. This metric makes that observable so a sustained skew toward self-improvement triggers operator review.",
+              "write_scope": [
+                "internal/builderloop/ship_ratio.go",
+                "internal/builderloop/ship_ratio_test.go",
+                "internal/builderloop/health_writer.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run TestShipRatio -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "ship_ratio fixtures prove self_improvement vs user_feature classification, unclassified bucketing, null evidence on insufficient history, and ratio computed against synthetic ship events."
+              ],
+              "provenance": {
+                "origin_type": "operator_audit",
+                "audit_run": "2026-04-26 overnight builder-loop post-mortem",
+                "note": "Surfaces the self-improvement vs user-feature skew observed in the overnight 2026-04-26 post-mortem (9 ships, almost all on the loop itself).",
+                "added_at": "2026-04-26T15:07:30Z"
+              }
             }
           ],
           "drift_state": {
@@ -369,7 +593,7 @@
       }
     },
     "2": {
-      "name": "Phase 2 — The Gateway",
+      "name": "Phase 2 \u2014 The Gateway",
       "deliverable": "Go-native operator wiring harness: tools, Telegram, shared gateway chassis, shipped cron, and the first OS-AI spine slices before focused channel closeout",
       "subphases": {
         "2.A": {
@@ -1027,7 +1251,7 @@
               "blocked_by": [
                 "Discord forum channel ingress + thread lifecycle"
               ],
-              "note": "TDD: port upstream PR #607be54a (forum channel media + polish) after the ingress slice is green — attachment flow for forum posts, initial-post vs reply differences, and deterministic outbound routing to forum threads. Keep the shared-chassis send contract intact so non-forum Discord behavior cannot regress."
+              "note": "TDD: port upstream PR #607be54a (forum channel media + polish) after the ingress slice is green \u2014 attachment flow for forum posts, initial-post vs reply differences, and deterministic outbound routing to forum threads. Keep the shared-chassis send contract intact so non-forum Discord behavior cannot regress."
             }
           ]
         },
@@ -2283,7 +2507,7 @@
             {
               "name": "Gateway-handled slash commands bypass active-session guard",
               "status": "planned",
-              "note": "TDD: mirror upstream PRs #12334 and #511ed4da — registry-resolved gateway slash commands must execute even while an agent is running for that session, without interrupting the running turn and without queuing discardable command text. Keep non-gateway/unknown commands behind the existing busy-state response so only the safe registry surface bypasses the guard; cover both allowed and denied paths with fixture tests before shipping."
+              "note": "TDD: mirror upstream PRs #12334 and #511ed4da \u2014 registry-resolved gateway slash commands must execute even while an agent is running for that session, without interrupting the running turn and without queuing discardable command text. Keep non-gateway/unknown commands behind the existing busy-state response so only the safe registry surface bypasses the guard; cover both allowed and denied paths with fixture tests before shipping."
             }
           ]
         },
@@ -2316,7 +2540,7 @@
       }
     },
     "3": {
-      "name": "Phase 3 — The Black Box (Memory)",
+      "name": "Phase 3 \u2014 The Black Box (Memory)",
       "deliverable": "SQLite + FTS5 + ontological graph + semantic fusion in Go; 3.E closes session visibility, audit trails, decay, and cross-chat/session boundaries",
       "subphases": {
         "3.A": {
@@ -3782,7 +4006,7 @@
       }
     },
     "4": {
-      "name": "Phase 4 — The Brain Transplant",
+      "name": "Phase 4 \u2014 The Brain Transplant",
       "deliverable": "Native Go agent orchestrator + prompt builder",
       "dependency_note": "Build priority: 2.E0 deterministic subagent runtime -> 2.G static skills + reviewed candidate flow -> runner-enforced delegation policy + wider gateway surface -> native agent loop",
       "subphases": {
@@ -4230,8 +4454,8 @@
                 "The slice reads or writes AZURE_FOUNDRY_BASE_URL, AZURE_FOUNDRY_API_KEY, deployment config, or model context metadata."
               ],
               "blocked_by": [
-                "Azure Foundry probe — path sniffing",
-                "Azure Foundry probe — /models classification + Anthropic fallback"
+                "Azure Foundry probe \u2014 path sniffing",
+                "Azure Foundry probe \u2014 /models classification + Anthropic fallback"
               ],
               "unblocks": [
                 "Azure Foundry runtime env/config read model"
@@ -4269,7 +4493,7 @@
               }
             },
             {
-              "name": "Azure Foundry probe — path sniffing",
+              "name": "Azure Foundry probe \u2014 path sniffing",
               "priority": "P2",
               "status": "planned",
               "contract": "Azure Foundry endpoint URLs are classified into anthropic_messages, openai_chat_completions, or unknown solely by URL path/host inspection, with no HTTP, no credential reads, and no config writes",
@@ -4290,14 +4514,14 @@
               ],
               "ready_when": [
                 "Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are validated; this slice classifies URLs into one of those two known transports.",
-                "Pure-function table-driven tests with synthetic URLs are sufficient — no httptest server is required."
+                "Pure-function table-driven tests with synthetic URLs are sufficient \u2014 no httptest server is required."
               ],
               "not_ready_when": [
                 "The slice opens HTTP connections, performs a /models probe, reads AZURE_FOUNDRY_BASE_URL or AZURE_FOUNDRY_API_KEY, or mutates config.",
                 "The slice introduces detection of any third transport family (Bedrock, Vertex, etc.)."
               ],
               "unblocks": [
-                "Azure Foundry probe — /models classification + Anthropic fallback"
+                "Azure Foundry probe \u2014 /models classification + Anthropic fallback"
               ],
               "acceptance": [
                 "URLs whose path contains /anthropic/ classify as anthropic_messages with the matched-token evidence preserved.",
@@ -4327,7 +4551,7 @@
                   "run_id": "20260426T150517Z-045212879",
                   "category": "no_progress",
                   "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe — path sniffing"
+                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe \u2014 path sniffing"
                 },
                 "backends_tried": [
                   "codexu"
@@ -4339,7 +4563,7 @@
               }
             },
             {
-              "name": "Azure Foundry probe — /models classification + Anthropic fallback",
+              "name": "Azure Foundry probe \u2014 /models classification + Anthropic fallback",
               "priority": "P2",
               "status": "planned",
               "contract": "Given a fake /models response (or its absence), classify an Azure Foundry deployment as openai_chat_completions, anthropic_messages, or manual-required, with explicit probe evidence and zero credential or config writes",
@@ -4360,7 +4584,7 @@
                 "internal/hermes/azure_anthropic_transport_test.go"
               ],
               "ready_when": [
-                "Azure Foundry probe — path sniffing is fixture-ready or validated, so this slice consumes a typed sniff result instead of duplicating URL inspection.",
+                "Azure Foundry probe \u2014 path sniffing is fixture-ready or validated, so this slice consumes a typed sniff result instead of duplicating URL inspection.",
                 "httptest.Server-driven fakes are acceptable; no live Azure call is permitted."
               ],
               "not_ready_when": [
@@ -4398,7 +4622,7 @@
                   "run_id": "20260426T150517Z-045212879",
                   "category": "no_progress",
                   "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe — /models classification + Anthropic fallback"
+                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe \u2014 /models classification + Anthropic fallback"
                 },
                 "backends_tried": [
                   "codexu"
@@ -4537,7 +4761,7 @@
             {
               "name": "Bedrock",
               "status": "planned",
-              "note": "Umbrella only: not landed on main. Five codexu/* worker attempts on 2026-04-23 produced candidate Bedrock adapters (`feat(phase4): add bedrock provider adapter` x2, `feat(provider): add bedrock client`, `feat(provider): add native Bedrock adapter`, `feat(gormes): add native bedrock provider adapter`) but none merged — no `bedrock_*.go` file is tracked in `internal/hermes/` and `grep -i bedrock|converse[sS]tream` over that package returns zero matches. Execute via the three dependency-ordered TDD slices below (payload mapping -> stream decoding -> SigV4/credential seam) before another full-rewrite attempt."
+              "note": "Umbrella only: not landed on main. Five codexu/* worker attempts on 2026-04-23 produced candidate Bedrock adapters (`feat(phase4): add bedrock provider adapter` x2, `feat(provider): add bedrock client`, `feat(provider): add native Bedrock adapter`, `feat(gormes): add native bedrock provider adapter`) but none merged \u2014 no `bedrock_*.go` file is tracked in `internal/hermes/` and `grep -i bedrock|converse[sS]tream` over that package returns zero matches. Execute via the three dependency-ordered TDD slices below (payload mapping -> stream decoding -> SigV4/credential seam) before another full-rewrite attempt."
             },
             {
               "name": "Bedrock Converse payload mapping (no AWS SDK)",
@@ -4591,7 +4815,7 @@
             {
               "name": "Bedrock stream event decoding (SSE fixtures)",
               "status": "planned",
-              "note": "TDD second slice: decode Bedrock stream reasoning/text/tool-use deltas and stop reasons into the shared `hermes.Event` model from captured SSE fixtures, reusing the Anthropic stream harness where possible. No AWS SDK dependency — the fixture set must cover empty-stream, retry-safe finish, truncated-stream, and tool-call-split events before the SigV4 slice lands."
+              "note": "TDD second slice: decode Bedrock stream reasoning/text/tool-use deltas and stop reasons into the shared `hermes.Event` model from captured SSE fixtures, reusing the Anthropic stream harness where possible. No AWS SDK dependency \u2014 the fixture set must cover empty-stream, retry-safe finish, truncated-stream, and tool-call-split events before the SigV4 slice lands."
             },
             {
               "name": "Bedrock SigV4 + credential seam",
@@ -4649,7 +4873,7 @@
             {
               "name": "OpenRouter",
               "status": "planned",
-              "note": "Not landed on main. Five codexu/* worker attempts on 2026-04-23 (`343ec085` / `c009045d` / `e7b271a7` / `f00010b1` / `b3b0c366`) produced candidate OpenRouter adapters but none merged — no `openrouter_*.go` file is tracked in `internal/hermes/` and `grep -i openrouter` over that package returns zero matches. Prior planner note incorrectly cited `agent/openrouter_client.py`, which does not exist upstream: `tools/openrouter_client.py` is only a 33-line async-client getter that delegates to `agent/auxiliary_client.py`. TDD scope: OpenRouter is not a standalone adapter upstream — it is one of several OpenAI-compatible providers routed through the shared provider resolver. Pin the behavior by porting against the real upstream surfaces: `agent/auxiliary_client.py:815 _try_openrouter`, `agent/auxiliary_client.py:2069 _is_openrouter_client`, the `X-OpenRouter-Title` / `X-OpenRouter-Categories` / `HTTP-Referer` app-attribution headers around `agent/auxiliary_client.py:170`, `agent/model_metadata.py:214 _is_openrouter_base_url`, `agent/usage_pricing.py:411 _openrouter_pricing_entry`, and `hermes_cli/runtime_provider.py:429 _resolve_openrouter_runtime`. Fixture-only unit tests must prove (a) base URL and model-family selection over the OpenAI-compatible client seam, (b) attribution-header emission, (c) retryable vs fatal error mapping through `internal/hermes/errors.go`, and (d) usage/pricing accounting against captured response fixtures — no live `OPENROUTER_API_KEY` in tests. Land after `Provider interface + stream fixture harness` and `Tool-call normalization + continuation contract` closeout so this slice reuses the shared transcript harness rather than inventing its own."
+              "note": "Not landed on main. Five codexu/* worker attempts on 2026-04-23 (`343ec085` / `c009045d` / `e7b271a7` / `f00010b1` / `b3b0c366`) produced candidate OpenRouter adapters but none merged \u2014 no `openrouter_*.go` file is tracked in `internal/hermes/` and `grep -i openrouter` over that package returns zero matches. Prior planner note incorrectly cited `agent/openrouter_client.py`, which does not exist upstream: `tools/openrouter_client.py` is only a 33-line async-client getter that delegates to `agent/auxiliary_client.py`. TDD scope: OpenRouter is not a standalone adapter upstream \u2014 it is one of several OpenAI-compatible providers routed through the shared provider resolver. Pin the behavior by porting against the real upstream surfaces: `agent/auxiliary_client.py:815 _try_openrouter`, `agent/auxiliary_client.py:2069 _is_openrouter_client`, the `X-OpenRouter-Title` / `X-OpenRouter-Categories` / `HTTP-Referer` app-attribution headers around `agent/auxiliary_client.py:170`, `agent/model_metadata.py:214 _is_openrouter_base_url`, `agent/usage_pricing.py:411 _openrouter_pricing_entry`, and `hermes_cli/runtime_provider.py:429 _resolve_openrouter_runtime`. Fixture-only unit tests must prove (a) base URL and model-family selection over the OpenAI-compatible client seam, (b) attribution-header emission, (c) retryable vs fatal error mapping through `internal/hermes/errors.go`, and (d) usage/pricing accounting against captured response fixtures \u2014 no live `OPENROUTER_API_KEY` in tests. Land after `Provider interface + stream fixture harness` and `Tool-call normalization + continuation contract` closeout so this slice reuses the shared transcript harness rather than inventing its own."
             },
             {
               "name": "Google Code Assist",
@@ -4670,7 +4894,7 @@
                 "Codex OAuth state + stale-token relogin",
                 "Codex stream repair + tool-call leak sanitizer"
               ],
-              "note": "Not landed on main. Four codexu/* worker attempts on 2026-04-23 (`a93551c9` / `a4c433f2` / `c9bc6d8d` / `a057f47c`) produced candidate Codex adapters but none merged — no `codex_*.go` file is tracked in `internal/hermes/` and `grep -i codex` over that package returns zero matches. TDD scope: upstream Codex is an OpenAI-Codex OAuth surface over the Responses API (not standard chat.completions), so the adapter must wrap `/v1/responses` at `https://chatgpt.com/backend-api/codex` — upstream surface lives at `agent/auxiliary_client.py:483 CodexAuxiliaryClient` / `:313 _CodexCompletionsAdapter` / `:501 _AsyncCodexCompletionsAdapter` / `:1038 _try_codex` (Responses→chat-completions shim, empty-output backfill from stream events, `gpt-5.2-codex` vs `gpt-5.3-codex` fallback), and the auth seam lives at `hermes_cli/auth.py:1451 refresh_codex_oauth_pure` / `:1546 _refresh_codex_auth_tokens` / `:1567 _import_codex_cli_tokens` / `:1601 resolve_codex_runtime_credentials` / `:3023 _codex_device_code_login`, with model enumeration at `hermes_cli/codex_models.py:147 get_codex_model_ids`. Pin behavior via fake-auth fixture tests: developer-message role handling, tool-call deltas, Responses→chat-completions envelope parity (including stream-event backfill when `response.output` arrives empty), `gpt-5.3-codex` rejection fallback, and explicit unsupported-feature errors. Upstream PR #12360 requires Codex auth state to live under Gormes's own home rather than touching `~/.codex/auth.json`, and upstream PR #2a2e5c0f requires 401/403 token-refresh failures to force a relogin rather than silently retrying with a stale token — freeze both behaviors as fake-auth unit tests before any live Codex request can fire. Land after `Provider interface + stream fixture harness`, `Tool-call normalization + continuation contract`, and `4.G Token vault` + `Multi-account auth` so the Codex adapter consumes a frozen credential seam rather than touching OS home paths directly."
+              "note": "Not landed on main. Four codexu/* worker attempts on 2026-04-23 (`a93551c9` / `a4c433f2` / `c9bc6d8d` / `a057f47c`) produced candidate Codex adapters but none merged \u2014 no `codex_*.go` file is tracked in `internal/hermes/` and `grep -i codex` over that package returns zero matches. TDD scope: upstream Codex is an OpenAI-Codex OAuth surface over the Responses API (not standard chat.completions), so the adapter must wrap `/v1/responses` at `https://chatgpt.com/backend-api/codex` \u2014 upstream surface lives at `agent/auxiliary_client.py:483 CodexAuxiliaryClient` / `:313 _CodexCompletionsAdapter` / `:501 _AsyncCodexCompletionsAdapter` / `:1038 _try_codex` (Responses\u2192chat-completions shim, empty-output backfill from stream events, `gpt-5.2-codex` vs `gpt-5.3-codex` fallback), and the auth seam lives at `hermes_cli/auth.py:1451 refresh_codex_oauth_pure` / `:1546 _refresh_codex_auth_tokens` / `:1567 _import_codex_cli_tokens` / `:1601 resolve_codex_runtime_credentials` / `:3023 _codex_device_code_login`, with model enumeration at `hermes_cli/codex_models.py:147 get_codex_model_ids`. Pin behavior via fake-auth fixture tests: developer-message role handling, tool-call deltas, Responses\u2192chat-completions envelope parity (including stream-event backfill when `response.output` arrives empty), `gpt-5.3-codex` rejection fallback, and explicit unsupported-feature errors. Upstream PR #12360 requires Codex auth state to live under Gormes's own home rather than touching `~/.codex/auth.json`, and upstream PR #2a2e5c0f requires 401/403 token-refresh failures to force a relogin rather than silently retrying with a stale token \u2014 freeze both behaviors as fake-auth unit tests before any live Codex request can fire. Land after `Provider interface + stream fixture harness`, `Tool-call normalization + continuation contract`, and `4.G Token vault` + `Multi-account auth` so the Codex adapter consumes a frozen credential seam rather than touching OS home paths directly."
             },
             {
               "name": "Codex Responses pure conversion harness",
@@ -5225,7 +5449,7 @@
             {
               "name": "Tool-result pruning + protected head/tail summary",
               "status": "planned",
-              "note": "TDD: freeze old tool-output pruning, protected system/first-turn head messages, recent-tail preservation, and summary prefix compatibility before mutating live message history. Must keep tool-call arguments JSON valid when shrinking per upstream PR #3128d9fc — a pruning pass that truncates an argument string mid-JSON breaks the continuation payload on the next turn, so the head/tail contract has to respect tool-call argument boundaries and never emit partial JSON values."
+              "note": "TDD: freeze old tool-output pruning, protected system/first-turn head messages, recent-tail preservation, and summary prefix compatibility before mutating live message history. Must keep tool-call arguments JSON valid when shrinking per upstream PR #3128d9fc \u2014 a pruning pass that truncates an argument string mid-JSON breaks the continuation payload on the next turn, so the head/tail contract has to respect tool-call argument boundaries and never emit partial JSON values."
             },
             {
               "name": "Aux compression single-prompt threshold reconciliation",
@@ -6161,8 +6385,8 @@
                 "Provider-side resilience",
                 "Classified provider-error taxonomy",
                 "Retry-After header parsing + HTTPError hint",
-                "Provider rate guard — x-ratelimit header classification",
-                "Provider rate guard — degraded-state + last-known-good evidence"
+                "Provider rate guard \u2014 x-ratelimit header classification",
+                "Provider rate guard \u2014 degraded-state + last-known-good evidence"
               ],
               "acceptance": [
                 "Headers with remaining=0 and reset window >=60s classify as genuine account rate limit and record redacted reset evidence.",
@@ -6198,7 +6422,7 @@
               }
             },
             {
-              "name": "Provider rate guard — x-ratelimit header classification",
+              "name": "Provider rate guard \u2014 x-ratelimit header classification",
               "priority": "P2",
               "status": "planned",
               "contract": "Pure functions parse x-ratelimit-* headers and classify a 429 as genuine_quota, upstream_capacity, or insufficient_evidence with redacted reset windows, no sleeps, and no shared breaker writes",
@@ -6224,7 +6448,7 @@
                 "The slice writes process-global breaker state in unit tests or sleeps to simulate reset windows."
               ],
               "unblocks": [
-                "Provider rate guard — degraded-state + last-known-good evidence"
+                "Provider rate guard \u2014 degraded-state + last-known-good evidence"
               ],
               "acceptance": [
                 "Headers with remaining=0 and reset window >=60s classify as genuine_quota with redacted reset evidence.",
@@ -6254,7 +6478,7 @@
                   "run_id": "20260426T150517Z-045212879",
                   "category": "no_progress",
                   "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard — x-ratelimit header classification"
+                  "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard \u2014 x-ratelimit header classification"
                 },
                 "backends_tried": [
                   "codexu"
@@ -6266,7 +6490,7 @@
               }
             },
             {
-              "name": "Provider rate guard — degraded-state + last-known-good evidence",
+              "name": "Provider rate guard \u2014 degraded-state + last-known-good evidence",
               "priority": "P2",
               "status": "planned",
               "contract": "Last-known-good bucket state distinguishes bare 429s; degraded modes (rate_guard_unavailable, budget_header_missing) are reported as visible provider status evidence without retry timing changes or shared mutable breaker state",
@@ -6286,7 +6510,7 @@
                 "internal/hermes/client.go"
               ],
               "ready_when": [
-                "Provider rate guard — x-ratelimit header classification is fixture-ready or validated, so this slice composes a typed classification result with last-known-good state."
+                "Provider rate guard \u2014 x-ratelimit header classification is fixture-ready or validated, so this slice composes a typed classification result with last-known-good state."
               ],
               "not_ready_when": [
                 "The slice writes a process-global or cross-session breaker.",
@@ -6323,7 +6547,7 @@
                   "run_id": "20260426T150517Z-045212879",
                   "category": "no_progress",
                   "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard — degraded-state + last-known-good evidence"
+                  "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard \u2014 degraded-state + last-known-good evidence"
                 },
                 "backends_tried": [
                   "codexu"
@@ -6344,7 +6568,7 @@
       }
     },
     "5": {
-      "name": "Phase 5 — The Final Purge",
+      "name": "Phase 5 \u2014 The Final Purge",
       "deliverable": "Python tool scripts ported to Go or WASM",
       "subphases": {
         "5.A": {
@@ -9180,7 +9404,7 @@
             {
               "name": "Unix installer (install.sh) source-backed update flow",
               "status": "planned",
-              "note": "TDD slice 1 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): port upstream Unix installer semantics into canonical `scripts/install.sh`, with the site embedding a synced `www.gormes.ai/internal/site/installers/install.sh` copy. The installer uses user-scoped PATH publication, a managed checkout under a Hermes-analogy install home, rerun-as-update behavior, and no root-owned target paths. Cover path selection, managed checkout, update-on-rerun, and publish+verify flow via a new `install_unix_test.go` Go test that executes the script under a temporary fake toolchain — no network calls in unit tests. Do not install Hermes/Python/Node: Gormes' current feature set does not require them."
+              "note": "TDD slice 1 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): port upstream Unix installer semantics into canonical `scripts/install.sh`, with the site embedding a synced `www.gormes.ai/internal/site/installers/install.sh` copy. The installer uses user-scoped PATH publication, a managed checkout under a Hermes-analogy install home, rerun-as-update behavior, and no root-owned target paths. Cover path selection, managed checkout, update-on-rerun, and publish+verify flow via a new `install_unix_test.go` Go test that executes the script under a temporary fake toolchain \u2014 no network calls in unit tests. Do not install Hermes/Python/Node: Gormes' current feature set does not require them."
             },
             {
               "name": "Unix installer root/FHS layout policy",
@@ -9243,7 +9467,7 @@
             {
               "name": "Windows installer (install.ps1 + install.cmd) parity",
               "status": "planned",
-              "note": "TDD slice 2 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): add `www.gormes.ai/internal/site/install.ps1` (native PowerShell) plus `install.cmd` wrapper that launches it, matching the Unix contract (user-scoped PATH, managed checkout, rerun-as-update, source-backed). Cover content/smoke assertions — PATH publication, managed checkout layout, release branch handling, and stable global command publication — via `install_windows_test.go` over fake toolchains; no live network calls in unit tests."
+              "note": "TDD slice 2 of installer parity (`docs/superpowers/plans/2026-04-23-gormes-installer-parity.md`): add `www.gormes.ai/internal/site/install.ps1` (native PowerShell) plus `install.cmd` wrapper that launches it, matching the Unix contract (user-scoped PATH, managed checkout, rerun-as-update, source-backed). Cover content/smoke assertions \u2014 PATH publication, managed checkout layout, release branch handling, and stable global command publication \u2014 via `install_windows_test.go` over fake toolchains; no live network calls in unit tests."
             },
             {
               "name": "Installer site asset/route coverage",
@@ -10182,17 +10406,17 @@
             {
               "name": "Execution-mode resolver + config precedence",
               "status": "planned",
-              "note": "TDD slice 1 of 4: pure helper in `internal/tools/execute_code.go` that returns `off`/`project`/`strict` from (a) env var (e.g. `GORMES_EXECUTE_CODE_MODE`), then (b) config key, then (c) default, with unknown values falling back to default and emitting a warning. Table tests only — no sandbox coupling, no CWD/interpreter behavior yet. Freeze the token set here so later slices cannot silently add modes."
+              "note": "TDD slice 1 of 4: pure helper in `internal/tools/execute_code.go` that returns `off`/`project`/`strict` from (a) env var (e.g. `GORMES_EXECUTE_CODE_MODE`), then (b) config key, then (c) default, with unknown values falling back to default and emitting a warning. Table tests only \u2014 no sandbox coupling, no CWD/interpreter behavior yet. Freeze the token set here so later slices cannot silently add modes."
             },
             {
               "name": "Strict-mode CWD + interpreter parity",
               "status": "planned",
-              "note": "TDD slice 2 of 4: strict mode keeps today's behavior frozen — isolated tmpdir CWD plus the canonical interpreter resolved via `LocalCodeSandbox.resolveRuntime`. Fixtures must prove the 5.K blocked-result envelope (status, error, filesystem_access, network_access) is unchanged and that relative imports/filesystem access outside the tmpdir continue to fail. This slice exists only to pin the reference behavior before project-mode lands."
+              "note": "TDD slice 2 of 4: strict mode keeps today's behavior frozen \u2014 isolated tmpdir CWD plus the canonical interpreter resolved via `LocalCodeSandbox.resolveRuntime`. Fixtures must prove the 5.K blocked-result envelope (status, error, filesystem_access, network_access) is unchanged and that relative imports/filesystem access outside the tmpdir continue to fail. This slice exists only to pin the reference behavior before project-mode lands."
             },
             {
               "name": "Project-mode CWD + active venv detection",
               "status": "planned",
-              "note": "TDD slice 3 of 4: port upstream `_resolve_python_binary`/`_resolve_cwd` project semantics — session's working directory for CWD and the active virtualenv/conda python when present, falling back to the resolved system interpreter. Unit tests must drive resolution via injected env (`VIRTUAL_ENV`, `CONDA_PREFIX`), not the real host. Do not widen the 5.K filesystem/network blocking contract — project mode still flows through the same `sandboxGuardReason` gate."
+              "note": "TDD slice 3 of 4: port upstream `_resolve_python_binary`/`_resolve_cwd` project semantics \u2014 session's working directory for CWD and the active virtualenv/conda python when present, falling back to the resolved system interpreter. Unit tests must drive resolution via injected env (`VIRTUAL_ENV`, `CONDA_PREFIX`), not the real host. Do not widen the 5.K filesystem/network blocking contract \u2014 project mode still flows through the same `sandboxGuardReason` gate."
             },
             {
               "name": "Default mode selection + config cut-over",
@@ -10204,7 +10428,7 @@
       }
     },
     "6": {
-      "name": "Phase 6 — The Learning Loop (Soul)",
+      "name": "Phase 6 \u2014 The Learning Loop (Soul)",
       "deliverable": "Native skill extraction. Compounding intelligence. The feature Hermes doesn't have.",
       "subphases": {
         "6.A": {
@@ -10552,7 +10776,7 @@
       }
     },
     "7": {
-      "name": "Phase 7 — Paused Channel Backlog",
+      "name": "Phase 7 \u2014 Paused Channel Backlog",
       "deliverable": "Deferred non-priority channel adapters after Telegram, Discord, Slack, WhatsApp, and WeChat stabilize",
       "subphases": {
         "7.A": {
