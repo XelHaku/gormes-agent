@@ -34,7 +34,7 @@ func defaultDeps() cliDeps {
 	return cliDeps{stdout: os.Stdout, stderr: os.Stderr, runner: cmdrunner.ExecRunner{}}
 }
 
-const usage = "usage: builder-loop [--repo-root <path>] run [--loop] [--dry-run] [--backend codexu|claudeu|opencode] | progress validate | progress write | repo benchmark record | repo readme update | audit | digest [--output <path>] [--force] | doctor | service install | service install-audit | service disable legacy-timers"
+const usage = "usage: builder-loop [--repo-root <path>] run [--loop] [--dry-run] [--backend codexu|claudeu|opencode] | progress validate | progress write | repo benchmark record | repo readme update | audit | digest [--output <path>] [--force] | doctor | service install | service install-audit | service install-watchdog | service disable legacy-timers"
 
 // subUsage maps each subcommand to its own help text. --help/-h on a
 // subcommand prints the matching entry instead of the giant top-level usage,
@@ -51,9 +51,10 @@ var subUsage = map[string]string{
 	"digest":                        "usage: builder-loop digest [--output <path>] [--force] [--format text|json]",
 	"doctor":                        "usage: builder-loop doctor [--format text|json]",
 	"progress validate":             "usage: builder-loop progress validate [--format text|json]",
-	"service":                       "usage: builder-loop service {install|install-audit|disable legacy-timers} [--force]",
+	"service":                       "usage: builder-loop service {install|install-audit|install-watchdog|disable legacy-timers} [--force]",
 	"service install":               "usage: builder-loop service install [--force]",
 	"service install-audit":         "usage: builder-loop service install-audit [--force]",
+	"service install-watchdog":      "usage: builder-loop service install-watchdog [--force]",
 	"service disable":               "usage: builder-loop service disable legacy-timers",
 	"service disable legacy-timers": "usage: builder-loop service disable legacy-timers",
 }
@@ -270,6 +271,8 @@ func runService(ctx context.Context, deps cliDeps, root string, args []string) e
 			key = "service install"
 		case len(args) >= 1 && args[0] == "install-audit":
 			key = "service install-audit"
+		case len(args) >= 1 && args[0] == "install-watchdog":
+			key = "service install-watchdog"
 		}
 		return printHelp(deps, key)
 	}
@@ -287,6 +290,12 @@ func runService(ctx context.Context, deps cliDeps, root string, args []string) e
 			return err
 		}
 		return installAuditService(ctx, deps, root, force)
+	case len(args) >= 1 && args[0] == "install-watchdog":
+		force, err := serviceForce(args[1:])
+		if err != nil {
+			return err
+		}
+		return installWatchdogService(ctx, deps, root, force)
 	case len(args) == 2 && args[0] == "disable" && args[1] == "legacy-timers":
 		return builderloop.DisableLegacyTimers(ctx, deps.runner)
 	default:
@@ -472,6 +481,24 @@ func installAuditService(ctx context.Context, deps cliDeps, root string, force b
 	})
 }
 
+func installWatchdogService(ctx context.Context, deps cliDeps, root string, force bool) error {
+	unitDir, err := systemdUserUnitDir()
+	if err != nil {
+		return err
+	}
+
+	return builderloop.InstallWatchdogService(ctx, builderloop.WatchdogServiceInstallOptions{
+		Runner:       deps.runner,
+		UnitDir:      unitDir,
+		UnitName:     "gormes-orchestrator-watchdog.service",
+		TimerName:    "gormes-orchestrator-watchdog.timer",
+		WatchdogPath: watchdogWrapperPath(root),
+		WorkDir:      root,
+		AutoStart:    autoStart(),
+		Force:        force,
+	})
+}
+
 func autoStart() bool {
 	return os.Getenv("AUTO_START") != "0"
 }
@@ -488,6 +515,13 @@ func auditWrapperPath(root string) string {
 		return path
 	}
 	return filepath.Join(root, "scripts", "orchestrator", "audit.sh")
+}
+
+func watchdogWrapperPath(root string) string {
+	if path := os.Getenv("WATCHDOG_PATH"); path != "" {
+		return path
+	}
+	return filepath.Join(root, "scripts", "orchestrator", "watchdog.sh")
 }
 
 func auditReportDir() (string, error) {

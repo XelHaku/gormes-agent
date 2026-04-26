@@ -178,6 +178,68 @@ func InstallAuditService(ctx context.Context, opts AuditServiceInstallOptions) e
 	return nil
 }
 
+type WatchdogServiceInstallOptions struct {
+	Runner       Runner
+	UnitDir      string
+	UnitName     string
+	TimerName    string
+	WatchdogPath string
+	WorkDir      string
+	AutoStart    bool
+	Force        bool
+}
+
+func InstallWatchdogService(ctx context.Context, opts WatchdogServiceInstallOptions) error {
+	if opts.UnitDir == "" {
+		return errors.New("unit dir is required")
+	}
+	if opts.UnitName == "" {
+		return errors.New("unit name is required")
+	}
+	if opts.TimerName == "" {
+		return errors.New("timer name is required")
+	}
+
+	runner := opts.Runner
+	if runner == nil {
+		runner = ExecRunner{}
+	}
+
+	if err := os.MkdirAll(opts.UnitDir, 0o755); err != nil {
+		return err
+	}
+
+	servicePath := filepath.Join(opts.UnitDir, opts.UnitName)
+	if err := writeAuditUnitFile(servicePath, opts.Force, RenderWatchdogServiceUnit(WatchdogServiceUnitOptions{
+		WatchdogPath: opts.WatchdogPath,
+		WorkDir:      opts.WorkDir,
+	})); err != nil {
+		return err
+	}
+
+	timerPath := filepath.Join(opts.UnitDir, opts.TimerName)
+	if err := writeAuditUnitFile(timerPath, opts.Force, RenderWatchdogTimerUnit(WatchdogTimerUnitOptions{
+		ServiceUnitName: opts.UnitName,
+	})); err != nil {
+		return err
+	}
+
+	if result := runner.Run(ctx, Command{Name: "systemctl", Args: []string{"--user", "daemon-reload"}}); result.Err != nil {
+		return result.Err
+	}
+	if opts.AutoStart {
+		result := runner.Run(ctx, Command{
+			Name: "systemctl",
+			Args: []string{"--user", "enable", "--now", opts.TimerName},
+		})
+		if result.Err != nil {
+			return result.Err
+		}
+	}
+
+	return nil
+}
+
 func writeAuditUnitFile(path string, force bool, contents string) error {
 	if !force {
 		if _, err := os.Stat(path); err == nil {
@@ -220,6 +282,47 @@ Description=Run Gormes orchestrator audit periodically
 [Timer]
 OnBootSec=2min
 OnUnitActiveSec=20min
+AccuracySec=30s
+Persistent=true
+Unit=%s
+
+[Install]
+WantedBy=timers.target
+`, opts.ServiceUnitName)
+}
+
+type WatchdogServiceUnitOptions struct {
+	WatchdogPath string
+	WorkDir      string
+}
+
+func RenderWatchdogServiceUnit(opts WatchdogServiceUnitOptions) string {
+	return fmt.Sprintf(`[Unit]
+Description=Gormes orchestrator watchdog
+
+[Service]
+Type=oneshot
+%s
+Environment=REPO_ROOT=%s
+Environment=GORMES_ORCHESTRATOR_SERVICE=gormes-orchestrator.service
+WorkingDirectory=%s
+ExecStart=%s
+TimeoutStartSec=180s
+Nice=10
+`, systemdPathEnvironment, systemdPathValue(opts.WorkDir), systemdPathValue(opts.WorkDir), systemdPathValue(opts.WatchdogPath))
+}
+
+type WatchdogTimerUnitOptions struct {
+	ServiceUnitName string
+}
+
+func RenderWatchdogTimerUnit(opts WatchdogTimerUnitOptions) string {
+	return fmt.Sprintf(`[Unit]
+Description=Run Gormes orchestrator watchdog every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
 AccuracySec=30s
 Persistent=true
 Unit=%s

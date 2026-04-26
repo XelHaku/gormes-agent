@@ -237,6 +237,70 @@ func TestInstallAuditServiceWritesServiceAndTimerAndEnablesTimer(t *testing.T) {
 	}
 }
 
+func TestInstallWatchdogServiceWritesServiceAndTenMinuteTimer(t *testing.T) {
+	unitDir := t.TempDir()
+	runner := &FakeRunner{
+		Results: []Result{{}, {}},
+	}
+
+	if err := InstallWatchdogService(context.Background(), WatchdogServiceInstallOptions{
+		Runner:       runner,
+		UnitDir:      unitDir,
+		UnitName:     "gormes-orchestrator-watchdog.service",
+		TimerName:    "gormes-orchestrator-watchdog.timer",
+		WatchdogPath: "/srv/gormes/scripts/orchestrator/watchdog.sh",
+		WorkDir:      "/srv/gormes",
+		AutoStart:    true,
+	}); err != nil {
+		t.Fatalf("InstallWatchdogService() error = %v", err)
+	}
+
+	service, err := os.ReadFile(filepath.Join(unitDir, "gormes-orchestrator-watchdog.service"))
+	if err != nil {
+		t.Fatalf("ReadFile(service) error = %v", err)
+	}
+	for _, want := range []string{
+		"Type=oneshot",
+		"Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin",
+		"Environment=REPO_ROOT=/srv/gormes",
+		"Environment=GORMES_ORCHESTRATOR_SERVICE=gormes-orchestrator.service",
+		"WorkingDirectory=/srv/gormes",
+		"ExecStart=/srv/gormes/scripts/orchestrator/watchdog.sh",
+		"TimeoutStartSec=180s",
+		"Nice=10",
+	} {
+		if !strings.Contains(string(service), want) {
+			t.Fatalf("service unit = %q, want %q", service, want)
+		}
+	}
+
+	timer, err := os.ReadFile(filepath.Join(unitDir, "gormes-orchestrator-watchdog.timer"))
+	if err != nil {
+		t.Fatalf("ReadFile(timer) error = %v", err)
+	}
+	for _, want := range []string{
+		"[Timer]",
+		"OnBootSec=2min",
+		"OnUnitActiveSec=10min",
+		"AccuracySec=30s",
+		"Persistent=true",
+		"Unit=gormes-orchestrator-watchdog.service",
+		"WantedBy=timers.target",
+	} {
+		if !strings.Contains(string(timer), want) {
+			t.Fatalf("timer unit = %q, want %q", timer, want)
+		}
+	}
+
+	wantCommands := []Command{
+		{Name: "systemctl", Args: []string{"--user", "daemon-reload"}},
+		{Name: "systemctl", Args: []string{"--user", "enable", "--now", "gormes-orchestrator-watchdog.timer"}},
+	}
+	if !reflect.DeepEqual(runner.Commands, wantCommands) {
+		t.Fatalf("commands = %#v, want %#v", runner.Commands, wantCommands)
+	}
+}
+
 func TestInstallAuditServicePreservesExistingServiceAndWritesMissingTimer(t *testing.T) {
 	unitDir := t.TempDir()
 	servicePath := filepath.Join(unitDir, "gormes-orchestrator-audit.service")

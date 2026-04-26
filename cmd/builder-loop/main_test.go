@@ -1281,6 +1281,56 @@ func TestServiceInstallAuditUsesAuditUnitName(t *testing.T) {
 	}
 }
 
+func TestServiceInstallWatchdogUsesWatchdogUnitName(t *testing.T) {
+	repoRoot := t.TempDir()
+	xdgConfigHome := filepath.Join(repoRoot, "xdg")
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
+	runner := &cmdrunner.FakeRunner{Results: []cmdrunner.Result{{}, {}}}
+	deps := defaultDeps()
+	deps.runner = runner
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	if err := os.Chdir(repoRoot); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldWD); err != nil {
+			t.Fatalf("restore Chdir() error = %v", err)
+		}
+	})
+
+	if err := run(context.Background(), deps, []string{"service", "install-watchdog"}); err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+
+	servicePath := filepath.Join(xdgConfigHome, "systemd", "user", "gormes-orchestrator-watchdog.service")
+	timerPath := filepath.Join(xdgConfigHome, "systemd", "user", "gormes-orchestrator-watchdog.timer")
+	if _, err := os.Stat(servicePath); err != nil {
+		t.Fatalf("Stat(service) error = %v", err)
+	}
+	if _, err := os.Stat(timerPath); err != nil {
+		t.Fatalf("Stat(timer) error = %v", err)
+	}
+	raw, err := os.ReadFile(servicePath)
+	if err != nil {
+		t.Fatalf("ReadFile(service) error = %v", err)
+	}
+	wantExec := "ExecStart=" + filepath.Join(repoRoot, "scripts", "orchestrator", "watchdog.sh")
+	if !strings.Contains(string(raw), wantExec) {
+		t.Fatalf("service unit = %q, want stable watchdog wrapper exec %q", raw, wantExec)
+	}
+	if strings.Contains(string(raw), "go-build") || strings.Contains(string(raw), " run") {
+		t.Fatalf("service unit = %q, want no temporary go-build path and no run arg", raw)
+	}
+	wantEnable := cmdrunner.Command{Name: "systemctl", Args: []string{"--user", "enable", "--now", "gormes-orchestrator-watchdog.timer"}}
+	if got := runner.Commands[len(runner.Commands)-1]; !reflect.DeepEqual(got, wantEnable) {
+		t.Fatalf("last command = %#v, want %#v", got, wantEnable)
+	}
+}
+
 func TestServiceInstallHonorsAutoStartZero(t *testing.T) {
 	repoRoot := t.TempDir()
 	xdgConfigHome := filepath.Join(repoRoot, "xdg")

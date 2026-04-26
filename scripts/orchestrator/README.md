@@ -12,6 +12,19 @@ shell entrypoints. Full runtime parity remains staged follow-up work.
 - `systemd/` — templates rendered or installed by `builder-loop service ...`.
 - `FROZEN.md` — freeze policy and the active Go-port exception.
 
+## Watchdog
+
+Install the 10-minute production watchdog with:
+
+```sh
+scripts/orchestrator/install-watchdog.sh --force
+```
+
+The watchdog is intentionally repair-oriented: every tick checkpoints dirty
+loop output, restarts `gormes-orchestrator.service` if inactive, runs
+`builder-loop doctor` and `planner-loop doctor`, writes the existing audit
+report, and exits zero so the timer keeps firing after recoverable failures.
+
 ## Running tests
 
 ```sh
