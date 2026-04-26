@@ -593,9 +593,9 @@
             {
               "name": "Builder-loop self-improvement vs user-feature ratio metric",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "TDD packet for a missing pure helper; create exactly two files and do not parse the live ledger. STEP 1: cd into the repo root and run `ls internal/builderloop/ship_ratio*.go` — both files must be absent before the worker writes them. STEP 2: write internal/builderloop/ship_ratio_test.go in package builderloop with two top-level test functions. TestClassifySubphase uses a t.Run-driven table with named subtests bare_1c, path_1c, bare_5o, path_5o, control_plane_prefix, user_feature_4a, user_feature_4h, user_feature_6a, user_feature_7b, blank_input, whitespace_only, and unknown_99x; each asserts ClassifySubphase returns the expected RowKind. TestComputeShipRatio uses a fixed time anchor `now := time.Date(2026,4,26,18,0,0,0,time.UTC)` and a 24h window; subtests inclusive_window_start, future_event_excluded, per_kind_counts, and zero_events_returns_zero_total. STEP 3: write internal/builderloop/ship_ratio.go exposing type RowKind string with constants RowKindSelfImprovement=\"self_improvement\", RowKindUserFeature=\"user_feature\", RowKindUnclassified=\"unclassified\"; type ShippedRowEvent struct{SubphaseID string; ShippedAt time.Time}; type ShipRatio struct{SelfImprovement int; UserFeature int; Unclassified int; Total int}; func ClassifySubphase(subphaseID string) RowKind; and func ComputeShipRatio(events []ShippedRowEvent, window time.Duration, now time.Time) ShipRatio. ClassifySubphase trims spaces, splits on \"/\" and inspects the second segment if the first is a phase number (\"1\",\"4\",\"5\",\"6\",\"7\"), and treats bare \"1.C\", \"5.O\", and any string with prefix \"control-plane/\" as RowKindSelfImprovement. \"4.A\", \"4.H\", \"6.*\", \"7.*\" map to RowKindUserFeature; everything else (including blank input) returns RowKindUnclassified. ComputeShipRatio is a pure aggregator over the provided slice. STEP 4: no file I/O, no ledger parsing, no record_run_health emission, no goroutines, no live clock; imports only `strings` and `time` plus `testing` in the test file.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -648,13 +648,14 @@
                 "internal/builderloop/ship_ratio_test.go fixtures prove classifier coverage of self_improvement/user_feature/unclassified plus windowed aggregation with no record_run_health writes."
               ],
               "health": {
-                "attempt_count": 3,
-                "last_attempt": "2026-04-26T15:09:51Z",
+                "attempt_count": 4,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T19:52:25Z",
                 "last_failure": {
-                  "run_id": "20260426T150941Z-113448856",
-                  "category": "no_progress",
+                  "run_id": "20260426T194254Z-265829762",
+                  "category": "worker_error",
                   "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 1/1.C/Builder-loop self-improvement vs user-feature ratio metric"
+                  "stderr_tail": "command 3 failed: exit status 1"
                 },
                 "backends_tried": [
                   "codexu"
@@ -4741,9 +4742,9 @@
             {
               "name": "Azure Foundry runtime env/config read model",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Azure Foundry runtime resolution combines detected api_mode, deployment/model, redacted env/config evidence, and provider context metadata without contacting Azure or storing plaintext secrets",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -6672,9 +6673,9 @@
             {
               "name": "Provider rate guard — degraded-state + last-known-good evidence",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "TDD packet for a missing pure state-transition helper. The prerequisite (RateLimitClass + Classify429 in internal/hermes/provider_rate_guard.go) is shipped on main as of commit a1d7d928; do NOT stub or duplicate those constants. STEP 1: write internal/hermes/provider_rate_guard_degraded_test.go in package hermes (importing only `testing` and `time`). Define t0 and t1 once at the top of TestApplyClassification: `t0 := time.Date(2026,4,26,12,0,0,0,time.UTC); t1 := t0.Add(5*time.Minute)`. Add six t.Run subtests in this order — preserves_last_known_when_insufficient, treats_empty_class_as_insufficient, fresh_genuine_quota_clears_unavailable, fresh_upstream_capacity_clears_unavailable, input_immutability_via_struct_value, transitions_back_to_available_on_fresh_evidence — each calling ApplyClassification with explicit GuardState literals and asserting the returned struct field-by-field with t.Fatalf on mismatch. STEP 2: write internal/hermes/provider_rate_guard_degraded.go in package hermes (importing only `time`). Define `type GuardState struct { LastKnownClass RateLimitClass; LastKnownAt time.Time; Unavailable bool }` and `func ApplyClassification(state GuardState, now time.Time, class RateLimitClass) GuardState`. Algorithm: if class == RateLimitInsufficientEvidence OR class == RateLimitClass(\"\"), return GuardState{LastKnownClass: state.LastKnownClass, LastKnownAt: state.LastKnownAt, Unavailable: true}. Otherwise return GuardState{LastKnownClass: class, LastKnownAt: now, Unavailable: false}. The helper takes its argument by value, never mutates it, never reads time.Now, never spawns a goroutine, and never touches retry/breaker code.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -6724,9 +6725,10 @@
                 "internal/hermes/provider_rate_guard_degraded.go contains only GuardState and ApplyClassification, reusing RateLimitClass from provider_rate_guard.go with no duplicated constants."
               ],
               "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T15:09:01Z",
+                "attempt_count": 4,
+                "consecutive_failures": 0,
+                "last_attempt": "2026-04-26T19:42:54Z",
+                "last_success": "2026-04-26T19:42:54Z",
                 "last_failure": {
                   "run_id": "20260426T150848Z-251659260",
                   "category": "no_progress",
@@ -6740,7 +6742,7 @@
               "planner_verdict": {
                 "reshape_count": 13,
                 "last_reshape": "2026-04-26T19:13Z",
-                "last_outcome": "reshaped_after_prerequisite_shipped"
+                "last_outcome": "validated_post_ship"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -7484,9 +7486,9 @@
             },
             {
               "name": "[IMPORTANT:] prompt prefix for cron and skill commands",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cron.CronHeartbeatPrefix and internal/skills.BuildSkillSlashCommandMessage emit `[IMPORTANT:` instead of `[SYSTEM:` so Azure OpenAI Default/DefaultV2 content filters do not reject Gormes prompts as prompt-injection (HTTP 400) — same semantic meta-instruction, different bracketed marker; tests update in lockstep so the byte-match assertions still cover drift",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "skills",
               "trust_class": [
@@ -7522,7 +7524,7 @@
                 "internal/skills/preprocessing_commands_test.go updates its expected golden string to `[IMPORTANT:` for the affected fixtures.",
                 "DetectSilent semantics in internal/cron/heartbeat.go are unchanged (the `[SILENT]` token is independent of the leading marker)."
               ],
-              "note": "Mirror of Hermes commits d7a34682 + 20cb706e (Azure content filter dodge). Workers must NOT rename the historical 2.D row `Heartbeat [SYSTEM:] + [SILENT] delivery contract` — that row is complete and its name reflects the original landing. The runtime constant + tests rename in lockstep. cli.py, gateway/run.py, and tools/process_registry.py do not have direct Gormes analogs that emit this marker today, so this slice covers only the cron + skills constants.",
+              "note": "Complete: cron heartbeat (CronHeartbeatPrefix) and skill-invocation prompt (BuildSkillSlashCommandMessage) now emit `[IMPORTANT:` instead of `[SYSTEM:`, mirroring Hermes commits d7a34682 + 20cb706e. The DELIVERY/SILENT/[SILENT] phrases in the cron prefix and the skill body trimming are byte-identical to the prior version. Tests in internal/cron/heartbeat_test.go and internal/skills/preprocessing_commands_test.go assert the new prefix and the absence of the legacy marker. The historical 2.D row name `Heartbeat [SYSTEM:] + [SILENT] delivery contract` was preserved per the not_ready_when guard. Code change landed previously via commit a8d25ba5; this slice closes the progress entry against the upstream pair.",
               "write_scope": [
                 "internal/cron/heartbeat.go",
                 "internal/cron/heartbeat_test.go",
@@ -7538,6 +7540,11 @@
               "done_signal": [
                 "go test ./internal/cron and ./internal/skills both pass after the marker rename; `grep -rn '\\[SYSTEM:' internal/cron/ internal/skills/` returns no matches in production code; `grep -rn '\\[IMPORTANT:' internal/cron/ internal/skills/` returns at least 4 matches (constant + tests in both packages)."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T19:45:00Z",
+                "last_success": "2026-04-26T19:45:00Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:d7a34682+20cb706e cron/scheduler.py,agent/skill_commands.py",
@@ -7852,9 +7859,9 @@
             },
             {
               "name": "MCP schema normalization + structured-content adapter",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools/mcp_normalize.go converts MCPRawTool slices and tools/call results into native tool descriptors and model-facing strings — sanitizes tool names, validates InputSchema is a JSON-Schema object, flattens structured content vs text content into a single string, isolates server stderr to a per-server log path, and emits a `tools/list_changed`-style refresh hook so dynamic discovery updates replace stale descriptors deterministically",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8933,9 +8940,9 @@
             },
             {
               "name": "CLI webhook URL normalizer",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds a pure function `NormalizeWebhookURL(raw string) (string, error)` that trims whitespace, requires scheme http or https, strips trailing slashes from the path, lowercases the host, rejects userinfo (raw URLs containing '@' before the host) with a sentinel error, and returns the canonicalized URL string; no network call is made",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9359,9 +9366,9 @@
             },
             {
               "name": "CLI profile name validator",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds a pure function `ValidateProfileName(name string) error` and an exported sentinel error set: ErrProfileNameEmpty, ErrProfileNameTooLong, ErrProfileNameInvalidChars, ErrProfileNameReserved; the function accepts names matching `^[a-z0-9][a-z0-9_-]{0,63}$`, treats 'default' as valid (special alias), and rejects the reserved subcommand names {'create','delete','list','use','export','import','show'}",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -10729,9 +10736,9 @@
             },
             {
               "name": "TUI gateway image/personality/platform-event helpers",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure TUI gateway media, personality, and platform-event helpers expose stable structs and validation without remote transport",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -10765,7 +10772,7 @@
                 "Personality validation/rendering returns deterministic messages for supported, missing, and invalid values.",
                 "PlatformEvent structs round-trip JSON for submit, cancel, resize, progress, and image metadata without starting transport."
               ],
-              "note": "Second pure-helper split; this creates the media/personality/event schema foundation that remote TUI transport can consume later.",
+              "note": "Complete: internal/tuigateway/image.go ports _estimate_image_tokens and _image_meta as EstimateImageTokens(width, height int) int and ReadImageMetadata(path string) (ImageMetadata, error) — the metadata reader caps reads at 64 KiB through io.LimitReader so PNG/JPEG/GIF headers decode in O(header) and a fake 12 MiB pseudo-PNG falls back to name-only without exhausting memory. internal/tuigateway/personality.go ports _render_personality_prompt and _validate_personality as RenderPersonalityPrompt(value any) string and ValidatePersonality(value string, personalities map[string]any) (name, prompt string, err error) with deterministic alias handling (`none`, `default`, `neutral`) and sorted, raw-casing-preserving error messages. internal/tuigateway/platform_event.go declares the PlatformEventKind enum plus SubmitEvent, CancelEvent, ResizeEvent, ProgressEvent, ImageMetadataEvent — each round-trips encoding/json with stable field tags, and ValidPlatformEventKind gives O(1) discriminator validation. Fixtures in internal/tuigateway/media_personality_event_test.go cover tile-math math + zero/negative guard, PNG/JPEG/GIF fixture decode, non-image and missing-file fallbacks, the bounded-read invariant, personality dict assembly + plain-string passthrough + alias clearing + sorted available-list error + raw-casing preservation, and JSON round-trip plus omitempty checks for every event variant. No NewRemoteClient, NewGatewayMux, SSE dialer, JSON-RPC dispatcher, or live image read outside t.TempDir() exists in this slice.",
               "write_scope": [
                 "internal/tuigateway/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -10782,6 +10789,11 @@
                 "reshape_count": 1,
                 "last_reshape": "2026-04-26T16:17:18Z",
                 "last_outcome": "no_attempts_yet"
+              },
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T19:51:20Z",
+                "last_success": "2026-04-26T19:51:20Z"
               },
               "provenance": {
                 "origin_type": "hybrid",

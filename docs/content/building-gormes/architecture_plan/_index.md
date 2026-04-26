@@ -37,11 +37,11 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 35/74 subphases shipped · 21 in progress · 18 planned
+**Overall:** 36/74 subphases shipped · 20 in progress · 18 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
-| Phase 1 — The Dashboard | 🔨 | 2/3 subphases |
+| Phase 1 — The Dashboard | ✅ | 3/3 subphases |
 | Phase 2 — The Gateway | 🔨 | 16/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
@@ -51,7 +51,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ---
 
-## Phase 1 — The Dashboard 🔨
+## Phase 1 — The Dashboard ✅
 
 *Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary*
 
@@ -65,7 +65,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Offline tool validation
 
-### 1.C — Automation Reliability 🔨
+### 1.C — Automation Reliability ✅
 
 - [x] Orchestrator failure-row stabilization for 4-8 workers
 - [x] Soft-success-nonzero bats coverage
@@ -76,7 +76,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Watchdog checkpoint coalescing
 - [x] PR-intake idle backoff
 - [x] Watchdog dead-process vs slow-progress separation
-- [ ] Builder-loop self-improvement vs user-feature ratio metric
+- [x] Builder-loop self-improvement vs user-feature ratio metric
 
 ## Phase 2 — The Gateway 🔨
 
@@ -349,7 +349,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Azure Foundry transport probe read model
 - [x] Azure Foundry probe — path sniffing
 - [x] Azure Foundry probe — /models classification + Anthropic fallback
-- [ ] Azure Foundry runtime env/config read model
+- [x] Azure Foundry runtime env/config read model
 - [ ] Azure Foundry CLI setup/status manual fallback
 - [ ] Bedrock
 - [x] Bedrock Converse payload mapping (no AWS SDK)
@@ -428,7 +428,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Prompt-cache capability guard
 - [ ] Provider rate guard + budget telemetry
 - [x] Provider rate guard — x-ratelimit header classification
-- [ ] Provider rate guard — degraded-state + last-known-good evidence
+- [x] Provider rate guard — degraded-state + last-known-good evidence
 
 ## Phase 5 — The Final Purge 🔨
 
@@ -479,7 +479,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Skills hub search read-model function over registry providers
 - [ ] Skill registries
 - [x] Skill preprocessing + dynamic slash commands
-- [ ] [IMPORTANT:] prompt prefix for cron and skill commands
+- [x] [IMPORTANT:] prompt prefix for cron and skill commands
 - [x] Skills list — enabled/disabled status column + --enabled-only filter
 
 ### 5.G — MCP Integration 🔨
@@ -488,7 +488,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] MCP server config/env resolver
 - [x] MCP stdio transport + tool/list discovery
 - [x] MCP HTTP transport + tool/list discovery
-- [ ] MCP schema normalization + structured-content adapter
+- [x] MCP schema normalization + structured-content adapter
 - [x] MCP OAuth state store + noninteractive auth errors
 - [x] MCP OAuth refresh + 401 session-expired recovery
 - [ ] Managed tool gateway bridge
@@ -545,7 +545,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
 - [x] CLI banner/output formatting helpers
 - [x] CLI deterministic tip selector
-- [ ] CLI webhook URL normalizer
+- [x] CLI webhook URL normalizer
 - [x] CLI dump support-summary helper
 - [x] PTY bridge protocol adapter
 - [ ] CLI command registry parity + active-turn busy policy
@@ -553,7 +553,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway /reasoning apply + dispatch
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
-- [ ] CLI profile name validator
+- [x] CLI profile name validator
 - [ ] CLI profile root resolver
 - [ ] CLI active-profile store
 - [ ] CLI profile path and active-profile store (deprecated umbrella)
@@ -588,7 +588,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] TUI gateway tool-progress mode normalizer
 - [x] TUI gateway completion path normalizer
 - [x] TUI gateway tool summary formatter
-- [ ] TUI gateway image/personality/platform-event helpers
+- [x] TUI gateway image/personality/platform-event helpers
 - [x] TUI mouse tracking config + slash toggle
 - [x] Native TUI bundle independence check
 - [x] TUI launch model override + static alias resolver

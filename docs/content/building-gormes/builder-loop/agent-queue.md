@@ -22,28 +22,7 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. Provider rate guard — degraded-state + last-known-good evidence
-
-- Phase: 4 / 4.H
-- Owner: `provider`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: TDD packet for a missing pure state-transition helper. The prerequisite (RateLimitClass + Classify429 in internal/hermes/provider_rate_guard.go) is shipped on main as of commit a1d7d928; do NOT stub or duplicate those constants. STEP 1: write internal/hermes/provider_rate_guard_degraded_test.go in package hermes (importing only `testing` and `time`). Define t0 and t1 once at the top of TestApplyClassification: `t0 := time.Date(2026,4,26,12,0,0,0,time.UTC); t1 := t0.Add(5*time.Minute)`. Add six t.Run subtests in this order — preserves_last_known_when_insufficient, treats_empty_class_as_insufficient, fresh_genuine_quota_clears_unavailable, fresh_upstream_capacity_clears_unavailable, input_immutability_via_struct_value, transitions_back_to_available_on_fresh_evidence — each calling ApplyClassification with explicit GuardState literals and asserting the returned struct field-by-field with t.Fatalf on mismatch. STEP 2: write internal/hermes/provider_rate_guard_degraded.go in package hermes (importing only `time`). Define `type GuardState struct { LastKnownClass RateLimitClass; LastKnownAt time.Time; Unavailable bool }` and `func ApplyClassification(state GuardState, now time.Time, class RateLimitClass) GuardState`. Algorithm: if class == RateLimitInsufficientEvidence OR class == RateLimitClass(""), return GuardState{LastKnownClass: state.LastKnownClass, LastKnownAt: state.LastKnownAt, Unavailable: true}. Otherwise return GuardState{LastKnownClass: class, LastKnownAt: now, Unavailable: false}. The helper takes its argument by value, never mutates it, never reads time.Now, never spawns a goroutine, and never touches retry/breaker code.
-- Trust class: system
-- Ready when: Provider rate guard — x-ratelimit header classification is complete on main (commit a1d7d928); RateLimitClass and the three RateLimit* constants are importable directly from package hermes., internal/hermes/provider_rate_guard_degraded.go and provider_rate_guard_degraded_test.go are absent on main; the worker's first edit is the focused failing test file.
-- Not ready when: The slice writes a process-global or cross-session breaker., The slice changes retry policy or treats every 429 as account-level quota exhaustion., The slice redeclares RateLimitGenuineQuota / RateLimitUpstreamCapacity / RateLimitInsufficientEvidence; reuse the constants from provider_rate_guard.go.
-- Degraded mode: Provider status reports last_known_good=present\|absent, plus rate_guard_unavailable or budget_header_missing when classification is unsafe; no retry amplification.
-- Fixture: `internal/hermes/provider_rate_guard_degraded_test.go (new file)::TestApplyClassification/preserves_last_known_when_insufficient`
-- Write scope: `internal/hermes/provider_rate_guard_degraded.go`, `internal/hermes/provider_rate_guard_degraded_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/hermes -run '^TestApplyClassification$' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/hermes/provider_rate_guard_degraded_test.go fixtures prove last-known-good preservation and degraded-mode transitions across all three RateLimitClass values., internal/hermes/provider_rate_guard_degraded.go contains only GuardState and ApplyClassification, reusing RateLimitClass from provider_rate_guard.go with no duplicated constants.
-- Acceptance: preserves_last_known_when_insufficient: ApplyClassification(GuardState{LastKnownClass: RateLimitGenuineQuota, LastKnownAt: t0, Unavailable: false}, t1, RateLimitInsufficientEvidence) == GuardState{RateLimitGenuineQuota, t0, true}; LastKnownAt is unchanged from t0, Unavailable flipped to true., treats_empty_class_as_insufficient: ApplyClassification(GuardState{LastKnownClass: RateLimitUpstreamCapacity, LastKnownAt: t0, Unavailable: false}, t1, RateLimitClass("")) preserves LastKnownClass=RateLimitUpstreamCapacity and LastKnownAt=t0 while setting Unavailable=true., fresh_genuine_quota_clears_unavailable: ApplyClassification(GuardState{}, t1, RateLimitGenuineQuota) == GuardState{RateLimitGenuineQuota, t1, false}., fresh_upstream_capacity_clears_unavailable: ApplyClassification(GuardState{}, t1, RateLimitUpstreamCapacity) == GuardState{RateLimitUpstreamCapacity, t1, false}., input_immutability_via_struct_value: declare `original := GuardState{LastKnownClass: RateLimitGenuineQuota, LastKnownAt: t0, Unavailable: true}`, call ApplyClassification(original, t1, RateLimitUpstreamCapacity), then assert original is unchanged via direct field comparison (LastKnownClass==RateLimitGenuineQuota, LastKnownAt==t0, Unavailable==true)., transitions_back_to_available_on_fresh_evidence: ApplyClassification(GuardState{LastKnownClass: RateLimitGenuineQuota, LastKnownAt: t0, Unavailable: true}, t1, RateLimitUpstreamCapacity) == GuardState{RateLimitUpstreamCapacity, t1, false}.
-- Source refs: ../hermes-agent/agent/nous_rate_guard.py@192e7eb2:record_nous_rate_limit, ../hermes-agent/agent/nous_rate_guard.py@192e7eb2:nous_rate_limit_remaining, internal/hermes/provider_rate_guard.go::RateLimitClass, internal/hermes/provider_rate_guard.go::Classify429
-- Unblocks: Provider rate guard + budget telemetry
-- Why now: Unblocks Provider rate guard + budget telemetry.
-
-## 2. BlueBubbles iMessage bubble formatting parity
+## 1. BlueBubbles iMessage bubble formatting parity
 
 - Phase: 7 / 7.E
 - Owner: `gateway`
@@ -64,27 +43,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: BlueBubbles iMessage session-context prompt guidance
 - Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
 
-## 3. CLI profile name validator
-
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Contract: internal/cli adds a pure function `ValidateProfileName(name string) error` and an exported sentinel error set: ErrProfileNameEmpty, ErrProfileNameTooLong, ErrProfileNameInvalidChars, ErrProfileNameReserved; the function accepts names matching `^[a-z0-9][a-z0-9_-]{0,63}$`, treats 'default' as valid (special alias), and rejects the reserved subcommand names {'create','delete','list','use','export','import','show'}
-- Trust class: operator, system
-- Ready when: internal/cli already exposes pure helpers; adding one new file with one validator + sentinel errors compiles cleanly alongside them., This slice only defines validation; no path resolution, active-profile read/write, command wiring, alias wrapper, or env mutation is required.
-- Not ready when: The slice resolves filesystem paths, creates wrapper scripts, mutates provider credentials, modifies internal/config, or registers a Cobra command., The slice modifies any other internal/cli file beyond the new profile_name.go and profile_name_test.go.
-- Degraded mode: Callers report a typed sentinel error class instead of free-form text so the CLI can render uniform error messages later without re-parsing strings.
-- Fixture: `internal/cli/profile_name_test.go`
-- Write scope: `internal/cli/profile_name.go`, `internal/cli/profile_name_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/cli -run 'TestValidateProfileName_' -count=1`, `go test ./internal/cli -count=1`, `go vet ./internal/cli`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/cli/profile_name.go declares ValidateProfileName plus the four sentinel errors; five named tests pass; no other internal/cli, internal/config, or cmd/gormes file is modified.
-- Acceptance: TestValidateProfileName_AcceptsValid: ValidateProfileName each of {'default','coder','work-1','tier_2','a','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'} returns nil (the last is exactly 64 chars)., TestValidateProfileName_RejectsEmpty: ValidateProfileName('') and ValidateProfileName('   ') (after caller-side trim) both return ErrProfileNameEmpty., TestValidateProfileName_RejectsTooLong: ValidateProfileName(strings.Repeat('a', 65)) returns ErrProfileNameTooLong., TestValidateProfileName_RejectsInvalidChars: each of {'Coder','my profile','-leading','_leading','dot.name','slash/name','tab\tname'} returns ErrProfileNameInvalidChars., TestValidateProfileName_RejectsReserved: each of {'create','delete','list','use','export','import','show'} returns ErrProfileNameReserved (these collide with subcommand names).
-- Source refs: ../hermes-agent/hermes_cli/profiles.py@edc78e25:_PROFILE_ID_RE, ../hermes-agent/hermes_cli/profiles.py@edc78e25:validate_profile_name, ../hermes-agent/tests/hermes_cli/test_profiles.py@edc78e25, internal/cli/banner.go
-- Unblocks: CLI active-profile store, CLI profile root resolver
-- Why now: Unblocks CLI active-profile store, CLI profile root resolver.
-
-## 4. doctorCustomEndpointReadiness check function
+## 2. doctorCustomEndpointReadiness check function
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -105,7 +64,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: CLI status summary over native stores
 - Why now: Unblocks CLI status summary over native stores.
 
-## 5. Custom provider model-switch credential preservation
+## 3. Custom provider model-switch credential preservation
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -126,26 +85,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: CLI command registry parity + active-turn busy policy
 - Why now: Unblocks CLI command registry parity + active-turn busy policy.
 
-## 6. [IMPORTANT:] prompt prefix for cron and skill commands
-
-- Phase: 5 / 5.F
-- Owner: `skills`
-- Size: `small`
-- Status: `planned`
-- Contract: internal/cron.CronHeartbeatPrefix and internal/skills.BuildSkillSlashCommandMessage emit `[IMPORTANT:` instead of `[SYSTEM:` so Azure OpenAI Default/DefaultV2 content filters do not reject Gormes prompts as prompt-injection (HTTP 400) — same semantic meta-instruction, different bracketed marker; tests update in lockstep so the byte-match assertions still cover drift
-- Trust class: operator, system
-- Ready when: Upstream Hermes shipped this rename across two commits (d7a34682 + 20cb706e) on 2026-04-09 / 2026-04-26 with explicit cause (Azure content filter HTTP 400 on `[SYSTEM:` markers)., Gormes uses the same marker pattern in exactly two production code paths today: internal/cron/heartbeat.go (CronHeartbeatPrefix) and internal/skills/commands.go (BuildSkillSlashCommandMessage).
-- Not ready when: The slice changes the `[SILENT]` token semantics, the skill body trimming, the cron prompt structure beyond the bracketed marker word, or the `Heartbeat [SYSTEM:] + [SILENT] delivery contract` row name in 2.D (that row name is a historical record; only the runtime constant + the byte-match tests change)., The slice introduces a new Azure provider adapter, a content-filter-detection layer, or a configurable marker word — the change is a hardcoded literal rename only., The slice updates internal/progress/progress_test.go literal assertions for the 2.D row name (the row name in progress.json must stay as `Heartbeat [SYSTEM:] + [SILENT] delivery contract` for historical accuracy).
-- Degraded mode: Operator-visible prompt text changes from `[SYSTEM: ...]` to `[IMPORTANT: ...]`; behavior is otherwise identical, including the `[SILENT]` suppression contract and the skill body trimming.
-- Fixture: `internal/cron/heartbeat_test.go`
-- Write scope: `internal/cron/heartbeat.go`, `internal/cron/heartbeat_test.go`, `internal/skills/commands.go`, `internal/skills/preprocessing_commands_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/cron ./internal/skills -count=1`, `go test ./internal/progress -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: go test ./internal/cron and ./internal/skills both pass after the marker rename; `grep -rn '\[SYSTEM:' internal/cron/ internal/skills/` returns no matches in production code; `grep -rn '\[IMPORTANT:' internal/cron/ internal/skills/` returns at least 4 matches (constant + tests in both packages).
-- Acceptance: internal/cron/heartbeat.go:CronHeartbeatPrefix starts with `[IMPORTANT:` (replacing `[SYSTEM:`) and the load-bearing phrases (`DELIVERY:`, `SILENT:`, `[SILENT]`) are byte-identical to the prior version., internal/cron/heartbeat_test.go asserts `strings.HasPrefix(full, "[IMPORTANT:")` (not `[SYSTEM:`); the existing TestHeartbeatPrefix_ContainsLoadBearingPhrases load-bearing phrase set updates only its first member., internal/skills/commands.go:BuildSkillSlashCommandMessage emits `[IMPORTANT: The user has invoked the "<name>" skill, ...` (replacing `[SYSTEM:`)., internal/skills/preprocessing_commands_test.go updates its expected golden string to `[IMPORTANT:` for the affected fixtures., DetectSilent semantics in internal/cron/heartbeat.go are unchanged (the `[SILENT]` token is independent of the leading marker).
-- Source refs: ../hermes-agent/cron/scheduler.py@d7a34682, ../hermes-agent/agent/skill_commands.py@d7a34682, ../hermes-agent/cli.py@20cb706e, ../hermes-agent/gateway/run.py@20cb706e, ../hermes-agent/tools/process_registry.py@20cb706e, internal/cron/heartbeat.go:CronHeartbeatPrefix, internal/cron/heartbeat_test.go, internal/skills/commands.go:BuildSkillSlashCommandMessage, internal/skills/preprocessing_commands_test.go
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
-
-## 7. TUI TerminalNativeSelectionHelp constant + help-string fixture
+## 4. TUI TerminalNativeSelectionHelp constant + help-string fixture
 
 - Phase: 5 / 5.Q
 - Owner: `gateway`
