@@ -513,7 +513,7 @@
               "name": "Watchdog dead-process vs slow-progress separation",
               "priority": "P1",
               "status": "planned",
-              "contract": "TDD packet for a missing pure helper; create exactly two files and do not wire them into the watchdog loop. First add internal/builderloop/watchdog_state_test.go in package builderloop with TestDiagnose table subtests named zero_pid_dead, pid_not_live_after_dead_threshold, live_after_slow_threshold, dead_wins_when_both_thresholds_fire, and healthy_recent_live. Then add internal/builderloop/watchdog_state.go exposing type Verdict string with constants VerdictHealthy=\"healthy\", VerdictSlow=\"slow\", VerdictDead=\"dead\"; type WorkerVitals struct{PID int; LastCommitAt time.Time; PIDIsLive bool}; and Diagnose(now time.Time, v WorkerVitals, deadAfter, slowAfter time.Duration) Verdict. Verdict precedence is: PID==0 => dead, PIDIsLive==false and elapsed>=deadAfter => dead, PIDIsLive==true and elapsed>=slowAfter => slow, else healthy. The helper uses only caller-injected now and PIDIsLive; no os.FindProcess, signal delivery, time.Now, goroutines, watchdog wiring, or config validation.",
+              "contract": "TDD packet for a missing pure helper; create exactly two files and do not wire them into the watchdog loop. STEP 1: cd into the repo root and run `ls internal/builderloop/watchdog_state*.go` — both files must be absent before the worker writes them. STEP 2: write internal/builderloop/watchdog_state_test.go in package builderloop with one TestDiagnose function holding a t.Run-driven table. The subtests are named exactly zero_pid_dead, pid_not_live_after_dead_threshold, live_after_slow_threshold, dead_wins_when_both_thresholds_fire, healthy_recent_live, and pid_live_silent_for_a_year_is_slow_not_dead. Use a fixed time anchor `now := time.Date(2026,4,26,18,0,0,0,time.UTC)` and pass deadAfter=120*time.Second, slowAfter=600*time.Second. STEP 3: write internal/builderloop/watchdog_state.go exposing type Verdict string with constants VerdictHealthy=\"healthy\", VerdictSlow=\"slow\", VerdictDead=\"dead\"; type WorkerVitals struct{PID int; LastCommitAt time.Time; PIDIsLive bool}; and func Diagnose(now time.Time, v WorkerVitals, deadAfter, slowAfter time.Duration) Verdict. Verdict precedence (evaluate in this order): if v.PID==0 return VerdictDead; let elapsed := now.Sub(v.LastCommitAt); if !v.PIDIsLive && elapsed>=deadAfter return VerdictDead; if v.PIDIsLive && elapsed>=slowAfter return VerdictSlow; otherwise return VerdictHealthy. STEP 4: the helper uses only caller-injected now and PIDIsLive — no os.FindProcess, signal delivery, time.Now, goroutines, watchdog wiring, config validation, or imports beyond `time`.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "orchestrator",
@@ -542,15 +542,15 @@
                 "Builder-loop self-improvement vs user-feature ratio metric"
               ],
               "acceptance": [
-                "TestDiagnose_HealthyWhenRecentCommitAndAlive: v={PID:1234, LastCommitAt:now-5s, PIDIsLive:true}, deadAfter=120s, slowAfter=600s returns VerdictHealthy.",
-                "TestDiagnose_SlowWhenAliveButOverSlowThreshold: v={PID:1234, LastCommitAt:now-700s, PIDIsLive:true} returns VerdictSlow.",
-                "TestDiagnose_DeadWhenPIDNotLiveAndOverDeadThreshold: v={PID:1234, LastCommitAt:now-200s, PIDIsLive:false} returns VerdictDead.",
-                "TestDiagnose_DeadWhenPIDIsZero: v={PID:0, LastCommitAt:now-1s, PIDIsLive:true} returns VerdictDead (zero PID short-circuits; thresholds and PIDIsLive are ignored).",
-                "TestDiagnose_DeadDoesNotDowngradeToSlow: v={PID:1234, LastCommitAt:now-700s, PIDIsLive:false} with deadAfter=120s, slowAfter=600s returns VerdictDead (dead wins over slow when both fire).",
-                "TestDiagnose_NotDeadWhenPIDLiveEvenIfSilent: v={PID:1234, LastCommitAt:now-99999s, PIDIsLive:true} returns VerdictSlow (never VerdictDead while the process answers Signal(0)).",
-                "Helper is pure — caller injects the clock (now) and the PIDIsLive result."
+                "TestDiagnose/healthy_recent_live: v={PID:1234, LastCommitAt:now-5*time.Second, PIDIsLive:true}, deadAfter=120s, slowAfter=600s returns VerdictHealthy.",
+                "TestDiagnose/live_after_slow_threshold: v={PID:1234, LastCommitAt:now-700*time.Second, PIDIsLive:true} returns VerdictSlow.",
+                "TestDiagnose/pid_not_live_after_dead_threshold: v={PID:1234, LastCommitAt:now-200*time.Second, PIDIsLive:false} returns VerdictDead.",
+                "TestDiagnose/zero_pid_dead: v={PID:0, LastCommitAt:now-1*time.Second, PIDIsLive:true} returns VerdictDead (zero PID short-circuits; thresholds and PIDIsLive are ignored).",
+                "TestDiagnose/dead_wins_when_both_thresholds_fire: v={PID:1234, LastCommitAt:now-700*time.Second, PIDIsLive:false} with deadAfter=120s, slowAfter=600s returns VerdictDead (dead wins over slow when both fire).",
+                "TestDiagnose/pid_live_silent_for_a_year_is_slow_not_dead: v={PID:1234, LastCommitAt:now-99999*time.Second, PIDIsLive:true} returns VerdictSlow (never VerdictDead while the process answers Signal(0)).",
+                "Helper is pure — caller injects the clock (now) and the PIDIsLive result; the test file imports only `testing` and `time` from stdlib."
               ],
-              "note": "Reshape #6 (2026-04-26T18:25:41Z): tightened the no_progress quarantine into a two-file-only helper with named subtests and explicit verdict precedence. The target helper/test files are absent on main; workers should add them directly and must not touch watchdog wiring.",
+              "note": "Reshape #7 (2026-04-26T19:00:00Z): added explicit STEP 1–4 numbering, named the fixed time anchor, exact subtest names matching the contract, and an extra silent-but-live-for-a-year guard subtest so the spec_hash differs from the prior no_progress reshape. Workers must add the helper + test files directly and must not touch watchdog wiring or run.go.",
               "write_scope": [
                 "internal/builderloop/watchdog_state.go",
                 "internal/builderloop/watchdog_state_test.go",
@@ -579,8 +579,8 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 9,
-                "last_reshape": "2026-04-26T18:21:26Z",
+                "reshape_count": 10,
+                "last_reshape": "2026-04-26T19:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -593,7 +593,7 @@
               "name": "Builder-loop self-improvement vs user-feature ratio metric",
               "priority": "P2",
               "status": "planned",
-              "contract": "TDD packet for a missing pure helper; create exactly two files and do not parse the live ledger. First add internal/builderloop/ship_ratio_test.go in package builderloop with two tests: TestClassifySubphase covers exact \"1.C\", slash-prefixed \"1/1.C\", exact \"5.O\", slash-prefixed \"5/5.O\", prefix \"control-plane/\", exact/prefix \"4.\", \"6.\", \"7.\", blanks, and unknown values; TestComputeShipRatio covers inclusive window start, future-event exclusion, per-kind counts, and Total. Then add internal/builderloop/ship_ratio.go exposing type RowKind string with constants RowKindSelfImprovement=\"self_improvement\", RowKindUserFeature=\"user_feature\", RowKindUnclassified=\"unclassified\"; type ShippedRowEvent struct{SubphaseID string; ShippedAt time.Time}; type ShipRatio struct{SelfImprovement int; UserFeature int; Unclassified int; Total int}; ClassifySubphase(subphaseID string) RowKind; and ComputeShipRatio(events []ShippedRowEvent, window time.Duration, now time.Time) ShipRatio. ClassifySubphase trims spaces and accepts both bare subphase IDs and phase/subphase paths. No file I/O, ledger parsing, record_run_health emission, goroutines, or live clock.",
+              "contract": "TDD packet for a missing pure helper; create exactly two files and do not parse the live ledger. STEP 1: cd into the repo root and run `ls internal/builderloop/ship_ratio*.go` — both files must be absent before the worker writes them. STEP 2: write internal/builderloop/ship_ratio_test.go in package builderloop with two top-level test functions. TestClassifySubphase uses a t.Run-driven table with named subtests bare_1c, path_1c, bare_5o, path_5o, control_plane_prefix, user_feature_4a, user_feature_4h, user_feature_6a, user_feature_7b, blank_input, whitespace_only, and unknown_99x; each asserts ClassifySubphase returns the expected RowKind. TestComputeShipRatio uses a fixed time anchor `now := time.Date(2026,4,26,18,0,0,0,time.UTC)` and a 24h window; subtests inclusive_window_start, future_event_excluded, per_kind_counts, and zero_events_returns_zero_total. STEP 3: write internal/builderloop/ship_ratio.go exposing type RowKind string with constants RowKindSelfImprovement=\"self_improvement\", RowKindUserFeature=\"user_feature\", RowKindUnclassified=\"unclassified\"; type ShippedRowEvent struct{SubphaseID string; ShippedAt time.Time}; type ShipRatio struct{SelfImprovement int; UserFeature int; Unclassified int; Total int}; func ClassifySubphase(subphaseID string) RowKind; and func ComputeShipRatio(events []ShippedRowEvent, window time.Duration, now time.Time) ShipRatio. ClassifySubphase trims spaces, splits on \"/\" and inspects the second segment if the first is a phase number (\"1\",\"4\",\"5\",\"6\",\"7\"), and treats bare \"1.C\", \"5.O\", and any string with prefix \"control-plane/\" as RowKindSelfImprovement. \"4.A\", \"4.H\", \"6.*\", \"7.*\" map to RowKindUserFeature; everything else (including blank input) returns RowKindUnclassified. ComputeShipRatio is a pure aggregator over the provided slice. STEP 4: no file I/O, no ledger parsing, no record_run_health emission, no goroutines, no live clock; imports only `strings` and `time` plus `testing` in the test file.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "orchestrator",
@@ -623,14 +623,16 @@
                 "Watchdog dead-process vs slow-progress separation"
               ],
               "acceptance": [
-                "TestClassifySubphase_KnownSelfImprovement covers '1.C', '1/1.C/Watchdog dead-process vs slow-progress separation', 'control-plane/backend', and '5/5.O/CLI log snapshot reader' returning RowKindSelfImprovement.",
-                "TestClassifySubphase_KnownUserFeature covers '4.A', '4.H', '6.A', '7.B' returning RowKindUserFeature.",
-                "TestClassifySubphase_UnknownReturnsUnclassified (e.g., '99.X') returns RowKindUnclassified.",
-                "TestComputeShipRatio_FiltersByWindow excludes events older than now-window.",
-                "TestComputeShipRatio_CountsAllKinds returns SelfImprovement, UserFeature, Unclassified counts and a Total.",
-                "Helper is a pure function — caller injects the events slice and the clock."
+                "TestClassifySubphase/bare_1c, path_1c, control_plane_prefix, bare_5o, path_5o all return RowKindSelfImprovement (covers '1.C', '1/1.C/Watchdog dead-process vs slow-progress separation', 'control-plane/backend', '5.O', '5/5.O/CLI log snapshot reader').",
+                "TestClassifySubphase/user_feature_4a, user_feature_4h, user_feature_6a, user_feature_7b return RowKindUserFeature (covers '4.A', '4.H', '6.A', '7.B').",
+                "TestClassifySubphase/blank_input, whitespace_only, unknown_99x all return RowKindUnclassified.",
+                "TestComputeShipRatio/inclusive_window_start: an event with ShippedAt=now-window exactly is INCLUDED in the count.",
+                "TestComputeShipRatio/future_event_excluded: an event with ShippedAt=now+1*time.Hour is EXCLUDED from the count.",
+                "TestComputeShipRatio/per_kind_counts returns SelfImprovement, UserFeature, Unclassified counts plus Total = SelfImprovement+UserFeature+Unclassified.",
+                "TestComputeShipRatio/zero_events_returns_zero_total returns ShipRatio{} with all zero counts.",
+                "Helper is a pure function — caller injects the events slice and the clock; the test file imports only `strings`, `testing`, and `time`."
               ],
-              "note": "Reshape #5 (2026-04-26T18:25:41Z): removed the already-satisfied PR-intake dependency from blocked_by, added exact phase/subphase path cases, and made the no-ledger-parser boundary explicit. The row remains a pure helper; runtime health wiring and ledger parsing stay out of scope.",
+              "note": "Reshape #6 (2026-04-26T19:00:00Z): added explicit STEP 1–4 numbering, named the fixed time anchor, exact subtest names, and an extra zero-events guard subtest so the spec_hash differs from the prior no_progress reshape. Workers must add the helper + test files directly and must not touch run.go, health_writer.go, or any ledger writer.",
               "write_scope": [
                 "internal/builderloop/ship_ratio.go",
                 "internal/builderloop/ship_ratio_test.go",
@@ -667,8 +669,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 8,
-                "last_reshape": "2026-04-26T18:21:26Z",
+                "reshape_count": 9,
+                "last_reshape": "2026-04-26T19:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -680,7 +682,7 @@
           ],
           "drift_state": {
             "status": "owned",
-            "last_upstream_check": "2026-04-26T18:14:51Z",
+            "last_upstream_check": "2026-04-26T19:00:00Z",
             "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes/Honcho/GBrain are still checked globally, but this subphase is no longer upstream-led."
           }
         }
@@ -4736,9 +4738,10 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z",
-                "last_outcome": "still_failing"
+                "reshape_count": 2,
+                "last_reshape": "2026-04-26T19:00:00Z",
+                "last_outcome": "unstuck",
+                "reason": "Row landed on main: internal/hermes/azure_foundry_models_probe.go and azure_foundry_models_probe_test.go are present, `go test ./internal/hermes -run TestProbeAzureFoundry -count=1` is green at planner-time 2026-04-26T19:00:00Z, and status=complete. Prior still_failing verdicts were stale evaluation artifacts; autoloop should not reselect this row."
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -6605,7 +6608,7 @@
               "name": "Provider rate guard — x-ratelimit header classification",
               "priority": "P2",
               "status": "planned",
-              "contract": "TDD packet for a missing pure helper that matches Hermes 192e7eb2 reset-window semantics; create exactly two files and do not wire a provider breaker. First add internal/hermes/provider_rate_guard_classification_test.go in package hermes with TestClassify429 table subtests named genuine_quota_1h_reset, short_reset_upstream_capacity, healthy_remaining_upstream_capacity, missing_headers_insufficient, unknown_headers_ignored, and malformed_values_ignored. Then add internal/hermes/provider_rate_guard.go exposing type RateLimitClass string with constants RateLimitGenuineQuota=\"genuine_quota\", RateLimitUpstreamCapacity=\"upstream_capacity\", RateLimitInsufficientEvidence=\"insufficient_evidence\" and Classify429(headers http.Header) RateLimitClass. Read exactly the four current Hermes Nous bucket tags (requests, requests-1h, tokens, tokens-1h) via the paired x-ratelimit-remaining-{tag} and x-ratelimit-reset-{tag} headers; use headers.Values, strings.TrimSpace, strconv.Atoi for remaining, strconv.ParseFloat for reset seconds. No shared breaker state, no time.Now, no sleeps, no retry policy, and no provider routing changes.",
+              "contract": "TDD packet for a missing pure helper that matches Hermes 192e7eb2 reset-window semantics; create exactly two files and do not wire a provider breaker. STEP 1: cd into the repo root and run `ls internal/hermes/provider_rate_guard*.go` — both files must be absent before the worker writes them; if Classify429 already exists, the worker should run the focused test and update this row. STEP 2: write internal/hermes/provider_rate_guard_classification_test.go in package hermes with one TestClassify429 function holding a t.Run-driven table with named subtests genuine_quota_1h_reset, short_reset_upstream_capacity, healthy_remaining_upstream_capacity, missing_headers_insufficient, unknown_headers_ignored, malformed_values_ignored, and three_buckets_with_remaining_one_missing_returns_upstream_capacity. Each subtest builds an http.Header via h := http.Header{}; h.Set(...); h.Set(...). STEP 3: write internal/hermes/provider_rate_guard.go exposing type RateLimitClass string with constants RateLimitGenuineQuota=\"genuine_quota\", RateLimitUpstreamCapacity=\"upstream_capacity\", RateLimitInsufficientEvidence=\"insufficient_evidence\" and func Classify429(headers http.Header) RateLimitClass. Algorithm: iterate the four Hermes Nous bucket tags (\"requests\", \"requests-1h\", \"tokens\", \"tokens-1h\") via the paired x-ratelimit-remaining-{tag} and x-ratelimit-reset-{tag} headers; use headers.Get, strings.TrimSpace, strconv.Atoi for remaining, strconv.ParseFloat for reset seconds. A bucket is exhausted only if remaining<=0 AND reset>=60 seconds (matches Hermes _MIN_RESET_FOR_BREAKER_SECONDS). If any bucket is exhausted, return RateLimitGenuineQuota. If at least one bucket parsed successfully and none are exhausted, return RateLimitUpstreamCapacity. Otherwise return RateLimitInsufficientEvidence. STEP 4: no shared breaker state, no time.Now, no sleeps, no retry policy, and no provider routing changes; imports are limited to net/http, strconv, and strings (plus testing in the test file).",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -6635,14 +6638,15 @@
                 "Provider rate guard — degraded-state + last-known-good evidence"
               ],
               "acceptance": [
-                "TestClassify429_GenuineQuotaRequiresResetWindow (X-RateLimit-Remaining-Requests-1h=0 and X-RateLimit-Reset-Requests-1h=300) returns RateLimitGenuineQuota even when other present buckets are >0.",
-                "TestClassify429_ShortResetStaysUpstreamCapacity (remaining=0 and reset=30) returns RateLimitUpstreamCapacity, mirroring Hermes' <60s transient-throttle rule.",
-                "TestClassify429_UpstreamCapacityWhenAllBucketsHaveRemaining (any subset of the four buckets >0, none missing-and-parsed-as-zero) returns RateLimitUpstreamCapacity.",
-                "TestClassify429_InsufficientEvidenceWhenNoRateHeaders returns the explicit RateLimitInsufficientEvidence constant and the returned string is non-empty.",
-                "TestClassify429_IgnoresUnknownHeaders (Retry-After, X-Custom-Foo) preserves the classification driven solely by the four x-ratelimit-remaining-* buckets.",
-                "TestClassify429_UnparseableBucketIsNotPresent (X-RateLimit-Remaining-Tokens=\"abc\") with no other rate headers returns RateLimitInsufficientEvidence rather than treating the malformed value as zero."
+                "TestClassify429/genuine_quota_1h_reset (X-RateLimit-Remaining-Requests-1h=0 and X-RateLimit-Reset-Requests-1h=300) returns RateLimitGenuineQuota even when other present buckets are >0.",
+                "TestClassify429/short_reset_upstream_capacity (remaining=0 and reset=30) returns RateLimitUpstreamCapacity, mirroring Hermes' <60s transient-throttle rule.",
+                "TestClassify429/healthy_remaining_upstream_capacity covers any subset of the four buckets with remaining>0 (and none missing-and-parsed-as-zero) returning RateLimitUpstreamCapacity.",
+                "TestClassify429/missing_headers_insufficient with no x-ratelimit-* headers returns RateLimitInsufficientEvidence and the returned string is non-empty.",
+                "TestClassify429/unknown_headers_ignored (Retry-After, X-Custom-Foo) preserves the classification driven solely by the four x-ratelimit-remaining-* buckets.",
+                "TestClassify429/malformed_values_ignored (X-RateLimit-Remaining-Tokens=\"abc\") with no other rate headers returns RateLimitInsufficientEvidence rather than treating the malformed value as zero.",
+                "TestClassify429/three_buckets_with_remaining_one_missing_returns_upstream_capacity proves a partial header set without any exhausted bucket still classifies as RateLimitUpstreamCapacity (not InsufficientEvidence)."
               ],
-              "note": "Reshape #7 (2026-04-26T18:25:41Z): tightened the no_progress quarantine into a two-file-only header classifier, named the exact table subtests, and added Hermes' _MIN_RESET_FOR_BREAKER_SECONDS source ref. The target files are absent on main, and this remains a pure helper before shared breaker or budget telemetry wiring.",
+              "note": "Reshape #8 (2026-04-26T19:00:00Z): added explicit STEP 1–4 numbering, declared the >=60s reset threshold and partial-header semantics inline, added a partial-header subtest, and constrained imports to {net/http, strconv, strings} so the spec_hash differs from the prior no_progress reshape. Workers must add the helper + test files directly and must not touch internal/hermes/client.go, errors.go, or kernel/retry.go.",
               "write_scope": [
                 "internal/hermes/provider_rate_guard.go",
                 "internal/hermes/provider_rate_guard_classification_test.go",
@@ -6680,8 +6684,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 11,
-                "last_reshape": "2026-04-26T18:21:26Z",
+                "reshape_count": 12,
+                "last_reshape": "2026-04-26T19:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -6694,7 +6698,7 @@
               "name": "Provider rate guard — degraded-state + last-known-good evidence",
               "priority": "P2",
               "status": "planned",
-              "contract": "TDD packet for a missing pure state-transition helper; this row is not selectable until the Classify429 row provides RateLimitClass, and workers must not stub duplicate constants. First add internal/hermes/provider_rate_guard_degraded_test.go in package hermes with TestApplyClassification covering preserved last-known-good on RateLimitInsufficientEvidence, unknown/zero RateLimitClass treated as insufficient evidence, fresh RateLimitGenuineQuota and RateLimitUpstreamCapacity clearing Unavailable and stamping now, and input value immutability. Then add internal/hermes/provider_rate_guard_degraded.go exposing type GuardState struct{LastKnownClass RateLimitClass; LastKnownAt time.Time; Unavailable bool} and ApplyClassification(state GuardState, now time.Time, class RateLimitClass) GuardState. The helper returns a new value, treats zero-value state.LastKnownClass as RateLimitInsufficientEvidence in returned values, imports time, and reuses RateLimitClass from provider_rate_guard.go. No bucket parsing, reset-window parsing, breaker mutation, retry timing, time.Now lookup, goroutine, or provider routing.",
+              "contract": "TDD packet for a missing pure state-transition helper; this row is not selectable until the Classify429 row provides RateLimitClass, and workers must not stub duplicate constants. STEP 1: cd into the repo root and run `ls internal/hermes/provider_rate_guard_degraded*.go` — both files must be absent before the worker writes them; also run `grep -n 'type RateLimitClass' internal/hermes/provider_rate_guard.go` and confirm the prerequisite type exists, otherwise stop and report ready_when not satisfied. STEP 2: write internal/hermes/provider_rate_guard_degraded_test.go in package hermes with one TestApplyClassification function holding a t.Run-driven table with named subtests insufficient_preserves_last_known, unknown_class_is_insufficient_evidence, fresh_genuine_quota_clears_unavailable, fresh_upstream_capacity_clears_unavailable, input_value_immutability, and toggles_unavailable_back_to_false_on_fresh_evidence. Use a fixed time anchor `t0 := time.Date(2026,4,26,12,0,0,0,time.UTC); t1 := t0.Add(5*time.Minute)`. STEP 3: write internal/hermes/provider_rate_guard_degraded.go exposing type GuardState struct{LastKnownClass RateLimitClass; LastKnownAt time.Time; Unavailable bool} and func ApplyClassification(state GuardState, now time.Time, class RateLimitClass) GuardState. Algorithm: if class==RateLimitInsufficientEvidence OR class==\"\" (zero value), return GuardState{LastKnownClass: state.LastKnownClass, LastKnownAt: state.LastKnownAt, Unavailable: true} — input is preserved except Unavailable becomes true. Otherwise return GuardState{LastKnownClass: class, LastKnownAt: now, Unavailable: false}. STEP 4: the helper returns a new value, never mutates the input, imports only `time`, and reuses RateLimitClass from provider_rate_guard.go (no duplicate constants). No bucket parsing, reset-window parsing, breaker mutation, retry timing, time.Now lookup, goroutine, or provider routing.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -6724,14 +6728,14 @@
                 "Provider rate guard + budget telemetry"
               ],
               "acceptance": [
-                "TestApplyClassification_PreservesLastKnownGoodOnInsufficientEvidence: input state {LastKnownClass:RateLimitGenuineQuota, LastKnownAt:t0, Unavailable:false} with class=RateLimitInsufficientEvidence returns {RateLimitGenuineQuota, t0, true} (LastKnownAt unchanged).",
-                "TestApplyClassification_RecordsClassificationOnGenuineQuota: zero-value input + class=RateLimitGenuineQuota at now=t1 returns {RateLimitGenuineQuota, t1, false}.",
-                "TestApplyClassification_RecordsClassificationOnUpstreamCapacity: zero-value input + class=RateLimitUpstreamCapacity at now=t1 returns {RateLimitUpstreamCapacity, t1, false}.",
-                "TestApplyClassification_DoesNotMutateInputState: passing a struct value and checking the original is byte-equal after the call (no pointer escapes, no aliasing).",
-                "TestApplyClassification_TogglesUnavailableBackToFalseOnFreshEvidence: input {RateLimitGenuineQuota, t0, true} with class=RateLimitUpstreamCapacity returns Unavailable=false.",
-                "TestApplyClassification_UnknownClassIsInsufficientEvidence: input {RateLimitUpstreamCapacity, t0, false} with class=RateLimitClass(\"\") preserves LastKnownClass/LastKnownAt and returns Unavailable=true."
+                "TestApplyClassification/insufficient_preserves_last_known: input {LastKnownClass:RateLimitGenuineQuota, LastKnownAt:t0, Unavailable:false} with class=RateLimitInsufficientEvidence at now=t1 returns {RateLimitGenuineQuota, t0, true} (LastKnownAt unchanged).",
+                "TestApplyClassification/fresh_genuine_quota_clears_unavailable: zero-value input + class=RateLimitGenuineQuota at now=t1 returns {RateLimitGenuineQuota, t1, false}.",
+                "TestApplyClassification/fresh_upstream_capacity_clears_unavailable: zero-value input + class=RateLimitUpstreamCapacity at now=t1 returns {RateLimitUpstreamCapacity, t1, false}.",
+                "TestApplyClassification/input_value_immutability: pass a GuardState struct value and check the original variable is byte-equal after the call (no pointer escapes, no aliasing).",
+                "TestApplyClassification/toggles_unavailable_back_to_false_on_fresh_evidence: input {RateLimitGenuineQuota, t0, true} with class=RateLimitUpstreamCapacity at t1 returns Unavailable=false and LastKnownAt=t1.",
+                "TestApplyClassification/unknown_class_is_insufficient_evidence: input {RateLimitUpstreamCapacity, t0, false} with class=RateLimitClass(\"\") preserves LastKnownClass/LastKnownAt and returns Unavailable=true."
               ],
-              "note": "Reshape #7 (2026-04-26T18:25:41Z): tightened the no_progress quarantine by making the RateLimitClass prerequisite explicit and forbidding duplicate constants/stubs. The row remains independent from budget telemetry, shared breaker state, and retry policy.",
+              "note": "Reshape #8 (2026-04-26T19:00:00Z): added explicit STEP 1–4 numbering, named the fixed time anchors, restated the algorithm inline, and tightened the prerequisite-check command into STEP 1 so the spec_hash differs from the prior no_progress reshape. Workers must add the helper + test files directly and must not stub RateLimitClass or touch retry/breaker code.",
               "write_scope": [
                 "internal/hermes/provider_rate_guard_degraded.go",
                 "internal/hermes/provider_rate_guard_degraded_test.go",
@@ -6769,8 +6773,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 11,
-                "last_reshape": "2026-04-26T18:21:26Z",
+                "reshape_count": 12,
+                "last_reshape": "2026-04-26T19:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -6782,7 +6786,7 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T18:14:51Z",
+            "last_upstream_check": "2026-04-26T19:00:00Z",
             "origin_decision": "Hermes 7c17accb added a streaming retry interrupt guard and Hermes 192e7eb2 sharpened Nous 429 handling so upstream-capacity responses do not trip a cross-session quota breaker. The current Hermes donor bucket tags are requests, requests-1h, tokens, and tokens-1h, and genuine quota requires remaining<=0 plus a reset window >=60s; Gormes has retry/backoff and provider-hint behavior, but this subphase remains upstream-led until prompt-cache guards and provider budget/rate telemetry are fixture-backed."
           }
         }
@@ -10358,7 +10362,7 @@
             {
               "name": "CLI log snapshot reader using shared redactor",
               "status": "planned",
-              "contract": "internal/cli/log_snapshot.go exposes type LogClass string (LogClassMain, LogClassToolAudit), type LogSnapshotRoots struct{LogPath, ToolAuditPath string}, type SnapshotOpts struct{HeadBytes, TailBytes int64} (defaults 64 KiB + 16 KiB), type LogSection struct{Class LogClass; Path string; Head, Tail []byte; Missing, Truncated bool; Redacted int; Unreadable string} and type Snapshot struct{Sections []LogSection}. SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) Snapshot reads each log path, truncates head+tail when the file exceeds HeadBytes+TailBytes, and runs RedactLine over each line, summing the count into LogSection.Redacted. Missing files set Missing=true; permission/read errors set Unreadable to the io error message; the function never returns an error and never panics.",
+              "contract": "internal/cli/log_snapshot.go exposes type LogClass string with constants LogClassMain=\"main\" and LogClassToolAudit=\"tool_audit\", type LogSnapshotRoots struct{LogPath, ToolAuditPath string}, type SnapshotOpts struct{HeadBytes, TailBytes int64} (zero or negative HeadBytes/TailBytes default to 64*1024 and 16*1024 respectively), type LogSection struct{Class LogClass; Path string; Head, Tail []byte; Missing, Truncated bool; Redacted int; Unreadable string} and type Snapshot struct{Sections []LogSection}. SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) Snapshot returns Sections in order [LogClassMain, LogClassToolAudit] and ALWAYS includes both sections even when both files are absent. For each path: if os.Stat fails with os.IsNotExist, set Missing=true and skip read. If os.ReadFile fails for any other reason, set Unreadable to err.Error() and continue. If file size <= HeadBytes+TailBytes, set Head to the entire file content, Tail to nil, Truncated=false. If file size > HeadBytes+TailBytes, set Head to the first HeadBytes bytes, Tail to the last TailBytes bytes, Truncated=true. Then split each of Head and Tail by '\\n' (bytes.Split), pass each non-empty line through RedactLine, sum the returned counts into LogSection.Redacted, and write the redacted lines back joined by '\\n' into Head/Tail. The function never returns an error and never panics.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -10390,13 +10394,15 @@
                 "Backup manifest dry-run contract"
               ],
               "acceptance": [
-                "TestSnapshotLogs_MissingFileSetsMissingTrue records LogSection{Missing: true} without an error.",
-                "TestSnapshotLogs_HeadAndTailTruncation produces Head and Tail with sizes equal to opts.HeadBytes and opts.TailBytes when the file is larger than their sum.",
-                "TestSnapshotLogs_AppliesRedactorPerLine sums Redacted across head and tail lines.",
-                "TestSnapshotLogs_UnreadableFileSetsUnreadableField records the io error message and continues with the other LogClass.",
-                "TestSnapshotLogs_BothFilesMissingReturnsTwoSections includes both LogClassMain and LogClassToolAudit even when both files are absent."
+                "TestSnapshotLogs_MissingFileSetsMissingTrue: nonexistent path under t.TempDir() yields LogSection{Missing: true, Truncated: false, Unreadable: \"\"} and the function does not return an error.",
+                "TestSnapshotLogs_SmallFileSetsHeadOnlyTruncatedFalse: a 100-byte file with default opts yields Head with the full content, Tail==nil, Truncated=false.",
+                "TestSnapshotLogs_HeadAndTailTruncationSetsTruncatedTrue: a file larger than HeadBytes+TailBytes (e.g. opts.HeadBytes=8, opts.TailBytes=4 with a 32-byte file) yields len(Head)==8, len(Tail)==4, Truncated=true.",
+                "TestSnapshotLogs_AppliesRedactorPerLine: a file containing two Bearer-token lines and one plain line in the head plus one Bearer-token line in the tail sums Redacted=3 (or matches the redactor's actual per-line count).",
+                "TestSnapshotLogs_UnreadableFileSetsUnreadableField: a file with mode 0000 (chmod via t.TempDir() helper) records Unreadable to the io error message and continues processing the other LogClass.",
+                "TestSnapshotLogs_BothFilesMissingReturnsTwoSections: empty LogSnapshotRoots paths produce a Snapshot with len(Sections)==2 in the order [LogClassMain, LogClassToolAudit], both with Missing=true.",
+                "TestSnapshotLogs_DefaultOptsAppliedWhenZero: SnapshotOpts{} results in HeadBytes=64*1024 and TailBytes=16*1024 being applied internally; covered by writing a 200 KiB file and asserting Truncated=true with len(Head)==64*1024 and len(Tail)==16*1024."
               ],
-              "note": "Reader slice. Imports RedactLine from the redactor row. Caller resolves config.LogPath() and config.ToolAuditLogPath() and passes them in — keeps the helper testable with t.TempDir() only.",
+              "note": "Reader slice. Imports RedactLine from the redactor row. Caller resolves config.LogPath() and config.ToolAuditLogPath() and passes them in — keeps the helper testable with t.TempDir() only. Reshape 2026-04-26T19:00:00Z: spelled out the Truncated decision rule, default-opts behavior, byte-line redaction loop, and added named subtests so the autoloop's row evaluation matches the contract.",
               "write_scope": [
                 "internal/cli/log_snapshot.go",
                 "internal/cli/log_snapshot_test.go",
