@@ -9702,6 +9702,20 @@
               "done_signal": [
                 "internal/cli/custom_provider_secret.go declares ResolveCustomProviderSecret, CustomProviderRef, CustomProviderResolution, ErrCustomProviderEnvUnset, and ErrCustomProviderCredentialMissing; five named tests pass; no internal/config, internal/hermes, or cmd/gormes file is modified."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:50:41Z",
+                "last_failure": {
+                  "run_id": "20260426T154403Z-926734365",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "command 4 failed: exit status 1"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:8bbeaea6 hermes_cli/main.py",
