@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-26T19:02:09Z",
+    "last_updated": "2026-04-26T21:50:06Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -675,8 +675,8 @@
           ],
           "drift_state": {
             "status": "owned",
-            "last_upstream_check": "2026-04-26T19:00:00Z",
-            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes/Honcho/GBrain are still checked globally, but this subphase is no longer upstream-led."
+            "last_upstream_check": "2026-04-26T21:50:06Z",
+            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes 755a2804, GBrain 172b55b, and Honcho e659b6b were checked this run, but this subphase remains owned and complete; follow-up audit-fidelity work stays in Phase 5.N beside the existing planner audit row so Phase 1 closeout remains stable."
           }
         }
       }
@@ -949,7 +949,12 @@
                 "note": "Config and cmd/gormes registration are Gormes-owned public surfaces built on the local shared gateway chassis."
               }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "converged",
+            "last_upstream_check": "2026-04-26T21:50:06Z",
+            "origin_decision": "Slack's shared Gormes channel chassis is shipped: Socket Mode acking, shared parser wiring, gateway.Channel registration, config, and doctor/status are complete. Upstream Hermes 6087e040/c0d25df3/f414df3a add follow-up Slack context/delivery semantics, now tracked under 2.B.5 rather than reopening this chassis subphase."
+          }
         },
         "2.B.4": {
           "name": "WhatsApp Adapter",
@@ -1238,8 +1243,151 @@
               "done_signal": [
                 "Gateway manager tests cover both editable streaming and Channel-only send fallback without platform-specific branches."
               ]
+            },
+            {
+              "name": "Slack rich-text quotes/lists + link-unfurl ingress",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Slack inbound text augmentation extracts readable rich_text quote/list/preformatted blocks and link-unfurl attachment previews while routing commands from the original Slack text only",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "If Slack blocks or attachments cannot be parsed, Gormes processes the original text and records slack_rich_text_unavailable evidence instead of dropping the message.",
+              "fixture": "internal/slack/rich_text_test.go::TestAugmentInboundTextExtractsQuotesListsAndAttachments",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/slack.py@6087e040:_extract_text_from_slack_blocks",
+                "../hermes-agent/gateway/platforms/slack.py@6087e040:SlackAdapter._handle_slack_message",
+                "../hermes-agent/tests/gateway/test_slack.py@6087e040:TestIncomingDocumentHandling.test_rich_text_quotes_and_lists_are_extracted",
+                "../hermes-agent/tests/gateway/test_slack.py@6087e040:TestIncomingDocumentHandling.test_attachments_unfurl_text_is_appended_even_when_url_is_in_message",
+                "internal/slack/client.go::Event",
+                "internal/slack/channel.go::Channel.toInboundEvent"
+              ],
+              "ready_when": [
+                "Slack gateway.Channel adapter shim and Slack config + cmd/gormes gateway registration are validated on main.",
+                "internal/slack.Event currently carries only Text, so the first implementation step is adding fixture-only block/attachment payload fields to the Slack client seam without changing real Socket Mode network behavior.",
+                "Command routing must continue to call gateway.ParseInboundText on the original Slack text; only EventSubmit text is augmented before entering gateway.InboundEvent."
+              ],
+              "not_ready_when": [
+                "The slice serializes arbitrary Block Kit JSON into the prompt, performs Slack API calls, downloads files, changes Socket Mode acking, or changes mention/allowed-channel policy.",
+                "The slice lets quoted block text beginning with / become a slash command or lets quoted <@bot> mentions affect routing.",
+                "The slice changes Slack final response formatting or outbound delivery."
+              ],
+              "blocked_by": [
+                "Slack config + cmd/gormes gateway registration"
+              ],
+              "unblocks": [
+                "Slack thread-parent context + team-scoped cache key"
+              ],
+              "acceptance": [
+                "A pure helper renders rich_text_quote as lines prefixed with `> `, rich_text_list bullet items as `- item`, ordered list items as `1. item`, and rich_text_preformatted as fenced code.",
+                "Plain rich_text composer blocks that duplicate the Slack Text field do not duplicate content in gateway.InboundEvent.Text.",
+                "Attachment previews append title, url, body, and footer; attachments with is_msg_unfurl=true are skipped.",
+                "Channel.toInboundEvent parses Event.Kind from the original Text field, so quoted `/deploy` remains EventSubmit text and does not become EventUnknown or a command.",
+                "No Slack network client or file download behavior is introduced."
+              ],
+              "note": "Upstream Hermes 6087e040 fixes Slack messages where forwarded/quoted rich_text blocks and link unfurl previews were invisible to the agent. Gormes currently normalizes only Event.Text; this row ports the behavior as a fake-payload Slack seam first, preserving command routing from original text.",
+              "write_scope": [
+                "internal/slack/client.go",
+                "internal/slack/channel.go",
+                "internal/slack/rich_text.go",
+                "internal/slack/rich_text_test.go",
+                "internal/slack/channel_shim_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/slack -run 'TestAugmentInboundText|TestSlackChannel_RichTextIngress|TestSlackChannel_QuotedSlashDoesNotRouteAsCommand' -count=1",
+                "go test ./internal/slack -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Slack channel fixtures prove rich_text quote/list/preformatted and attachment preview text reaches EventSubmit payloads while slash-command classification still uses the original Slack text."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:6087e040 gateway/platforms/slack.py",
+                "note": "Direct Slack gateway drift from upstream Hermes; tracked under session-context/delivery routing so the completed Slack shared-chassis subphase stays closed."
+              }
+            },
+            {
+              "name": "Slack thread-parent context + team-scoped cache key",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Slack thread replies preserve parent text and team-scoped thread-context cache keys so cron or third-party bot parents are available as reply context without self-bot echo loops",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "If the thread parent cannot be fetched, Slack ingress continues with thread_id and message_id evidence but leaves reply_to_text empty.",
+              "fixture": "internal/slack/thread_context_test.go::TestThreadParentContextIncludesBotParentAndScopesCacheByTeam",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/slack.py@c0d25df3:_fetch_thread_context",
+                "../hermes-agent/gateway/platforms/slack.py@c0d25df3:_fetch_thread_parent_text",
+                "../hermes-agent/gateway/platforms/slack.py@f414df3a:cache_key",
+                "../hermes-agent/tests/gateway/test_slack.py@c0d25df3:TestSlackReplyToText",
+                "internal/gateway/event.go::InboundEvent",
+                "internal/slack/channel.go::Channel.toInboundEvent"
+              ],
+              "ready_when": [
+                "Slack rich-text quotes/lists + link-unfurl ingress is validated, so Event and Channel write-scope conflicts are resolved first.",
+                "gateway.InboundEvent can be extended with a small ReplyToText field without changing non-Slack adapters.",
+                "The row uses fake Slack thread-replies data only; no live conversations.replies call is required in tests."
+              ],
+              "not_ready_when": [
+                "The slice ports full Slack history search, channel directory lookup, file downloads, Slack Connect auth, or real conversations.replies retries.",
+                "The slice includes self-bot prior replies in parent context or uses channel/thread alone as a cache key in multi-workspace fixtures.",
+                "The slice changes session-map keys for non-Slack channels."
+              ],
+              "blocked_by": [
+                "Slack rich-text quotes/lists + link-unfurl ingress"
+              ],
+              "acceptance": [
+                "Thread context cache keys include channel_id, thread_ts, and team_id; two workspaces with the same channel/thread IDs do not share cached parent text.",
+                "A thread parent with bot_id is kept when it is the parent message; self-bot child replies are excluded from context.",
+                "Slack thread replies populate gateway.InboundEvent.ReplyToText with the raw parent text, keep ThreadID as the thread timestamp, and leave MessageID as the triggering Slack message timestamp.",
+                "Top-level Slack messages leave ReplyToText empty.",
+                "Non-Slack gateway manager tests remain green with the new optional field."
+              ],
+              "note": "Upstream Hermes c0d25df3 and f414df3a fixed Slack replies to cron/bot-created thread parents and multi-workspace cache collisions. Gormes has thread IDs but no parent-text seam, so this row adds the smallest channel/gateway contract before any Slack API fetcher is wired.",
+              "write_scope": [
+                "internal/gateway/event.go",
+                "internal/gateway/manager.go",
+                "internal/gateway/manager_test.go",
+                "internal/slack/client.go",
+                "internal/slack/channel.go",
+                "internal/slack/thread_context.go",
+                "internal/slack/thread_context_test.go",
+                "internal/slack/channel_shim_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/slack -run 'TestThreadParentContext|TestSlackChannel_ReplyToText' -count=1",
+                "go test ./internal/gateway ./internal/slack -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Slack and gateway fixtures prove reply_to_text parent context, team-scoped cache keys, self-bot exclusion, and top-level empty behavior without live Slack API calls."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:c0d25df3 gateway/platforms/slack.py",
+                "note": "Direct Slack gateway drift from upstream Hermes, sequenced after rich-text ingress because both rows touch the Slack Event and Channel seams."
+              }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-26T21:50:06Z",
+            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific context details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete."
+          }
         },
         "2.B.10": {
           "name": "WeChat Adapter",
@@ -3160,8 +3308,8 @@
           ],
           "drift_state": {
             "status": "converged",
-            "last_upstream_check": "2026-04-25T11:44:44Z",
-            "origin_decision": "Honcho e659b6b added SillyTavern integration guidance, and Gormes already has validated host-integration, SillyTavern persona/group mapping, scope/source schema, deny-path, and operator-evidence fixtures. Internal implementation remains Goncho; external compatibility keeps honcho_* naming."
+            "last_upstream_check": "2026-04-26T21:50:06Z",
+            "origin_decision": "Honcho e659b6b remains the synchronized donor for SillyTavern integration guidance. The 2026-04-26 check found docs/install-label drift but no new core cross-chat schema requirement beyond Gormes' validated host-integration, persona/group mapping, scope/source schema, deny-path, and operator-evidence fixtures. Internal implementation remains Goncho; external compatibility keeps honcho_* naming."
           }
         },
         "3.E.8": {
@@ -4088,8 +4236,8 @@
           ],
           "drift_state": {
             "status": "converged",
-            "last_upstream_check": "2026-04-25T22:23:30Z",
-            "origin_decision": "Honcho e659b6b remains the latest synchronized memory donor for core memory docs, and all Goncho/Honcho parity rows are validated on main including host integration, SillyTavern mapping, filter grammar, streaming chat persistence, and Go-native dream scheduler intent. Honcho MCP self-hosted HONCHO_API_URL drift is now tracked under Phase 5.G MCP config/env resolution rather than reopening internal Goncho memory. Keep the implementation named Goncho while preserving honcho_* public tool compatibility."
+            "last_upstream_check": "2026-04-26T21:50:06Z",
+            "origin_decision": "Honcho e659b6b remains the synchronized memory donor for core memory docs. The 2026-04-26 check found docs-only SillyTavern/opencode guidance drift and no new Goncho runtime contract beyond the validated host integration, SillyTavern mapping, filter grammar, streaming chat persistence, configuration namespace, and Go-native dream scheduler intent. Honcho MCP self-hosted HONCHO_API_URL drift stays under Phase 5.G MCP config/env resolution rather than reopening internal Goncho memory. Keep the implementation named Goncho while preserving honcho_* public tool compatibility."
           }
         }
       }
@@ -6973,6 +7121,67 @@
               }
             },
             {
+              "name": "Home Assistant HASS_TOKEN platform-toolset carveout",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Platform toolset resolution keeps homeassistant enabled for cron and CLI default selections when HASS_TOKEN is present while leaving MOA/RL and missing-token Home Assistant default-off behavior unchanged",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "When HASS_TOKEN is absent, homeassistant remains default-off and toolset status reports homeassistant_token_missing rather than advertising HA control tools.",
+              "fixture": "internal/cli/toolset_config_test.go::TestPlatformToolsetStatusKeepsHomeAssistantWhenHASSTokenSet",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/tools_config.py@4921b269:_get_platform_tools",
+                "../hermes-agent/tests/hermes_cli/test_tools_config.py@4921b269:test_get_platform_tools_homeassistant_toolset_enabled_for_cron_when_hass_token_set",
+                "internal/cli/toolset_config.go::PlatformToolsetConfig.PlatformStatus",
+                "internal/tools/testdata/upstream_tool_parity_manifest.json:homeassistant"
+              ],
+              "ready_when": [
+                "Platform toolset config persistence + MCP sentinel is validated on main, so default-off filtering, platform default supersets, and restricted toolsets already have pure fixtures.",
+                "The upstream parity manifest already contains the homeassistant toolset and HASS_TOKEN requirement; the row only changes runtime default resolution when the env var is present.",
+                "The test can use t.Setenv(\"HASS_TOKEN\", \"fake-test-token\") and t.Setenv(\"HASS_TOKEN\", \"\") without live Home Assistant calls."
+              ],
+              "not_ready_when": [
+                "The slice ports Home Assistant service handlers, opens a websocket, edits internal/channels/homeassistant, or changes the public installer/docs.",
+                "The slice enables default-off toolsets other than homeassistant when their credentials are present.",
+                "The slice persists HASS_TOKEN or prints token values in status output."
+              ],
+              "blocked_by": [
+                "Platform toolset config persistence + MCP sentinel"
+              ],
+              "acceptance": [
+                "With no explicit platform_toolsets and HASS_TOKEN set, PlatformStatus(\"cron\") and PlatformStatus(\"cli\") include homeassistant.",
+                "With HASS_TOKEN unset, PlatformStatus(\"cron\") does not include homeassistant.",
+                "moa and rl remain absent from default runtime toolsets even when HASS_TOKEN is set.",
+                "An explicit empty platform_toolsets selection still stays empty; the env carveout only applies to default selections.",
+                "No Home Assistant network or channel code is touched."
+              ],
+              "note": "Upstream Hermes 4921b269 fixed a cron regression where HA users with HASS_TOKEN lost the homeassistant toolset after per-platform tool config made default-off filtering stricter. Gormes has the same platform toolset helper shape, so this is a narrow pure CLI/toolset row, not a Home Assistant handler port.",
+              "write_scope": [
+                "internal/cli/toolset_config.go",
+                "internal/cli/toolset_config_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run 'TestPlatformToolsetStatusKeepsHomeAssistantWhenHASSTokenSet|TestPlatformToolsetStatusLeavesHomeAssistantOffWithoutHASSToken' -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Toolset config fixtures prove HASS_TOKEN opts Home Assistant back into cron/CLI defaults while missing-token, explicit-empty, MOA, and RL behavior remain unchanged."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:4921b269 hermes_cli/tools_config.py",
+                "note": "Direct upstream Hermes CLI/toolset regression; Gormes should express it through the Go-native platform toolset helper."
+              }
+            },
+            {
               "name": "Pure core tools first",
               "status": "planned",
               "note": "TDD: port side-effect-light tools such as todo, clarify, debug helpers, and local formatting helpers before network/browser/sandbox tools so the native registry can grow without external credentials."
@@ -7052,8 +7261,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T14:29:29Z",
-            "origin_decision": "Hermes still leads terminal/process tool behavior. The 97d54f0e watch-pattern flood-control fix must become a small Go-native policy fixture before Gormes ports the live process runner or broad stateful tool migration queue."
+            "last_upstream_check": "2026-04-26T21:50:06Z",
+            "origin_decision": "Hermes still leads terminal/process and platform-toolset behavior. The 97d54f0e watch-pattern flood-control fix is now validated, and Hermes 4921b269 adds the next narrow default-off carveout: HASS_TOKEN should keep homeassistant available for cron/CLI defaults without enabling unrelated default-off toolsets."
           }
         },
         "5.B": {
@@ -8716,6 +8925,68 @@
                 "origin_type": "gormes",
                 "owned_since": "2026-04-26T01:23:57Z",
                 "note": "Reshape of the prior quarantined 5.N umbrella. The backend-side classifier landed earlier; this row narrows the remaining scope to audit attribution."
+              }
+            },
+            {
+              "name": "Autoloop recent-failure detail excerpts",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Planner audit includes bounded worker_failed detail excerpts in Recent failed tasks so control-plane/backend failures are distinguishable without reopening the raw ledger",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "If no detail fields exist on a failed ledger event, the audit continues to show status and task only instead of fabricating a cause.",
+              "fixture": "internal/plannerloop/autoloop_audit_test.go::TestSummarizeAutoloopAuditIncludesRecentFailureDetail",
+              "source_refs": [
+                ".codex/builder-loop/state/runs.jsonl:control-plane/backend backend_failed cluster in 2026-04-19..2026-04-26 window",
+                "internal/plannerloop/autoloop_audit.go::TaskAuditRow",
+                "internal/plannerloop/prompt.go:Recent failed tasks",
+                "internal/builderloop/ledger.go::LedgerEvent.Detail",
+                "internal/builderloop/ledger.go::LedgerEvent.StderrTail"
+              ],
+              "ready_when": [
+                "Planner audit blank-subphase control-plane bucket is complete and already attributes empty Task worker_failed events to control-plane/backend.",
+                "builderloop.LedgerEvent already exposes Detail, ExitError, StdoutTail, and StderrTail from worker_failed records; the row only surfaces a bounded excerpt in planner audit output.",
+                "This row is planner-control-plane only; no worker backend execution, candidate selection, or promotion semantics change is needed."
+              ],
+              "not_ready_when": [
+                "The slice changes backend invocation, retry policy, row selection, worker prompts, or ledger event writing instead of only summarizing existing fields.",
+                "The slice prints unbounded stdout/stderr into the planner prompt.",
+                "The slice edits internal/builderloop runtime files; the existing LedgerEvent fields are sufficient for this audit-side change."
+              ],
+              "blocked_by": [
+                "Planner audit blank-subphase control-plane bucket"
+              ],
+              "acceptance": [
+                "TestSummarizeAutoloopAuditIncludesRecentFailureDetail writes a worker_failed event with Task=\"\", Status=\"backend_failed\", Detail containing \"backend_waiting_for_stdin\", and StderrTail containing \"Reading additional input from stdin\"; the summary row has SubphaseID=\"control-plane/backend\" and Detail containing the classified excerpt.",
+                "A second fixture with a 4096-character StderrTail proves TaskAuditRow.Detail is capped to 240 characters and keeps the status/task counts unchanged.",
+                "Prompt rendering includes the detail after the task line as ` — <excerpt>` only when Detail is non-empty; existing prompt output for empty Detail remains byte-stable.",
+                "No builderloop package files change in this slice."
+              ],
+              "note": "Planner repair for the 2026-04-26 audit: control-plane/backend is the hottest toxic bucket (60 claimed, 0 promoted, 31 failed) but Recent failed tasks only shows status. Surface the bounded ledger detail already recorded by builderloop so the next planner run can tell stdin waits, kills, and command failures apart without scanning runs.jsonl manually.",
+              "write_scope": [
+                "internal/plannerloop/autoloop_audit.go",
+                "internal/plannerloop/autoloop_audit_test.go",
+                "internal/plannerloop/prompt.go",
+                "internal/plannerloop/prompt_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/plannerloop -run 'TestSummarizeAutoloopAuditIncludesRecentFailureDetail|TestBuildPromptIncludesRecentFailureDetail' -count=1",
+                "go test ./internal/plannerloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Planner prompt Recent failed tasks lines include bounded control-plane/backend detail excerpts, and plannerloop tests prove counts and empty-detail compatibility remain stable."
+              ],
+              "provenance": {
+                "origin_type": "gormes",
+                "owned_since": "2026-04-26T21:50:06Z",
+                "note": "Autoloop audit prompt fidelity is a Gormes-owned control-plane surface with no upstream Hermes/Honcho/GBrain analog."
               }
             },
             {

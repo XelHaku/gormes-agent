@@ -16,9 +16,9 @@ weight: 30
 | Phase 2.A — Tool Registry | ✅ complete | P0 | In-process Go tool registry, streamed `tool_calls` accumulation, kernel tool loop, and doctor verification |
 | Phase 2.B.1 — Telegram Scout | ✅ complete | P1 | Telegram adapter over the existing kernel, long-poll ingress, edit coalescing at the messaging edge |
 | Phase 2.B.2 — Gateway Chassis + Discord | ✅ complete | P1 | Shared gateway manager, Telegram migrated onto the chassis, `gormes gateway` multi-channel entrypoint, and Discord as the second real adapter |
-| Phase 2.B.3 — Slack on Shared Chassis | 🔨 in progress | P1 | `internal/slack` has a Socket Mode bot, threaded reply flow, placeholder updates, and shared CommandRegistry parser wiring; the remaining work is now split into a `gateway.Channel` shim, then config/doctor/`cmd/gormes gateway` registration |
+| Phase 2.B.3 — Slack on Shared Chassis | ✅ complete | P1 | `internal/slack` has a Socket Mode bot, threaded reply flow, placeholder updates, shared CommandRegistry parser wiring, the gateway.Channel shim, and config/doctor/`cmd/gormes gateway` registration; Hermes `6087e040`/`c0d25df3`/`f414df3a` follow-ups now live under 2.B.5 context/delivery routing |
 | Phase 2.B.4 — WhatsApp Adapter | ✅ complete | P1 | Transport-neutral runtime selection, ingress normalization, command passthrough, identity/self-chat guards, outbound pairing gates, raw peer mapping, and bounded reconnect/send retry contracts are fixture-locked in `internal/channels/whatsapp`; live bridge/native transport startup and QR UX belong in new follow-up rows rather than the closed 2.B.4 umbrella |
-| Phase 2.B.5 — Session Context + Delivery Routing | 🔨 in progress | P1 | Session-store handle resolution, baseline SessionContext prompt injection, typed `--deliver` parsing, and deterministic gateway stream fan-out now live together in `internal/gateway`; BlueBubbles/iMessage prompt guidance and non-editable progress/commentary fallback fixtures remain narrow follow-up slices |
+| Phase 2.B.5 — Session Context + Delivery Routing | 🔨 in progress | P1 | Session-store handle resolution, baseline SessionContext prompt injection, typed `--deliver` parsing, and deterministic gateway stream fan-out now live together in `internal/gateway`; BlueBubbles/iMessage prompt guidance plus Slack rich_text/unfurl and thread-parent context fixtures remain narrow follow-up slices |
 | Phase 2.B.10 — WeChat Adapter | ✅ complete | P1 | WeCom/WeiXin shared-bot ingress, reply-path contracts, WebSocket/callback bootstrap, credential validation, and outbound push/reply lifecycle seams are landed |
 | Phase 2.B.11 — Discord Forum Channels | 🔨 in progress | P3 | Forum-channel detection, parent-forum ingress routing, canonical thread IDs, and thread lifecycle gateway events are landed; Hermes `b35d692f` adds guild/parent/message source metadata as the next fixture before media, outbound polish, or Discord admin tools widen the surface |
 | Phase 2.C — Thin Mapping Persistence | ✅ complete | P0 | bbolt-backed `(platform, chat_id) -> session_id` resume; no transcript ownership moved into Go |
@@ -81,10 +81,16 @@ for cron/subagent replay without importing the whole Minions queue.
 
 Phase 2 is no longer just "ship more adapters." The remaining backlog is dominated by cross-cutting contracts that future adapters depend on. The execution order is:
 
-1. **P1 — 2.B.3 Slack gateway.Channel shim**
-   The parser row is complete: Slack message ingress calls `gateway.ParseInboundText`, help renders `gateway.GatewayHelpLines`, and slash-command envelopes are forwarded as shared parser text. Next, adapt the existing Socket Mode bot to the `gateway.Channel`/`Manager` lifecycle without changing config registration.
-2. **P2 — 2.B.3 Slack config + cmd/gormes registration**
-   Register Slack in `cmd/gormes gateway` only after the Channel shim is green; config and doctor/status tests should use fake Slack clients and keep Telegram/Discord-only startup unchanged.
+1. **P1 — 2.B.5 Slack rich_text and link-unfurl ingress**
+   The shared Slack manager path is now complete. Next, port Hermes `6087e040`
+   as a fake-payload Slack row: augment submitted message text with rich_text
+   quotes/lists/preformatted blocks and link-unfurl previews, while routing
+   slash commands from the original Slack text only.
+2. **P2 — 2.B.5 Slack thread-parent context + team cache**
+   After the rich_text row lands, port Hermes `c0d25df3`/`f414df3a` as a
+   second Slack row: preserve bot/cron thread-parent text as optional reply
+   context, scope the cache by team_id, and keep self-bot child replies out of
+   injected context.
 3. **P3 — 2.B.11 Discord SessionSource metadata**
    Port Hermes `b35d692f` source fields (`guild_id`, `parent_chat_id`, `message_id`) through `InboundEvent`, `SessionSource`, and session-context rendering before media polish or Discord tool/admin rows rely on current-server/current-message IDs. This is source metadata only; keep send behavior and REST/tool handlers out of the slice.
 4. **P3 — 2.F.4 Home Channel + Operator Surfaces**

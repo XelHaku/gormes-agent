@@ -127,6 +127,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 - [x] Non-editable gateway progress/commentary send fallback
+- [ ] Slack rich-text quotes/lists + link-unfurl ingress
+- [ ] Slack thread-parent context + team-scoped cache key
 
 ### 2.B.10 — WeChat Adapter ✅
 
@@ -440,6 +442,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Tool registry inventory + schema parity harness
 - [x] Tool parity manifest refresh for Hermes b35d692f
 - [x] Discord tool split + platform-scoped toolsets
+- [ ] Home Assistant HASS_TOKEN platform-toolset carveout
 - [ ] Pure core tools first
 - [ ] Stateful tool migration queue
 - [x] Terminal process watch notification throttle contract
@@ -534,6 +537,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Session search
 - [ ] Debug helpers
 - [x] Planner audit blank-subphase control-plane bucket
+- [ ] Autoloop recent-failure detail excerpts
 - [ ] Cronjob tool API + schedule parser parity
 - [ ] Cron context_from output chaining
 - [ ] Cron prompt/script safety + pre-run script contract
