@@ -6539,11 +6539,11 @@
                 "Skills hub search fixtures prove read-only fake-registry search, degraded evidence, RPC/command dispatch, and no active-store mutation or prompt injection."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:27:57Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:28:54Z",
                 "last_failure": {
-                  "run_id": "20260426T141709Z-105849682",
+                  "run_id": "20260426T142840Z-771787827",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.F/Skills hub search RPC read model"
@@ -6758,6 +6758,20 @@
               "done_signal": [
                 "Fake MCP server fixtures prove discovery, schema normalization, structured result conversion, stderr isolation, timeout/cancel degradation, and dynamic descriptor refresh."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T14:28:54Z",
+                "last_failure": {
+                  "run_id": "20260426T142840Z-771787827",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 5/5.G/MCP fake-server discovery + tool schema normalization"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:edc78e25 tools/mcp_tool.py",
@@ -7239,14 +7253,14 @@
                 "Dangerous-command fixtures prove hardline blocks are unconditional, regular dangerous detections remain yolo-bypassable, benign lookalikes pass, and blocked results are side-effect free."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:27:57Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:28:54Z",
                 "last_failure": {
-                  "run_id": "20260426T141709Z-105849682",
-                  "category": "worker_error",
+                  "run_id": "20260426T142840Z-771787827",
+                  "category": "no_progress",
                   "backend": "codexu",
-                  "stderr_tail": "repository has uncommitted changes:\nM docs/content/building-gormes/architecture_plan/progress.json\n M internal/tools/execute_code.go\n?? internal/tools/dangerous_command.go\n?? internal/tools/dangerous_command_test.go"
+                  "stderr_tail": "worker made no changes: 5/5.J/Dangerous-command detector + blocked-result schema"
                 },
                 "backends_tried": [
                   "codexu"
@@ -7434,6 +7448,20 @@
               "done_signal": [
                 "Backend/audit fixtures prove stdin-waiting and killed backends are classified with preserved evidence and no blank toxic-subphase buckets."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T14:28:54Z",
+                "last_failure": {
+                  "run_id": "20260426T142840Z-771787827",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 5/5.N/Planner backend noninteractive stdin failure guard"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "gormes",
                 "owned_since": "2026-04-26T01:23:57Z",
@@ -7840,6 +7868,20 @@
               "done_signal": [
                 "Gateway reasoning command fixtures prove session-only default scope, --global persistence behavior, reset cleanup, and no ordinary prompt leakage for /reasoning."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T14:28:54Z",
+                "last_failure": {
+                  "run_id": "20260426T142840Z-771787827",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 5/5.O/Gateway /reasoning session override command"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:25ba6a4a gateway/run.py",
@@ -8550,6 +8592,20 @@
               "done_signal": [
                 "Doctor fixtures prove custom endpoint/provider-style settings are accepted with explicit readiness evidence and no live provider or legacy Hermes config dependency."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T14:28:54Z",
+                "last_failure": {
+                  "run_id": "20260426T142840Z-771787827",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 5/5.O/Doctor custom endpoint provider readiness"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:b2d3308f hermes_cli/doctor.py",
@@ -8691,6 +8747,20 @@
               "done_signal": [
                 "Log snapshot fixtures prove local log capture, rotated fallback, truncation evidence, redaction, and no network/archive side effects."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T14:28:54Z",
+                "last_failure": {
+                  "run_id": "20260426T142840Z-771787827",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 5/5.O/CLI log snapshot reader"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/debug.py",
@@ -9141,11 +9211,11 @@
                 "Native TUI fixtures and docs prove Gormes advertises terminal-native selection honestly and remains independent from Hermes Ink/Node clipboard behavior."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:27:57Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:28:54Z",
                 "last_failure": {
-                  "run_id": "20260426T141709Z-105849682",
+                  "run_id": "20260426T142840Z-771787827",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.Q/Native TUI terminal-selection divergence contract"
