@@ -4858,6 +4858,11 @@
               "done_signal": [
                 "CLI/status fixtures prove detected/manual Azure Foundry states, deployment/model fallback, secret redaction, and no live setup or provider calls."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T20:12:55Z",
+                "last_success": "2026-04-26T20:12:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:731e1ef8 hermes_cli/main.py",
@@ -6583,9 +6588,9 @@
                 "Provider rate-guard fixtures prove genuine quota, upstream-capacity, last-known-state, malformed-header, and no-sleep degraded decisions with visible status evidence."
               ],
               "health": {
-                "attempt_count": 2,
-                "last_attempt": "2026-04-26T19:58:11Z",
-                "last_success": "2026-04-26T19:58:11Z",
+                "attempt_count": 3,
+                "last_attempt": "2026-04-26T20:12:55Z",
+                "last_success": "2026-04-26T20:12:55Z",
                 "backends_tried": [
                   "codexu"
                 ]
@@ -6728,7 +6733,6 @@
               ],
               "health": {
                 "attempt_count": 4,
-                "consecutive_failures": 0,
                 "last_attempt": "2026-04-26T19:42:54Z",
                 "last_success": "2026-04-26T19:42:54Z",
                 "last_failure": {
@@ -8102,15 +8106,15 @@
               "done_signal": [
                 "Managed-gateway fixtures prove inventory discovery, pass-through calls, auth/unavailable degradation, and zero live-service dependency over the shared MCP descriptor path."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-26T20:12:55Z",
+                "last_success": "2026-04-26T20:12:55Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T22:17:23Z",
                 "last_outcome": "validated"
-              },
-              "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-26T19:58:11Z",
-                "last_success": "2026-04-26T19:58:11Z"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -9163,6 +9167,11 @@
               "done_signal": [
                 "Command-registry policy fixtures prove every recognized command has explicit active-turn behavior and unknown commands do not leak into model prompts."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-26T20:12:55Z",
+                "last_success": "2026-04-26T20:12:55Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T21:04:49Z",
@@ -9172,11 +9181,6 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/commands.py",
                 "note": "Hermes defines the command inventory; Gormes owns the Go policy table and active-turn degradation."
-              },
-              "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-26T19:58:11Z",
-                "last_success": "2026-04-26T19:58:11Z"
               }
             },
             {
@@ -9486,6 +9490,11 @@
               "done_signal": [
                 "internal/cli/profile_root.go declares ResolveProfileRoot and ErrProfileXDGRootRequired; five named tests pass; no other internal/cli, internal/config, or cmd/gormes file is modified."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T20:12:55Z",
+                "last_success": "2026-04-26T20:12:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/profiles.py",
@@ -10013,6 +10022,11 @@
               "done_signal": [
                 "TestGatewayMutating* fixtures prove every introduced mutating subcommand returns the stable unavailability error and never invokes a live service manager."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T20:12:55Z",
+                "last_success": "2026-04-26T20:12:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/gateway.py",
@@ -10288,9 +10302,9 @@
                 "internal/cli/custom_provider_secret.go declares ResolveCustomProviderSecret, CustomProviderRef, CustomProviderResolution, ErrCustomProviderEnvUnset, and ErrCustomProviderCredentialMissing; five named tests pass; no internal/config, internal/hermes, or cmd/gormes file is modified."
               ],
               "health": {
-                "attempt_count": 2,
-                "last_attempt": "2026-04-26T19:59:41Z",
-                "last_success": "2026-04-26T19:59:41Z"
+                "attempt_count": 3,
+                "last_attempt": "2026-04-26T20:12:55Z",
+                "last_success": "2026-04-26T20:12:55Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -10788,15 +10802,15 @@
               "done_signal": [
                 "Media/personality/platform-event fixtures prove deterministic helper behavior and JSON schema without remote transport."
               ],
-              "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z",
-                "last_outcome": "no_attempts_yet"
-              },
               "health": {
                 "attempt_count": 1,
                 "last_attempt": "2026-04-26T19:51:20Z",
                 "last_success": "2026-04-26T19:51:20Z"
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-26T16:17:18Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -11442,6 +11456,11 @@
               "done_signal": [
                 "Remote TUI fixtures prove SSE event consumption, submit/cancel/resize dispatch, remote startup wiring, and no Python/Node dependency."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T20:12:55Z",
+                "last_success": "2026-04-26T20:12:55Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-25T21:04:49Z",
