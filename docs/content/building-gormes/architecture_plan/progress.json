@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-26T21:50:06Z",
+    "last_updated": "2026-04-26T23:39:31Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -664,7 +664,7 @@
               "planner_verdict": {
                 "needs_human": true,
                 "reason": "auto: 9 reshapes without unsticking; last category row_evaluation_failed",
-                "since": "2026-04-26T23:11:47Z",
+                "since": "2026-04-26T23:34:04Z",
                 "reshape_count": 9,
                 "last_reshape": "2026-04-26T19:00:00Z",
                 "last_outcome": "still_failing"
@@ -5628,8 +5628,78 @@
             },
             {
               "name": "Cross-provider reasoning-tag sanitization",
+              "priority": "P1",
               "status": "planned",
-              "note": "TDD: port upstream PRs #ec48ec55 (strip `<think>` blocks from stored assistant content), #9489d157 (strip unterminated `<think>` blocks from visible content), and #bd01ec78 (strip all reasoning-tag variants from `/resume` recap) as one shared sanitization contract over `internal/hermes` event/assistant-content boundaries. Pure fixture-driven tests must cover closed `<think>...</think>` blocks, unterminated `<think>...` at stream EOF, and mixed reasoning-tag variants (`<think>`, `<reasoning>`, `<thought>`) without mutating the raw SSE transcript, and must separate (a) what is stored into assistant history, (b) what is rendered to operators, and (c) what `/resume`-style recap surfaces expose. Land before Codex/Gemini/OpenRouter/Bedrock bring new reasoning-model surfaces through the shared harness so each adapter inherits the same storage-vs-render behavior rather than reinventing it."
+              "contract": "internal/hermes owns one provider-neutral reasoning-tag sanitizer that strips model-emitted reasoning tags from stored assistant text, visible operator text, and resume recap text without mutating raw stream/transcript evidence",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Provider status reports reasoning_tag_sanitizer_unavailable when the shared sanitizer is not wired; raw stream fixtures remain available for audit even when rendered or stored text is sanitized.",
+              "fixture": "internal/hermes/reasoning_tag_sanitizer_test.go",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@ec48ec55:_strip_think_blocks",
+                "../hermes-agent/tests/run_agent/test_run_agent.py@ec48ec55",
+                "../hermes-agent/run_agent.py@9489d157:_strip_think_blocks",
+                "../hermes-agent/tests/run_agent/test_run_agent.py@9489d157",
+                "../hermes-agent/cli.py@bd01ec78:_strip_reasoning_tags",
+                "../hermes-agent/tests/cli/test_resume_display.py@bd01ec78",
+                "internal/hermes/events.go",
+                "internal/hermes/stream.go",
+                "internal/hermes/client.go"
+              ],
+              "ready_when": [
+                "DeepSeek/Kimi reasoning_content replay and Codex stream repair are complete on main, so stored assistant reasoning/text boundaries already exist.",
+                "The worker can implement and test a pure sanitizer in internal/hermes with synthetic strings; no live provider, kernel wiring, TUI rendering, or transcript migration is required."
+              ],
+              "not_ready_when": [
+                "The slice changes raw SSE transcript capture, provider-specific adapters, kernel turn orchestration, TUI rendering, or /resume command wiring before the pure sanitizer contract is fixture-locked.",
+                "The slice strips structured ReasoningContent, Codex encrypted reasoning items, or Anthropic/Bedrock reasoning events instead of only sanitizing text fields that may contain inline XML-style reasoning tags.",
+                "The tests require a live model, streaming server, or filesystem transcript fixture."
+              ],
+              "blocked_by": [
+                "DeepSeek/Kimi all-assistant reasoning_content replay",
+                "Codex stream repair + tool-call leak sanitizer"
+              ],
+              "unblocks": [
+                "Gemini",
+                "OpenRouter",
+                "Google Code Assist",
+                "Codex OAuth state + stale-token relogin"
+              ],
+              "acceptance": [
+                "TestSanitizeReasoningTags_StoredAssistantText removes complete `<think>...</think>` blocks while preserving surrounding answer text and whitespace collapse deterministically.",
+                "TestSanitizeReasoningTags_VisibleTextDropsUnterminatedThink removes an unterminated `<think>` block at EOF so partial reasoning never renders as visible assistant content.",
+                "TestSanitizeReasoningTags_ResumeRecapVariants removes complete and unterminated `<think>`, `<thinking>`, `<reasoning>`, `<thought>`, and `<REASONING_SCRATCHPAD>` blocks from recap text.",
+                "TestSanitizeReasoningTags_RawAuditTextUnchanged proves callers receive sanitized copies and the original raw string remains byte-identical for stream/transcript audit.",
+                "The implementation imports only strings/regexp-style standard-library packages plus testing in the test file; no provider clients, kernel package imports, or filesystem reads."
+              ],
+              "note": "Refined 2026-04-26T23:39:31Z after the builder-loop dry run reported zero selectable candidates. This turns the prior placeholder into one unblocked, fixture-ready 4.A slice over a pure internal/hermes sanitizer, using Hermes ec48ec55, 9489d157, and bd01ec78 as donor evidence while avoiding adapter/kernel/TUI churn.",
+              "write_scope": [
+                "internal/hermes/reasoning_tag_sanitizer.go",
+                "internal/hermes/reasoning_tag_sanitizer_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run '^TestSanitizeReasoningTags' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/hermes/reasoning_tag_sanitizer_test.go fixtures prove stored assistant text, visible text, resume recap text, and raw audit text have distinct sanitized/raw behavior with no provider or kernel dependencies."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-26T23:34:04Z"
+              },
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ec48ec55+9489d157+bd01ec78 run_agent.py,cli.py",
+                "note": "Hermes provides the reasoning-tag sanitization regressions; Gormes centralizes them as a provider-neutral Go text sanitizer before more reasoning-model adapters land."
+              }
             },
             {
               "name": "Tool-call argument repair + schema sanitizer",
@@ -7154,7 +7224,7 @@
               "planner_verdict": {
                 "needs_human": true,
                 "reason": "auto: 13 reshapes without unsticking; last category ",
-                "since": "2026-04-26T23:11:47Z",
+                "since": "2026-04-26T23:34:04Z",
                 "reshape_count": 13,
                 "last_reshape": "2026-04-26T19:13Z",
                 "last_outcome": "still_failing"

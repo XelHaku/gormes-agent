@@ -358,7 +358,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Bedrock Converse payload mapping (no AWS SDK)
 - [x] Bedrock stream event decoding (SSE fixtures)
 - [x] Bedrock SigV4 + credential seam
-- [ ] Bedrock stale-client eviction + retry classification
+- [x] Bedrock stale-client eviction + retry classification
 - [ ] Gemini
 - [ ] OpenRouter
 - [ ] Google Code Assist

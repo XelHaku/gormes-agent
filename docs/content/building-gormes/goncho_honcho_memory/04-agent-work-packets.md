@@ -5,7 +5,7 @@ weight: 4
 
 # 04 - Agent Work Packets
 
-Last studied: 2026-04-25.
+Last studied: 2026-04-26.
 
 Source root: `/home/xel/git/sages-openclaw/workspace-mineru/honcho/docs`.
 
@@ -28,8 +28,8 @@ Before starting any packet, read:
 
 If the work touches generated roadmap pages or the site, also run:
 
-- `go run ./cmd/autoloop progress validate`
-- `go run ./cmd/autoloop progress write`
+- `go run ./cmd/builder-loop progress validate`
+- `go run ./cmd/builder-loop progress write`
 - `go test ./docs -count=1`
 - `(cd www.gormes.ai && go test ./... -count=1)`
 
@@ -86,7 +86,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/gonchotools -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -144,7 +144,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/memory -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -205,7 +205,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/memory ./internal/gonchotools -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -267,7 +267,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/memory ./internal/gonchotools -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -326,7 +326,7 @@ Do not implement:
 Validation:
 
 - `go test ./cmd/gormes ./internal/goncho ./internal/memory -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -394,7 +394,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/gonchotools -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -466,7 +466,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/memory ./cmd/gormes -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -524,7 +524,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/gonchotools -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -572,7 +572,7 @@ Implementation boundaries:
 Validation:
 
 - `go test ./internal/goncho ./internal/gonchotools ./internal/memory -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Acceptance:
 
@@ -617,7 +617,7 @@ Validation:
 
 - contract tests generated or table-driven from `openapi.json`;
 - `go test ./internal/goncho ./cmd/gormes -count=1`;
-- `go run ./cmd/autoloop progress validate`.
+- `go run ./cmd/builder-loop progress validate`.
 
 Acceptance:
 
@@ -679,7 +679,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/session ./internal/memory -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -747,7 +747,7 @@ Do not implement:
 Validation:
 
 - `go test ./cmd/gormes ./internal/goncho ./internal/memory -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -804,7 +804,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/memory ./internal/gonchotools -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -867,7 +867,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/config ./cmd/gormes ./internal/goncho -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
@@ -930,7 +930,7 @@ Do not implement:
 Validation:
 
 - `go test ./internal/goncho ./internal/memory ./internal/config ./cmd/gormes -run TestGonchoDream -count=1`
-- `go run ./cmd/autoloop progress validate`
+- `go run ./cmd/builder-loop progress validate`
 
 Commit message:
 
