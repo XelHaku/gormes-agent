@@ -1307,6 +1307,20 @@
               "done_signal": [
                 "Slack channel fixtures prove rich_text quote/list/preformatted and attachment preview text reaches EventSubmit payloads while slash-command classification still uses the original Slack text."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T22:19:46Z",
+                "last_failure": {
+                  "run_id": "20260426T221037Z-686069648",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:6087e040 gateway/platforms/slack.py",
