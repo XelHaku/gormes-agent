@@ -1390,6 +1390,20 @@
               "done_signal": [
                 "Slack and gateway fixtures prove reply_to_text parent context, team-scoped cache keys, self-bot exclusion, and top-level empty behavior without live Slack API calls."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T22:34:54Z",
+                "last_failure": {
+                  "run_id": "20260426T222541Z-540851901",
+                  "category": "report_validation_failed",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n2026-04-26T22:30:04.499296Z ERROR codex_core::tools::router: error=apply_patch verification failed: Failed to find expected lines in /home/xel/git/sages-openclaw/workspace-mineru/gormes-agent/.codex/orchestrator/worktrees/20260426T222541Z-540851901/w1/internal/gateway/manager_test.go:\n\tif !strings.Contains(got.Text, \"sourceId=file-code-timeout\") || !strings.Contains(got.Text, \"error=download timeout\") {\n\t\tt.Fatalf(\"submitted text missing attachment failure evidence:\\n%s\", got.Text)\n\t}\n}\n\nfunc TestManager_Inbound_Cancel(t *testing.T) {\n\ttg := newFakeChannel(\"telegram\")\n\tfk := &fakeKernel{}\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:c0d25df3 gateway/platforms/slack.py",
