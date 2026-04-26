@@ -156,6 +156,43 @@ func TestOrchestratorWatchdogRestartsDeadRunLockPID(t *testing.T) {
 	}
 }
 
+func TestOrchestratorWatchdogAmendsPreviousCheckpointCommit(t *testing.T) {
+	repoRoot := testRepoRoot(t)
+	tmpRepo := t.TempDir()
+	copyFile(t,
+		filepath.Join(repoRoot, "scripts", "orchestrator", "watchdog.sh"),
+		filepath.Join(tmpRepo, "scripts", "orchestrator", "watchdog.sh"),
+		0o755,
+	)
+
+	logDir := filepath.Join(tmpRepo, "logs")
+	binDir := installWatchdogFakeBin(t, tmpRepo)
+	cmd := exec.Command("bash", "scripts/orchestrator/watchdog.sh")
+	cmd.Dir = tmpRepo
+	cmd.Env = overlayEnv(os.Environ(),
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"HOME="+filepath.Join(tmpRepo, "home"),
+		"XDG_RUNTIME_DIR="+filepath.Join(tmpRepo, "runtime"),
+		"WATCHDOG_LOG="+logDir,
+		"WATCHDOG_SERVICE_STATE=active",
+		"WATCHDOG_GIT_DIRTY=1",
+		"WATCHDOG_LAST_SUBJECT=builder-loop: watchdog checkpoint 20260426T112800Z",
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("watchdog failed: %v\noutput:\n%s", err, string(out))
+	}
+
+	gitLog := readOptionalFile(t, filepath.Join(logDir, "git"))
+	if !strings.Contains(gitLog, "commit --amend --no-edit") {
+		t.Fatalf("git log = %q, want watchdog to amend previous checkpoint", gitLog)
+	}
+	if strings.Contains(gitLog, "commit -m") {
+		t.Fatalf("git log = %q, want no new checkpoint commit", gitLog)
+	}
+}
+
 func installWatchdogFakeBin(t *testing.T, repo string) string {
 	t.Helper()
 	binDir := filepath.Join(repo, "bin")
@@ -189,6 +226,10 @@ case "$*" in
     if [ -n "${WATCHDOG_GIT_DIRTY:-}" ]; then
       printf ' M docs/content/building-gormes/architecture_plan/progress.json\n'
     fi
+    exit 0
+    ;;
+  "log -1 --pretty=%s")
+    printf '%s\n' "${WATCHDOG_LAST_SUBJECT:-}"
     exit 0
     ;;
 esac
