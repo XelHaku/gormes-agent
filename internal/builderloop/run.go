@@ -1011,6 +1011,7 @@ func postPromotionCommandEnv(cfg Config) []string {
 		"MODE=" + cfg.Mode,
 		fmt.Sprintf("MAX_AGENTS=%d", cfg.MaxAgents),
 		fmt.Sprintf("MAX_PHASE=%d", cfg.MaxPhase),
+		"DISABLE_COMPANIONS=1",
 	}
 	if len(cfg.PriorityBoost) > 0 {
 		env = append(env, "PRIORITY_BOOST="+strings.Join(cfg.PriorityBoost, ","))

@@ -51,6 +51,41 @@ func TestTruncateLedgerDetail_ShortStringPassesThrough(t *testing.T) {
 	}
 }
 
+func TestPostPromotionCommandEnvDisablesCompanionsForVerification(t *testing.T) {
+	cfg := Config{
+		ProgressJSON: "/repo/progress.json",
+		RunRoot:      "/repo/.codex/builder-loop",
+		Backend:      "codexu",
+		Mode:         "full",
+		MaxAgents:    8,
+		MaxPhase:     4,
+	}
+
+	env := postPromotionCommandEnv(cfg)
+
+	for _, got := range env {
+		if got == "DISABLE_COMPANIONS=1" {
+			return
+		}
+	}
+	t.Fatalf("postPromotionCommandEnv() = %#v, want companion scripts disabled during verification", env)
+}
+
+func TestPostPromotionVerificationOverridesInheritedCompanionEnv(t *testing.T) {
+	t.Setenv("DISABLE_COMPANIONS", "0")
+	dir := t.TempDir()
+	cfg := Config{
+		RepoRoot:                    dir,
+		RunRoot:                     filepath.Join(dir, "runroot"),
+		PostPromotionVerifyCommands: []string{`test "$DISABLE_COMPANIONS" = 1`},
+	}
+
+	err := runPostPromotionVerification(context.Background(), cfg, ExecRunner{}, "env-run", 1)
+	if err != nil {
+		t.Fatalf("verification should force DISABLE_COMPANIONS=1 over inherited env: %v", err)
+	}
+}
+
 // TestRunPostPromotionVerification_RunsAllCommandsAndCollectsFailures
 // verifies that the verify gate does NOT abort on the first failed command.
 // Recent ledger evidence shows verify aborts at command 1/5, so the operator
