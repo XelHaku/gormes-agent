@@ -4523,9 +4523,9 @@
             {
               "name": "Azure Foundry transport probe read model",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Azure Foundry endpoint probing determines OpenAI-style, Anthropic-style, or manual-required transport from deterministic inputs without reading credentials or writing config",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4563,7 +4563,7 @@
                 "Failed /models plus a fake Anthropic Messages-shaped error selects anthropic_messages with explicit probe evidence.",
                 "Total probe failure returns manual-required evidence, not a fatal error, and does not hide manual api_mode selection."
               ],
-              "note": "Split from the quarantined Azure Foundry umbrella after 86 attempts/no-progress quarantine. This first slice owns only deterministic transport probing and advisory model evidence; runtime env/config, context length, and CLI setup/status are separate dependent rows.",
+              "note": "Complete: TDD landed internal/hermes/azure_foundry_probe.go exposing DetectAzureFoundry, which short-circuits on ClassifyAzurePath when the URL ends in /anthropic (no HTTP) and otherwise delegates to ProbeAzureFoundry for /models + /v1/messages classification. Manual-required falls through with Reason=manual_required and a nil error so manual api_mode entry remains available. Fixtures freeze AZURE_FOUNDRY_* env to sentinels and assert they survive each call, proving zero config/credential mutation. Split from the quarantined Azure Foundry umbrella after 86 attempts/no-progress quarantine. This first slice owns only deterministic transport probing and advisory model evidence; runtime env/config, context length, and CLI setup/status are separate dependent rows.",
               "write_scope": [
                 "internal/hermes/azure_foundry_probe.go",
                 "internal/hermes/azure_foundry_probe_test.go",
@@ -4578,9 +4578,11 @@
                 "Azure Foundry probe fixtures prove path sniffing, OpenAI /models detection, Anthropic Messages fallback detection, manual-required evidence, and zero config/credential mutation."
               ],
               "health": {
-                "last_attempt": "2026-04-26T12:49:08Z",
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T19:22:28Z",
+                "last_success": "2026-04-26T19:22:28Z",
                 "backends_tried": [
-                  "codexu"
+                  "claude"
                 ]
               },
               "provenance": {
