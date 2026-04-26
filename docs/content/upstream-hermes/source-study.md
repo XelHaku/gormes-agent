@@ -13,10 +13,37 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `f93d4624`
+- Upstream commit: `b2d3308f`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `1747b964`
-- Date: 2026-04-25
+- Gormes commit: `b56a81ef`
+- Date: 2026-04-26
+
+## 2026-04-26 Drift Check
+
+The synchronized Hermes head is now `b2d3308f` after the local upstream moved
+from `dc4d92f1` to `b2d3308f`. The new drift is narrow but execution-relevant:
+
+- `ad0ac894` widens DeepSeek/Kimi/Moonshot replay padding from assistant
+  tool-call turns to all assistant messages. Gormes already landed tool-call
+  padding and cross-provider reasoning isolation, but its current
+  `internal/hermes/http_client.go` fixtures still leave plain assistant turns
+  unpadded. The roadmap now tracks this as a small Phase 4.A provider row.
+- `25ba6a4a` makes gateway `/reasoning <level>` session-scoped by default,
+  keeps `--global` as the persistence opt-in, and clears model plus reasoning
+  session overrides on `/new`/reset flows. Gormes has per-turn model override
+  plumbing but no typed reasoning-effort request field or gateway command
+  state yet, so the plan splits this into a Phase 4.D request-propagation row
+  followed by a Phase 5.O gateway command row.
+- `b2d3308f` teaches Hermes doctor to accept bare `custom` provider
+  configuration as valid operator intent instead of requiring a provider
+  registry match. Gormes uses a different TOML/XDG config shape, so the plan
+  captures the equivalent custom-endpoint readiness contract under Phase 5.O
+  rather than porting Hermes config parsing.
+
+Honcho and GBrain were unchanged in this sync. The internal memory direction
+therefore remains Goncho as the Go implementation name, with Honcho-compatible
+public tool names and data shapes preserved where external contracts require
+`honcho_*`.
 
 ## 2026-04-25 Drift Check
 

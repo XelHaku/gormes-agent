@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-25",
+    "last_updated": "2026-04-26",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -3986,14 +3986,74 @@
                 "Reasoning echo fixtures prove DeepSeek/Kimi replay sends empty reasoning_content for prior-provider generic reasoning, preserves explicit reasoning_content, and leaves non-thinking payloads untouched."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-25T23:40:17Z",
-                "last_success": "2026-04-25T23:40:17Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-25T23:54:40Z",
+                "last_success": "2026-04-25T23:54:40Z"
               },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:f93d4624 run_agent.py",
                 "note": "Hermes changed provider replay ordering to avoid cross-provider reasoning leakage; Gormes should port the behavior as a focused provider-boundary fixture."
+              }
+            },
+            {
+              "name": "DeepSeek/Kimi all-assistant reasoning_content replay",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "DeepSeek, Kimi, and Moonshot OpenAI-compatible replays include provider-required reasoning_content on every assistant message while preserving Gormes' cross-provider reasoning isolation",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports all-assistant reasoning_content padding as unavailable until fixtures prove plain assistant turns and tool-call turns both satisfy thinking-provider replay requirements.",
+              "fixture": "internal/hermes/reasoning_content_echo_test.go",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@ad0ac894:_copy_reasoning_content_for_api",
+                "../hermes-agent/tests/run_agent/test_deepseek_reasoning_content_echo.py@ad0ac894",
+                "internal/hermes/http_client.go:openAICompatibleReasoningContent",
+                "internal/hermes/reasoning_content_echo_test.go"
+              ],
+              "ready_when": [
+                "DeepSeek/Kimi cross-provider reasoning isolation is validated, so provider detection and storage-only reasoning isolation already exist.",
+                "The existing captureRequestHTTPClient fixture can inspect serialized OpenAI-compatible request messages without live provider credentials."
+              ],
+              "not_ready_when": [
+                "The slice forwards storage-only Message.Reasoning from a prior provider to DeepSeek/Kimi/Moonshot instead of using provider-native ReasoningContent or an empty placeholder.",
+                "The slice changes non-thinking provider payloads, provider routing, or Codex/Bedrock/Gemini request builders."
+              ],
+              "blocked_by": [
+                "DeepSeek/Kimi cross-provider reasoning isolation"
+              ],
+              "unblocks": [
+                "OpenRouter",
+                "Codex stream repair + tool-call leak sanitizer"
+              ],
+              "acceptance": [
+                "A DeepSeek/Moonshot replay fixture with a plain assistant text turn and no ReasoningContent serializes reasoning_content=\"\".",
+                "Assistant tool-call turns still serialize reasoning_content=\"\" when no provider-native ReasoningContent exists.",
+                "Explicit provider-native ReasoningContent is preserved on plain and tool-call assistant turns.",
+                "Storage-only Message.Reasoning is not serialized to thinking providers, and non-thinking providers remain unchanged."
+              ],
+              "note": "Hermes ad0ac894 tightened the earlier tool-call-only fix: DeepSeek V4/Kimi thinking mode now requires reasoning_content on every assistant message. Gormes already has tool-call padding and cross-provider isolation, so this follow-up should change only the OpenAI-compatible request serializer and focused fixtures.",
+              "write_scope": [
+                "internal/hermes/http_client.go",
+                "internal/hermes/reasoning_content_echo_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestReasoningContentEcho.*AllAssistant|TestReasoningContentEcho.*Plain|TestReasoningContentEcho.*Preserves|TestReasoningContentEcho.*Untouched' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Reasoning echo fixtures prove plain assistant and tool-call assistant messages satisfy DeepSeek/Kimi/Moonshot reasoning_content replay without leaking storage-only reasoning."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ad0ac894 run_agent.py",
+                "note": "Upstream widened thinking-provider replay padding from assistant tool-call turns to all assistant turns."
               }
             },
             {
@@ -4413,8 +4473,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T17:16:35Z",
-            "origin_decision": "Hermes 648b8991 fixed Codex Responses assistant list-content replay to use output_text instead of input_text. Gormes has pure Responses conversion and stream repair, but the role-specific content-part fixture is not landed yet, so this provider subphase remains upstream-led until that small row and Codex auth/live state rows are validated."
+            "last_upstream_check": "2026-04-26T01:01:44Z",
+            "origin_decision": "Hermes ad0ac894 widened DeepSeek/Kimi thinking-mode replay from assistant tool-call turns to all assistant turns after the earlier f93d4624 cross-provider isolation row landed in Gormes. Gormes still trails that all-assistant replay edge, so this subphase remains upstream-led until the small all-assistant reasoning_content row is validated; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
           }
         },
         "4.B": {
@@ -5038,6 +5098,73 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5401a008 run_agent.py",
                 "note": "Hermes defines model switching and provider-routing behavior; Gormes must implement a smaller Go kernel per-turn override that consumes the native routing selector without importing Python runtime."
+              }
+            },
+            {
+              "name": "Per-turn reasoning effort propagation",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Kernel and provider request models carry an optional reasoning effort for exactly one turn or session without mutating resident model/provider configuration",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Status frames and provider request evidence distinguish unsupported reasoning effort, default reasoning, disabled reasoning, and explicit per-turn/session overrides.",
+              "fixture": "internal/kernel/per_turn_reasoning_test.go and internal/hermes/reasoning_effort_request_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_constants.py@25ba6a4a:parse_reasoning_effort",
+                "../hermes-agent/run_agent.py@25ba6a4a:AIAgent.__init__",
+                "../hermes-agent/gateway/run.py@25ba6a4a:_resolve_session_reasoning_config",
+                "internal/hermes/client.go:ChatRequest",
+                "internal/kernel/kernel.go:runTurn"
+              ],
+              "ready_when": [
+                "Per-turn model selection is validated, so the kernel already has a turn-scoped override path and RenderFrame evidence pattern.",
+                "A fake hermes.Client can capture ChatRequest fields without live provider credentials."
+              ],
+              "not_ready_when": [
+                "The slice implements slash command parsing, persistent config writes, or provider-specific reasoning UI in the same change.",
+                "The slice mutates cfg.Model/cfg.Hermes globally or treats reasoning effort as a model alias."
+              ],
+              "blocked_by": [
+                "Per-turn model selection"
+              ],
+              "unblocks": [
+                "Gateway /reasoning session override command"
+              ],
+              "acceptance": [
+                "ChatRequest carries optional reasoning effort values none, minimal, low, medium, high, and xhigh with validation evidence.",
+                "A per-turn reasoning override is sent on one fake provider request and the next turn falls back to the configured default.",
+                "Unsupported providers or absent request fields report explicit degraded evidence instead of silently dropping a requested override.",
+                "Existing per-turn model selection fixtures remain green and no provider network calls are introduced."
+              ],
+              "note": "Hermes 25ba6a4a made gateway reasoning state session-scoped, but Gormes first needs a typed Go request path before slash-command state can influence native turns.",
+              "write_scope": [
+                "internal/hermes/client.go",
+                "internal/hermes/http_client.go",
+                "internal/hermes/reasoning_effort_request_test.go",
+                "internal/kernel/frame.go",
+                "internal/kernel/kernel.go",
+                "internal/kernel/per_turn_reasoning_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/kernel -run TestPerTurnReasoning -count=1",
+                "go test ./internal/hermes -run TestReasoningEffortRequest -count=1",
+                "go test ./internal/kernel ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Kernel/provider fixtures prove reasoning effort is turn-scoped, validated, visible in status evidence, and absent from subsequent turns unless explicitly requested."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:25ba6a4a gateway/run.py",
+                "note": "Hermes owns the reasoning-effort behavior; Gormes needs a smaller typed kernel/provider path before command wiring."
               }
             }
           ]
@@ -6009,9 +6136,9 @@
             },
             {
               "name": "MCP server config/env resolver",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes parses Hermes-compatible mcp_servers config into safe stdio/HTTP server definitions with env validation, timeout defaults, header redaction, and Honcho MCP self-hosted URL support before any live MCP connection starts",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -6045,7 +6172,7 @@
                 "Invalid env var names, servers with both command and url, and servers with neither command nor url fail before runtime startup.",
                 "A Honcho MCP fixture preserves HONCHO_API_URL only as the configured server env value and never exposes it as a request header or Goncho memory setting."
               ],
-              "note": "Honcho 51497f1 added HONCHO_API_URL for self-hosted MCP Workers. Keep that as MCP server configuration evidence, not as a hosted-Honcho dependency for internal Goncho memory.",
+              "note": "Complete: TDD added a pure internal/tools MCP config resolver without SDK imports or runtime startup. Fixtures prove Hermes-compatible YAML/JSON parsing for stdio command/args/env/sampling and timeout defaults, HTTP url/header parsing with Authorization/token-like redaction, fail-closed invalid env/transport/missing env/missing SDK statuses without valid server output, and Honcho HONCHO_API_URL preserved only as a server-local MCP env binding while config.Load keeps Goncho memory defaults independent.",
               "write_scope": [
                 "internal/tools/mcp_config.go",
                 "internal/tools/mcp_config_test.go",
@@ -6060,6 +6187,11 @@
               "done_signal": [
                 "MCP config fixtures prove transport/env parsing, redaction, invalid-config degradation, no live SDK startup, and HONCHO_API_URL server-local handling."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-26T00:33:29Z",
+                "last_success": "2026-04-26T00:33:29Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/mcp_config.py",
@@ -6764,9 +6896,9 @@
             },
             {
               "name": "CLI banner/output formatting helpers",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure CLI banner and output formatting helpers match upstream deterministic text behavior without terminal or command-registry coupling",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -6795,7 +6927,7 @@
                 "Output helpers return strings or writer-bound functions with deterministic newline and prompt behavior.",
                 "Tests run without terminal/TTY detection, clock access, config files, or network calls."
               ],
-              "note": "Split from the prior all-helper 5.O row so workers can land the banner/output foundation without colliding with tips, webhook, dump, or command registry work.",
+              "note": "Complete: TDD added pure internal/cli banner and output formatting helpers without command wiring. Fixtures prove Hermes-compatible context length rounding, toolset display normalization, injected banner version labels, plain output lines, writer-bound newline behavior, and prompt/default parsing without TTY detection, config files, clock access, or network calls.",
               "write_scope": [
                 "internal/cli/banner.go",
                 "internal/cli/banner_output_test.go",
@@ -6810,6 +6942,11 @@
               "done_signal": [
                 "Focused internal/cli fixtures prove banner and output helper formatting with no TTY, config, or command-registry dependency."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T00:33:29Z",
+                "last_success": "2026-04-26T00:33:29Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/banner.py",
@@ -6986,6 +7123,72 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/commands.py",
                 "note": "Hermes defines the command inventory; Gormes owns the Go policy table and active-turn degradation."
+              }
+            },
+            {
+              "name": "Gateway /reasoning session override command",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Gateway /reasoning changes reasoning effort for the current session by default, persists only with --global, and clears only the current session on reset",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "gateway"
+              ],
+              "degraded_mode": "Gateway replies report session-only override, global-save failure fallback, invalid effort, unsupported reset --global, and reasoning-display toggle state instead of treating /reasoning as ordinary prompt text.",
+              "fixture": "internal/gateway/reasoning_command_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/run.py@25ba6a4a:_parse_reasoning_command_args",
+                "../hermes-agent/gateway/run.py@25ba6a4a:_handle_reasoning_command",
+                "../hermes-agent/tests/gateway/test_reasoning_command.py@25ba6a4a",
+                "../hermes-agent/tests/gateway/test_session_model_reset.py@25ba6a4a",
+                "internal/gateway/commands.go",
+                "internal/gateway/manager.go",
+                "internal/config/config.go"
+              ],
+              "ready_when": [
+                "Per-turn reasoning effort propagation is validated so a session override can affect the next native turn through typed request metadata.",
+                "The existing gateway command registry can add one recognized command and focused fake-channel fixtures without porting the whole Hermes command tree."
+              ],
+              "not_ready_when": [
+                "The slice implements model switching, provider setup, interactive pickers, or broad command-registry parity in the same change.",
+                "The slice persists reasoning changes without --global or clears other sessions' reasoning overrides on /new."
+              ],
+              "blocked_by": [
+                "Per-turn reasoning effort propagation"
+              ],
+              "unblocks": [
+                "CLI command registry parity + active-turn busy policy"
+              ],
+              "acceptance": [
+                "/reasoning with no args reports effective effort, scope, and display state from fake config/session state.",
+                "/reasoning high stores a session-only override and evicts only that session's cached runtime before the next turn.",
+                "/reasoning low --global writes the configured default and clears the session override; save failure falls back to session-only state with visible evidence.",
+                "/reasoning reset clears only the current session override, while reset --global is rejected with the upstream warning class.",
+                "/new or /reset clears model and reasoning overrides only for the triggering session."
+              ],
+              "note": "Hermes 25ba6a4a changed /reasoning from global-by-default to session-by-default. Keep this as a focused gateway command slice so workers do not mix it with /model pickers or the broad CLI command registry row.",
+              "write_scope": [
+                "internal/gateway/commands.go",
+                "internal/gateway/manager.go",
+                "internal/gateway/reasoning_command_test.go",
+                "internal/config/config.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run 'Test.*Reasoning.*Command|Test.*Reset.*Reasoning' -count=1",
+                "go test ./internal/gateway ./internal/config -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Gateway reasoning command fixtures prove session-only default scope, --global persistence behavior, reset cleanup, and no ordinary prompt leakage for /reasoning."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:25ba6a4a gateway/run.py",
+                "note": "Hermes defines the gateway command semantics; Gormes should adapt them to the native command registry and typed request path."
               }
             },
             {
@@ -7639,6 +7842,66 @@
               "note": "Umbrella only: read-mostly diagnostics, log capture, status, backup, and optional support-upload behavior must be split so workers do not mix local redaction and filesystem inventory with network uploads or archive writes."
             },
             {
+              "name": "Doctor custom endpoint provider readiness",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "gormes doctor accepts custom endpoint/provider-style configuration as operator intent and reports credential/readiness evidence without requiring a named provider registry match",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Doctor output reports custom-endpoint configured, missing API key, offline-skip, or provider-registry-unavailable evidence instead of failing bare custom provider settings as unknown.",
+              "fixture": "cmd/gormes/doctor_custom_provider_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/doctor.py@b2d3308f",
+                "../hermes-agent/tests/hermes_cli/test_doctor.py@b2d3308f:test_run_doctor_accepts_bare_custom_provider",
+                "cmd/gormes/doctor.go",
+                "internal/config/config.go",
+                "internal/hermes/status.go"
+              ],
+              "ready_when": [
+                "Gormes doctor already has --offline, API server health, tool registry, Goncho config, and gateway diagnostics.",
+                "The slice can use temp XDG config and fake endpoint/provider metadata without network calls."
+              ],
+              "not_ready_when": [
+                "The slice introduces a live provider catalog lookup, reads legacy Hermes config.yaml as authoritative state, or changes non-custom provider routing behavior.",
+                "The slice ports Hermes setup/auth prompts instead of doctor readiness reporting."
+              ],
+              "unblocks": [
+                "CLI status summary over native stores"
+              ],
+              "acceptance": [
+                "A config shaped as a custom endpoint with model and no named provider registry entry does not produce an unknown-provider doctor failure.",
+                "Doctor output distinguishes missing credentials from unknown provider and remains usable in --offline mode.",
+                "Known-provider validation, if present, remains deterministic and local-testdata backed.",
+                "No test opens provider network calls, Hermes config.yaml, or live auth stores."
+              ],
+              "note": "Hermes b2d3308f accepts bare `custom` provider in doctor. Gormes has a different TOML/XDG config shape, so this row freezes the equivalent operator contract: custom endpoints are valid intent and doctor should report readiness, not registry-name failure.",
+              "write_scope": [
+                "cmd/gormes/doctor.go",
+                "cmd/gormes/doctor_custom_provider_test.go",
+                "internal/config/",
+                "internal/hermes/status.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes -run TestDoctorCustomProvider -count=1",
+                "go test ./cmd/gormes ./internal/config ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Doctor fixtures prove custom endpoint/provider-style settings are accepted with explicit readiness evidence and no live provider or legacy Hermes config dependency."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:b2d3308f hermes_cli/doctor.py",
+                "note": "Hermes fixed doctor false positives for bare custom provider; Gormes must express the equivalent custom-endpoint readiness contract in its native config shape."
+              }
+            },
+            {
               "name": "CLI log snapshot reader",
               "status": "planned",
               "contract": "Gormes captures redacted local log snapshots for agent, gateway, error, tool-audit, and builder-loop logs from XDG paths without network upload or archive creation",
@@ -7698,7 +7961,12 @@
                 "note": "Hermes defines operator log/debug expectations; Gormes ports the local diagnostic contract first over XDG paths."
               }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-26T01:01:44Z",
+            "origin_decision": "Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence, and b2d3308f fixed doctor so bare custom provider config is accepted. Gormes has native oneshot/model override and helper rows, but it still lacks typed reasoning-effort propagation, gateway /reasoning session overrides, and custom-endpoint doctor readiness fixtures, so this CLI/gateway surface remains upstream-led."
+          }
         },
         "5.P": {
           "name": "Docker / Packaging",
@@ -7963,9 +8231,9 @@
             {
               "name": "Native TUI bundle independence check",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes TUI startup and install/update status stay Go-native and never depend on Hermes' Node/Ink dist bundle freshness checks",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -7993,7 +8261,7 @@
                 "Offline doctor or startup status describes the TUI as native Go/Bubble Tea and does not require `HERMES_TUI_DIR`, `package-lock.json`, `node_modules`, or `ink-bundle.js`.",
                 "Landing/docs install messaging continues to state no runtime npm/Node dependency and does not inherit Hermes first-launch TUI rebuild instructions."
               ],
-              "note": "Hermes ee0728c6 fixed a Python/Node first-launch regression by rebuilding when the bundled Ink dist file is stale. Gormes should not port that rebuild path; freeze the intentional divergence with a fixture so future CLI/TUI work does not reintroduce npm or Hermes Ink bundle checks.",
+              "note": "Complete: TDD landed `cmd/gormes/tui_bundle_independence_test.go` plus native startup/status seams. The focused fixture starts the real Cobra TUI path from a Hermes-shaped temp workdir with `ui-tui/dist/entry.js` and `node_modules/ink` but no Hermes Ink bundle, traps node/npm/pnpm/yarn/corepack on PATH, and proves no package-manager command runs before the Bubble Tea program launches. Doctor status now reports a compiled Go-native Bubble Tea TUI without asking for Hermes TUI env or bundle files, and landing copy explicitly promises no runtime Node or npm dependency.",
               "write_scope": [
                 "cmd/gormes/",
                 "internal/tui/",
@@ -8010,6 +8278,11 @@
               "done_signal": [
                 "Focused fixtures prove Gormes TUI startup/status remains independent from Hermes Node/Ink bundle rebuild checks and public install copy still promises no runtime npm dependency."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T00:33:29Z",
+                "last_success": "2026-04-26T00:33:29Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:ee0728c6 hermes_cli/main.py",
@@ -8019,9 +8292,9 @@
             {
               "name": "TUI launch model override + static alias resolver",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes TUI honors top-level --model/--provider and GORMES_INFERENCE_* overrides at startup without network model lookup or oneshot-only coupling",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -8055,7 +8328,7 @@
                 "A provider override without an explicit model returns the same exit-code-2 ambiguity class as oneshot resolution.",
                 "Resume/session startup still persists the same TUI session key and does not mutate persisted config defaults."
               ],
-              "note": "Hermes 283c8fd6 moved model/provider overrides into TUI launch and fixed startup alias resolution to avoid network lookup. Gormes already parses top-level flags for oneshot; add a TUI-specific fixture before remote TUI transport so model state is not silently stale.",
+              "note": "Complete: TUI startup now resolves top-level --model/--provider and GORMES_INFERENCE_* overrides through the shared inference resolver, applies embedded static aliases such as sonnet -> claude-sonnet-4-20250514 without network catalog lookup, returns exit-code-2 ambiguity errors before TUI startup when a provider is explicit without a model, and preserves persisted config defaults.",
               "write_scope": [
                 "cmd/gormes/main.go",
                 "cmd/gormes/tui_model_override_test.go",
@@ -8071,6 +8344,11 @@
               "done_signal": [
                 "TUI startup fixtures prove --model/--provider/env override behavior, static alias resolution, exit-code-2 ambiguity errors, and no network catalog lookup."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T00:33:29Z",
+                "last_success": "2026-04-26T00:33:29Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:283c8fd6 hermes_cli/main.py",

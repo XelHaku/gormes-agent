@@ -37,7 +37,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 36/74 subphases shipped · 14 in progress · 24 planned
+**Overall:** 36/74 subphases shipped · 15 in progress · 23 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -338,6 +338,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Tool-call normalization + continuation contract
 - [x] DeepSeek/Kimi reasoning_content echo for tool-call replay
 - [x] DeepSeek/Kimi cross-provider reasoning isolation
+- [ ] DeepSeek/Kimi all-assistant reasoning_content replay
 - [x] Anthropic
 - [ ] Bedrock
 - [x] Bedrock Converse payload mapping (no AWS SDK)
@@ -382,6 +383,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Model pricing/capability registry fixtures
 - [x] Routing policy and fallback selector
 - [x] Per-turn model selection
+- [ ] Per-turn reasoning effort propagation
 
 ### 4.E — Trajectory + Insights ⏳
 
@@ -461,10 +463,10 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Skill registries
 - [x] Skill preprocessing + dynamic slash commands
 
-### 5.G — MCP Integration ⏳
+### 5.G — MCP Integration 🔨
 
 - [ ] MCP client
-- [ ] MCP server config/env resolver
+- [x] MCP server config/env resolver
 - [ ] MCP fake-server discovery + tool schema normalization
 - [ ] MCP OAuth state store + noninteractive auth errors
 - [ ] Managed tool gateway bridge
@@ -517,10 +519,11 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] 49-file CLI tree port
 - [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
-- [ ] CLI banner/output formatting helpers
+- [x] CLI banner/output formatting helpers
 - [ ] CLI tips/dump/webhook deterministic helpers
 - [x] PTY bridge protocol adapter
 - [ ] CLI command registry parity + active-turn busy policy
+- [ ] Gateway /reasoning session override command
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
 - [ ] CLI profile path and active-profile store
@@ -534,6 +537,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Service RestartSec parser helper
 - [x] Service restart active-status poller
 - [ ] Diagnostics, backup, logs, and status CLI
+- [ ] Doctor custom endpoint provider readiness
 - [ ] CLI log snapshot reader
 
 ### 5.P — Docker / Packaging ⏳
@@ -551,8 +555,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] TUI gateway progress/completion helpers
 - [ ] TUI gateway image/personality/platform-event helpers
 - [x] TUI mouse tracking config + slash toggle
-- [ ] Native TUI bundle independence check
-- [ ] TUI launch model override + static alias resolver
+- [x] Native TUI bundle independence check
+- [x] TUI launch model override + static alias resolver
 - [ ] Native TUI terminal-selection divergence contract
 - [ ] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
