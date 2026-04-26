@@ -429,7 +429,7 @@ func makeOpenAICompatibleMessages(messages []Message, provider, model, baseURL s
 }
 
 func openAICompatibleReasoningContent(msg Message, provider, model, baseURL string) *string {
-	if len(msg.ToolCalls) == 0 || !openAICompatibleRequiresReasoningEcho(provider, model, baseURL) {
+	if !openAICompatibleRequiresReasoningEcho(provider, model, baseURL) {
 		return nil
 	}
 	if msg.ReasoningContent != nil {
