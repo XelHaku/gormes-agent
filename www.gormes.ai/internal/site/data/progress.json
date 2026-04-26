@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-26T17:30:00Z",
+    "last_updated": "2026-04-26T18:00:00Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -362,9 +362,9 @@
             {
               "name": "Watchdog checkpoint coalescing",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure helper internal/builderloop/watchdog_coalesce.go exposes type Decision string with constants DecisionFirst=\"first\", DecisionAmend=\"amend\", DecisionNoop=\"noop\"; type CheckpointState struct{LastCheckpointAt time.Time; LastSubject string; WindowID string}; type CoalesceConfig struct{WindowSeconds int; Dirty bool; NextWindowID func() string} and one function DecideCheckpoint(now time.Time, st CheckpointState, cfg CoalesceConfig) (Decision, CheckpointState). Window math: windowSeconds <= 0 falls back to 600. Algorithm: when cfg.Dirty is false, return DecisionNoop and the input state unchanged. When cfg.Dirty is true and (st.WindowID == \"\" OR now.Sub(st.LastCheckpointAt) >= window), return DecisionFirst with state {LastCheckpointAt: now, LastSubject: st.LastSubject (caller fills), WindowID: cfg.NextWindowID()}. Otherwise (cfg.Dirty and inside the window) return DecisionAmend with state {LastCheckpointAt: now, LastSubject: st.LastSubject, WindowID: st.WindowID} (preserve the existing WindowID). No git invocation, no shell-script change, no live filesystem mutation in this slice; cfg.NextWindowID is the only source of new IDs and is supplied by the caller (typically a small monotonic counter or a uuid stub in tests).",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -397,7 +397,7 @@
                 "TestDecideCheckpoint_DefaultWindowWhenZeroOrNegative: cfg.WindowSeconds=0 and cfg.WindowSeconds=-5 both behave like windowSeconds=600.",
                 "Helper is a pure function with no time.Now, no git invocation, no os.* calls — caller passes both the clock (now) and the dirty flag (cfg.Dirty) and the WindowID generator (cfg.NextWindowID)."
               ],
-              "note": "Reshape #2 (2026-04-26): prior reshape hashed identical contract+write_scope+fixture so Quarantine.spec_hash never changed. This pass pins the typed Decision constants, the CoalesceConfig struct shape (Dirty + NextWindowID injection), the windowSeconds<=0 fallback, and adds an acceptance case for the default-window fallback. Worker quarantine on this row was caused by an empty-prompt window 2026-04-26 15:08-15:09 (claudeu shim received --ephemeral with no task body); the underlying contract was already correct so this reshape is the minimum material change needed to clear ItemSpecHash. Pure-Go decider only — shell-script wiring at scripts/orchestrator/watchdog.sh is OUT of scope and will be a separate row that imports DecideCheckpoint via a small stub binary. Overnight 2026-04-25 → 2026-04-26 builder-loop run produced 74 dirty-worktree checkpoint commits in a 28-min stuck window — this helper is the brain that collapses them.",
+              "note": "Complete: TDD landed the pure DecideCheckpoint helper and fake-clock fixtures for first checkpoint, in-window amend, post-window rotation, no-dirty noop, and the 600-second fallback for zero/negative window sizes. Pure-Go decider only — shell-script wiring at scripts/orchestrator/watchdog.sh is OUT of scope and will be a separate row that imports DecideCheckpoint via a small stub binary.",
               "write_scope": [
                 "internal/builderloop/watchdog_coalesce.go",
                 "internal/builderloop/watchdog_coalesce_test.go",
@@ -412,9 +412,9 @@
                 "internal/builderloop/watchdog_coalesce_test.go fixtures prove first/amend/first-after-rotation/noop decisions across a fake clock with no live git or systemd."
               ],
               "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T15:09:51Z",
+                "attempt_count": 5,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z",
                 "last_failure": {
                   "run_id": "20260426T150941Z-113448856",
                   "category": "no_progress",
@@ -423,20 +423,12 @@
                 },
                 "backends_tried": [
                   "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T15:09:51Z",
-                  "after_run_id": "20260426T150941Z-113448856",
-                  "threshold": 3,
-                  "spec_hash": "2bf4f1e1a34cc697eba235d10e8ef9bc11fdcfb90928967c72e03cb612fc6615",
-                  "last_category": "no_progress"
-                }
+                ]
               },
               "planner_verdict": {
                 "reshape_count": 2,
                 "last_reshape": "2026-04-26T17:30:00Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -510,7 +502,7 @@
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-26T16:17:18Z",
-                "last_outcome": "still_failing"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "operator_audit",
@@ -521,7 +513,7 @@
               "name": "Watchdog dead-process vs slow-progress separation",
               "priority": "P1",
               "status": "planned",
-              "contract": "Pure helper internal/builderloop/watchdog_state.go exposes type Verdict string with constants VerdictHealthy=\"healthy\", VerdictSlow=\"slow\", VerdictDead=\"dead\" (zero value = VerdictHealthy is NOT used; the helper always sets one of the three explicitly); type WorkerVitals struct{PID int; LastCommitAt time.Time; PIDIsLive bool}; and one function Diagnose(now time.Time, v WorkerVitals, deadAfter, slowAfter time.Duration) Verdict. Algorithm (evaluated in this order — first match wins): (1) when v.PID == 0, return VerdictDead (zero PID is treated as missing, regardless of PIDIsLive or thresholds). (2) when v.PIDIsLive == false AND now.Sub(v.LastCommitAt) >= deadAfter, return VerdictDead. (3) when v.PIDIsLive == true AND now.Sub(v.LastCommitAt) >= slowAfter, return VerdictSlow. (4) otherwise return VerdictHealthy. Threshold preconditions enforced by tests: deadAfter and slowAfter are both > 0 and deadAfter <= slowAfter; the helper does NOT validate them — the orchestrator config layer does. No os.FindProcess, no signal delivery, no time.Now lookup, no goroutines. Caller injects v.PIDIsLive (typically a small shim around os.FindProcess + Signal(0) in production; a fixed bool in tests).",
+              "contract": "Pure helper internal/builderloop/watchdog_state.go exposes type Verdict string with constants VerdictHealthy=\"healthy\", VerdictSlow=\"slow\", VerdictDead=\"dead\"; type WorkerVitals struct{PID int; LastCommitAt time.Time; PIDIsLive bool}; and Diagnose(now time.Time, v WorkerVitals, deadAfter, slowAfter time.Duration) Verdict. Diagnose MUST always return one of the three named constants, never the Verdict zero value, even for zero-value WorkerVitals. Algorithm (evaluated in this order — first match wins): (1) when v.PID == 0, return VerdictDead (zero PID is treated as missing, regardless of PIDIsLive or thresholds). (2) when v.PIDIsLive == false AND now.Sub(v.LastCommitAt) >= deadAfter, return VerdictDead. (3) when v.PIDIsLive == true AND now.Sub(v.LastCommitAt) >= slowAfter, return VerdictSlow. (4) otherwise return VerdictHealthy. Threshold preconditions are test fixtures only: deadAfter and slowAfter are both > 0 and deadAfter <= slowAfter; the helper does NOT validate them because the orchestrator config layer owns config validation. No os.FindProcess, no signal delivery, no time.Now lookup, no goroutines. Caller injects v.PIDIsLive.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "orchestrator",
@@ -530,7 +522,7 @@
                 "system"
               ],
               "degraded_mode": "Watchdog status reports worker_state ∈ {alive_progressing, alive_silent, dead, unknown} and the threshold each one tripped; record_run_health carries the worker_state and which threshold (dead_after_seconds, silent_after_seconds) fired.",
-              "fixture": "internal/builderloop/watchdog_state_test.go",
+              "fixture": "internal/builderloop/watchdog_state_test.go::TestDiagnose",
               "source_refs": [
                 "internal/builderloop/run.go",
                 "internal/builderloop/run_health_test.go"
@@ -555,7 +547,7 @@
                 "TestDiagnose_NotDeadWhenPIDLiveEvenIfSilent: v={PID:1234, LastCommitAt:now-99999s, PIDIsLive:true} returns VerdictSlow (never VerdictDead while the process answers Signal(0)).",
                 "Helper is pure — caller injects the clock (now) and the PIDIsLive result."
               ],
-              "note": "Reshape #2 (2026-04-26): prior reshape hashed identical contract+write_scope+fixture so Quarantine.spec_hash never changed. This pass pins the typed Verdict constants, the explicit four-case match-order algorithm (PID==0 short-circuits first), and adds an acceptance case proving an alive but silent worker never reports VerdictDead. Worker quarantine on this row was caused by an empty-prompt window 2026-04-26 15:08-15:09 (claudeu shim received --ephemeral with no task body); the underlying contract was already correct so this reshape is the minimum material change needed to clear ItemSpecHash. Two independent thresholds: deadAfter (orchestrator default 120s) and slowAfter (orchestrator default 600s); deadAfter <= slowAfter is enforced by config, not by the helper.",
+              "note": "Reshape #4 (2026-04-26T18:00:00Z): sharpened the fixture to the exact TestDiagnose table so the quarantined no_progress row has a new spec hash without widening scope. The worker still owns one pure helper and one test file; no watchdog wiring, PID probing, or signal delivery belongs in this slice.",
               "write_scope": [
                 "internal/builderloop/watchdog_state.go",
                 "internal/builderloop/watchdog_state_test.go",
@@ -592,12 +584,13 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-26T17:30:00Z",
+                "reshape_count": 4,
+                "last_reshape": "2026-04-26T18:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
-                "origin_type": "operator_audit",
+                "origin_type": "gormes",
+                "owned_since": "2026-04-26T17:47:44Z",
                 "note": "Closes the 50-min dead-air gap from 05:28→06:19 local on 2026-04-26 by separating fast (dead-process) and slow (no-progress) thresholds."
               }
             },
@@ -605,7 +598,7 @@
               "name": "Builder-loop self-improvement vs user-feature ratio metric",
               "priority": "P2",
               "status": "planned",
-              "contract": "Pure helper internal/builderloop/ship_ratio.go exposes ClassifySubphase(subphaseID string) RowKind (kinds: self_improvement, user_feature, unclassified) and ComputeShipRatio(events []ShippedRowEvent, window time.Duration, now time.Time) ShipRatio where ShipRatio counts each kind in the [now-window, now] band. The classifier table maps 1.C/control-plane/* and 5.O operator-tooling rows to self_improvement, and 4.*/6.*/7.* to user_feature, with everything else as unclassified. No file I/O, no record_run_health emission.",
+              "contract": "Pure helper internal/builderloop/ship_ratio.go exposes type RowKind string with constants RowKindSelfImprovement=\"self_improvement\", RowKindUserFeature=\"user_feature\", RowKindUnclassified=\"unclassified\"; type ShippedRowEvent struct{SubphaseID string; ShippedAt time.Time}; type ShipRatio struct{SelfImprovement int; UserFeature int; Unclassified int; Total int}; ClassifySubphase(subphaseID string) RowKind; and ComputeShipRatio(events []ShippedRowEvent, window time.Duration, now time.Time) ShipRatio. ComputeShipRatio includes only events where !ShippedAt.Before(now.Add(-window)) && !ShippedAt.After(now), calls ClassifySubphase once per included event, and increments Total for every included event. The classifier trims subphaseID, then maps exact \"1.C\" or prefix \"1.C/\", exact \"5.O\" or prefix \"5.O/\", and prefix \"control-plane/\" to self_improvement; exact/prefix \"4.\", \"6.\", or \"7.\" subphases map to user_feature; everything else, including blank strings, maps to unclassified. No file I/O, no ledger parsing, no record_run_health emission.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "orchestrator",
@@ -613,7 +606,7 @@
                 "system"
               ],
               "degraded_mode": "When the ship_ratio cannot be computed (insufficient history, classification ambiguous), record_run_health carries ship_ratio=null and reports ship_ratio_evidence with the reason instead of fabricating zero.",
-              "fixture": "internal/builderloop/ship_ratio_test.go",
+              "fixture": "internal/builderloop/ship_ratio_test.go::TestClassifySubphase+TestComputeShipRatio",
               "source_refs": [
                 "internal/builderloop/run.go",
                 "internal/builderloop/health_writer.go",
@@ -628,6 +621,9 @@
                 "The slice changes ship-detection or ledger-write semantics — only adds a derived counter.",
                 "The slice depends on a yet-unbuilt classifier service or external store."
               ],
+              "blocked_by": [
+                "Watchdog dead-process vs slow-progress separation"
+              ],
               "acceptance": [
                 "TestClassifySubphase_KnownSelfImprovement covers '1.C', 'control-plane/backend', '5.O/CLI log snapshot reader' returning RowKindSelfImprovement.",
                 "TestClassifySubphase_KnownUserFeature covers '4.A', '4.H', '6.A', '7.B' returning RowKindUserFeature.",
@@ -636,7 +632,7 @@
                 "TestComputeShipRatio_CountsAllKinds returns SelfImprovement, UserFeature, Unclassified counts and a Total.",
                 "Helper is a pure function — caller injects the events slice and the clock."
               ],
-              "note": "Pure-Go classifier and aggregator only. Wiring into health_writer.go to emit ratios on record_run_health is a separate row. Goal: post-mortems can detect when the loop is mostly fixing itself instead of shipping user features.",
+              "note": "Reshape #3 (2026-04-26T18:00:00Z): made the classifier mapping exact/prefix-based and changed the fixture target to the named table tests. This keeps quarantine reset material while preserving the dependency behind the watchdog helper and excluding record_run_health wiring.",
               "write_scope": [
                 "internal/builderloop/ship_ratio.go",
                 "internal/builderloop/ship_ratio_test.go",
@@ -673,19 +669,20 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-26T16:17:18Z",
+                "reshape_count": 3,
+                "last_reshape": "2026-04-26T18:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
-                "origin_type": "operator_audit",
+                "origin_type": "gormes",
+                "owned_since": "2026-04-26T17:47:44Z",
                 "note": "Surfaces the self-improvement vs user-feature skew observed in the overnight 2026-04-26 post-mortem (9 ships, almost all on the loop itself)."
               }
             }
           ],
           "drift_state": {
             "status": "owned",
-            "last_upstream_check": "2026-04-26T01:23:57Z",
+            "last_upstream_check": "2026-04-26T18:00:00Z",
             "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes/Honcho/GBrain are still checked globally, but this subphase is no longer upstream-led."
           }
         }
@@ -4595,7 +4592,7 @@
               "name": "Azure Foundry probe — path sniffing",
               "priority": "P2",
               "status": "planned",
-              "contract": "Pure helper internal/hermes/azure_foundry_path_sniff.go exposes type AzureTransport string with three string-typed constants — AzureTransportAnthropic = \"anthropic\", AzureTransportOpenAI = \"openai\", AzureTransportUnknown = \"\" (zero value) — and one function ClassifyAzurePath(rawURL string) AzureTransport. Algorithm: parse rawURL with url.Parse; on parse error or empty result, return AzureTransportUnknown. Otherwise lowercase parsed.Path with strings.ToLower; if the lowercased path equals \"/anthropic\", ends with the suffix \"/anthropic\", or contains the substring \"/anthropic/\", return AzureTransportAnthropic. Every other input — including bare hosts, /openai/* paths, missing paths, or paths matching /anthropicx (no trailing slash) — returns AzureTransportUnknown. The OpenAI constant is declared so the follow-up /models classification slice can return it; this slice never returns AzureTransportOpenAI. No HTTP, no env reads, no config writes, no goroutines.",
+              "contract": "Pure helper internal/hermes/azure_foundry_path_sniff.go adds ClassifyAzurePath(rawURL string) AzureTransport and MUST reuse the AzureTransport type/constants already declared in internal/hermes/azure_foundry_models_probe.go (AzureTransportUnknown=\"unknown\", AzureTransportOpenAI=\"openai_chat_completions\", AzureTransportAnthropic=\"anthropic_messages\"); do not redeclare the type or constants. Algorithm: parse rawURL with url.Parse; on parse error or empty path, return AzureTransportUnknown. Otherwise lowercase strings.TrimRight(parsed.Path, \"/\"). If the lowercased path equals \"/anthropic\", ends with the suffix \"/anthropic\", or contains the substring \"/anthropic/\", return AzureTransportAnthropic. Every other input — including bare hosts, /openai/* paths, missing paths, /anthropicx, and /anthropic-mirror — returns AzureTransportUnknown. This slice never returns AzureTransportOpenAI and never opens HTTP, reads env/config, writes files, or starts goroutines.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -4604,12 +4601,13 @@
                 "system"
               ],
               "degraded_mode": "Probe status reports azure_path_sniff_unknown when no path heuristic matches, and azure_path_sniff_evidence with detected scheme/host/path otherwise.",
-              "fixture": "internal/hermes/azure_foundry_path_sniff_test.go",
+              "fixture": "internal/hermes/azure_foundry_path_sniff_test.go::TestClassifyAzurePath",
               "source_refs": [
-                "../hermes-agent/hermes_cli/azure_detect.py:_looks_like_anthropic_path:114"
+                "../hermes-agent/hermes_cli/azure_detect.py:_looks_like_anthropic_path:114",
+                "internal/hermes/azure_foundry_models_probe.go:AzureTransport"
               ],
               "ready_when": [
-                "internal/hermes already compiles and has no azure_foundry_path_sniff.go file yet — this row creates the file plus a sibling _test.go.",
+                "internal/hermes/azure_foundry_models_probe.go is complete and owns the AzureTransport type/constant values; this row only adds a path-sniff helper file plus a sibling _test.go.",
                 "No upstream gating: this is a pure URL inspector with synthetic input."
               ],
               "not_ready_when": [
@@ -4617,7 +4615,7 @@
                 "The slice introduces detection of any third transport family (Bedrock, Vertex, etc.)."
               ],
               "unblocks": [
-                "Azure Foundry probe — /models classification + Anthropic fallback"
+                "Azure Foundry transport probe read model"
               ],
               "acceptance": [
                 "TestClassifyAzurePath_AnthropicSuffix: https://x.openai.azure.com/openai/deployments/y/anthropic returns AzureTransportAnthropic.",
@@ -4627,7 +4625,7 @@
                 "TestClassifyAzurePath_MalformedReturnsUnknown: empty string, \"::garbage::\", and rawURL=\"http://%zz\" return AzureTransportUnknown.",
                 "TestClassifyAzurePath_NotASubstringFalsePositive: /anthropicx and /anthropic-mirror return AzureTransportUnknown (substring guard requires \"/anthropic\" with a trailing path separator or end-of-path)."
               ],
-              "note": "Reshape #3 (2026-04-26): prior reshapes hashed identical contract+write_scope+fixture so Quarantine.spec_hash never changed. This pass pins the three string-typed constant values (\"anthropic\", \"openai\", \"\") so the zero value maps to Unknown, calls out the explicit url.Parse + ToLower path, and adds a sixth acceptance case ruling out /anthropicx false-positive substring matches. Worker quarantine on this row was caused by an empty-prompt window 2026-04-26 15:08-15:09 (claudeu shim received --ephemeral with no task body); the underlying contract was already correct so this reshape is the minimum material change needed to clear ItemSpecHash and let the autoloop retry under the fixed worker prompt path.",
+              "note": "Reshape #5 (2026-04-26T18:00:00Z): fixture now names the exact TestClassifyAzurePath table and the contract remains one helper that reuses AzureTransport from azure_foundry_models_probe.go. No HTTP probe, config read, env read, or provider wiring belongs in this row.",
               "write_scope": [
                 "internal/hermes/azure_foundry_path_sniff.go",
                 "internal/hermes/azure_foundry_path_sniff_test.go",
@@ -4664,13 +4662,14 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 4,
-                "last_reshape": "2026-04-26T17:30:00Z",
+                "reshape_count": 6,
+                "last_reshape": "2026-04-26T18:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
-                "origin_type": "split",
-                "note": "Path-sniffing slice carved off so the worker can land a deterministic table-test in one cycle."
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:0824ba6a hermes_cli/azure_detect.py:_looks_like_anthropic_path",
+                "note": "Hermes defines the path heuristic; Gormes must adapt it to the AzureTransport constants that already landed in the Go /models probe."
               }
             },
             {
@@ -4697,8 +4696,8 @@
                 "internal/hermes/azure_anthropic_transport_test.go"
               ],
               "ready_when": [
-                "Azure Foundry probe — path sniffing is fixture-ready or validated, so this slice consumes a typed sniff result instead of duplicating URL inspection.",
-                "httptest.Server-driven fakes are acceptable; no live Azure call is permitted."
+                "httptest.Server-driven fakes are acceptable; no live Azure call is permitted.",
+                "This row is already validated on main; the path-sniff row is now the remaining prerequisite for the combined transport read-model row."
               ],
               "not_ready_when": [
                 "The slice persists deployment lists, mutates AZURE_FOUNDRY_* env, or runs interactive setup.",
@@ -4715,7 +4714,7 @@
                 "TestProbeAzureFoundry_RespectsContextCancel cancels mid-probe and returns ctx.Err.",
                 "Helper does not write to disk, does not mutate config, does not retry beyond the two named probes."
               ],
-              "note": "Second half of the Azure Foundry probe split. Composes ClassifyAzurePath upstream — only invoked when path sniffing returns unknown. Mirrors hermes_cli/azure_detect.py:_probe_openai_models (line 143) and _probe_anthropic_messages (line 175).",
+              "note": "Complete: TDD landed internal/hermes/azure_foundry_models_probe.go and azure_foundry_models_probe_test.go. ProbeAzureFoundry uses httptest-backed /models and /v1/messages probes, returns openai_chat_completions for OpenAI-shaped /models responses including an empty data list, returns anthropic_messages for Anthropic-shaped 4xx message errors, reports manual_required when both probes fail, respects context cancellation, and never writes config or contacts live Azure.",
               "write_scope": [
                 "internal/hermes/azure_foundry_models_probe.go",
                 "internal/hermes/azure_foundry_models_probe_test.go",
@@ -4749,8 +4748,9 @@
                 "last_outcome": "still_failing"
               },
               "provenance": {
-                "origin_type": "split",
-                "note": "Composes the path-sniff slice with deterministic /models + Anthropic fallback fixtures."
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:0824ba6a hermes_cli/azure_detect.py",
+                "note": "Hermes defines /models and Anthropic fallback probe semantics; Gormes landed the Go probe first, while the path sniff remains a separate dependency for the combined read model."
               }
             },
             {
@@ -5290,8 +5290,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T12:19:33Z",
-            "origin_decision": "Hermes ad0ac894 widened DeepSeek/Kimi thinking-mode replay from assistant tool-call turns to all assistant turns, and the Gormes provider fixtures now validate the DeepSeek/Kimi, Azure OpenAI, and Azure Anthropic edges. Azure Foundry remains upstream-led but is split into probe, runtime read-model, and CLI/status fallback rows after the prior umbrella row quarantined with no-progress. Later Hermes 192e7eb2 provider-rate drift is tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
+            "last_upstream_check": "2026-04-26T18:00:00Z",
+            "origin_decision": "Hermes ad0ac894 widened DeepSeek/Kimi thinking-mode replay from assistant tool-call turns to all assistant turns, and the Gormes provider fixtures now validate the DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, and Azure Foundry /models probe edges. Azure Foundry remains upstream-led: /models probing landed first, so the path-sniff row now reuses the existing AzureTransport constants before the combined transport read model can close. Later Hermes 192e7eb2 provider-rate drift is tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
           }
         },
         "4.B": {
@@ -5680,9 +5680,9 @@
             {
               "name": "[SYSTEM:→[IMPORTANT: meta-instruction prefix rename for Azure content filter compatibility",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Single rename of the bracketed meta-instruction prefix used for skill-invocation and cron-heartbeat prompts: change every occurrence of the literal string \"[SYSTEM:\" to \"[IMPORTANT:\" in (a) internal/skills/commands.go (currently at line 94 inside the BuildSkill block string template) and (b) internal/cron/heartbeat.go's CronHeartbeatPrefix constant. The replacement is byte-for-byte over a 7→10 character literal; semantic meaning to the model is unchanged. Update the two existing assertions in internal/skills/preprocessing_commands_test.go (string literal `[SYSTEM: The user has invoked`) and the two assertions in internal/cron/heartbeat_test.go (HasPrefix and contained \"[SYSTEM:\") to match the new prefix. No public Go API renames, no struct shape changes, no provider/transport edits, no schema migrations.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -5708,7 +5708,6 @@
                 "The slice introduces a runtime feature flag, environment variable, or config knob to switch between [SYSTEM: and [IMPORTANT: — the rename is unconditional.",
                 "The slice touches gateway prompt assembly, provider transports, or any runtime that does not currently emit the [SYSTEM: marker."
               ],
-              "unblocks": [],
               "acceptance": [
                 "TestCronHeartbeatBuildPromptUsesImportantPrefix asserts BuildPrompt output starts with \"[IMPORTANT:\" and contains the existing scheduled-cron-job description body unchanged.",
                 "TestCronHeartbeatPrefixConstantValue asserts CronHeartbeatPrefix is exactly the new \"[IMPORTANT: You are running as a scheduled cron job. \" prefix.",
@@ -5716,7 +5715,7 @@
                 "TestSkillsCommandsBuildBlockNeverEmitsLegacyMarker (new) renders BuildSkillBlock against a synthetic active skill and asserts strings.Contains(out, \"[SYSTEM:\") == false.",
                 "go vet ./... and go build ./... pass with no compile errors after the rename."
               ],
-              "note": "Mirrors upstream Hermes d7a34682 (fix(prompts): replace [SYSTEM: with [IMPORTANT: to avoid Azure content filter, fixes #6576). The Azure OpenAI Default/DefaultV2 content filter heuristic flags [SYSTEM: at message head as a prompt-injection attempt and rejects with HTTP 400; switching to [IMPORTANT: preserves model semantics and bypasses the heuristic. Two Gormes files emit this marker today (internal/skills/commands.go:94 and internal/cron/heartbeat.go:16); both have existing fixture coverage that needs synchronized updates inside the same slice. This is a deliberate cross-package literal rename, not a refactor — no helper extraction.",
+              "note": "Complete: cron heartbeat and skill-invocation prompts now emit [IMPORTANT: while preserving the existing prompt bodies and public Go APIs. Fixtures assert the new prefix, the absence of legacy [SYSTEM: markers from the relevant rendered prompts, and the exact heartbeat constant body. Mirrors upstream Hermes d7a34682 (fix(prompts): replace [SYSTEM: with [IMPORTANT: to avoid Azure content filter, fixes #6576).",
               "write_scope": [
                 "internal/skills/commands.go",
                 "internal/cron/heartbeat.go",
@@ -5734,6 +5733,11 @@
               "done_signal": [
                 "internal/cron/heartbeat_test.go and internal/skills/preprocessing_commands_test.go assert the [IMPORTANT: prefix and the codebase contains zero remaining \"[SYSTEM:\" string literals under internal/skills and internal/cron."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:d7a34682 fix(prompts): replace [SYSTEM: with [IMPORTANT: to avoid Azure content filter",
@@ -6608,16 +6612,17 @@
               "name": "Provider rate guard — x-ratelimit header classification",
               "priority": "P2",
               "status": "planned",
-              "contract": "Pure helper internal/hermes/provider_rate_guard.go exposes type RateLimitClass string with constants RateLimitGenuineQuota, RateLimitUpstreamCapacity, RateLimitInsufficientEvidence (zero value = RateLimitInsufficientEvidence) and Classify429(headers http.Header) RateLimitClass. The function reads exactly four candidate buckets — x-ratelimit-remaining-1h, x-ratelimit-remaining-1m, x-ratelimit-remaining-requests, x-ratelimit-remaining-tokens — via headers.Get (Go-canonical case insensitive). A bucket counts as 'present' when headers.Values returns at least one entry whose strings.TrimSpace value parses as a base-10 int via strconv.Atoi. Returns RateLimitGenuineQuota if any present bucket parses to <=0; RateLimitUpstreamCapacity when at least one bucket is present and every present bucket parses to >0; RateLimitInsufficientEvidence when none of the four bucket headers is present (parse failures count as not-present, never as -1). No Bucket struct, no reset evidence, no time.Now, no shared/process state. Bucket/reset detail is the next slice.",
+              "contract": "Pure helper internal/hermes/provider_rate_guard.go exposes type RateLimitClass string with constants RateLimitGenuineQuota=\"genuine_quota\", RateLimitUpstreamCapacity=\"upstream_capacity\", RateLimitInsufficientEvidence=\"insufficient_evidence\" (the helper must explicitly return RateLimitInsufficientEvidence for no evidence; callers must not rely on the string zero value) and Classify429(headers http.Header) RateLimitClass. The function reads exactly the four current Hermes Nous remaining-bucket headers from agent/nous_rate_guard.py:_parse_buckets_from_headers — x-ratelimit-remaining-requests, x-ratelimit-remaining-requests-1h, x-ratelimit-remaining-tokens, x-ratelimit-remaining-tokens-1h — using headers.Values for canonical case-insensitive access. A bucket counts as present when any value for that header trims with strings.TrimSpace and parses as base-10 int via strconv.Atoi. Returns RateLimitGenuineQuota if any present bucket parses to <=0; RateLimitUpstreamCapacity when at least one bucket is present and every present bucket parses to >0; RateLimitInsufficientEvidence when none of the four bucket headers has a parseable int. Parse failures count as not-present, never as zero. No Bucket struct, no reset-window parsing, no time.Now, no shared/process state.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
                 "system"
               ],
-              "degraded_mode": "Provider status reports rate_guard_classified as one of {genuine_quota, upstream_capacity, insufficient_evidence}, plus reset-window evidence when present, instead of silently tripping a global breaker.",
-              "fixture": "internal/hermes/provider_rate_guard_classification_test.go",
+              "degraded_mode": "Provider status reports rate_guard_classified as one of {genuine_quota, upstream_capacity, insufficient_evidence}; reset-window evidence waits for the dependent budget telemetry row instead of appearing in this parser-only slice.",
+              "fixture": "internal/hermes/provider_rate_guard_classification_test.go::TestClassify429",
               "source_refs": [
+                "../hermes-agent/agent/nous_rate_guard.py:_parse_buckets_from_headers:241",
                 "../hermes-agent/agent/nous_rate_guard.py:is_genuine_nous_rate_limit:191"
               ],
               "ready_when": [
@@ -6632,13 +6637,13 @@
                 "Provider rate guard — degraded-state + last-known-good evidence"
               ],
               "acceptance": [
-                "TestClassify429_GenuineQuotaWhenAnyBucketExhausted (X-RateLimit-Remaining-1h=0) returns RateLimitGenuineQuota even when other present buckets are >0.",
+                "TestClassify429_GenuineQuotaWhenAnyBucketExhausted (X-RateLimit-Remaining-Requests-1h=0) returns RateLimitGenuineQuota even when other present buckets are >0.",
                 "TestClassify429_UpstreamCapacityWhenAllBucketsHaveRemaining (any subset of the four buckets >0, none missing-and-parsed-as-zero) returns RateLimitUpstreamCapacity.",
-                "TestClassify429_InsufficientEvidenceWhenNoRateHeaders returns RateLimitInsufficientEvidence and equals the RateLimitClass zero value.",
+                "TestClassify429_InsufficientEvidenceWhenNoRateHeaders returns the explicit RateLimitInsufficientEvidence constant and the returned string is non-empty.",
                 "TestClassify429_IgnoresUnknownHeaders (Retry-After, X-Custom-Foo) preserves the classification driven solely by the four x-ratelimit-remaining-* buckets.",
                 "TestClassify429_UnparseableBucketIsNotPresent (X-RateLimit-Remaining-Tokens=\"abc\") with no other rate headers returns RateLimitInsufficientEvidence rather than treating the malformed value as zero."
               ],
-              "note": "Reshape #3 (2026-04-26): prior reshapes hashed identical contract+write_scope+fixture so Quarantine.spec_hash never changed. This pass pins exactly four candidate bucket header names, the headers.Get + strconv.Atoi parse path, declares the zero-value mapping, and adds a fifth acceptance case for malformed numeric values. Worker quarantine on this row was caused by an empty-prompt window 2026-04-26 15:08-15:09 (claudeu shim received --ephemeral with no task body); the underlying contract was already correct so this reshape is the minimum material change needed to clear ItemSpecHash and let the autoloop retry under the fixed worker prompt path.",
+              "note": "Reshape #5 (2026-04-26T18:00:00Z): fixture now names the exact TestClassify429 table so the no_progress quarantine sees a material spec-hash change. The four bucket names stay pinned to the current Hermes Nous donor tags; reset-window evidence remains owned by the dependent telemetry row.",
               "write_scope": [
                 "internal/hermes/provider_rate_guard.go",
                 "internal/hermes/provider_rate_guard_classification_test.go",
@@ -6650,7 +6655,7 @@
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "internal/hermes/provider_rate_guard_classification_test.go fixtures prove genuine_quota / upstream_capacity / insufficient_evidence classification with redacted reset windows under a fake clock."
+                "internal/hermes/provider_rate_guard_classification_test.go fixtures prove genuine_quota / upstream_capacity / insufficient_evidence classification from the four current Hermes Nous remaining-bucket headers with no reset-window parsing."
               ],
               "health": {
                 "attempt_count": 3,
@@ -6675,20 +6680,21 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 4,
-                "last_reshape": "2026-04-26T17:30:00Z",
+                "reshape_count": 6,
+                "last_reshape": "2026-04-26T18:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
-                "origin_type": "split",
-                "note": "Header-classification slice carved off so the parser/state-machine lands as pure functions before degraded-mode reporting."
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:0824ba6a agent/nous_rate_guard.py:_parse_buckets_from_headers",
+                "note": "Hermes defines the Nous bucket names and account-vs-upstream distinction; Gormes narrows this first slice to a pure remaining-header classifier before reset-window telemetry."
               }
             },
             {
               "name": "Provider rate guard — degraded-state + last-known-good evidence",
               "priority": "P2",
               "status": "planned",
-              "contract": "Pure helper internal/hermes/provider_rate_guard_degraded.go exposes type GuardState struct{LastKnownClass RateLimitClass; LastKnownAt time.Time; Unavailable bool} (zero value = {RateLimitInsufficientEvidence, time.Time{}, false}) and ApplyClassification(state GuardState, now time.Time, class RateLimitClass) GuardState that returns a NEW value (never mutates the receiver-style input). Behavior: when class == RateLimitInsufficientEvidence the helper returns a copy with the prior LastKnownClass and LastKnownAt preserved verbatim and Unavailable=true; for any other class (RateLimitGenuineQuota or RateLimitUpstreamCapacity) it returns a copy with LastKnownClass=class, LastKnownAt=now, Unavailable=false. No Bucket parsing, no breaker mutation, no retry timing, no time.Now lookups, no goroutines. Imports time and the RateLimitClass type from the sibling provider_rate_guard.go from the prior slice.",
+              "contract": "Pure helper internal/hermes/provider_rate_guard_degraded.go exposes type GuardState struct{LastKnownClass RateLimitClass; LastKnownAt time.Time; Unavailable bool} and ApplyClassification(state GuardState, now time.Time, class RateLimitClass) GuardState. The helper treats a zero-value input state's LastKnownClass as RateLimitInsufficientEvidence in returned values, returns a NEW value (never mutates the input), and follows this exact table: class==RateLimitInsufficientEvidence or an unknown/zero RateLimitClass preserves prior LastKnownClass/LastKnownAt and sets Unavailable=true; class==RateLimitGenuineQuota or RateLimitUpstreamCapacity sets LastKnownClass=class, LastKnownAt=now, Unavailable=false. No Bucket parsing, no reset-window parsing, no breaker mutation, no retry timing, no time.Now lookups, no goroutines. Imports time and the RateLimitClass type from provider_rate_guard.go.",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -6696,7 +6702,7 @@
                 "system"
               ],
               "degraded_mode": "Provider status reports last_known_good=present|absent, plus rate_guard_unavailable or budget_header_missing when classification is unsafe; no retry amplification.",
-              "fixture": "internal/hermes/provider_rate_guard_degraded_test.go",
+              "fixture": "internal/hermes/provider_rate_guard_degraded_test.go::TestApplyClassification",
               "source_refs": [
                 "../hermes-agent/agent/nous_rate_guard.py:record_nous_rate_limit:70",
                 "../hermes-agent/agent/nous_rate_guard.py:nous_rate_limit_remaining:138"
@@ -6719,9 +6725,10 @@
                 "TestApplyClassification_RecordsClassificationOnGenuineQuota: zero-value input + class=RateLimitGenuineQuota at now=t1 returns {RateLimitGenuineQuota, t1, false}.",
                 "TestApplyClassification_RecordsClassificationOnUpstreamCapacity: zero-value input + class=RateLimitUpstreamCapacity at now=t1 returns {RateLimitUpstreamCapacity, t1, false}.",
                 "TestApplyClassification_DoesNotMutateInputState: passing a struct value and checking the original is byte-equal after the call (no pointer escapes, no aliasing).",
-                "TestApplyClassification_TogglesUnavailableBackToFalseOnFreshEvidence: input {RateLimitGenuineQuota, t0, true} with class=RateLimitUpstreamCapacity returns Unavailable=false."
+                "TestApplyClassification_TogglesUnavailableBackToFalseOnFreshEvidence: input {RateLimitGenuineQuota, t0, true} with class=RateLimitUpstreamCapacity returns Unavailable=false.",
+                "TestApplyClassification_UnknownClassIsInsufficientEvidence: input {RateLimitUpstreamCapacity, t0, false} with class=RateLimitClass(\"\") preserves LastKnownClass/LastKnownAt and returns Unavailable=true."
               ],
-              "note": "Reshape #3 (2026-04-26): prior reshapes hashed identical contract+write_scope+fixture so Quarantine.spec_hash never changed. This pass pins the value-vs-pointer copy semantics, the zero-value mapping, and adds a fifth acceptance case for the Unavailable=true→false transition (recovery). Worker quarantine on this row was caused by an empty-prompt window 2026-04-26 15:08-15:09 (claudeu shim received --ephemeral with no task body); the underlying contract was already correct so this reshape is the minimum material change needed to clear ItemSpecHash and let the autoloop retry under the fixed worker prompt path.",
+              "note": "Reshape #5 (2026-04-26T18:00:00Z): contract now treats an unknown/zero RateLimitClass argument as insufficient evidence and fixture names the exact TestApplyClassification table. The row remains independent from budget telemetry and breaker state.",
               "write_scope": [
                 "internal/hermes/provider_rate_guard_degraded.go",
                 "internal/hermes/provider_rate_guard_degraded_test.go",
@@ -6758,20 +6765,21 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 4,
-                "last_reshape": "2026-04-26T17:30:00Z",
+                "reshape_count": 6,
+                "last_reshape": "2026-04-26T18:00:00Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
-                "origin_type": "split",
-                "note": "Degraded-mode + last-known-good slice; depends on the classification slice landing first."
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:0824ba6a agent/nous_rate_guard.py:record_nous_rate_limit",
+                "note": "Hermes records cross-session rate state in Python; Gormes first lands a pure last-known-class state transition before any shared breaker or reset-window telemetry."
               }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T12:19:33Z",
-            "origin_decision": "Hermes 7c17accb added a streaming retry interrupt guard and Hermes 192e7eb2 sharpened Nous 429 handling so upstream-capacity responses do not trip a cross-session quota breaker. Gormes has retry/backoff and provider-hint behavior, but this subphase remains upstream-led until prompt-cache guards and provider budget/rate telemetry are fixture-backed."
+            "last_upstream_check": "2026-04-26T18:00:00Z",
+            "origin_decision": "Hermes 7c17accb added a streaming retry interrupt guard and Hermes 192e7eb2 sharpened Nous 429 handling so upstream-capacity responses do not trip a cross-session quota breaker. The current Hermes donor bucket names are requests, requests-1h, tokens, and tokens-1h; Gormes has retry/backoff and provider-hint behavior, but this subphase remains upstream-led until prompt-cache guards and provider budget/rate telemetry are fixture-backed."
           }
         }
       }
@@ -7081,6 +7089,66 @@
               "note": "TDD: port Docker execution after the environment interface is green, covering image selection, mount policy, env passthrough allowlists, timeout cleanup, and blocked dangerous mounts."
             },
             {
+              "name": "Docker backend top-level container reuse semantics",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Pure helper internal/tools/docker_container_key.go exposes type DockerContainerRequest struct{TaskID string; IsSubagent bool; IsRollout bool} and DockerContainerKey(req DockerContainerRequest) string. The helper trims TaskID, returns \"default\" for top-level requests with empty TaskID, returns the trimmed TaskID for top-level explicit task IDs, and returns the trimmed TaskID for subagent or rollout requests. If IsSubagent or IsRollout is true and TaskID is empty, it returns \"\" so callers must generate an isolated task ID before creating a Docker environment. No Docker CLI calls, no filesystem reads, no cleanup, no env config.",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Doctor/status reports docker_task_scope_missing when an isolated subagent or rollout request lacks a generated task_id instead of silently falling back to the shared default container.",
+              "fixture": "internal/tools/docker_container_key_test.go",
+              "source_refs": [
+                "../hermes-agent/website/docs/user-guide/configuration.md@9be83728:Docker Backend",
+                "../hermes-agent/tools/terminal_tool.py:1476",
+                "../hermes-agent/tools/terminal_tool.py:1530",
+                "../hermes-agent/tools/delegate_tool.py:1396",
+                "../hermes-agent/environments/tool_context.py:72"
+              ],
+              "ready_when": [
+                "internal/tools already exists and can accept a pure helper without the live Docker backend implementation.",
+                "The worker can prove behavior with table tests only; no docker binary, container runtime, or live filesystem sandbox is required."
+              ],
+              "not_ready_when": [
+                "The slice shells out to docker, creates containers, writes sandbox directories, implements cleanup, or changes execute_code behavior.",
+                "The slice treats /new, /reset, or TUI session changes as new Docker task IDs for the top-level agent."
+              ],
+              "unblocks": [
+                "Docker"
+              ],
+              "acceptance": [
+                "TestDockerContainerKey_TopLevelDefault: empty TaskID with IsSubagent=false and IsRollout=false returns \"default\".",
+                "TestDockerContainerKey_TopLevelExplicitTaskID: TaskID=\"manual\" returns \"manual\" for top-level requests.",
+                "TestDockerContainerKey_SubagentRequiresIsolatedTaskID: IsSubagent=true with empty TaskID returns \"\" and with TaskID=\"subagent-1\" returns \"subagent-1\".",
+                "TestDockerContainerKey_RolloutRequiresIsolatedTaskID: IsRollout=true with empty TaskID returns \"\" and with TaskID=\"rollout-1\" returns \"rollout-1\".",
+                "TestDockerContainerKey_TrimsWhitespace: surrounding whitespace never creates a distinct container key."
+              ],
+              "note": "Hermes 9be83728 clarified that the top-level Docker terminal backend reuses one default container across sessions, /new, and /reset, while delegate_task subagents and RL rollouts isolate by task_id. Gormes should freeze the keying rule before implementing the live Docker backend so public docs and runtime behavior do not diverge.",
+              "write_scope": [
+                "internal/tools/docker_container_key.go",
+                "internal/tools/docker_container_key_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run TestDockerContainerKey -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/tools/docker_container_key_test.go fixtures prove shared top-level default container keying and isolated subagent/rollout task_id requirements without live Docker."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:9be83728 website/docs/user-guide/configuration.md",
+                "note": "Upstream clarified Docker lifecycle semantics in docs; Gormes adapts the same contract as a pure keying helper before live container execution lands."
+              }
+            },
+            {
               "name": "Modal",
               "status": "planned",
               "note": "TDD: freeze Modal request/job lifecycle, upload/download mapping, and unavailable-credential behavior as fixtures before any cloud execution path is enabled."
@@ -7095,7 +7163,12 @@
               "status": "planned",
               "note": "TDD: port Singularity command construction, bind mounts, and timeout cleanup as a local command builder first; live runtime tests stay opt-in."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-26T18:00:00Z",
+            "origin_decision": "Hermes 9be83728 clarified Docker terminal-backend lifecycle: the top-level agent reuses task_id=default across sessions, /new, and /reset, while delegate_task subagents and RL rollouts isolate by their generated task_id. Gormes has only local execute_code today, so Phase 5.B stays upstream-led and now carries a pure container-keying row before live Docker execution."
+          }
         },
         "5.C": {
           "name": "Browser Automation",
@@ -7422,9 +7495,9 @@
             },
             {
               "name": "Skills list — enabled/disabled status column + --enabled-only filter",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/skills/list.go exposes type SkillStatus string (\"enabled\", \"disabled\"), extends SkillRow with a Status field and adds ListOptions{Source string; EnabledOnly bool}. ListInstalledSkills(opts ListOptions, disabled map[string]struct{}) []SkillRow returns every installed skill annotated with Status from the disabled set; when opts.EnabledOnly is true, disabled rows are filtered out. The CLI surface (gormes skills list --source <s> --enabled-only) calls this helper and prints a table with a Status column plus a summary \"N enabled, M disabled\" (or \"K enabled shown\" when --enabled-only). No platform-aware override read in this slice — disabled set comes from the active profile only, mirroring upstream do_list semantics.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "skills",
               "trust_class": [
@@ -7477,13 +7550,23 @@
               "done_signal": [
                 "internal/skills/list_test.go and internal/cli/skills_command_test.go fixtures prove the Status column, --enabled-only filter, and platform-arg guard."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:0e2a53ea hermes_cli/skills_hub.py do_list",
                 "note": "Mirrors PR #16129; pure introspection feature — no skill execution change."
               }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-26T18:00:00Z",
+            "origin_decision": "Hermes 93977675 removed the empty skills/feeds category and its static website label. Gormes does not have a static feeds category label in internal/skills; the skills surface remains upstream-led for hub search/list/install parity, but no new executable row is needed until a Gormes-generated skills catalog grows empty category markers."
+          }
         },
         "5.G": {
           "name": "MCP Integration",
@@ -7828,9 +7911,9 @@
             },
             {
               "name": "MCP OAuth refresh + 401 session-expired recovery",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools adds a pure function `RefreshMCPOAuth(ctx context.Context, store *MCPOAuthStore, server string, refresher MCPRefresher, now time.Time) (MCPOAuthRefreshResult, error)` where MCPRefresher is an interface with one method `Refresh(ctx, refreshToken string) (newTokens MCPOAuthToken, err error)`; the function refreshes expired tokens, handles 401-equivalent SessionExpired errors by clearing the stored token, and never blocks on user input",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -7878,6 +7961,11 @@
               "done_signal": [
                 "internal/tools/mcp_oauth_refresh.go declares RefreshMCPOAuth, MCPRefresher, MCPOAuthRefreshResult, and ErrMCPOAuthSessionExpired; five named tests pass; the store from the prior row is reused without modification."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:edc78e25 tools/mcp_oauth_manager.py",
@@ -8288,9 +8376,9 @@
             },
             {
               "name": "Recoverable dangerous patterns + blocked-result schema",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools declares DangerousPatterns []HardlinePattern (recoverable rules from Hermes DANGEROUS_PATTERNS), DetectDangerous(cmd) (matched, description), and BlockedResult{Approved=false, Hardline bool, Description, Operator, Command, Evidence map[string]string} produced by GuardCommand(cmd, mode) which calls DetectHardline first then DetectDangerous; pure, no execute_code wiring in this slice",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8332,7 +8420,7 @@
                 "TestBlockedResultEvidenceFields: Evidence map records the matched pattern description and the input command verbatim.",
                 "TestGuardCommandPure: GuardCommand has no side effects (verified by absence of os/exec, net/http, os.Open in dangerous_command.go)."
               ],
-              "note": "Continuation of the 5.J split. The prior single quarantined row is replaced by this two-row sequence; a third follow-up row will wire GuardCommand into execute_code.",
+              "note": "Complete: TDD added internal/tools/dangerous_command_test.go and the pure internal/tools/dangerous_command.go guard. The recoverable Hermes DANGEROUS_PATTERNS table compiles under Go regexp, DetectDangerous reports matched descriptions, GuardCommand calls DetectHardline first, hardline results remain unapproved and non-bypassable, recoverable results set ApprovalRequired=true, benign commands return the zero value, evidence records the command and matched pattern description, and execute_code.go remains untouched.",
               "write_scope": [
                 "internal/tools/dangerous_command.go",
                 "internal/tools/dangerous_command_test.go",
@@ -8347,6 +8435,11 @@
               "done_signal": [
                 "GuardCommand returns typed BlockedResult values; hardline beats recoverable; benign returns zero value; no side effects; execute_code.go is still unchanged."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:eb28145f tools/approval.py",
@@ -8477,9 +8570,9 @@
             {
               "name": "Planner audit blank-subphase control-plane bucket",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/plannerloop.subphaseFromTask normalizes empty/non-conforming task labels to a sentinel ControlPlaneSubphaseID = 'control-plane/backend' so SummarizeAutoloopAudit toxic_subphases and hot_subphases never use the empty string as a subphase_id",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -8526,6 +8619,11 @@
               "done_signal": [
                 "ControlPlaneSubphaseID is exported from internal/plannerloop and SummarizeAutoloopAudit attributes empty-Task events to it; four named tests pass; backend.go/backend_failure.go are unchanged."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "gormes",
                 "owned_since": "2026-04-26T01:23:57Z",
@@ -10122,9 +10220,9 @@
             },
             {
               "name": "CLI log redactor for known secret shapes",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli/log_redact.go exposes RedactLine(line []byte) ([]byte, int) where the int is the number of redactions applied. Matches and replaces with \"[REDACTED]\": (1) Bearer XXX in any header line, (2) api_key=VALUE or x-api-key: VALUE, (3) Telegram bot tokens NN:XXXXXXXX (digits + colon + >=20 alnum/_/-), (4) Slack xoxb-/xoxp-/xoxs- tokens, (5) OpenAI sk-* keys longer than 16 chars. Returns input unchanged with count=0 if no match. Pure: only regexp + bytes packages from stdlib.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -10169,6 +10267,11 @@
               "done_signal": [
                 "internal/cli/log_redact_test.go fixtures prove redaction across the five secret shapes plus no-match preservation."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "split",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/logs.py",
@@ -10482,9 +10585,9 @@
             {
               "name": "TUI gateway tool summary formatter",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure helper internal/tuigateway/tool_summary.go exposes FormatToolSummary(name string, resultJSON []byte, durationSeconds *float64) (string, bool). Mirrors upstream tui_gateway/server.py:_tool_summary (line 996): for web_search returns 'Did N searches' (or 'Did 1 search'); for web_extract returns 'Extracted N pages'; for any other tool returns 'Completed' if duration is set, else (\"\", false). The duration suffix ' in 1.2s' is appended whenever durationSeconds is non-nil. Caller decides whether to emit; this helper never logs or writes.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -10522,7 +10625,7 @@
                 "TestFormatToolSummary_InvalidJSONFallsBackToCompleted treats malformed result as no-data.",
                 "Helper does not depend on time.Now or external services."
               ],
-              "note": "Third TUI gateway pure-helper slice. Mirrors the upstream summary contract for web_search and web_extract; future tools can be added incrementally.",
+              "note": "Complete: internal/tuigateway/tool_summary.go exposes FormatToolSummary(name string, resultJSON []byte, durationSeconds *float64) (string, bool) as a pure JSON-shape formatter with no registry, logging, wall-clock, or service dependency. Fixtures in internal/tuigateway/tool_summary_test.go prove web_search singular/plural summaries, web_extract plural summaries, unknown-tool duration fallback, unknown-tool no-duration suppression, and malformed JSON fallback to Completed when a duration is present.",
               "write_scope": [
                 "internal/tuigateway/tool_summary.go",
                 "internal/tuigateway/tool_summary_test.go",
@@ -10536,6 +10639,11 @@
               "done_signal": [
                 "internal/tuigateway/tool_summary_test.go fixtures prove web_search singular/plural, web_extract plural, unknown-tool-with-duration, and unknown-tool-no-duration paths with no live tool registry."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:eaa7e2db tui_gateway/server.py:_tool_summary",
@@ -10778,6 +10886,64 @@
               }
             },
             {
+              "name": "TUI prompt-submit auto-title eligibility helper",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Pure helper internal/tui/auto_title.go exposes type AutoTitleInput struct{SessionKey string; FallbackSessionID string; Status string; UserText string; AssistantText string; Interrupted bool; HistoryCount int}, type AutoTitleRequest struct{SessionID string; UserText string; AssistantText string; HistoryCount int}, and BuildAutoTitleRequest(in AutoTitleInput) (AutoTitleRequest, bool). It returns ok=true only when Status==\"complete\", Interrupted is false, strings.TrimSpace(UserText) and strings.TrimSpace(AssistantText) are non-empty, and the resolved session ID is non-empty. Resolution prefers strings.TrimSpace(SessionKey) and falls back to strings.TrimSpace(FallbackSessionID). The returned request preserves the original UserText/AssistantText bytes and HistoryCount. No title generation, provider call, DB write, goroutine, clock lookup, or TUI transport change in this slice.",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "TUI/session status can report auto_title_skipped with reason interrupted, empty_prompt, empty_response, non_complete, or missing_session before a later row wires title generation.",
+              "fixture": "internal/tui/auto_title_test.go::TestBuildAutoTitleRequest",
+              "source_refs": [
+                "../hermes-agent/tui_gateway/server.py@9662e321:prompt.submit",
+                "../hermes-agent/tests/test_tui_gateway_server.py@9662e321:test_prompt_submit_auto_titles_session_on_complete",
+                "../hermes-agent/tests/test_tui_gateway_server.py@9662e321:test_prompt_submit_skips_auto_title_when_interrupted",
+                "../hermes-agent/tests/test_tui_gateway_server.py@9662e321:test_prompt_submit_skips_auto_title_when_response_empty",
+                "internal/tui/update.go",
+                "internal/session/directory.go"
+              ],
+              "ready_when": [
+                "internal/tui already owns pure helper files and tests; this row adds one helper without touching Bubble Tea update flow.",
+                "The worker can table-test eligibility with synthetic strings and history counts; no title model, database, or live TUI session is required."
+              ],
+              "not_ready_when": [
+                "The slice calls an LLM/title generator, writes session metadata, starts goroutines, or changes kernel/TUI submit behavior.",
+                "The slice ports Hermes Python session_key storage directly instead of adapting to Gormes SessionID metadata."
+              ],
+              "acceptance": [
+                "TestBuildAutoTitleRequest_CompletePromptReturnsRequest: status complete with session_key, non-empty user text, non-empty assistant text, and HistoryCount=2 returns ok=true and preserves the original texts.",
+                "TestBuildAutoTitleRequest_FallbackSessionID: empty SessionKey with FallbackSessionID=\"sid\" returns request.SessionID=\"sid\".",
+                "TestBuildAutoTitleRequest_SkipsInterrupted: Interrupted=true returns ok=false even when texts are non-empty.",
+                "TestBuildAutoTitleRequest_SkipsEmptyPromptOrResponse: whitespace-only UserText or AssistantText returns ok=false.",
+                "TestBuildAutoTitleRequest_SkipsNonCompleteOrMissingSession: non-complete status or empty resolved session returns ok=false."
+              ],
+              "note": "Tracks Hermes 9662e321, which wired maybe_auto_title into tui_gateway prompt.submit after message.complete for clean non-empty TUI turns. Gormes should land the pure eligibility/request helper first so a later wiring row can update native session titles without hiding DB/provider side effects inside the TUI update loop.",
+              "write_scope": [
+                "internal/tui/auto_title.go",
+                "internal/tui/auto_title_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tui -run TestBuildAutoTitleRequest -count=1",
+                "go test ./internal/tui -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/tui/auto_title_test.go fixtures prove complete-turn eligibility, interrupted/empty/non-complete skips, session-key fallback, and zero title generation side effects."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:9662e321 tui_gateway/server.py prompt.submit",
+                "note": "Hermes defines the TUI auto-title trigger; Gormes adapts it as a pure native TUI/session request helper before title generation is wired."
+              }
+            },
+            {
               "name": "TUI TerminalNativeSelectionHelp constant + help-string fixture",
               "status": "planned",
               "contract": "internal/tui declares an exported string constant TerminalNativeSelectionHelp = 'Selection: use your terminal's native selection (Shift-drag in most terminals; iTerm Cmd-drag, tmux copy-mode). Gormes does not advertise an in-app copy hotkey.' and a pure helper SelectionHelpLine() that returns it; one fixture asserts the constant exists, mentions 'terminal' but not 'Cmd+C'/'Ctrl+C'/'Ctrl-Shift-C'/'OSC 52'/'clipboard hotkey'/'Ink', and another asserts no advertised copy shortcut leaks anywhere else in the package",
@@ -10863,6 +11029,7 @@
               ],
               "unblocks": [
                 "Native TUI /save canonical session export",
+                "Native TUI /branch session fork + transcript target switch",
                 "TUI running-agent placeholder surfaces interrupt + queued slash actions"
               ],
               "acceptance": [
@@ -10971,6 +11138,77 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:2536a36f ui-tui/src/app/slash/commands/core.ts",
                 "note": "Hermes defines /save as a JSON-RPC session.save call; Gormes wires it directly to internal/transcript.ExportMarkdown via an injected SessionExportFunc to keep the TUI testable without SSE/JSON-RPC."
+              }
+            },
+            {
+              "name": "Native TUI /branch session fork + transcript target switch",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Native Bubble Tea TUI adds a `/branch [name]` slash handler using an injected SessionBranchFunc(ctx context.Context, req BranchRequest) (BranchResult, error). BranchRequest carries ParentSessionID, Title, and HistoryCount; BranchResult carries SessionID, ParentSessionID, Title, and TranscriptCopied. The handler refuses empty conversation history, never submits `/branch` to the kernel, calls the injected function with the current frame SessionID, updates the model's active SessionID to the returned branch SessionID, clears per-session pending UI state, and ensures subsequent turns persist under the branch session rather than the parent. The backing session/transcript helper copies persisted turns from parent to child and writes session.Metadata with ParentSessionID=parent and LineageKind=session.LineageKindFork; ResolveLineageTip must continue ignoring fork children.",
+              "contract_status": "fixture_ready",
+              "slice_size": "medium",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "TUI StatusMessage reports `branch: no conversation`, `branch: no active session`, `branch: store unavailable`, or `branch: fork failed: <err>`; failures leave the parent session active and do not copy partial turns.",
+              "fixture": "internal/tui/slash_branch_test.go and internal/session/fork_test.go",
+              "source_refs": [
+                "../hermes-agent/cli.py@0824ba6a:_handle_branch_command",
+                "../hermes-agent/hermes_state.py@0824ba6a:list_sessions_rich",
+                "../hermes-agent/tests/cli/test_branch_command.py@0824ba6a",
+                "../hermes-agent/tests/test_hermes_state.py@0824ba6a:TestListSessionsRich",
+                "internal/session/lineage.go:LineageKindFork,ResolveLineageTip",
+                "internal/transcript/markdown.go:ExportMarkdown",
+                "internal/tui/slash_dispatch.go"
+              ],
+              "ready_when": [
+                "Native TUI slash-command dispatch table is complete, so `/branch` can register as a handled slash command instead of entering the model prompt.",
+                "parent_session_id lineage for compression splits is validated, so fork children can be represented without changing compression-tip resolution.",
+                "internal/transcript already stores persisted turns by session_id and can be exercised through sqlite fixtures with no live provider."
+              ],
+              "not_ready_when": [
+                "The slice changes cmd/gormes startup wiring, opens a provider connection, or implements a full session browser/list UI in the same change.",
+                "The slice treats fork children as compression continuations or rewrites parent transcript history instead of copying to a child session."
+              ],
+              "blocked_by": [
+                "Native TUI slash-command dispatch table",
+                "parent_session_id lineage for compression splits"
+              ],
+              "acceptance": [
+                "TestSessionFork_CopiesTranscriptAndWritesForkMetadata seeds a parent transcript, forks to a child, asserts copied turn count, ParentSessionID=parent, and LineageKindFork.",
+                "TestSessionFork_ResolveLineageTipIgnoresFork proves a fork child does not become the live compression continuation for its parent.",
+                "TestSlashBranch_EmptyHistoryReturnsStatus runs `/branch` with no model history and asserts StatusMessage=`branch: no conversation` and no SessionBranchFunc call.",
+                "TestSlashBranch_HappyPathSwitchesSessionIDAndDoesNotSubmit wires a fake SessionBranchFunc, asserts the model SessionID changes to the child, the fake sees the parent ID, and kernel.Submit is not called.",
+                "TestSlashBranch_CustomNamePreserved passes `/branch refactor path` and asserts BranchRequest.Title=`refactor path`."
+              ],
+              "note": "Tracks Hermes 0824ba6a, which fixed /branch so post-branch writes target the branch session log and branch sessions remain visible in session lists while delegate/compression children stay hidden. Gormes adapts this to native session IDs, transcript copying, and fork lineage rather than Python session_log_file paths.",
+              "write_scope": [
+                "internal/session/fork.go",
+                "internal/session/fork_test.go",
+                "internal/transcript/fork.go",
+                "internal/transcript/fork_test.go",
+                "internal/tui/slash_branch.go",
+                "internal/tui/slash_branch_test.go",
+                "internal/tui/slash_dispatch.go",
+                "internal/tui/model.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/session -run 'TestSessionFork_|TestBoltMap_ResolveLineageTipFollowsCompressionChildrenOnly' -count=1",
+                "go test ./internal/transcript -run TestForkTranscript -count=1",
+                "go test ./internal/tui -run TestSlashBranch_ -count=1",
+                "go test ./internal/session ./internal/transcript ./internal/tui -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Fork fixtures prove transcript copy, fork lineage metadata, compression-tip exclusion, TUI session switch, custom branch title propagation, and no kernel submission for `/branch`."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:0824ba6a cli.py:_handle_branch_command",
+                "note": "Hermes defines branch/fork session semantics; Gormes adapts them to Go-native transcript/session stores and the internal LineageKindFork contract."
               }
             },
             {
@@ -11477,8 +11715,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T01:23:57Z",
-            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, edc78e25/31d7f195 add Ink selection-copy fixes that Gormes must either adapt natively or document as a terminal-native divergence, and 2536a36f routes TUI /save through canonical session.save JSON-RPC so Gormes needs a native /save session-export row instead of UI-shaped transcript serialization."
+            "last_upstream_check": "2026-04-26T18:00:00Z",
+            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, edc78e25/31d7f195 add Ink selection-copy fixes that Gormes documents as a terminal-native divergence, 2536a36f routes TUI /save through canonical session.save JSON-RPC, 0824ba6a tightens /branch so post-branch writes target the branch session and branch children remain visible without becoming compression continuations, and 9662e321 wires prompt.submit auto-title generation after clean non-empty TUI completions. Gormes tracks those as native /save, /branch, and auto-title eligibility rows over internal/transcript, session.LineageKindFork, and native TUI helper seams instead of importing Hermes Python session_log_file or maybe_auto_title wiring."
           }
         },
         "5.R": {

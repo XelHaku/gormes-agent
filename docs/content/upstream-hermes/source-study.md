@@ -13,10 +13,64 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `eaa7e2db`
+- Upstream commit: `9be83728`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `af646b52`
+- Gormes commit: `9aa50224`
 - Date: 2026-04-26
+
+## 2026-04-26 (auto-title, skills cleanup, Docker docs) Drift Check
+
+The synchronized Hermes head moved from `0824ba6a` to `9be83728`. Honcho
+remains at `e659b6b` and GBrain remains at `172b55b`, so no new Goncho/Honcho
+memory row is needed. Internal implementation remains Goncho; public memory
+tools keep Honcho-compatible `honcho_*` names where external contracts require
+them.
+
+The new Hermes delta is small but touches three planning surfaces:
+
+- `9662e321` wires `maybe_auto_title()` into `tui_gateway/server.py` after a
+  clean `prompt.submit` completion with non-empty user prompt and assistant
+  response. Gormes does not have the Python TUI gateway/session-key path, so the
+  roadmap now tracks a native Phase 5.Q helper row,
+  `TUI prompt-submit auto-title eligibility helper`, before any title
+  generation or session metadata write is wired.
+- `93977675` removes the empty `skills/feeds` category marker and its website
+  `CATEGORY_LABELS["feeds"]` entry. Gormes' `internal/skills` surface does not
+  have a static feeds category label, so this is documented in the Phase 5.F
+  drift state rather than adding an executable row.
+- `9be83728` clarifies Docker terminal-backend lifecycle: the top-level agent
+  reuses one `default` container across sessions, `/new`, and `/reset`, while
+  `delegate_task` subagents and RL rollouts isolate by generated `task_id`.
+  Gormes' Phase 5.B Docker backend is still planned, so the roadmap now adds
+  `Docker backend top-level container reuse semantics` as a pure keying row
+  before live container execution.
+
+## 2026-04-26 (branch drift) Drift Check
+
+The synchronized Hermes head moved from `42c076d3` to `0824ba6a`. Honcho
+remains at `e659b6b` and GBrain remains at `172b55b`; no new memory-donor
+behavior changed, so the internal implementation name stays Goncho while public
+tool contracts keep `honcho_*` where compatibility requires it.
+
+The Hermes delta is narrow but user-visible:
+
+- `0824ba6a` updates `/branch` so an active agent's `session_log_file` is
+  redirected to the newly created branch session. Gormes has no Python
+  `session_log_file`, but the equivalent native contract is that `/branch`
+  switches the active TUI/kernel session ID and all later transcript writes use
+  the branch ID, not the parent.
+- The same commit changes `SessionDB.list_sessions_rich()` so branch children
+  are visible in default session lists while delegate subagents and compression
+  continuations stay hidden. Gormes already has `session.LineageKindFork` and
+  `ResolveLineageTip` ignores fork children; the missing slice is the native
+  TUI `/branch` handler plus transcript-copy helper that writes fork metadata.
+- `scripts/release.py` only added an author-map entry and does not affect the
+  Gormes architecture plan.
+
+The roadmap now tracks this under Phase 5.Q as
+`Native TUI /branch session fork + transcript target switch`, blocked behind
+the existing native slash-command dispatch table and the validated session
+lineage contract.
 
 ## 2026-04-26 (later) Drift Check
 

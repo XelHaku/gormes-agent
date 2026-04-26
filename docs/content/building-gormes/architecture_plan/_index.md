@@ -37,7 +37,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 35/74 subphases shipped · 17 in progress · 22 planned
+**Overall:** 35/74 subphases shipped · 19 in progress · 20 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -73,7 +73,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Autoloop row health and quarantine contract
 - [x] Planner self-healing verdict loop
 - [x] Planner divergence and provenance awareness
-- [ ] Watchdog checkpoint coalescing
+- [x] Watchdog checkpoint coalescing
 - [x] PR-intake idle backoff
 - [ ] Watchdog dead-process vs slow-progress separation
 - [ ] Builder-loop self-improvement vs user-feature ratio metric
@@ -379,14 +379,14 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Aux compression single-prompt threshold reconciliation
 - [ ] Manual compression feedback + context references
 
-### 4.C — Native Prompt Builder ⏳
+### 4.C — Native Prompt Builder 🔨
 
 - [ ] System + memory + tools + history assembly
 - [ ] Context-file discovery + injection scan
 - [ ] Model-specific role and tool-use guidance
 - [ ] Toolset-aware skills prompt snapshot
 - [ ] Memory and session-search guidance assembly
-- [ ] [SYSTEM:→[IMPORTANT: meta-instruction prefix rename for Azure content filter compatibility
+- [x] [SYSTEM:→[IMPORTANT: meta-instruction prefix rename for Azure content filter compatibility
 
 ### 4.D — Smart Model Routing 🔨
 
@@ -448,6 +448,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Environment interface + file sync contract
 - [ ] Docker
+- [ ] Docker backend top-level container reuse semantics
 - [ ] Modal
 - [ ] Daytona
 - [ ] Singularity
@@ -478,7 +479,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Skill registries
 - [x] Skill preprocessing + dynamic slash commands
 - [ ] [IMPORTANT:] prompt prefix for cron and skill commands
-- [ ] Skills list — enabled/disabled status column + --enabled-only filter
+- [x] Skills list — enabled/disabled status column + --enabled-only filter
 
 ### 5.G — MCP Integration 🔨
 
@@ -488,7 +489,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] MCP HTTP transport + tool/list discovery
 - [ ] MCP schema normalization + structured-content adapter
 - [x] MCP OAuth state store + noninteractive auth errors
-- [ ] MCP OAuth refresh + 401 session-expired recovery
+- [x] MCP OAuth refresh + 401 session-expired recovery
 - [ ] Managed tool gateway bridge
 
 ### 5.H — ACP Integration ⏳
@@ -507,7 +508,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Dangerous action gating
 - [x] Hardline command pattern table + DetectHardline function
-- [ ] Recoverable dangerous patterns + blocked-result schema
+- [x] Recoverable dangerous patterns + blocked-result schema
 - [ ] Approval mode config normalization
 - [ ] Subagent dangerous-command non-interactive approval policy
 - [ ] Cron dangerous-command approval mode
@@ -525,13 +526,13 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Multi-model coordination
 
-### 5.N — Misc Operator Tools ⏳
+### 5.N — Misc Operator Tools 🔨
 
 - [ ] Todo
 - [ ] Clarify
 - [ ] Session search
 - [ ] Debug helpers
-- [ ] Planner audit blank-subphase control-plane bucket
+- [x] Planner audit blank-subphase control-plane bucket
 - [ ] Cronjob tool API + schedule parser parity
 - [ ] Cron context_from output chaining
 - [ ] Cron prompt/script safety + pre-run script contract
@@ -568,7 +569,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Diagnostics, backup, logs, and status CLI
 - [ ] doctorCustomEndpointReadiness check function
 - [ ] Custom provider model-switch credential preservation
-- [ ] CLI log redactor for known secret shapes
+- [x] CLI log redactor for known secret shapes
 - [ ] CLI log snapshot reader using shared redactor
 
 ### 5.P — Docker / Packaging ⏳
@@ -585,14 +586,16 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
 - [x] TUI gateway tool-progress mode normalizer
 - [x] TUI gateway completion path normalizer
-- [ ] TUI gateway tool summary formatter
+- [x] TUI gateway tool summary formatter
 - [ ] TUI gateway image/personality/platform-event helpers
 - [x] TUI mouse tracking config + slash toggle
 - [x] Native TUI bundle independence check
 - [x] TUI launch model override + static alias resolver
+- [ ] TUI prompt-submit auto-title eligibility helper
 - [ ] TUI TerminalNativeSelectionHelp constant + help-string fixture
 - [x] Native TUI slash-command dispatch table
 - [ ] Native TUI /save canonical session export
+- [ ] Native TUI /branch session fork + transcript target switch
 - [ ] TUI running-agent placeholder surfaces interrupt + queued slash actions
 - [ ] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
