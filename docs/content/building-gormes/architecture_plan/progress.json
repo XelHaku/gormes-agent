@@ -5680,9 +5680,9 @@
             {
               "name": "[SYSTEM:→[IMPORTANT: meta-instruction prefix rename for Azure content filter compatibility",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Single rename of the bracketed meta-instruction prefix used for skill-invocation and cron-heartbeat prompts: change every occurrence of the literal string \"[SYSTEM:\" to \"[IMPORTANT:\" in (a) internal/skills/commands.go (currently at line 94 inside the BuildSkill block string template) and (b) internal/cron/heartbeat.go's CronHeartbeatPrefix constant. The replacement is byte-for-byte over a 7→10 character literal; semantic meaning to the model is unchanged. Update the two existing assertions in internal/skills/preprocessing_commands_test.go (string literal `[SYSTEM: The user has invoked`) and the two assertions in internal/cron/heartbeat_test.go (HasPrefix and contained \"[SYSTEM:\") to match the new prefix. No public Go API renames, no struct shape changes, no provider/transport edits, no schema migrations.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -5716,7 +5716,7 @@
                 "TestSkillsCommandsBuildBlockNeverEmitsLegacyMarker (new) renders BuildSkillBlock against a synthetic active skill and asserts strings.Contains(out, \"[SYSTEM:\") == false.",
                 "go vet ./... and go build ./... pass with no compile errors after the rename."
               ],
-              "note": "Mirrors upstream Hermes d7a34682 (fix(prompts): replace [SYSTEM: with [IMPORTANT: to avoid Azure content filter, fixes #6576). The Azure OpenAI Default/DefaultV2 content filter heuristic flags [SYSTEM: at message head as a prompt-injection attempt and rejects with HTTP 400; switching to [IMPORTANT: preserves model semantics and bypasses the heuristic. Two Gormes files emit this marker today (internal/skills/commands.go:94 and internal/cron/heartbeat.go:16); both have existing fixture coverage that needs synchronized updates inside the same slice. This is a deliberate cross-package literal rename, not a refactor — no helper extraction.",
+              "note": "Complete: cron heartbeat and skill-invocation prompts now emit [IMPORTANT: while preserving the existing prompt bodies and public Go APIs. Fixtures assert the new prefix, the absence of legacy [SYSTEM: markers from the relevant rendered prompts, and the exact heartbeat constant body. Mirrors upstream Hermes d7a34682 (fix(prompts): replace [SYSTEM: with [IMPORTANT: to avoid Azure content filter, fixes #6576).",
               "write_scope": [
                 "internal/skills/commands.go",
                 "internal/cron/heartbeat.go",

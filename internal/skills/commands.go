@@ -91,7 +91,7 @@ func ResolveSkillSlashCommand(commands []SkillSlashCommand, raw string) (SkillSl
 
 func BuildSkillSlashCommandMessage(command SkillSlashCommand, userInstruction string, opts SlashMessageOptions) string {
 	parts := []string{
-		`[SYSTEM: The user has invoked the "` + command.Name + `" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]`,
+		`[IMPORTANT: The user has invoked the "` + command.Name + `" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]`,
 		"",
 		strings.TrimSpace(command.Skill.Body),
 	}
