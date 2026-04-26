@@ -13,11 +13,23 @@ Go-native `gormes-agent`.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/gbrain`
-- Upstream commit: `172b55b`
+- Upstream commit: `e2961c0`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
 - Date: 2026-04-26
 
-## 2026-04-26 Drift Check
+## 2026-04-26 v0.22.1 Drift Check
+
+GBrain `e2961c0` ships a maintenance-loop hotfix wave: cooperative cycle abort,
+worker slot recovery after ignored aborts, incremental extraction bounded by
+changed slugs, server-side stale embedding filters, and Postgres session
+timeouts. Gormes should not import the Minions worker or Postgres runtime, but
+the architecture lessons matter. The roadmap now records a blocked Phase 2.E.3
+durable-worker abort-slot recovery slice for the first real durable worker loop,
+and a Phase 6.D delta-bounded retrieval maintenance slice so future learning
+passes do not reprocess the whole local memory/skills corpus when only a small
+set changed.
+
+## 2026-04-26 v0.22.0 Drift Check
 
 GBrain `172b55b` ships v0.22.0 source-aware search ranking. The new lesson is
 source-swamp resistance: curated sources win over bulky chat/daily/raw imports

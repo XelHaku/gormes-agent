@@ -74,6 +74,8 @@ The handler can remain ordinary Go.
 | hybrid search + source-aware ranking | FTS5, graph traversal, semantic recall, source-tier evidence | Add a retrieval eval harness, stable score breakdown, curated/reviewed boosts, bulk-source damping, hard-exclude evidence, and temporal-query bypass. |
 | Code Cathedral II call graph + two-pass retrieval | optional code-context evidence for skill/retrieval explanations | Start with synthetic parent-scope/call-edge fixtures and capped high-fan-out behavior; do not embed GBrain's TypeScript indexer or tree-sitter WASM in the runtime. |
 | Minions SQL queue | subagent manager, cron, audit logs | Add a durable job ledger for long work and child runs. |
+| v0.22.1 worker abort and slot recovery | durable worker loop and builder/autoloop health | Propagate cancellation through every long phase and free claimed worker slots with auditable timeout evidence when a handler ignores cancellation. |
+| v0.22.1 incremental extract + embed-stale filters | learning-loop skill and memory maintenance passes | Carry changed-source IDs through extract/index/embed phases and prove stale-only work avoids whole-corpus scans. |
 | `subagent_messages` and tool ledger | run logs and transcript export | Persist child-agent messages/tool calls enough to resume or replay. |
 | skills resolver and checks | `internal/skills` active/inactive store | Add resolver conformance, routing evals, conflict checks, and promotion evidence. |
 | `gbrain doctor`/skillpack-check | `gormes doctor --offline` | Extend doctor to report operation registry, memory degradation, job queue health, and skill resolver health. |
@@ -141,6 +143,14 @@ Do not start with every Minions feature. Start with the current
 and LLM subagents, with shell-like work kept operator-trusted. Then implement
 only the cron/subagent replay needs: claim, renew, complete, fail, retry,
 cancel, parent child_done event, and audit.
+
+GBrain `e2961c0` adds one more durable-job lesson: timeout must release capacity
+even when a handler ignores cancellation. Gormes should keep this as a small,
+blocked durable-worker row until there is a real worker execution loop: a claimed
+job receives the run context, timeout records aborted/dead evidence, a grace
+timer frees the slot without double-completing the job, and doctor/status names
+the recovery path. Do not build a hidden background worker just to satisfy the
+lesson.
 
 ### 3. Strengthen Memory Provenance Before More Recall Magic
 
@@ -210,6 +220,18 @@ that skill retrieval can consume:
 That lets the learning loop benefit from code-context donors later without
 silently requiring tree-sitter, WASM grammars, repository-wide backfill, or a
 second database.
+
+### 5b. Bound Maintenance Work By Changed Sources
+
+GBrain `e2961c0` fixed production loops that re-read tens of thousands of pages
+and pulled unnecessary embedding columns just to discover that nothing changed.
+The Gormes analogue is future skill/memory maintenance, not the current static
+skill selector. Carry changed source IDs from sync/import/draft writes into the
+extract and scoring phases; when there are no changed sources, return a visible
+no-op result. For embedding refresh, preflight with a stale-count query or
+in-memory equivalent and only load stale texts. The operator-facing status
+should report full-scan fallback separately from delta maintenance so a slow
+learning loop is diagnosable before it starves gateway or TUI work.
 
 ### 6. Define Degraded Mode As A Product Contract
 

@@ -37,12 +37,12 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 37/74 subphases shipped · 19 in progress · 18 planned
+**Overall:** 36/74 subphases shipped · 20 in progress · 18 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 16/20 subphases |
+| Phase 2 — The Gateway | 🔨 | 15/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 2/18 subphases |
@@ -173,12 +173,13 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Interrupt propagation to concurrent-tool workers
 
-### 2.E.3 — OS-AI Spine: Durable Job Resilience ✅
+### 2.E.3 — OS-AI Spine: Durable Job Resilience 🔨
 
 - [x] Durable job backpressure + timeout audit
 - [x] Durable worker supervisor status seam
 - [x] Durable pause/resume intent contract
 - [x] Durable replay and inbox message contract
+- [ ] Durable worker abort-slot recovery safety net
 
 ### 2.F.1 — Slash Command Registry + Gateway Dispatch ✅
 
@@ -356,7 +357,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Bedrock
 - [x] Bedrock Converse payload mapping (no AWS SDK)
 - [x] Bedrock stream event decoding (SSE fixtures)
-- [ ] Bedrock SigV4 + credential seam
+- [x] Bedrock SigV4 + credential seam
 - [ ] Bedrock stale-client eviction + retry classification
 - [ ] Gemini
 - [ ] OpenRouter
@@ -638,6 +639,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Hybrid lexical + semantic lookup
 - [ ] Source-aware retrieval damping fixtures
+- [ ] Delta-bounded skill and memory maintenance passes
 - [ ] Code Cathedral II code-context retrieval fixtures
 
 ### 6.E — Feedback Loop ⏳

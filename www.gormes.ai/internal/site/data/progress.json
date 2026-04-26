@@ -675,8 +675,8 @@
           ],
           "drift_state": {
             "status": "owned",
-            "last_upstream_check": "2026-04-26T21:50:06Z",
-            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes 755a2804, GBrain 172b55b, and Honcho e659b6b were checked this run, but this subphase remains owned and complete; follow-up audit-fidelity work stays in Phase 5.N beside the existing planner audit row so Phase 1 closeout remains stable."
+            "last_upstream_check": "2026-04-26T23:11:47Z",
+            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes 755a2804, GBrain e2961c0, and Honcho e659b6b were checked this run; this subphase remains owned and complete. GBrain's v0.22.1 abort-slot and delta-maintenance lessons are tracked as small future rows in 2.E.3 and 6.D rather than reopening Phase 1 control-plane closeout."
           }
         }
       }
@@ -1938,12 +1938,77 @@
                 "upstream_ref": "gbrain:11abb24 skills/minion-orchestrator/SKILL.md",
                 "note": "Upstream provides the lifecycle and protection model; Gormes owns the Go-native ledger representation."
               }
+            },
+            {
+              "name": "Durable worker abort-slot recovery safety net",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "When Gormes grows a real durable worker execution loop, timed-out jobs propagate cancellation into the handler and a bounded grace timer frees the worker slot with auditable recovery evidence if the handler ignores cancellation",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Durable-worker status reports abort_signal_sent, abort_slot_recovered, handler_ignored_abort, or abort_recovery_unavailable instead of leaving capacity wedged.",
+              "fixture": "internal/subagent/durable_worker_abort_test.go",
+              "source_refs": [
+                "../gbrain/CHANGELOG.md@e2961c0:v0.22.1",
+                "../gbrain/src/core/cycle.ts@e2961c0:CycleOpts.signal",
+                "../gbrain/src/commands/jobs.ts@e2961c0:autopilot-cycle passes job.signal to runCycle",
+                "../gbrain/src/core/minions/worker.ts@e2961c0:force-eviction safety net",
+                "../gbrain/test/e2e/worker-abort-recovery.test.ts@e2961c0",
+                "internal/subagent/durable_ledger.go",
+                "internal/subagent/durable_supervisor_status_test.go",
+                "internal/doctor/durable_ledger.go"
+              ],
+              "ready_when": [
+                "A Gormes durable worker execution loop exists that claims jobs from the SQLite ledger and invokes a handler through context.Context.",
+                "Durable job backpressure + timeout audit, Durable worker supervisor status seam, and Durable replay and inbox message contract are validated on main.",
+                "The worker can be tested with fake handlers only; no shell executor, external worker daemon, or GBrain runtime is required."
+              ],
+              "not_ready_when": [
+                "The slice must create the first durable worker execution loop, shell handler, or systemd service before cancellation can be tested.",
+                "The slice changes live delegate_task behavior, cron execution semantics, or builder-loop backend execution.",
+                "The tests require real timeouts longer than 100ms, external processes, Postgres/PGLite, or GBrain TypeScript imports."
+              ],
+              "blocked_by": [
+                "Durable worker execution loop"
+              ],
+              "acceptance": [
+                "TestDurableWorker_TimeoutPropagatesCancel seeds a claimed job with a short timeout, runs a fake handler that observes ctx.Done, and asserts the ledger records aborted/dead evidence plus abort_signal_sent status.",
+                "TestDurableWorker_IgnoredAbortReleasesSlot runs a fake handler that blocks after ctx cancellation; after the injected grace clock fires, worker capacity is released, abort_slot_recovered is recorded once, and the handler cannot later double-complete the job.",
+                "TestDurableWorker_ClaimsNextJobAfterRecovery proves a second waiting job can be claimed after recovery from the ignored-abort handler.",
+                "Doctor/status fixtures expose handler_ignored_abort and abort_recovery_unavailable without requiring operators to inspect raw ledger rows."
+              ],
+              "note": "GBrain e2961c0 fixed a production Minions wedge where a timed-out autopilot cycle ignored AbortSignal and kept the worker at capacity. Gormes already has timeout audit and supervisor status, but no real durable worker execution loop yet; keep this row blocked until that loop exists so workers do not invent a daemon just to port the safety net.",
+              "write_scope": [
+                "internal/subagent/durable_worker.go",
+                "internal/subagent/durable_worker_abort_test.go",
+                "internal/doctor/durable_ledger.go",
+                "internal/doctor/durable_ledger_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/subagent -run 'TestDurableWorker_TimeoutPropagatesCancel|TestDurableWorker_IgnoredAbortReleasesSlot|TestDurableWorker_ClaimsNextJobAfterRecovery' -count=1",
+                "go test ./internal/subagent ./internal/doctor -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Durable worker fixtures prove timeout cancellation reaches handlers, ignored handlers free capacity through a one-shot grace recovery, the next job can claim, and doctor/status expose abort recovery evidence."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:e2961c0 src/core/minions/worker.ts",
+                "note": "GBrain provides the abort-slot recovery lesson; Gormes adapts it only after a Go-native durable worker loop exists."
+              }
             }
           ],
           "drift_state": {
-            "status": "converged",
-            "last_upstream_check": "2026-04-25T11:44:44Z",
-            "origin_decision": "GBrain 11abb24 unified the jobs lane into minion-orchestrator. Gormes now has Go-native durable routing, ledger, backpressure, supervisor status, pause/resume, replay, inbox, and protected-submit denial slices validated over SQLite; future GBrain drift should become new small rows instead of keeping this subphase porting."
+            "status": "porting",
+            "last_upstream_check": "2026-04-26T23:11:47Z",
+            "origin_decision": "GBrain 11abb24 unified the jobs lane into minion-orchestrator, and GBrain e2961c0 adds abort propagation plus a force-eviction safety net for wedged workers. Gormes has Go-native durable routing, ledger, backpressure, supervisor status, pause/resume, replay, inbox, and protected-submit denial validated over SQLite. The remaining upstream-led delta is blocked until Gormes has a real durable worker execution loop, so the new abort-slot recovery row is non-executable and does not ask workers to invent a daemon."
           }
         },
         "2.F.1": {
@@ -5158,7 +5223,6 @@
               ],
               "health": {
                 "attempt_count": 2,
-                "consecutive_failures": 0,
                 "last_attempt": "2026-04-26T23:00:47Z",
                 "last_success": "2026-04-26T23:00:47Z",
                 "last_failure": {
@@ -5179,9 +5243,9 @@
             },
             {
               "name": "Bedrock SigV4 + credential seam",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/hermes/bedrock_sigv4.go exposes a transport-free Bedrock credential and signing seam: ResolveBedrockAuth(env map[string]string) BedrockAuthEvidence classifies AWS_BEARER_TOKEN_BEDROCK, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, AWS_PROFILE, AWS_CONTAINER_CREDENTIALS_RELATIVE_URI, AWS_WEB_IDENTITY_TOKEN_FILE, or missing credentials; ResolveBedrockRegion(env) chooses AWS_REGION, AWS_DEFAULT_REGION, then us-east-1; SignBedrockRequest(req *http.Request, creds StaticAWSCredentials, now time.Time) error adds deterministic SigV4 Authorization, X-Amz-Date, and X-Amz-Content-Sha256 headers for bedrock-runtime without opening the network",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -5222,7 +5286,7 @@
                 "TestSignBedrockRequest_DeterministicHeaders signs a fixed POST /model/x/converse request with a fixed body/time/creds and asserts Authorization starts with `AWS4-HMAC-SHA256 Credential=AKIA_TEST/20260426/us-east-1/bedrock/aws4_request`, X-Amz-Date=`20260426T224556Z`, and X-Amz-Content-Sha256 equals the request body SHA-256.",
                 "TestBedrockAuthEvidence_RedactsSecrets asserts Evidence.String() and error text contain none of the fake access key, secret key, session token, or bearer token."
               ],
-              "note": "Planner split 2026-04-26T22:45:56Z: this was previously note-only and blocked stale-client work. It now defines a narrow fake-env + deterministic SigV4 seam so no worker has to invent credential scope or pull in AWS SDK behavior.",
+              "note": "Complete: TDD added internal/hermes/bedrock_sigv4_test.go and internal/hermes/bedrock_sigv4.go for a transport-free Bedrock auth and SigV4 seam. Tests cover bearer-token priority, static key-pair completeness, profile/container/web-identity classification, AWS_REGION > AWS_DEFAULT_REGION > us-east-1, deterministic fixed-time SigV4 headers for bedrock-runtime, body preservation, and redacted evidence/error text with no AWS SDK, profile-file read, IMDS/ECS endpoint call, provider registration, retry classification, or config schema change.",
               "write_scope": [
                 "internal/hermes/bedrock_sigv4.go",
                 "internal/hermes/bedrock_sigv4_test.go",
@@ -5236,6 +5300,11 @@
               "done_signal": [
                 "internal/hermes/bedrock_sigv4_test.go proves env-source classification, region priority, deterministic SigV4 headers, and redacted evidence without AWS SDK or network calls."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T23:11:47Z",
+                "last_success": "2026-04-26T23:11:47Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:755a2804 agent/bedrock_adapter.py",
@@ -12612,6 +12681,7 @@
                 "Hybrid lexical + semantic lookup"
               ],
               "unblocks": [
+                "Delta-bounded skill and memory maintenance passes",
                 "Code Cathedral II code-context retrieval fixtures",
                 "Skill effectiveness scoring"
               ],
@@ -12641,6 +12711,74 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:172b55b src/core/search/sql-ranking.ts",
                 "note": "GBrain defines source-swamp resistance; Gormes adapts it as explainable source-tier scoring for skills and memory."
+              }
+            },
+            {
+              "name": "Delta-bounded skill and memory maintenance passes",
+              "status": "planned",
+              "contract": "Learning-loop maintenance accepts changed source IDs and stale semantic-refresh hints so skill/memory extraction, scoring, and embedding refresh can no-op or process only changed records instead of rescanning the whole local corpus",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Maintenance status reports delta_noop, delta_sources_missing, stale_refresh_empty, or full_scan_fallback evidence instead of silently doing whole-corpus work.",
+              "fixture": "internal/skills/delta_maintenance_test.go",
+              "source_refs": [
+                "../gbrain/CHANGELOG.md@e2961c0:v0.22.1",
+                "../gbrain/src/core/cycle.ts@e2961c0:pagesAffected-to-extract flow",
+                "../gbrain/src/commands/extract.ts@e2961c0:extractForSlugs",
+                "../gbrain/src/commands/embed.ts@e2961c0:countStaleChunks/listStaleChunks",
+                "../gbrain/test/extract-incremental.test.ts@e2961c0",
+                "../gbrain/test/embed.test.ts@e2961c0",
+                "docs/content/upstream-gbrain/gormes-takeaways.md",
+                "internal/skills/selector.go",
+                "internal/memory/semantic_sql.go"
+              ],
+              "ready_when": [
+                "Hybrid lexical + semantic lookup and Source-aware retrieval damping fixtures are validated so maintenance evidence can reuse score explanations and source tiers.",
+                "The worker can use fake skill/memory rows and injected stale-count callbacks; no live embeddings, Ollama, Postgres/PGLite, or tree-sitter runtime is required."
+              ],
+              "not_ready_when": [
+                "The slice ports GBrain's sync/import command, TypeScript extractors, SQL ranking builders, or a repository-wide code indexer.",
+                "The slice requires live embedding calls or reads the whole checkout/memory corpus in unit tests.",
+                "The slice changes prompt injection or skill selection behavior before the maintenance evidence shape is fixture-locked."
+              ],
+              "blocked_by": [
+                "Source-aware retrieval damping fixtures"
+              ],
+              "unblocks": [
+                "Skill effectiveness scoring"
+              ],
+              "acceptance": [
+                "TestDeltaMaintenance_NoChangedSourcesReturnsNoop passes an empty changed-source list and asserts no extractor/scorer/embedding callback is invoked and status evidence is delta_noop.",
+                "TestDeltaMaintenance_ProcessesOnlyChangedSources passes two changed skill or memory source IDs and asserts only those IDs reach the fake extractor/scorer.",
+                "TestDeltaMaintenance_StaleRefreshSkipsWhenCountZero injects staleCount=0 and asserts no stale text loader or embed callback runs.",
+                "TestDeltaMaintenance_FullScanFallbackIsExplicit omits changed-source evidence and asserts the returned plan marks full_scan_fallback instead of hiding a whole-corpus scan.",
+                "Score/status explanations carry source IDs, stale counts, and fallback reason strings without importing GBrain's database runtime."
+              ],
+              "note": "GBrain e2961c0 fixed production loops that re-read 54K markdown files and pulled unnecessary embedding data on every autopilot cycle. Gormes should preserve the lesson for future skill/memory maintenance: delta inputs and stale-only refresh are operator-visible contracts, not hidden performance magic.",
+              "write_scope": [
+                "internal/skills/delta_maintenance.go",
+                "internal/skills/delta_maintenance_test.go",
+                "internal/memory/semantic_sql.go",
+                "docs/content/upstream-gbrain/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/skills ./internal/memory -run 'TestDeltaMaintenance_' -count=1",
+                "go test ./internal/skills ./internal/memory -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Delta maintenance fixtures prove no-op, changed-source-only, stale-count-zero, and explicit full-scan fallback behavior with operator-visible evidence and no live embedding/runtime imports."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:e2961c0 src/core/cycle.ts",
+                "note": "GBrain provides the delta/stale maintenance lesson; Gormes adapts it to local skills and memory maintenance evidence."
               }
             },
             {
@@ -12703,8 +12841,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T12:19:33Z",
-            "origin_decision": "GBrain f718c59/172b55b lead the retrieval lessons for hybrid scoring, Code Cathedral II evidence, and source-swamp resistance. Gormes should adapt these as small SQLite/skills evidence contracts with visible degraded modes, not import GBrain's TypeScript chunker, PGLite/Postgres search runtime, or SQL ranking builders."
+            "last_upstream_check": "2026-04-26T23:11:47Z",
+            "origin_decision": "GBrain f718c59/172b55b/e2961c0 lead the retrieval lessons for hybrid scoring, Code Cathedral II evidence, source-swamp resistance, and delta-bounded maintenance. Gormes should adapt these as small SQLite/skills evidence contracts with visible degraded modes, not import GBrain's TypeScript chunker, PGLite/Postgres search runtime, or SQL ranking builders."
           }
         },
         "6.E": {

@@ -13,18 +13,19 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `9be83728`
+- Upstream commit: `755a2804`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `9aa50224`
+- Gormes commit: `4b408086`
 - Date: 2026-04-26
 
 ## 2026-04-26 (auto-title, skills cleanup, Docker docs) Drift Check
 
-The synchronized Hermes head moved from `0824ba6a` to `9be83728`. Honcho
-remains at `e659b6b` and GBrain remains at `172b55b`, so no new Goncho/Honcho
-memory row is needed. Internal implementation remains Goncho; public memory
-tools keep Honcho-compatible `honcho_*` names where external contracts require
-them.
+The synchronized Hermes head moved from `0824ba6a` to `9be83728`; the sibling
+repo is now at `755a2804` after release-author mapping. Honcho remains at
+`e659b6b`, and GBrain is now at `e2961c0`; no new Goncho/Honcho memory row is
+needed from this Hermes delta. Internal implementation remains Goncho; public
+memory tools keep Honcho-compatible `honcho_*` names where external contracts
+require them.
 
 The new Hermes delta is small but touches three planning surfaces:
 
