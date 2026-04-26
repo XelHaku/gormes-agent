@@ -40,6 +40,7 @@ const (
 	FailureWorkerError      FailureCategory = "worker_error"
 	FailureReportValidation FailureCategory = "report_validation_failed"
 	FailureProgressSummary  FailureCategory = "progress_summary_failed"
+	FailureNoProgress       FailureCategory = "no_progress"
 	FailureTimeout          FailureCategory = "timeout"
 	FailureBackendDegraded  FailureCategory = "backend_degraded"
 )

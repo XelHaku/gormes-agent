@@ -516,7 +516,7 @@ func TestRunOnce_PreflightFailureSoftSkipsAndContinues(t *testing.T) {
         "12.B": {
           "name": "SB",
           "items": [
-            {"name": "row-ok", "status": "planned", "contract": "do y", "contract_status": "draft"}
+            {"name": "row-ok", "status": "planned", "contract": "do y", "contract_status": "draft", "write_scope": ["soft-skip-success.txt"]}
           ]
         }
       }
@@ -540,7 +540,16 @@ func TestRunOnce_PreflightFailureSoftSkipsAndContinues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	runner := &FakeRunner{Results: []Result{{}, {}}}
+	runner := runnerFunc(func(ctx context.Context, command Command) Result {
+		if command.Name == "opencode" {
+			if err := os.WriteFile(filepath.Join(command.Dir, "soft-skip-success.txt"), []byte("ok\n"), 0o644); err != nil {
+				t.Fatalf("write worker output: %v", err)
+			}
+			runGitCommand(t, command.Dir, "add", "soft-skip-success.txt")
+			runGitCommand(t, command.Dir, "commit", "-m", "worker success after soft skip")
+		}
+		return Result{}
+	})
 
 	_, err := RunOnce(context.Background(), RunOptions{
 		Config: Config{

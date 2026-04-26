@@ -200,6 +200,10 @@ func newOneshotHTTPClient(_ context.Context, cfg config.Config, invocation onesh
 	return hermes.NewHTTPClientWithProvider(cfg.Hermes.Endpoint, cfg.Hermes.APIKey, invocation.Inference.Provider), nil
 }
 
+func runResolvedOneshot(cmd *cobra.Command, invocation oneshotInvocation) error {
+	return runResolvedOneshotWithClient(cmd, invocation, newOneshotHTTPClient)
+}
+
 func runResolvedOneshotWithClient(cmd *cobra.Command, invocation oneshotInvocation, newClient oneshotClientFactory, configureKernel ...oneshotKernelConfigurer) error {
 	if newClient == nil {
 		newClient = newOneshotHTTPClient
@@ -309,6 +313,18 @@ func finalAssistantContent(history []hermes.Message) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func runTUI(cmd *cobra.Command, _ []string) error {
+	invocation, err := resolveTUIInvocation(cmd)
+	if err != nil {
+		return err
+	}
+	return runResolvedTUI(cmd, invocation)
+}
+
+func runResolvedTUI(cmd *cobra.Command, invocation tuiInvocation) error {
+	return runResolvedTUIWithRuntime(cmd, invocation, rootRuntime{})
 }
 
 type tuiProgram interface {

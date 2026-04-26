@@ -50,6 +50,12 @@ func (c *coalescer) setPending(text string) {
 	}
 }
 
+func (c *coalescer) currentMessageID() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.pendingMsgID
+}
+
 func (c *coalescer) flushImmediate(ctx context.Context, text string) {
 	c.flushImmediateFinal(ctx, text, false)
 }

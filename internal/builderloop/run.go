@@ -31,6 +31,8 @@ var ErrPostPromotionVerifyFailed = errors.New("post-promotion verify failed")
 // overlap planner regeneration.
 var ErrControlPlaneRunInProgress = errors.New("control-plane run already in progress")
 
+var errWorkerNoChanges = errors.New("worker made no changes")
+
 type RunOptions struct {
 	Config Config
 	Runner Runner
@@ -341,6 +343,9 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			finishErr := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker)
 			recordWorkerOutcome(acc, observeOutcome, degrader.Current(), worker, finishErr)
 			if finishErr != nil {
+				if errors.Is(finishErr, errWorkerNoChanges) {
+					continue
+				}
 				return RunSummary{}, errors.Join(finishErr, flushHealth())
 			}
 			completedWork = true
@@ -433,6 +438,9 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		finishErr := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker)
 		recordWorkerOutcome(acc, observeOutcome, degrader.Current(), worker, finishErr)
 		if finishErr != nil {
+			if errors.Is(finishErr, errWorkerNoChanges) {
+				continue
+			}
 			return RunSummary{}, errors.Join(finishErr, flushHealth())
 		}
 		completedWork = true
@@ -1170,6 +1178,9 @@ func mapFinishErrorToCategory(worker workerRun, err error) progress.FailureCateg
 	if err == nil {
 		return ""
 	}
+	if errors.Is(err, errWorkerNoChanges) {
+		return progress.FailureNoProgress
+	}
 	// A backend exit error (worker.Result.Err != nil) is always worker_error.
 	if worker.Result.Err != nil {
 		return progress.FailureWorkerError
@@ -1439,6 +1450,8 @@ func finishWorker(ctx context.Context, cfg Config, runner Runner, backendName st
 				}); err != nil {
 					return err
 				}
+				removeCleanWorkerWorktree(cfg.RepoRoot, worker.WorktreePath)
+				return fmt.Errorf("%w: %s", errWorkerNoChanges, worker.Task)
 			}
 			removeCleanWorkerWorktree(cfg.RepoRoot, worker.WorktreePath)
 		} else {
@@ -1455,6 +1468,7 @@ func finishWorker(ctx context.Context, cfg Config, runner Runner, backendName st
 				return err
 			}
 			removeCleanWorkerWorktree(cfg.RepoRoot, worker.WorktreePath)
+			return fmt.Errorf("%w: %s", errWorkerNoChanges, worker.Task)
 		}
 	}
 
