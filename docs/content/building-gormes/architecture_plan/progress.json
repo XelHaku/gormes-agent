@@ -9345,6 +9345,20 @@
               "done_signal": [
                 "doctorCustomEndpointReadiness is a pure function with five named tests; doctorCmd invokes it; no internal/config or internal/hermes files are modified."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:33:49Z",
+                "last_failure": {
+                  "run_id": "20260426T152715Z-551870907",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "command 3 failed: exit status 1"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:b2d3308f hermes_cli/doctor.py",
