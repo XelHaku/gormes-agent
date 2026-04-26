@@ -476,12 +476,15 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Skills hub search read-model function over registry providers
 - [ ] Skill registries
 - [x] Skill preprocessing + dynamic slash commands
+- [ ] [IMPORTANT:] prompt prefix for cron and skill commands
 
 ### 5.G — MCP Integration 🔨
 
 - [ ] MCP client
 - [x] MCP server config/env resolver
-- [ ] MCP fake-server discovery + tool schema normalization
+- [ ] MCP stdio transport + tool/list discovery
+- [ ] MCP HTTP transport + tool/list discovery
+- [ ] MCP schema normalization + structured-content adapter
 - [ ] MCP OAuth state store + noninteractive auth errors
 - [ ] MCP OAuth refresh + 401 session-expired recovery
 - [ ] Managed tool gateway bridge
@@ -540,7 +543,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] CLI deterministic tip selector
 - [ ] CLI webhook URL normalizer
 - [ ] CLI dump support-summary helper
-- [ ] CLI tips/dump/webhook deterministic helpers (deprecated umbrella)
+- [x] CLI tips/dump/webhook deterministic helpers (deprecated umbrella)
 - [x] PTY bridge protocol adapter
 - [ ] CLI command registry parity + active-turn busy policy
 - [ ] Gateway /reasoning session override command
@@ -556,7 +559,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Platform toolset config persistence + MCP sentinel
 - [x] Effective toolset picker dedupes bundled plugin keys
 - [ ] Gateway, platform, webhook, and cron management CLI
-- [ ] Gateway management CLI read-model closeout
+- [x] Gateway management CLI read-model closeout
+- [ ] Gateway mutating-subcommand unavailability stub
 - [x] Service RestartSec parser helper
 - [x] Service restart active-status poller
 - [ ] Diagnostics, backup, logs, and status CLI
@@ -582,7 +586,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Native TUI bundle independence check
 - [x] TUI launch model override + static alias resolver
 - [ ] TUI TerminalNativeSelectionHelp constant + help-string fixture
+- [ ] Native TUI slash-command dispatch table
 - [ ] Native TUI /save canonical session export
+- [ ] TUI running-agent placeholder surfaces interrupt + queued slash actions
 - [ ] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
 - [x] Responses API store + run event stream

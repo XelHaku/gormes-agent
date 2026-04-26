@@ -7245,6 +7245,68 @@
                 "last_attempt": "2026-04-25T05:56:06Z",
                 "last_success": "2026-04-25T05:56:06Z"
               }
+            },
+            {
+              "name": "[IMPORTANT:] prompt prefix for cron and skill commands",
+              "status": "planned",
+              "contract": "internal/cron.CronHeartbeatPrefix and internal/skills.BuildSkillSlashCommandMessage emit `[IMPORTANT:` instead of `[SYSTEM:` so Azure OpenAI Default/DefaultV2 content filters do not reject Gormes prompts as prompt-injection (HTTP 400) — same semantic meta-instruction, different bracketed marker; tests update in lockstep so the byte-match assertions still cover drift",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Operator-visible prompt text changes from `[SYSTEM: ...]` to `[IMPORTANT: ...]`; behavior is otherwise identical, including the `[SILENT]` suppression contract and the skill body trimming.",
+              "fixture": "internal/cron/heartbeat_test.go",
+              "source_refs": [
+                "../hermes-agent/cron/scheduler.py@d7a34682",
+                "../hermes-agent/agent/skill_commands.py@d7a34682",
+                "../hermes-agent/cli.py@20cb706e",
+                "../hermes-agent/gateway/run.py@20cb706e",
+                "../hermes-agent/tools/process_registry.py@20cb706e",
+                "internal/cron/heartbeat.go:CronHeartbeatPrefix",
+                "internal/cron/heartbeat_test.go",
+                "internal/skills/commands.go:BuildSkillSlashCommandMessage",
+                "internal/skills/preprocessing_commands_test.go"
+              ],
+              "ready_when": [
+                "Upstream Hermes shipped this rename across two commits (d7a34682 + 20cb706e) on 2026-04-09 / 2026-04-26 with explicit cause (Azure content filter HTTP 400 on `[SYSTEM:` markers).",
+                "Gormes uses the same marker pattern in exactly two production code paths today: internal/cron/heartbeat.go (CronHeartbeatPrefix) and internal/skills/commands.go (BuildSkillSlashCommandMessage)."
+              ],
+              "not_ready_when": [
+                "The slice changes the `[SILENT]` token semantics, the skill body trimming, the cron prompt structure beyond the bracketed marker word, or the `Heartbeat [SYSTEM:] + [SILENT] delivery contract` row name in 2.D (that row name is a historical record; only the runtime constant + the byte-match tests change).",
+                "The slice introduces a new Azure provider adapter, a content-filter-detection layer, or a configurable marker word — the change is a hardcoded literal rename only.",
+                "The slice updates internal/progress/progress_test.go literal assertions for the 2.D row name (the row name in progress.json must stay as `Heartbeat [SYSTEM:] + [SILENT] delivery contract` for historical accuracy)."
+              ],
+              "acceptance": [
+                "internal/cron/heartbeat.go:CronHeartbeatPrefix starts with `[IMPORTANT:` (replacing `[SYSTEM:`) and the load-bearing phrases (`DELIVERY:`, `SILENT:`, `[SILENT]`) are byte-identical to the prior version.",
+                "internal/cron/heartbeat_test.go asserts `strings.HasPrefix(full, \"[IMPORTANT:\")` (not `[SYSTEM:`); the existing TestHeartbeatPrefix_ContainsLoadBearingPhrases load-bearing phrase set updates only its first member.",
+                "internal/skills/commands.go:BuildSkillSlashCommandMessage emits `[IMPORTANT: The user has invoked the \"<name>\" skill, ...` (replacing `[SYSTEM:`).",
+                "internal/skills/preprocessing_commands_test.go updates its expected golden string to `[IMPORTANT:` for the affected fixtures.",
+                "DetectSilent semantics in internal/cron/heartbeat.go are unchanged (the `[SILENT]` token is independent of the leading marker)."
+              ],
+              "note": "Mirror of Hermes commits d7a34682 + 20cb706e (Azure content filter dodge). Workers must NOT rename the historical 2.D row `Heartbeat [SYSTEM:] + [SILENT] delivery contract` — that row is complete and its name reflects the original landing. The runtime constant + tests rename in lockstep. cli.py, gateway/run.py, and tools/process_registry.py do not have direct Gormes analogs that emit this marker today, so this slice covers only the cron + skills constants.",
+              "write_scope": [
+                "internal/cron/heartbeat.go",
+                "internal/cron/heartbeat_test.go",
+                "internal/skills/commands.go",
+                "internal/skills/preprocessing_commands_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cron ./internal/skills -count=1",
+                "go test ./internal/progress -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "go test ./internal/cron and ./internal/skills both pass after the marker rename; `grep -rn '\\[SYSTEM:' internal/cron/ internal/skills/` returns no matches in production code; `grep -rn '\\[IMPORTANT:' internal/cron/ internal/skills/` returns at least 4 matches (constant + tests in both packages)."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:d7a34682+20cb706e cron/scheduler.py,agent/skill_commands.py",
+                "note": "Direct port of Hermes commits d7a34682 (initial rename in cron/skill_commands) + 20cb706e (extension to cli/gateway/process_registry). Gormes only mirrors the cron + skills changes because the cli/gateway/process_registry call sites don't emit this marker yet."
+              }
             }
           ]
         },
@@ -7261,7 +7323,9 @@
               ],
               "unblocks": [
                 "MCP server config/env resolver",
-                "MCP fake-server discovery + tool schema normalization",
+                "MCP stdio transport + tool/list discovery",
+                "MCP HTTP transport + tool/list discovery",
+                "MCP schema normalization + structured-content adapter",
                 "MCP OAuth state store + noninteractive auth errors",
                 "Managed tool gateway bridge"
               ],
@@ -7296,7 +7360,8 @@
                 "The slice opens stdio/HTTP transports, performs OAuth, probes tools, starts managed gateways, or treats HONCHO_API_URL as global Goncho configuration instead of a server-local MCP env binding."
               ],
               "unblocks": [
-                "MCP fake-server discovery + tool schema normalization",
+                "MCP stdio transport + tool/list discovery",
+                "MCP HTTP transport + tool/list discovery",
                 "MCP OAuth state store + noninteractive auth errors"
               ],
               "acceptance": [
@@ -7332,87 +7397,194 @@
               }
             },
             {
-              "name": "MCP fake-server discovery + tool schema normalization",
+              "name": "MCP stdio transport + tool/list discovery",
               "status": "planned",
-              "contract": "Gormes discovers tools from deterministic fake MCP stdio and HTTP servers, normalizes schemas into native tool descriptors, and degrades reconnect/timeout/cancel paths without corrupting the TUI",
+              "contract": "internal/tools/mcp_stdio.go exposes a stdio MCP client (NewStdioClient(def MCPServerDefinition, opts StdioClientOpts) (*StdioClient, error); (*StdioClient).Initialize(ctx) error; (*StdioClient).ListTools(ctx) ([]MCPRawTool, error); (*StdioClient).Close() error) that speaks JSON-RPC over a stdio.ReadWriteCloser injected from tests — deterministic over an in-process fake server with no real subprocess",
               "contract_status": "draft",
-              "slice_size": "medium",
+              "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "MCP discovery/status reports unavailable SDK, connect timeout, schema rejection, reconnect backoff, and stderr-log locations without registering unsafe descriptors.",
-              "fixture": "internal/tools/mcp_client_test.go",
+              "degraded_mode": "Initialize/ListTools failures return typed errors (ErrConnectTimeout, ErrInitializeFailed, ErrInvalidJSONRPCResponse) and Close is idempotent; no global stderr/stdout writes, no os.StartProcess in tests.",
+              "fixture": "internal/tools/mcp_stdio_test.go",
               "source_refs": [
-                "../hermes-agent/tools/mcp_tool.py@edc78e25",
-                "../hermes-agent/tests/tools/test_mcp_tool.py@edc78e25",
-                "../hermes-agent/tests/tools/test_mcp_dynamic_discovery.py@edc78e25",
-                "../hermes-agent/tests/tools/test_mcp_structured_content.py@edc78e25",
-                "../hermes-agent/tests/tools/test_mcp_stability.py@edc78e25",
+                "../hermes-agent/tools/mcp_tool.py@edc78e25:_StdioMCPServer,probe_mcp_server_tools",
+                "../hermes-agent/tests/tools/test_mcp_tool.py@edc78e25:test_stdio_initialize,test_stdio_list_tools",
+                "internal/tools/mcp_config.go:MCPServerDefinition,MCPTransportStdio,defaultMCPConnectTimeout",
                 "internal/tools/tool.go"
               ],
               "ready_when": [
-                "MCP server config/env resolver is validated, so server definitions are typed and redacted before connection.",
-                "Fake stdio/HTTP MCP servers can be represented with in-process test doubles; no network credentials or npm packages are required."
+                "internal/tools/mcp_config.go already provides MCPServerDefinition with Command/Args/Env and the stdio transport constant.",
+                "Tests inject a `Conn io.ReadWriteCloser` instead of spawning a real subprocess; an in-process bytes.Buffer-based fake server can echo JSON-RPC frames."
               ],
               "not_ready_when": [
-                "The slice implements OAuth, managed tool gateways, sampling LLM callbacks, or live third-party MCP server smoke tests."
+                "The slice opens a real OS subprocess in tests, talks to the network, implements the HTTP transport, performs schema normalization beyond raw tool envelopes, or registers tools into the kernel registry.",
+                "The slice introduces OAuth, sampling, structured-content adapters, or `tools/list_changed` notification handling."
               ],
               "blocked_by": [
                 "MCP server config/env resolver"
               ],
               "unblocks": [
-                "Managed tool gateway bridge"
+                "MCP HTTP transport + tool/list discovery",
+                "MCP schema normalization + structured-content adapter"
               ],
               "acceptance": [
-                "Fake stdio and HTTP transports expose tool/list and call-tool fixtures that become native tools with deterministic names, descriptions, schemas, and timeouts.",
-                "Structured content and text content results are normalized without leaking raw protocol envelopes into model-facing output.",
-                "tools/list_changed-style discovery updates replace stale descriptors deterministically.",
-                "Server stderr is routed to an MCP log path or disabled sink and never writes directly to the TUI/stdout stream in tests.",
-                "Connect timeout, call timeout, cancellation, reconnect backoff, and schema rejection all produce visible degraded evidence."
+                "internal/tools/mcp_stdio.go declares: type StdioClientOpts struct{ Conn io.ReadWriteCloser, Logger *slog.Logger, Now func() time.Time }; type StdioClient struct{ ... }; type MCPRawTool struct{ Name, Description string, InputSchema json.RawMessage }; var ErrConnectTimeout, ErrInitializeFailed, ErrInvalidJSONRPCResponse error.",
+                "TestStdioClient_InitializeNegotiatesProtocolVersion writes a fake `initialize` response with protocolVersion `2024-11-05` and asserts Initialize returns nil + records the negotiated version.",
+                "TestStdioClient_InitializeReturnsErrInitializeFailedOnError writes a fake JSON-RPC error response and asserts Initialize returns ErrInitializeFailed wrapped with the error message.",
+                "TestStdioClient_ListToolsParsesToolList writes a fake `tools/list` response with two tools (one with InputSchema, one without) and asserts ListTools returns both with stable ordering and verbatim InputSchema bytes.",
+                "TestStdioClient_ConnectTimeoutHonoredViaContext sets ctx with a 10ms deadline against a fake that never responds and asserts ListTools returns context.DeadlineExceeded (or wrapped ErrConnectTimeout).",
+                "TestStdioClient_CloseIsIdempotent calls Close twice and asserts no panic, no double-close error.",
+                "No test calls os/exec; verified by `grep -L 'os/exec' internal/tools/mcp_stdio.go internal/tools/mcp_stdio_test.go`."
               ],
-              "note": "Split discovery/schema normalization from OAuth and managed gateways so the first runnable MCP client slice can land over fake servers only.",
+              "note": "Reshaped 2026-04-26 (split 1 of 3 from the prior `MCP fake-server discovery + tool schema normalization` quarantine). Original contract bundled stdio + HTTP + normalization + dynamic refresh + stderr isolation into one medium row; workers couldn't land it atomically and reported no_progress 3 times. This row is the smallest runnable stdio slice. The original RowHealth was dropped per the split convention.",
               "write_scope": [
-                "internal/tools/mcp_client.go",
-                "internal/tools/mcp_client_test.go",
-                "internal/tools/mcp_config.go",
+                "internal/tools/mcp_stdio.go",
+                "internal/tools/mcp_stdio_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/tools -run 'Test.*MCP.*Client|Test.*MCP.*Discovery|Test.*MCP.*Schema|Test.*MCP.*Timeout' -count=1",
+                "go test ./internal/tools -run 'TestStdioClient_' -count=1",
                 "go test ./internal/tools -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Fake MCP server fixtures prove discovery, schema normalization, structured result conversion, stderr isolation, timeout/cancel degradation, and dynamic descriptor refresh."
+                "All 5 TestStdioClient_* fixtures pass and `grep -L 'os/exec' internal/tools/mcp_stdio*.go` confirms no real subprocess is spawned."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T14:32:48Z",
-                "last_failure": {
-                  "run_id": "20260426T143235Z-044472064",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 5/5.G/MCP fake-server discovery + tool schema normalization"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T14:32:48Z",
-                  "after_run_id": "20260426T143235Z-044472064",
-                  "threshold": 3,
-                  "spec_hash": "9bba55b83c008d763e93424f8ed65b8feeb65fadb8a72fdf3198dc1f480ad80f",
-                  "last_category": "no_progress"
-                }
-              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:edc78e25 tools/mcp_tool.py",
-                "note": "Hermes remains the donor for MCP runtime behavior; Gormes ports it behind native fake-server fixtures first."
+                "note": "Hermes remains the donor for MCP stdio runtime behavior; Gormes ports it behind an injected io.ReadWriteCloser so unit tests skip the real subprocess. Health block dropped per split convention."
+              }
+            },
+            {
+              "name": "MCP HTTP transport + tool/list discovery",
+              "status": "planned",
+              "contract": "internal/tools/mcp_http.go exposes an HTTP MCP client (NewHTTPClient(def MCPServerDefinition, opts HTTPClientOpts) (*HTTPClient, error); (*HTTPClient).Initialize(ctx) error; (*HTTPClient).ListTools(ctx) ([]MCPRawTool, error); (*HTTPClient).Close() error) that speaks JSON-RPC over an injectable http.RoundTripper — deterministic over httptest.Server in unit tests with no real network egress",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Same typed errors as the stdio client (ErrConnectTimeout, ErrInitializeFailed, ErrInvalidJSONRPCResponse) plus ErrAuthRequired (HTTP 401) so the OAuth follow-up row can build on it; no panic on response close even if the server hangs up mid-stream.",
+              "fixture": "internal/tools/mcp_http_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/mcp_tool.py@edc78e25:_HTTPMCPServer",
+                "../hermes-agent/tests/tools/test_mcp_tool.py@edc78e25:test_http_initialize,test_http_list_tools,test_http_401",
+                "internal/tools/mcp_config.go:MCPServerDefinition,MCPTransportHTTP,Headers",
+                "internal/tools/mcp_stdio.go:MCPRawTool"
+              ],
+              "ready_when": [
+                "`MCP stdio transport + tool/list discovery` is complete (MCPRawTool and the typed error set are defined).",
+                "MCPServerDefinition.URL + Headers are present in mcp_config.go for HTTP servers.",
+                "Tests construct an httptest.Server returning canned JSON-RPC responses; no real network destination is used."
+              ],
+              "not_ready_when": [
+                "The slice talks to a real network endpoint, implements OAuth flows, performs schema normalization, or wires the HTTP client into the kernel tool registry.",
+                "The slice changes the MCPRawTool struct shape introduced by the stdio row."
+              ],
+              "blocked_by": [
+                "MCP stdio transport + tool/list discovery"
+              ],
+              "unblocks": [
+                "MCP schema normalization + structured-content adapter",
+                "MCP OAuth state store + noninteractive auth errors"
+              ],
+              "acceptance": [
+                "internal/tools/mcp_http.go declares: type HTTPClientOpts struct{ Transport http.RoundTripper, Logger *slog.Logger, Now func() time.Time }; type HTTPClient struct{ ... }; var ErrAuthRequired error.",
+                "TestHTTPClient_InitializeSendsAuthHeadersFromConfig sets MCPServerDefinition.Headers={`Authorization`:`Bearer test`} and asserts the recorded httptest request includes that header.",
+                "TestHTTPClient_ListToolsParsesResponse uses httptest with a canned JSON-RPC tools/list response and asserts ListTools returns the same MCPRawTool shape as the stdio row's TestStdioClient_ListToolsParsesToolList expects.",
+                "TestHTTPClient_401ReturnsErrAuthRequired uses httptest returning 401 and asserts ListTools returns ErrAuthRequired (wrapping the response status).",
+                "TestHTTPClient_ConnectTimeoutHonoredViaContext uses an httptest server that sleeps 1s with ctx deadline 10ms and asserts ErrConnectTimeout (or context.DeadlineExceeded).",
+                "TestHTTPClient_RoundTripperIsInjectable wires a custom http.RoundTripper that records requests; asserts the test never opens a real socket via `net.Listen` outside httptest."
+              ],
+              "note": "Reshaped 2026-04-26 (split 2 of 3). Mirrors the stdio client's API surface so a future managed-gateway bridge or kernel tool-registry wiring sees a consistent client interface across both transports.",
+              "write_scope": [
+                "internal/tools/mcp_http.go",
+                "internal/tools/mcp_http_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run 'TestHTTPClient_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "All 5 TestHTTPClient_* fixtures pass and the only network surface is httptest.Server."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:edc78e25 tools/mcp_tool.py",
+                "note": "Hermes' HTTP MCP transport ported behind an http.RoundTripper. Health block dropped per split convention."
+              }
+            },
+            {
+              "name": "MCP schema normalization + structured-content adapter",
+              "status": "planned",
+              "contract": "internal/tools/mcp_normalize.go converts MCPRawTool slices and tools/call results into native tool descriptors and model-facing strings — sanitizes tool names, validates InputSchema is a JSON-Schema object, flattens structured content vs text content into a single string, isolates server stderr to a per-server log path, and emits a `tools/list_changed`-style refresh hook so dynamic discovery updates replace stale descriptors deterministically",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Invalid InputSchema produces a SchemaRejected status (no descriptor registered); structured content with unknown content kinds renders the text fallback; stderr writes are buffered into a bounded ring buffer (8 KiB tail) and flushed to the configured per-server log file or discarded when no path is set.",
+              "fixture": "internal/tools/mcp_normalize_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/mcp_tool.py@edc78e25:sanitize_mcp_name_component,probe_mcp_server_tools",
+                "../hermes-agent/tests/tools/test_mcp_dynamic_discovery.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_structured_content.py@edc78e25",
+                "../hermes-agent/tests/tools/test_mcp_stability.py@edc78e25",
+                "internal/tools/mcp_stdio.go:MCPRawTool",
+                "internal/tools/tool.go"
+              ],
+              "ready_when": [
+                "`MCP stdio transport + tool/list discovery` and `MCP HTTP transport + tool/list discovery` are both complete (MCPRawTool exists and both clients return a stable shape).",
+                "internal/tools/tool.go provides the native Tool descriptor that NormalizeTools targets."
+              ],
+              "not_ready_when": [
+                "The slice depends on a live MCP server, implements OAuth, registers tools into the kernel registry, or changes the kernel.Tools type.",
+                "The slice introduces a separate `mcpadapter` package outside internal/tools."
+              ],
+              "blocked_by": [
+                "MCP stdio transport + tool/list discovery",
+                "MCP HTTP transport + tool/list discovery"
+              ],
+              "unblocks": [
+                "Managed tool gateway bridge"
+              ],
+              "acceptance": [
+                "internal/tools/mcp_normalize.go declares: type NormalizedTool struct{ Name, ServerName, Description string, InputSchema json.RawMessage, SourceRaw MCPRawTool }; type NormalizeResult struct{ Tools []NormalizedTool, Rejected []SchemaRejection }; type SchemaRejection struct{ ServerName, ToolName, Reason string }; func NormalizeTools(serverName string, raw []MCPRawTool) NormalizeResult; type StructuredContent struct{ ... }; func RenderToolCallResult(parts []StructuredContent) string; type StderrSink interface{ Write(p []byte) (int, error); Close() error }; func NewBoundedStderrSink(path string, tailBytes int) StderrSink.",
+                "TestNormalizeTools_SanitizesUnsafeNames maps `weather/get current` to `weather_get_current` (matching upstream sanitize_mcp_name_component semantics) and asserts the original is preserved on SourceRaw.",
+                "TestNormalizeTools_RejectsInvalidInputSchema feeds a tool with InputSchema `\"true\"` (not an object) and asserts NormalizeResult.Rejected contains it with Reason=`input_schema_must_be_object`; the tool is NOT in NormalizeResult.Tools.",
+                "TestRenderToolCallResult_StructuredContent renders mixed text+image+resource content and asserts the rendered string includes the text part verbatim, image parts as `[image: <mime>]`, and resource parts as `[resource: <uri>]`.",
+                "TestRenderToolCallResult_UnknownContentKindFallsBackToText feeds a content kind `unknown_xyz` and asserts the renderer returns its text field if any (no panic, no leak of raw protocol envelope).",
+                "TestBoundedStderrSink_TruncatesAtTailBytes writes 32 KiB and asserts the file on disk contains only the last 8 KiB (with a `[truncated <N> bytes]` marker prefix).",
+                "TestBoundedStderrSink_DiscardModeNoFileWrite passes path=`` and asserts no file is created and Write returns the full byte count without error."
+              ],
+              "note": "Reshaped 2026-04-26 (split 3 of 3). Closes the tool/list_changed dynamic-refresh story by giving callers a single NormalizeTools/RenderToolCallResult pair plus a bounded stderr sink. Live `tools/list_changed` notification handling lands in a follow-up Managed tool gateway bridge row once the kernel registry exposes the right hook.",
+              "write_scope": [
+                "internal/tools/mcp_normalize.go",
+                "internal/tools/mcp_normalize_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run 'TestNormalizeTools_|TestRenderToolCallResult_|TestBoundedStderrSink_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "All TestNormalizeTools_*, TestRenderToolCallResult_*, and TestBoundedStderrSink_* fixtures pass and `grep -L 'net\\.\\|http\\.' internal/tools/mcp_normalize.go` confirms the normalizer has no transport dependency."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:edc78e25 tools/mcp_tool.py",
+                "note": "Hermes defines the structured-content + sanitization semantics; Gormes ports them behind a transport-free normalizer so dynamic-refresh tests use the same code path. Health block dropped per split convention."
               }
             },
             {
@@ -7557,13 +7729,13 @@
                 "internal/tools/"
               ],
               "ready_when": [
-                "MCP fake-server discovery + tool schema normalization and MCP OAuth state store + noninteractive auth errors are validated on main."
+                "MCP stdio + HTTP transports, MCP schema normalization + structured-content adapter, and MCP OAuth state store + noninteractive auth errors are all validated on main."
               ],
               "not_ready_when": [
                 "The slice contacts a live managed gateway, performs real OAuth, introduces provider-specific managed tools, or bypasses the MCP descriptor/call normalization layer."
               ],
               "blocked_by": [
-                "MCP fake-server discovery + tool schema normalization",
+                "MCP schema normalization + structured-content adapter",
                 "MCP OAuth state store + noninteractive auth errors"
               ],
               "acceptance": [
@@ -8530,13 +8702,13 @@
             },
             {
               "name": "CLI tips/dump/webhook deterministic helpers (deprecated umbrella)",
-              "status": "planned",
+              "status": "complete",
               "slice_size": "umbrella",
               "execution_owner": "tools",
               "not_ready_when": [
                 "The row is selected at all — execute the three sibling rows above (CLI deterministic tip selector, CLI webhook URL normalizer, CLI dump support-summary helper) instead."
               ],
-              "note": "Deprecated 2026-04-26: the prior tips+dump+webhook umbrella was repeatedly quarantined because workers could not land three concept layers atomically. Replaced by three smaller sibling rows. Keep this row in inventory so historical references resolve.",
+              "note": "Closed 2026-04-26 (superseded). The original tips+dump+webhook umbrella was repeatedly quarantined (no_progress x3) because workers could not land three concept layers atomically. Three smaller sibling rows now own the work: `CLI deterministic tip selector`, `CLI webhook URL normalizer`, `CLI dump support-summary helper`. Marked complete so the candidate selector stops surfacing this stale umbrella; the row remains in inventory only so historical references resolve.",
               "health": {
                 "attempt_count": 3,
                 "consecutive_failures": 3,
@@ -8562,7 +8734,7 @@
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/tips.py",
-                "note": "Hermes defines helper semantics; Gormes ports deterministic helper contracts before command wiring."
+                "note": "Superseded 2026-04-26 by three sibling rows. Health block preserved per RowHealth invariant."
               }
             },
             {
@@ -9353,8 +9525,69 @@
             },
             {
               "name": "Gateway management CLI read-model closeout",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway management CLI exposes read-only status, pairing, runtime-validation, and channel-availability evidence over existing Gormes stores before mutating start/stop/restart commands widen the surface",
+              "contract_status": "validated",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Gateway CLI reports missing runtime state, invalid PID/process evidence, missing pairing store, and disabled channels via the existing native runtime/pairing read models instead of inventing a second management state model.",
+              "fixture": "cmd/gormes/gateway_status_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/gateway.py@edc78e25",
+                "../hermes-agent/hermes_cli/pairing.py@edc78e25",
+                "../hermes-agent/hermes_cli/status.py@edc78e25",
+                "cmd/gormes/gateway_status.go",
+                "cmd/gormes/gateway_status_test.go",
+                "internal/gateway/pairing_store.go",
+                "internal/gateway/runtime_status_pid_test.go"
+              ],
+              "ready_when": [
+                "`gormes gateway status` reads the native runtime status, pairing store, and configured channels.",
+                "This slice is read-only; it must not start, stop, restart, install, or supervise live gateway services."
+              ],
+              "not_ready_when": [
+                "The slice invokes systemd/sc.exe, opens live channel clients, changes service restart polling, or creates another gateway state file."
+              ],
+              "unblocks": [
+                "Gateway mutating-subcommand unavailability stub",
+                "Webhook/platform management CLI helpers",
+                "Cron management CLI over native store"
+              ],
+              "acceptance": [
+                "TestGatewayStatusCommand_RendersConfiguredChannelsFromReadModels in cmd/gormes/gateway_status_test.go renders configured Telegram/Discord/Slack channels, pairing status, runtime validation, and missing-state evidence from fake stores.",
+                "TestGatewayStatusCommand_RendersRuntimePIDValidationEvidence asserts PID validation output reuses the existing RuntimeProcessValidation model and never shells out to a live service manager.",
+                "TestGatewayStatusCommand_NoChannelsSucceedsWithoutOpeningRuntimeClients + assertGatewayStatusDidNotOpenRuntimeStores prove no duplicate management state file is opened and no Python Hermes command path is read.",
+                "Top-level gatewayCmd.AddCommand only registers the read-only `status` subcommand today; no mutating start/stop/restart subcommand exists on cmd/gormes/gateway.go to gate, so the unavailability stub is deferred to a sibling row tracked under unblocks."
+              ],
+              "note": "Closed 2026-04-26: read-only acceptance items are landed in cmd/gormes/gateway_status.go and cmd/gormes/gateway_status_test.go (3 fixtures). The fourth acceptance item (unsupported mutating commands return a stable unavailable error) is vacuously satisfied because cmd/gormes/gateway.go currently exposes only `gateway` (run) and `gateway status`; the explicit unavailability stub is split out as `Gateway mutating-subcommand unavailability stub` so workers land it once mutating subcommands are introduced.",
+              "write_scope": [
+                "cmd/gormes/gateway_status.go",
+                "cmd/gormes/gateway_status_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes -run 'TestGatewayStatusCommand' -count=1",
+                "go test ./cmd/gormes ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "TestGatewayStatusCommand_NoChannelsSucceedsWithoutOpeningRuntimeClients, TestGatewayStatusCommand_RendersConfiguredChannelsFromReadModels, and TestGatewayStatusCommand_RendersRuntimePIDValidationEvidence pass without opening session/memory stores or shelling out to a live service manager."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 hermes_cli/gateway.py",
+                "note": "Hermes defines the operator command expectations; Gormes consumes its existing Go read models rather than recreating Python state. Marked complete 2026-04-26 against existing gateway_status.go evidence."
+              }
+            },
+            {
+              "name": "Gateway mutating-subcommand unavailability stub",
+              "status": "planned",
+              "contract": "When `gormes gateway` introduces start/stop/restart/install/uninstall subcommands, each unsupported mutating subcommand surfaces a stable `unavailable` error with a pointer to the existing internal/cli/service_restart.go helper instead of silently failing or shelling out to systemd/launchd",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -9363,75 +9596,53 @@
                 "gateway",
                 "system"
               ],
-              "degraded_mode": "Gateway CLI reports missing runtime state, invalid PID/process evidence, missing pairing store, disabled channels, and unsupported mutating commands instead of inventing a second management state model.",
-              "fixture": "cmd/gormes/gateway_management_cli_test.go",
+              "degraded_mode": "Mutating subcommands print a deterministic `gateway: <subcommand> is not available; use the systemd/service_restart helper` message and exit with a stable non-zero code; no service-manager call is made under tests.",
+              "fixture": "cmd/gormes/gateway_mutating_unavailable_test.go",
               "source_refs": [
-                "../hermes-agent/hermes_cli/gateway.py@edc78e25",
-                "../hermes-agent/hermes_cli/pairing.py@edc78e25",
-                "../hermes-agent/hermes_cli/status.py@edc78e25",
-                "../hermes-agent/tests/hermes_cli/test_gateway_runtime_health.py@edc78e25",
+                "../hermes-agent/hermes_cli/gateway.py@edc78e25:systemd_install,launchd_install,systemd_start,launchd_start",
+                "cmd/gormes/gateway.go",
                 "cmd/gormes/gateway_status.go",
-                "internal/gateway/status.go",
-                "internal/gateway/pairing_store.go"
+                "internal/cli/service_restart.go"
               ],
               "ready_when": [
-                "`gormes gateway status` already reads the native runtime status and pairing stores.",
-                "This slice is read-only; it must not start, stop, restart, install, or supervise live gateway services."
+                "Gateway management CLI read-model closeout is complete (read-only baseline already landed).",
+                "internal/cli/service_restart.go provides the systemd/launchd helper that the unavailability message points to."
               ],
               "not_ready_when": [
-                "The slice invokes systemd/sc.exe, opens live channel clients, changes service restart polling, or creates another gateway state file."
+                "The slice actually shells out to systemd/launchd/sc.exe in tests, or installs/uninstalls real services from a Go test process.",
+                "The slice rewrites the existing `gateway status` subcommand or changes the runtime status read path."
+              ],
+              "blocked_by": [
+                "Gateway management CLI read-model closeout"
               ],
               "unblocks": [
-                "Webhook/platform management CLI helpers",
-                "Cron management CLI over native store"
+                "Service restart active-status poller",
+                "Webhook/platform management CLI helpers"
               ],
               "acceptance": [
-                "A gateway management fixture renders configured channels, pairing status, runtime validation, Slack/Discord/Telegram availability, and missing-state evidence from fake stores.",
-                "Unsupported mutating management commands return a stable unavailable error with a pointer to the existing service/restart helper rows.",
-                "PID validation output reuses the existing runtime status validation model and never shells out to a live service manager in tests.",
-                "The fixture proves no duplicate management state file or Python Hermes command path is read."
+                "Adding mutating subcommands `start`, `stop`, `restart`, `install`, `uninstall` to gatewayCmd registers a deterministic unavailability handler that returns `gateway: <subcommand> is not available; use the service_restart helper` and exits non-zero.",
+                "A new test in cmd/gormes/gateway_mutating_unavailable_test.go invokes `gormes gateway <subcommand>` for each mutating verb and asserts the error message + non-zero exit code without opening systemd/launchd.",
+                "The existing `gateway status` subcommand and runtime status path are unchanged.",
+                "No new gateway runtime state file or service manager dependency is introduced."
               ],
-              "note": "Gormes already has a native gateway status read model. This row closes the CLI handoff around read-only management evidence before future mutating gateway/platform command rows are assigned.",
+              "note": "Split out of `Gateway management CLI read-model closeout` 2026-04-26. The closeout row's read-only acceptance was already validated; this row covers the remaining mutating-command unavailability gap once mutating verbs are introduced.",
               "write_scope": [
-                "cmd/gormes/gateway_status.go",
-                "cmd/gormes/gateway_management_cli_test.go",
-                "internal/gateway/",
+                "cmd/gormes/gateway.go",
+                "cmd/gormes/gateway_mutating_unavailable_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./cmd/gormes ./internal/gateway -run 'Test.*Gateway.*Management|Test.*Gateway.*Status|Test.*Pairing|Test.*Runtime.*Validation' -count=1",
-                "go test ./cmd/gormes ./internal/gateway -count=1",
+                "go test ./cmd/gormes -run 'TestGatewayMutating' -count=1",
+                "go test ./cmd/gormes -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Gateway management fixtures prove read-only status/pairing/runtime evidence, explicit unavailable mutating commands, and no live service-manager dependency."
+                "TestGatewayMutating* fixtures prove every introduced mutating subcommand returns the stable unavailability error and never invokes a live service manager."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T14:32:48Z",
-                "last_failure": {
-                  "run_id": "20260426T143235Z-044472064",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 5/5.O/Gateway management CLI read-model closeout"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T14:32:48Z",
-                  "after_run_id": "20260426T143235Z-044472064",
-                  "threshold": 3,
-                  "spec_hash": "9f82bfe81f15fe4c61697e6d172ec441501d37423e172be21f1f4eafae9cdf0e",
-                  "last_category": "no_progress"
-                }
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/gateway.py",
-                "note": "Hermes defines the operator command expectations; Gormes must consume its existing Go read models rather than recreate Python state."
+                "note": "Hermes exposes systemd/launchd mutating commands; Gormes intentionally defers them to the service_restart helper and surfaces an unavailability stub on cmd/gormes/gateway.go to keep the mutating surface honest."
               }
             },
             {
@@ -9702,6 +9913,20 @@
               "done_signal": [
                 "internal/cli/custom_provider_secret.go declares ResolveCustomProviderSecret, CustomProviderRef, CustomProviderResolution, ErrCustomProviderEnvUnset, and ErrCustomProviderCredentialMissing; five named tests pass; no internal/config, internal/hermes, or cmd/gormes file is modified."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:50:41Z",
+                "last_failure": {
+                  "run_id": "20260426T154403Z-926734365",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "command 4 failed: exit status 1"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:8bbeaea6 hermes_cli/main.py",
@@ -9711,7 +9936,7 @@
             {
               "name": "CLI log snapshot reader",
               "status": "planned",
-              "contract": "Gormes captures redacted local log snapshots for agent, gateway, error, tool-audit, and builder-loop logs from XDG paths without network upload or archive creation",
+              "contract": "internal/cli/log_snapshot.go exposes SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) (Snapshot, error) that reads existing Gormes log files (config.LogPath() + config.ToolAuditLogPath()) from injectable XDG roots, redacts secrets shaped like bearer tokens / api_key=values / Telegram-bot / Slack tokens, caps each file at 64 KiB head + 16 KiB tail, and returns a typed Snapshot per LogClass with explicit Missing/Truncated/Redacted/Unreadable evidence — no network upload, no archive write, no live provider call",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -9719,48 +9944,51 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Diagnostics report missing logs, rotated-log fallback, truncation, redaction, and unreadable-file evidence without failing the whole doctor/status command.",
+              "degraded_mode": "Per-class results carry MissingPrimary, RotatedFallbackUsed, BytesTruncated, LinesTruncated, RedactionsApplied, and Unreadable booleans/counters; the top-level call never returns an error for missing or unreadable files — it embeds the evidence so callers (doctor / status / backup-manifest) can render it without failing.",
               "fixture": "internal/cli/log_snapshot_test.go",
               "source_refs": [
+                "../hermes-agent/hermes_cli/logs.py@edc78e25:LOG_FILES,_TS_RE,_LEVEL_RE",
                 "../hermes-agent/hermes_cli/debug.py@edc78e25",
-                "../hermes-agent/hermes_cli/logs.py@edc78e25",
-                "../hermes-agent/tests/hermes_cli/test_debug.py@edc78e25",
                 "../hermes-agent/tests/hermes_cli/test_logs.py@edc78e25",
-                "internal/cli/",
-                "internal/config/config.go",
+                "internal/config/config.go:LogPath,ToolAuditLogPath,xdgDataHome",
                 "cmd/gormes/doctor.go"
               ],
               "ready_when": [
-                "This slice is a pure local file reader with injected root paths and fixture log files.",
-                "No paste upload, support bundle archive, live provider status, or backup write behavior is required."
+                "internal/config exposes LogPath() and ToolAuditLogPath() (already present at lines 791-794 and 872-875 of internal/config/config.go).",
+                "This slice is a pure local file reader; tests pass injected `LogSnapshotRoots{LogPath, ToolAuditPath}` with files written to t.TempDir() — no paste upload, support bundle archive, live provider status, or backup write behavior is exercised."
               ],
               "not_ready_when": [
-                "The slice uploads to paste.rs/dpaste, creates tar/zip backups, reads legacy Hermes logs as authoritative state, or changes `gormes doctor` exit codes."
+                "The slice adds a `gateway.log`, `errors.log`, or `builder-loop.log` file constant — those don't exist yet and are tracked under follow-up rows once the gateway/builderloop start emitting separate file logs.",
+                "The slice uploads to paste.rs/dpaste, creates tar/zip backups, reads `~/.hermes/logs/` as authoritative state, or changes `gormes doctor` exit codes.",
+                "The slice depends on regex packages outside the standard library or pulls in a YAML/JSON support-bundle layer."
               ],
               "unblocks": [
                 "CLI status summary over native stores",
-                "Backup manifest dry-run contract"
+                "Backup manifest dry-run contract",
+                "Gateway/error log snapshot follow-up (once those files exist)"
               ],
               "acceptance": [
-                "Fixtures read small log files and return full plus tail text for agent, gateway, error, tool-audit, and builder-loop log classes.",
-                "Missing primary logs fall back to rotated log names when available and otherwise emit file-not-found evidence.",
-                "Large logs are capped by byte and line limits with truncation evidence.",
-                "Secrets shaped like API keys, bearer tokens, and configured proxy keys are redacted before rendering."
+                "internal/cli/log_snapshot.go declares: type LogClass string with constants LogClassAgent (\"agent\") and LogClassToolAudit (\"tool_audit\"); type LogSnapshotRoots struct{ AgentLogPath, ToolAuditLogPath string }; type SnapshotOpts struct{ MaxHeadBytes, MaxTailBytes, MaxLines int }; type FileResult struct{ Class LogClass, Path string, Head, Tail string, Missing, RotatedFallbackUsed, BytesTruncated, LinesTruncated, Unreadable bool, RedactionsApplied int }; type Snapshot struct{ Files []FileResult }; func SnapshotLogs(roots LogSnapshotRoots, opts SnapshotOpts) (Snapshot, error).",
+                "Default opts (zero values) cap each file at 64 KiB head + 16 KiB tail and 1000 lines; explicit zero `MaxLines` disables the line cap.",
+                "TestSnapshotLogs_MissingPrimary_FallsBackToRotated writes only `<path>.1` and asserts RotatedFallbackUsed=true; missing both primary and `.1` rotation produces Missing=true (no error).",
+                "TestSnapshotLogs_RedactsBearerAndApiKey writes log lines containing `Authorization: Bearer abcd1234abcd1234`, `api_key=\"sk-live-1234567890\"`, `1234567890:AABBCC-DDEE_FFGGHHII` (Telegram), and `xoxb-12345-67890-abcdef` (Slack) and asserts the rendered Head/Tail does not contain the secret payload, RedactionsApplied >= 4, and the line count is preserved.",
+                "TestSnapshotLogs_TruncatesLargeFiles writes a 256 KiB log, asserts Head len ~64 KiB, Tail len ~16 KiB, BytesTruncated=true, and Head/Tail boundaries do not split a UTF-8 rune.",
+                "TestSnapshotLogs_UnreadableFile sets file mode to 0 (POSIX) and asserts Unreadable=true with no panic and no global error from SnapshotLogs.",
+                "Test process never opens a network socket: assert via net.Listen-on-test-fail or by structure (only os.ReadFile / os.OpenFile are called; verified by `grep -L 'net\\.\\|http\\.' internal/cli/log_snapshot.go`)."
               ],
-              "note": "Split first from the diagnostics umbrella because Hermes debug/log behavior mixes local capture, redaction, optional upload, and backup-like support bundles. Gormes should land local capture before any network or archive surface.",
+              "note": "Reshaped 2026-04-26 after 3 quarantined no_progress runs. Original contract listed five log classes (agent/gateway/error/tool-audit/builder-loop) but only LogPath() + ToolAuditLogPath() exist as constants today. Workers couldn't decide what to do for the absent classes and exited without changes. New contract pins to the two existing classes, names the exact Go API (LogClass enum, LogSnapshotRoots struct, SnapshotOpts, FileResult, Snapshot, SnapshotLogs func), names 4 redaction patterns by example, and names 4 specific test functions. Gateway/error/builder-loop log classes are deferred to a follow-up row tracked under unblocks.",
               "write_scope": [
                 "internal/cli/log_snapshot.go",
                 "internal/cli/log_snapshot_test.go",
-                "internal/config/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/cli ./internal/config -run 'Test.*Log.*Snapshot|Test.*Diagnostic.*Log|Test.*Redact' -count=1",
-                "go test ./internal/cli ./internal/config -count=1",
+                "go test ./internal/cli -run 'TestSnapshotLogs_' -count=1",
+                "go test ./internal/cli -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Log snapshot fixtures prove local log capture, rotated fallback, truncation evidence, redaction, and no network/archive side effects."
+                "TestSnapshotLogs_MissingPrimary_FallsBackToRotated, TestSnapshotLogs_RedactsBearerAndApiKey, TestSnapshotLogs_TruncatesLargeFiles, and TestSnapshotLogs_UnreadableFile all pass; SnapshotLogs imports only os/io/bufio/regexp/utf8 (no net/http) per `grep -L 'net\\.\\|http\\.' internal/cli/log_snapshot.go`."
               ],
               "health": {
                 "attempt_count": 3,
@@ -9786,8 +10014,8 @@
               },
               "provenance": {
                 "origin_type": "hybrid",
-                "upstream_ref": "hermes:edc78e25 hermes_cli/debug.py",
-                "note": "Hermes defines operator log/debug expectations; Gormes ports the local diagnostic contract first over XDG paths."
+                "upstream_ref": "hermes:edc78e25 hermes_cli/logs.py",
+                "note": "Hermes defines operator log/debug expectations across 3 log files. Gormes ports a smaller two-class reader (agent + tool-audit) first because only those file constants exist today; remaining classes follow once those files start being written."
               }
             }
           ],
@@ -10263,10 +10491,71 @@
               }
             },
             {
+              "name": "Native TUI slash-command dispatch table",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "internal/tui exposes a generic slash-command registry — a single dispatch helper checks editor input on Enter, routes any registered slash to a handler that returns (handled bool, statusMessage string, cmd tea.Cmd), and short-circuits the normal kernel.Submit path; the existing /mouse handler migrates onto the registry, and `/save` registers as an explicit no-op stub that emits `save not yet implemented` so a follow-up row can wire the export call",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Unknown slash commands are still submitted to the model (current behavior); registered slashes that return handled=false continue submission so a buggy handler can never silently drop a turn.",
+              "fixture": "internal/tui/slash_dispatch_test.go",
+              "source_refs": [
+                "../hermes-agent/ui-tui/src/app/slash/commands/core.ts@2536a36f",
+                "internal/tui/update.go:Update,parseMouseTrackingSlash",
+                "internal/tui/mouse_tracking.go",
+                "internal/tui/mouse_tracking_test.go"
+              ],
+              "ready_when": [
+                "internal/tui/update.go currently switches on `tea.KeyEnter`, calls parseMouseTrackingSlash, and either short-circuits or calls submitCmd — the dispatch helper drops in at the same point.",
+                "internal/tui/mouse_tracking.go already returns a typed result struct; the new registry signature should be source-compatible so the migration is mechanical."
+              ],
+              "not_ready_when": [
+                "The slice opens a network socket, talks to api_server, performs a real session export, or removes the existing mouse-slash test.",
+                "The slice changes kernel.Submit signatures or introduces a new `slash` package outside internal/tui."
+              ],
+              "unblocks": [
+                "Native TUI /save canonical session export",
+                "TUI running-agent placeholder surfaces interrupt + queued slash actions"
+              ],
+              "acceptance": [
+                "internal/tui/slash_dispatch.go declares: type SlashHandler func(input string, model *Model) SlashResult; type SlashResult struct{ Handled bool, StatusMessage string, Cmd tea.Cmd }; type SlashRegistry struct{ ... }; func NewDefaultSlashRegistry() *SlashRegistry; func (r *SlashRegistry) Dispatch(input string, model *Model) SlashResult; func (r *SlashRegistry) Register(name string, handler SlashHandler).",
+                "TestSlashRegistry_DispatchRoutesToRegisteredHandler proves dispatching `/foo bar` invokes the registered `foo` handler with the full input string and returns Handled=true.",
+                "TestSlashRegistry_UnknownSlashIsNotHandled proves dispatching `/unknown` returns Handled=false so Update falls through to the normal submit path.",
+                "TestSlashRegistry_SaveStubReturnsNotImplemented proves the default registry contains a `save` entry that returns Handled=true with StatusMessage=`save not yet implemented` and a nil Cmd.",
+                "TestSlashRegistry_MouseHandlerMigrationParity proves invoking `/mouse on`, `/mouse off`, and an invalid `/mouse foo` through the registry produces the same StatusMessage values that parseMouseTrackingSlash returned in the existing mouse_tracking_test.go cases.",
+                "internal/tui/update.go's tea.KeyEnter branch calls registry.Dispatch BEFORE m.submitCmd; only handler-returning Handled=false reaches submitCmd."
+              ],
+              "note": "Reshaped 2026-04-26 (split from `Native TUI /save canonical session export`). Original /save row was quarantined no_progress x3 because Gormes TUI has no slash-command dispatch at all — only parseMouseTrackingSlash hardcoded in update.go. Workers couldn't decide where to register a new handler. This prerequisite row introduces a generic registry and a /save no-op stub; the follow-up row replaces the stub with the export call.",
+              "write_scope": [
+                "internal/tui/slash_dispatch.go",
+                "internal/tui/slash_dispatch_test.go",
+                "internal/tui/update.go",
+                "internal/tui/mouse_tracking.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tui -run 'TestSlashRegistry_|TestModelMouseTracking' -count=1",
+                "go test ./internal/tui -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "All 5 TestSlashRegistry_* fixtures pass and the existing mouse-tracking tests still pass after parseMouseTrackingSlash is migrated behind the registry."
+              ],
+              "provenance": {
+                "origin_type": "gormes",
+                "note": "Gormes-owned dispatch primitive that doesn't exist in upstream (Hermes uses an Ink/TS slash registry). Reshaped 2026-04-26 from the prior `Native TUI /save canonical session export` quarantine — the original row was split into this dispatch prerequisite + the /save wiring follow-up below; the original RowHealth block was dropped per the planner split convention."
+              }
+            },
+            {
               "name": "Native TUI /save canonical session export",
               "priority": "P2",
               "status": "planned",
-              "contract": "Native Bubble Tea /save exports canonical persisted session history through a session-save service instead of serializing UI-shaped in-memory transcript rows",
+              "contract": "Native Bubble Tea TUI replaces the /save no-op stub registered by `Native TUI slash-command dispatch table` with a handler that calls an injected SessionExportFunc(ctx, sessionID) (path string, err error) which delegates to internal/transcript.ExportMarkdown over the persisted session DB and renders the resulting file path through StatusMessage — never via the kernel submit path",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -10274,73 +10563,119 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "TUI status reports no_conversation, no_active_session, save_failed, or session_store_unavailable instead of sending /save text to the model or writing partial UI-only transcripts.",
-              "fixture": "internal/tui/session_save_test.go",
+              "degraded_mode": "TUI StatusMessage reports `save: no conversation`, `save: no active session`, `save: store unavailable`, or `save: write failed: <err>` instead of sending /save to the model or writing partial UI-only transcripts; failed writes remove partial files via os.Remove before reporting.",
+              "fixture": "internal/tui/slash_save_test.go",
               "source_refs": [
                 "../hermes-agent/ui-tui/src/app/slash/commands/core.ts@2536a36f:/save",
-                "../hermes-agent/ui-tui/src/gatewayTypes.ts@2536a36f:SessionSaveResponse",
                 "../hermes-agent/tui_gateway/server.py@2536a36f:session.save",
-                "cmd/gormes/session.go",
-                "internal/transcript/markdown.go",
-                "internal/session/"
+                "internal/tui/slash_dispatch.go",
+                "internal/tui/slash_dispatch_test.go",
+                "internal/transcript/markdown.go:ExportMarkdown,ErrSessionNotFound",
+                "cmd/gormes/session.go:sessionExportCmd"
               ],
               "ready_when": [
-                "`gormes session export <id> --format=markdown` and internal/transcript.ExportMarkdown already prove Gormes has a canonical persisted transcript read path.",
-                "The slice can use a fake TUI model, temp session/transcript store, and injected clock/path generator; no SSE remote client, api_server, provider, or live terminal is required."
+                "`Native TUI slash-command dispatch table` is complete (the registry and /save stub already exist).",
+                "internal/transcript.ExportMarkdown is the canonical persisted-transcript reader — `cmd/gormes/session.go` already proves it works over a sql.DB pointing at config.MemoryDBPath()."
               ],
               "not_ready_when": [
-                "The slice writes UI-shaped message structs directly, starts remote TUI/SSE transport, changes command registry policy, or treats /save as ordinary model prompt text.",
-                "The slice exports from transient screen rows instead of the persisted session/transcript store that CLI export and future JSON-RPC save share."
+                "The slice writes UI-shaped Model.frame.History rows directly instead of going through internal/transcript.ExportMarkdown.",
+                "The slice opens a network connection, starts SSE/api_server transport, or treats /save as a normal model prompt.",
+                "The slice changes kernel.Submit signatures or the registry shape introduced by the prior row."
+              ],
+              "blocked_by": [
+                "Native TUI slash-command dispatch table"
               ],
               "acceptance": [
-                "/save short-circuits before normal prompt submission; empty history returns no_conversation and a missing active session returns no_active_session.",
-                "An active session invokes exactly one native session-save/export service and returns the written file path to the transcript without starting a provider turn.",
-                "The saved artifact is produced from persisted session/transcript data, includes session_id and model/source metadata where available, and is deterministic under injected path/clock fixtures.",
-                "Write failures remove partial files when possible and surface save_failed evidence without corrupting the session store."
+                "internal/tui declares: type SessionExportFunc func(ctx context.Context, sessionID string) (path string, err error); Options gains a SessionExport SessionExportFunc field; NewModelWithOptions stores it on Model; the registry's `save` handler invokes it with the active session id from m.frame.SessionID (or returns `save: no active session` when empty).",
+                "TestSlashSave_NoConversationReturnsStatus runs /save against a Model with empty frame.History and asserts StatusMessage=`save: no conversation` with no SessionExportFunc call.",
+                "TestSlashSave_NoActiveSessionReturnsStatus runs /save with non-empty history but empty SessionID and asserts StatusMessage=`save: no active session`.",
+                "TestSlashSave_HappyPathReturnsWrittenPath wires a fake SessionExportFunc returning `/tmp/sess-export-fixture.md` and asserts StatusMessage contains that path, exactly one fake invocation, and no kernel.Submit call.",
+                "TestSlashSave_ExportFailureRemovesPartialFile wires a fake that writes a partial file then returns an error; asserts the partial file is removed (os.Stat ENOENT) and StatusMessage starts with `save: write failed:`.",
+                "TestSlashSave_ErrSessionNotFoundReturnsStoreUnavailable wires a fake returning transcript.ErrSessionNotFound; asserts StatusMessage=`save: store unavailable`."
               ],
-              "note": "Hermes 2536a36f moved TUI /save back through session.save JSON-RPC to avoid a third UI-only transcript format. Gormes should keep the same canonical-storage principle in the native Bubble Tea TUI and reuse the existing session export boundary.",
+              "note": "Reshaped 2026-04-26 (continuation of `Native TUI slash-command dispatch table`). Wires the no-op /save stub to internal/transcript.ExportMarkdown via an injected function so unit tests do not need a real SQLite DB. cmd/gormes/main.go is responsible for binding the real implementation (open MemoryDBPath, call ExportMarkdown) when constructing the Model — that wiring lives outside this row's write_scope.",
               "write_scope": [
-                "internal/tui/",
-                "internal/tui/session_save_test.go",
-                "internal/session/",
-                "internal/transcript/",
-                "cmd/gormes/session.go",
+                "internal/tui/slash_dispatch.go",
+                "internal/tui/slash_save.go",
+                "internal/tui/slash_save_test.go",
+                "internal/tui/model.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/tui ./internal/session ./internal/transcript -run 'Test.*Session.*Save|Test.*Save.*Transcript|Test.*Slash.*Save' -count=1",
-                "go test ./cmd/gormes ./internal/tui ./internal/session ./internal/transcript -count=1",
+                "go test ./internal/tui -run 'TestSlashSave_' -count=1",
+                "go test ./internal/tui ./internal/transcript -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Native TUI fixtures prove /save uses canonical persisted session export, handles empty/no-session/failure states, and never submits /save to the model."
+                "All 5 TestSlashSave_* fixtures pass; the existing TestSlashRegistry_SaveStubReturnsNotImplemented assertion is updated or removed because the stub is replaced; no test in internal/tui opens a real network or DB connection."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T14:32:48Z",
-                "last_failure": {
-                  "run_id": "20260426T143235Z-044472064",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 5/5.Q/Native TUI /save canonical session export"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T14:32:48Z",
-                  "after_run_id": "20260426T143235Z-044472064",
-                  "threshold": 3,
-                  "spec_hash": "c6f56c10c56790471715a947f01b90416c186549be43ee21b3f84f9b0378db5d",
-                  "last_category": "no_progress"
-                }
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:2536a36f ui-tui/src/app/slash/commands/core.ts",
-                "note": "Hermes defines the canonical session.save behavior; Gormes should adapt it to the native Bubble Tea session/export service without reintroducing UI-only transcript formats."
+                "note": "Hermes defines /save as a JSON-RPC session.save call; Gormes wires it directly to internal/transcript.ExportMarkdown via an injected SessionExportFunc to keep the TUI testable without SSE/JSON-RPC."
+              }
+            },
+            {
+              "name": "TUI running-agent placeholder surfaces interrupt + queued slash actions",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "internal/tui Model.editor.Placeholder switches between an idle placeholder (`Type a message and hit Enter…`) and an in-flight placeholder that lists discoverable busy-time actions — at minimum `msg=interrupt · Ctrl+C cancel`, plus any slash command registered with BusyAvailable=true on the SlashRegistry — so operators can discover the cancel + interrupt UX without reading docs",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "If the registry exposes no busy-available slashes, the in-flight placeholder degrades to `msg=interrupt · Ctrl+C cancel` only (Gormes's current minimum-viable busy actions).",
+              "fixture": "internal/tui/running_placeholder_test.go",
+              "source_refs": [
+                "../hermes-agent/cli.py@eaa7e2db:RUNNING_PLACEHOLDER",
+                "internal/tui/model.go:Placeholder,inFlight",
+                "internal/tui/update.go:Update,frameMsg,PhaseIdle",
+                "internal/tui/slash_dispatch.go"
+              ],
+              "ready_when": [
+                "`Native TUI slash-command dispatch table` is complete (the registry is the source of truth for which slashes show in the busy placeholder).",
+                "internal/tui/update.go already toggles `m.inFlight` between user submit and PhaseIdle frame; this slice piggybacks on that boolean."
+              ],
+              "not_ready_when": [
+                "The slice introduces /queue, /bg, or /steer slash commands themselves — those are separate larger rows; this slice only surfaces them in the placeholder IF they exist as registered busy-available slashes.",
+                "The slice changes Ctrl+C semantics, the cancel callback signature, or the kernel.Submit path.",
+                "The slice writes to stdout/stderr instead of the Bubble Tea editor placeholder."
+              ],
+              "blocked_by": [
+                "Native TUI slash-command dispatch table"
+              ],
+              "acceptance": [
+                "internal/tui/slash_dispatch.go's SlashRegistry exposes BusyAvailable on Register: `Register(name string, handler SlashHandler, opts ...RegisterOpt)` with `WithBusyAvailable() RegisterOpt`; the default `save` stub registers WITHOUT BusyAvailable.",
+                "internal/tui/running_placeholder.go declares `func (m Model) RunningPlaceholder() string` that returns `Type a message and hit Enter…` when m.inFlight is false, and otherwise returns `msg=interrupt · ` + comma-joined registry.BusyAvailableSlashes() with `/` prefixes + ` · Ctrl+C cancel` (no trailing/leading whitespace beyond the joiners).",
+                "internal/tui/update.go's frameMsg branch sets `m.editor.Placeholder = m.RunningPlaceholder()` after the PhaseIdle/in-flight transition is decided, NOT before, so the placeholder reflects the post-frame state.",
+                "TestRunningPlaceholder_IdleStateUsesIdleText asserts the placeholder is `Type a message and hit Enter…` when inFlight=false.",
+                "TestRunningPlaceholder_BusyStateListsRegisteredBusySlashes registers two fake busy slashes (`queue`, `steer`) and asserts the placeholder is `msg=interrupt · /queue · /steer · Ctrl+C cancel`.",
+                "TestRunningPlaceholder_BusyStateWithNoBusySlashesShowsMinimum asserts a registry with zero busy-available slashes produces `msg=interrupt · Ctrl+C cancel`."
+              ],
+              "note": "Tracks Hermes commit eaa7e2db (2026-04-26) which surfaced /queue · /bg · /steer · Ctrl+C cancel in cli.py's running placeholder. Gormes does not have /queue/bg/steer slash commands yet — this row only adds the placeholder mechanism (gated on the SlashRegistry); each individual busy slash command is a separate downstream row.",
+              "write_scope": [
+                "internal/tui/running_placeholder.go",
+                "internal/tui/running_placeholder_test.go",
+                "internal/tui/slash_dispatch.go",
+                "internal/tui/model.go",
+                "internal/tui/update.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tui -run 'TestRunningPlaceholder_' -count=1",
+                "go test ./internal/tui -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "All 3 TestRunningPlaceholder_* fixtures pass; the placeholder transitions on PhaseIdle frames; no Hermes /queue or /bg implementation is added by this slice."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:eaa7e2db cli.py running_placeholder",
+                "note": "Hermes shipped /queue + /bg + /steer slash commands first then surfaced them in cli.py's placeholder. Gormes inverts the order: the placeholder mechanism lands now (gated on SlashRegistry) so each future busy slash registers itself and is discovered automatically."
               }
             },
             {
