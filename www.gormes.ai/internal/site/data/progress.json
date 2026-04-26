@@ -6767,11 +6767,11 @@
                 "Fake MCP server fixtures prove discovery, schema normalization, structured result conversion, stderr isolation, timeout/cancel degradation, and dynamic descriptor refresh."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:28:54Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:30:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142840Z-771787827",
+                  "run_id": "20260426T143037Z-508753512",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.G/MCP fake-server discovery + tool schema normalization"
@@ -7465,18 +7465,26 @@
                 "Backend/audit fixtures prove stdin-waiting and killed backends are classified with preserved evidence and no blank toxic-subphase buckets."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-26T14:29:55Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-26T14:30:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142936Z-986783975",
+                  "run_id": "20260426T143037Z-508753512",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.N/Planner backend noninteractive stdin failure guard"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category no_progress",
+                  "since": "2026-04-26T14:30:50Z",
+                  "after_run_id": "20260426T143037Z-508753512",
+                  "threshold": 3,
+                  "spec_hash": "f6bf9b4e0429e4f54f9980b768e3832cbbb5e6b67294ae30805fafd4779bd630",
+                  "last_category": "no_progress"
+                }
               },
               "provenance": {
                 "origin_type": "gormes",
@@ -7899,11 +7907,11 @@
                 "Gateway reasoning command fixtures prove session-only default scope, --global persistence behavior, reset cleanup, and no ordinary prompt leakage for /reasoning."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:28:54Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:30:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142840Z-771787827",
+                  "run_id": "20260426T143037Z-508753512",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.O/Gateway /reasoning session override command"
@@ -8029,11 +8037,11 @@
                 "Profile helper fixtures prove validation, path resolution, active-profile persistence, environment resolution, and no writes outside selected Gormes roots."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:29:55Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:30:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142936Z-986783975",
+                  "run_id": "20260426T143037Z-508753512",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.O/CLI profile path and active-profile store"
@@ -8439,6 +8447,20 @@
               "done_signal": [
                 "Gateway management fixtures prove read-only status/pairing/runtime evidence, explicit unavailable mutating commands, and no live service-manager dependency."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T14:30:50Z",
+                "last_failure": {
+                  "run_id": "20260426T143037Z-508753512",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 5/5.O/Gateway management CLI read-model closeout"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/gateway.py",
@@ -8637,11 +8659,11 @@
                 "Doctor fixtures prove custom endpoint/provider-style settings are accepted with explicit readiness evidence and no live provider or legacy Hermes config dependency."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:28:54Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:30:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142840Z-771787827",
+                  "run_id": "20260426T143037Z-508753512",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.O/Doctor custom endpoint provider readiness"
@@ -8792,11 +8814,11 @@
                 "Log snapshot fixtures prove local log capture, rotated fallback, truncation evidence, redaction, and no network/archive side effects."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T14:28:54Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T14:30:50Z",
                 "last_failure": {
-                  "run_id": "20260426T142840Z-771787827",
+                  "run_id": "20260426T143037Z-508753512",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 5/5.O/CLI log snapshot reader"
@@ -9341,6 +9363,20 @@
               "done_signal": [
                 "Native TUI fixtures prove /save uses canonical persisted session export, handles empty/no-session/failure states, and never submits /save to the model."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T14:30:50Z",
+                "last_failure": {
+                  "run_id": "20260426T143037Z-508753512",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 5/5.Q/Native TUI /save canonical session export"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:2536a36f ui-tui/src/app/slash/commands/core.ts",
