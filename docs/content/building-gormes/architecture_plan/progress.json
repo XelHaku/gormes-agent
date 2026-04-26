@@ -5179,9 +5179,9 @@
             },
             {
               "name": "Bedrock SigV4 + credential seam",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/hermes/bedrock_sigv4.go exposes a transport-free Bedrock credential and signing seam: ResolveBedrockAuth(env map[string]string) BedrockAuthEvidence classifies AWS_BEARER_TOKEN_BEDROCK, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, AWS_PROFILE, AWS_CONTAINER_CREDENTIALS_RELATIVE_URI, AWS_WEB_IDENTITY_TOKEN_FILE, or missing credentials; ResolveBedrockRegion(env) chooses AWS_REGION, AWS_DEFAULT_REGION, then us-east-1; SignBedrockRequest(req *http.Request, creds StaticAWSCredentials, now time.Time) error adds deterministic SigV4 Authorization, X-Amz-Date, and X-Amz-Content-Sha256 headers for bedrock-runtime without opening the network",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -5222,7 +5222,7 @@
                 "TestSignBedrockRequest_DeterministicHeaders signs a fixed POST /model/x/converse request with a fixed body/time/creds and asserts Authorization starts with `AWS4-HMAC-SHA256 Credential=AKIA_TEST/20260426/us-east-1/bedrock/aws4_request`, X-Amz-Date=`20260426T224556Z`, and X-Amz-Content-Sha256 equals the request body SHA-256.",
                 "TestBedrockAuthEvidence_RedactsSecrets asserts Evidence.String() and error text contain none of the fake access key, secret key, session token, or bearer token."
               ],
-              "note": "Planner split 2026-04-26T22:45:56Z: this was previously note-only and blocked stale-client work. It now defines a narrow fake-env + deterministic SigV4 seam so no worker has to invent credential scope or pull in AWS SDK behavior.",
+              "note": "Complete: TDD added internal/hermes/bedrock_sigv4_test.go and internal/hermes/bedrock_sigv4.go for a transport-free Bedrock auth and SigV4 seam. Tests cover bearer-token priority, static key-pair completeness, profile/container/web-identity classification, AWS_REGION > AWS_DEFAULT_REGION > us-east-1, deterministic fixed-time SigV4 headers for bedrock-runtime, body preservation, and redacted evidence/error text with no AWS SDK, profile-file read, IMDS/ECS endpoint call, provider registration, retry classification, or config schema change.",
               "write_scope": [
                 "internal/hermes/bedrock_sigv4.go",
                 "internal/hermes/bedrock_sigv4_test.go",
