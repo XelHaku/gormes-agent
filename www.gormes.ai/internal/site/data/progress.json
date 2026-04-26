@@ -4229,6 +4229,10 @@
                 "The slice requires ARM deployment-list credentials, live Azure network calls, browser auth, or hosted provider credentials in unit tests.",
                 "The slice reads or writes AZURE_FOUNDRY_BASE_URL, AZURE_FOUNDRY_API_KEY, deployment config, or model context metadata."
               ],
+              "blocked_by": [
+                "Azure Foundry probe — path sniffing",
+                "Azure Foundry probe — /models classification + Anthropic fallback"
+              ],
               "unblocks": [
                 "Azure Foundry runtime env/config read model"
               ],
@@ -4253,37 +4257,156 @@
                 "Azure Foundry probe fixtures prove path sniffing, OpenAI /models detection, Anthropic Messages fallback detection, manual-required evidence, and zero config/credential mutation."
               ],
               "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
                 "last_attempt": "2026-04-26T12:49:08Z",
-                "last_failure": {
-                  "run_id": "20260426T124900Z-808544274",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry transport probe read model"
-                },
                 "backends_tried": [
                   "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T12:49:08Z",
-                  "after_run_id": "20260426T124900Z-808544274",
-                  "threshold": 3,
-                  "spec_hash": "bdc6aab158d03e7afc757007b702cd7cb454b1f8f64439b23b6aa7b36e1246e5",
-                  "last_category": "no_progress"
-                }
-              },
-              "planner_verdict": {
-                "needs_human": true,
-                "reason": "manual audit 2026-04-26: three no-progress worker attempts after fixture_ready row; remove from default queue until a human either lands internal/hermes/azure_foundry_probe_test.go fixtures or splits path-sniffing, /models probing, and Anthropic fallback into separate rows.",
-                "since": "2026-04-26T14:39:26Z",
-                "last_outcome": "still_failing"
+                ]
               },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:731e1ef8 hermes_cli/azure_detect.py",
                 "note": "Hermes defines Azure Foundry probing semantics; Gormes ports the pure read model first to avoid another setup/runtime umbrella attempt."
+              }
+            },
+            {
+              "name": "Azure Foundry probe — path sniffing",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Azure Foundry endpoint URLs are classified into anthropic_messages, openai_chat_completions, or unknown solely by URL path/host inspection, with no HTTP, no credential reads, and no config writes",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Probe status reports azure_path_sniff_unknown when no path heuristic matches, and azure_path_sniff_evidence with detected scheme/host/path otherwise.",
+              "fixture": "internal/hermes/azure_foundry_path_sniff_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
+                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
+                "internal/hermes/azure_openai_transport_test.go",
+                "internal/hermes/azure_anthropic_transport_test.go"
+              ],
+              "ready_when": [
+                "Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are validated; this slice classifies URLs into one of those two known transports.",
+                "Pure-function table-driven tests with synthetic URLs are sufficient — no httptest server is required."
+              ],
+              "not_ready_when": [
+                "The slice opens HTTP connections, performs a /models probe, reads AZURE_FOUNDRY_BASE_URL or AZURE_FOUNDRY_API_KEY, or mutates config.",
+                "The slice introduces detection of any third transport family (Bedrock, Vertex, etc.)."
+              ],
+              "unblocks": [
+                "Azure Foundry probe — /models classification + Anthropic fallback"
+              ],
+              "acceptance": [
+                "URLs whose path contains /anthropic/ classify as anthropic_messages with the matched-token evidence preserved.",
+                "URLs whose path contains /openai/deployments/.../chat/completions classify as openai_chat_completions with deployment-name evidence preserved.",
+                "Other URLs classify as unknown without panicking and surface the host/path that was inspected.",
+                "No test in this slice creates an httptest.Server or reads OS env."
+              ],
+              "note": "Split 1/2 of quarantined Azure Foundry probe row. Path-sniffing-only keeps the surface tiny so a worker can land deterministic table tests in one cycle.",
+              "write_scope": [
+                "internal/hermes/azure_foundry_path_sniff.go",
+                "internal/hermes/azure_foundry_path_sniff_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestAzureFoundryPathSniff -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "azure_foundry_path_sniff fixtures prove anthropic-path, openai-deployment-path, and unknown-host classifications are deterministic and side-effect-free."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:05:29Z",
+                "last_failure": {
+                  "run_id": "20260426T150517Z-045212879",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe — path sniffing"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
+              "provenance": {
+                "origin_type": "split",
+                "note": "Path-sniffing slice carved off so the worker can land a deterministic table-test in one cycle."
+              }
+            },
+            {
+              "name": "Azure Foundry probe — /models classification + Anthropic fallback",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Given a fake /models response (or its absence), classify an Azure Foundry deployment as openai_chat_completions, anthropic_messages, or manual-required, with explicit probe evidence and zero credential or config writes",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Probe status reports azure_models_probe_failed, azure_anthropic_probe_failed, or azure_detect_manual_required when classification cannot be made; manual api_mode entry remains available.",
+              "fixture": "internal/hermes/azure_foundry_models_probe_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
+                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
+                "internal/hermes/http_client.go",
+                "internal/hermes/azure_openai_transport_test.go",
+                "internal/hermes/azure_anthropic_transport_test.go"
+              ],
+              "ready_when": [
+                "Azure Foundry probe — path sniffing is fixture-ready or validated, so this slice consumes a typed sniff result instead of duplicating URL inspection.",
+                "httptest.Server-driven fakes are acceptable; no live Azure call is permitted."
+              ],
+              "not_ready_when": [
+                "The slice persists deployment lists, mutates AZURE_FOUNDRY_* env, or runs interactive setup.",
+                "The slice changes existing Azure OpenAI or Azure Anthropic request-builder behavior."
+              ],
+              "unblocks": [
+                "Azure Foundry transport probe read model"
+              ],
+              "acceptance": [
+                "A fake /models OpenAI-shaped response selects openai_chat_completions and records advisory model IDs without persisting them.",
+                "A failed /models call followed by a fake Anthropic Messages-shaped error selects anthropic_messages with explicit probe evidence.",
+                "Total probe failure returns manual-required evidence rather than a fatal error, and does not hide manual api_mode selection.",
+                "No test in this slice writes to AZURE_FOUNDRY_API_KEY, real config files, or a live Azure host."
+              ],
+              "note": "Split 2/2 of quarantined Azure Foundry probe row. Composes the path-sniff slice into deterministic /models + Anthropic fallback classification.",
+              "write_scope": [
+                "internal/hermes/azure_foundry_models_probe.go",
+                "internal/hermes/azure_foundry_models_probe_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestAzureFoundryModelsProbe -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "azure_foundry_models_probe fixtures prove OpenAI-shape detection, Anthropic-shape fallback, and manual-required all return typed evidence with no credential/config side effects."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:05:29Z",
+                "last_failure": {
+                  "run_id": "20260426T150517Z-045212879",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe — /models classification + Anthropic fallback"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
+              "provenance": {
+                "origin_type": "split",
+                "note": "Composes the path-sniff slice with deterministic /models + Anthropic fallback fixtures."
               }
             },
             {
@@ -6037,7 +6160,9 @@
               "blocked_by": [
                 "Provider-side resilience",
                 "Classified provider-error taxonomy",
-                "Retry-After header parsing + HTTPError hint"
+                "Retry-After header parsing + HTTPError hint",
+                "Provider rate guard — x-ratelimit header classification",
+                "Provider rate guard — degraded-state + last-known-good evidence"
               ],
               "acceptance": [
                 "Headers with remaining=0 and reset window >=60s classify as genuine account rate limit and record redacted reset evidence.",
@@ -6061,37 +6186,152 @@
                 "Provider rate-guard fixtures prove genuine quota, upstream-capacity, last-known-state, malformed-header, and no-sleep degraded decisions with visible status evidence."
               ],
               "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
                 "last_attempt": "2026-04-26T12:49:08Z",
-                "last_failure": {
-                  "run_id": "20260426T124900Z-808544274",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard + budget telemetry"
-                },
                 "backends_tried": [
                   "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T12:49:08Z",
-                  "after_run_id": "20260426T124900Z-808544274",
-                  "threshold": 3,
-                  "spec_hash": "25b39bdce6d1371988267d060360d7ba63c514dc221dbb2301fa09962fc112d9",
-                  "last_category": "no_progress"
-                }
-              },
-              "planner_verdict": {
-                "needs_human": true,
-                "reason": "manual audit 2026-04-26: three no-progress attempts on draft rate-guard row; keep out of default builder selection until a human splits genuine-quota, upstream-capacity, last-known-state, and malformed-header fixtures or lands internal/hermes/provider_rate_guard_test.go first.",
-                "since": "2026-04-26T14:39:26Z",
-                "last_outcome": "still_failing"
+                ]
               },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:192e7eb2 agent/nous_rate_guard.py",
                 "note": "Hermes defines the Nous 429 distinction; Gormes adapts it to native provider status and retry/budget telemetry."
+              }
+            },
+            {
+              "name": "Provider rate guard — x-ratelimit header classification",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Pure functions parse x-ratelimit-* headers and classify a 429 as genuine_quota, upstream_capacity, or insufficient_evidence with redacted reset windows, no sleeps, and no shared breaker writes",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports rate_guard_classified as one of {genuine_quota, upstream_capacity, insufficient_evidence}, plus reset-window evidence when present, instead of silently tripping a global breaker.",
+              "fixture": "internal/hermes/provider_rate_guard_classification_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/nous_rate_guard.py@192e7eb2",
+                "../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2",
+                "internal/hermes/errors.go"
+              ],
+              "ready_when": [
+                "Provider-side resilience and classified provider-error taxonomy are validated, so this slice only adds a pure header-parsing classifier on top.",
+                "Tests use synthetic headers and a fake clock; no live Nous Portal or wall-clock sleep is required."
+              ],
+              "not_ready_when": [
+                "The slice changes retry timing, provider routing, or model fallback policy.",
+                "The slice writes process-global breaker state in unit tests or sleeps to simulate reset windows."
+              ],
+              "unblocks": [
+                "Provider rate guard — degraded-state + last-known-good evidence"
+              ],
+              "acceptance": [
+                "Headers with remaining=0 and reset window >=60s classify as genuine_quota with redacted reset evidence.",
+                "429 responses with healthy x-ratelimit buckets classify as upstream_capacity and do not trip cross-session breaker state.",
+                "Missing or unparseable headers classify as insufficient_evidence and surface which header(s) failed parsing.",
+                "No test in this slice opens a network connection or calls time.Sleep."
+              ],
+              "note": "Split 1/2 of quarantined Provider rate guard row. Header parsing + classification is deterministic and table-testable.",
+              "write_scope": [
+                "internal/hermes/provider_rate_guard.go",
+                "internal/hermes/provider_rate_guard_classification_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestProviderRateGuardClassification -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "rate_guard classification fixtures prove genuine_quota, upstream_capacity, and insufficient_evidence outcomes are all reachable from synthetic headers with no side effects."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:05:29Z",
+                "last_failure": {
+                  "run_id": "20260426T150517Z-045212879",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard — x-ratelimit header classification"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
+              "provenance": {
+                "origin_type": "split",
+                "note": "Header-classification slice carved off so the parser/state-machine lands as pure functions before degraded-mode reporting."
+              }
+            },
+            {
+              "name": "Provider rate guard — degraded-state + last-known-good evidence",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Last-known-good bucket state distinguishes bare 429s; degraded modes (rate_guard_unavailable, budget_header_missing) are reported as visible provider status evidence without retry timing changes or shared mutable breaker state",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "Provider status reports last_known_good=present|absent, plus rate_guard_unavailable or budget_header_missing when classification is unsafe; no retry amplification.",
+              "fixture": "internal/hermes/provider_rate_guard_degraded_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/nous_rate_guard.py@192e7eb2",
+                "../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2",
+                "../hermes-agent/run_agent.py@192e7eb2",
+                "internal/hermes/errors.go",
+                "internal/hermes/client.go"
+              ],
+              "ready_when": [
+                "Provider rate guard — x-ratelimit header classification is fixture-ready or validated, so this slice composes a typed classification result with last-known-good state."
+              ],
+              "not_ready_when": [
+                "The slice writes a process-global or cross-session breaker.",
+                "The slice changes retry policy or treats every 429 as account-level quota exhaustion."
+              ],
+              "unblocks": [
+                "Provider rate guard + budget telemetry"
+              ],
+              "acceptance": [
+                "A bare 429 with last-known-good=exhausted classifies as genuine_quota; with last-known-good=healthy classifies as upstream_capacity.",
+                "A bare 429 with no last-known-good record classifies as insufficient_evidence and reports rate_guard_unavailable.",
+                "Malformed budget headers degrade visibly with budget_header_missing evidence and do not amplify retries or block unrelated models.",
+                "No test in this slice writes process-global state or sleeps."
+              ],
+              "note": "Split 2/2 of quarantined Provider rate guard row. Composes the classification slice with last-known-good state and degraded-mode reporting.",
+              "write_scope": [
+                "internal/hermes/provider_rate_guard_degraded.go",
+                "internal/hermes/provider_rate_guard_degraded_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestProviderRateGuardDegraded -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "rate_guard degraded fixtures prove last-known-good composition, rate_guard_unavailable, and budget_header_missing evidence are all reachable without shared state or retry timing changes."
+              ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T15:05:29Z",
+                "last_failure": {
+                  "run_id": "20260426T150517Z-045212879",
+                  "category": "no_progress",
+                  "backend": "codexu",
+                  "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard — degraded-state + last-known-good evidence"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
+              "provenance": {
+                "origin_type": "split",
+                "note": "Degraded-mode + last-known-good slice; depends on the classification slice landing first."
               }
             }
           ],

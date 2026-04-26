@@ -343,6 +343,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Azure OpenAI query/default_query transport contract
 - [x] Azure Anthropic Messages endpoint contract
 - [ ] Azure Foundry transport probe read model
+- [ ] Azure Foundry probe — path sniffing
+- [ ] Azure Foundry probe — /models classification + Anthropic fallback
 - [ ] Azure Foundry runtime env/config read model
 - [ ] Azure Foundry CLI setup/status manual fallback
 - [ ] Bedrock
@@ -420,6 +422,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Streaming interrupt retry suppression
 - [ ] Prompt-cache capability guard
 - [ ] Provider rate guard + budget telemetry
+- [ ] Provider rate guard — x-ratelimit header classification
+- [ ] Provider rate guard — degraded-state + last-known-good evidence
 
 ## Phase 5 — The Final Purge 🔨
 

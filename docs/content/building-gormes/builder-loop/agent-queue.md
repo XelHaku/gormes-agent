@@ -22,28 +22,91 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. Azure Foundry transport probe read model
+## 1. Azure Foundry probe — path sniffing
 
 - Phase: 4 / 4.A
 - Owner: `provider`
 - Size: `small`
 - Status: `planned`
 - Priority: `P2`
-- Contract: Azure Foundry endpoint probing determines OpenAI-style, Anthropic-style, or manual-required transport from deterministic inputs without reading credentials or writing config
+- Contract: Azure Foundry endpoint URLs are classified into anthropic_messages, openai_chat_completions, or unknown solely by URL path/host inspection, with no HTTP, no credential reads, and no config writes
 - Trust class: operator, system
-- Ready when: Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are validated, so each detected transport has a request-builder contract., The worker can implement pure probe functions with injected fake HTTP responses; no config mutation or provider runtime resolver is needed.
-- Not ready when: The slice requires ARM deployment-list credentials, live Azure network calls, browser auth, or hosted provider credentials in unit tests., The slice reads or writes AZURE_FOUNDRY_BASE_URL, AZURE_FOUNDRY_API_KEY, deployment config, or model context metadata.
-- Degraded mode: Probe status reports azure_transport_detected, azure_models_probe_failed, azure_anthropic_probe_failed, or azure_detect_manual_required evidence while preserving manual endpoint entry.
-- Fixture: `internal/hermes/azure_foundry_probe_test.go`
-- Write scope: `internal/hermes/azure_foundry_probe.go`, `internal/hermes/azure_foundry_probe_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/hermes -run TestAzureFoundryProbe -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Azure Foundry probe fixtures prove path sniffing, OpenAI /models detection, Anthropic Messages fallback detection, manual-required evidence, and zero config/credential mutation.
-- Acceptance: Path sniffing detects /anthropic endpoints as anthropic_messages without HTTP., A fake /models OpenAI-shaped response selects chat_completions and records advisory model IDs without persisting them., Failed /models plus a fake Anthropic Messages-shaped error selects anthropic_messages with explicit probe evidence., Total probe failure returns manual-required evidence, not a fatal error, and does not hide manual api_mode selection.
-- Source refs: ../hermes-agent/hermes_cli/azure_detect.py@731e1ef8, ../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8, ../hermes-agent/website/docs/guides/azure-foundry.md@7c50ed70, internal/hermes/http_client.go, internal/hermes/azure_openai_transport_test.go, internal/hermes/azure_anthropic_transport_test.go
-- Unblocks: Azure Foundry runtime env/config read model
-- Why now: Unblocks Azure Foundry runtime env/config read model.
+- Ready when: Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are validated; this slice classifies URLs into one of those two known transports., Pure-function table-driven tests with synthetic URLs are sufficient — no httptest server is required.
+- Not ready when: The slice opens HTTP connections, performs a /models probe, reads AZURE_FOUNDRY_BASE_URL or AZURE_FOUNDRY_API_KEY, or mutates config., The slice introduces detection of any third transport family (Bedrock, Vertex, etc.).
+- Degraded mode: Probe status reports azure_path_sniff_unknown when no path heuristic matches, and azure_path_sniff_evidence with detected scheme/host/path otherwise.
+- Fixture: `internal/hermes/azure_foundry_path_sniff_test.go`
+- Write scope: `internal/hermes/azure_foundry_path_sniff.go`, `internal/hermes/azure_foundry_path_sniff_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run TestAzureFoundryPathSniff -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: azure_foundry_path_sniff fixtures prove anthropic-path, openai-deployment-path, and unknown-host classifications are deterministic and side-effect-free.
+- Acceptance: URLs whose path contains /anthropic/ classify as anthropic_messages with the matched-token evidence preserved., URLs whose path contains /openai/deployments/.../chat/completions classify as openai_chat_completions with deployment-name evidence preserved., Other URLs classify as unknown without panicking and surface the host/path that was inspected., No test in this slice creates an httptest.Server or reads OS env.
+- Source refs: ../hermes-agent/hermes_cli/azure_detect.py@731e1ef8, ../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8, internal/hermes/azure_openai_transport_test.go, internal/hermes/azure_anthropic_transport_test.go
+- Unblocks: Azure Foundry probe — /models classification + Anthropic fallback
+- Why now: Unblocks Azure Foundry probe — /models classification + Anthropic fallback.
 
-## 2. Native TUI terminal-selection divergence contract
+## 2. Azure Foundry probe — /models classification + Anthropic fallback
+
+- Phase: 4 / 4.A
+- Owner: `provider`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: Given a fake /models response (or its absence), classify an Azure Foundry deployment as openai_chat_completions, anthropic_messages, or manual-required, with explicit probe evidence and zero credential or config writes
+- Trust class: operator, system
+- Ready when: Azure Foundry probe — path sniffing is fixture-ready or validated, so this slice consumes a typed sniff result instead of duplicating URL inspection., httptest.Server-driven fakes are acceptable; no live Azure call is permitted.
+- Not ready when: The slice persists deployment lists, mutates AZURE_FOUNDRY_* env, or runs interactive setup., The slice changes existing Azure OpenAI or Azure Anthropic request-builder behavior.
+- Degraded mode: Probe status reports azure_models_probe_failed, azure_anthropic_probe_failed, or azure_detect_manual_required when classification cannot be made; manual api_mode entry remains available.
+- Fixture: `internal/hermes/azure_foundry_models_probe_test.go`
+- Write scope: `internal/hermes/azure_foundry_models_probe.go`, `internal/hermes/azure_foundry_models_probe_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run TestAzureFoundryModelsProbe -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: azure_foundry_models_probe fixtures prove OpenAI-shape detection, Anthropic-shape fallback, and manual-required all return typed evidence with no credential/config side effects.
+- Acceptance: A fake /models OpenAI-shaped response selects openai_chat_completions and records advisory model IDs without persisting them., A failed /models call followed by a fake Anthropic Messages-shaped error selects anthropic_messages with explicit probe evidence., Total probe failure returns manual-required evidence rather than a fatal error, and does not hide manual api_mode selection., No test in this slice writes to AZURE_FOUNDRY_API_KEY, real config files, or a live Azure host.
+- Source refs: ../hermes-agent/hermes_cli/azure_detect.py@731e1ef8, ../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8, internal/hermes/http_client.go, internal/hermes/azure_openai_transport_test.go, internal/hermes/azure_anthropic_transport_test.go
+- Unblocks: Azure Foundry transport probe read model
+- Why now: Unblocks Azure Foundry transport probe read model.
+
+## 3. Provider rate guard — x-ratelimit header classification
+
+- Phase: 4 / 4.H
+- Owner: `provider`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: Pure functions parse x-ratelimit-* headers and classify a 429 as genuine_quota, upstream_capacity, or insufficient_evidence with redacted reset windows, no sleeps, and no shared breaker writes
+- Trust class: system
+- Ready when: Provider-side resilience and classified provider-error taxonomy are validated, so this slice only adds a pure header-parsing classifier on top., Tests use synthetic headers and a fake clock; no live Nous Portal or wall-clock sleep is required.
+- Not ready when: The slice changes retry timing, provider routing, or model fallback policy., The slice writes process-global breaker state in unit tests or sleeps to simulate reset windows.
+- Degraded mode: Provider status reports rate_guard_classified as one of {genuine_quota, upstream_capacity, insufficient_evidence}, plus reset-window evidence when present, instead of silently tripping a global breaker.
+- Fixture: `internal/hermes/provider_rate_guard_classification_test.go`
+- Write scope: `internal/hermes/provider_rate_guard.go`, `internal/hermes/provider_rate_guard_classification_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run TestProviderRateGuardClassification -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: rate_guard classification fixtures prove genuine_quota, upstream_capacity, and insufficient_evidence outcomes are all reachable from synthetic headers with no side effects.
+- Acceptance: Headers with remaining=0 and reset window >=60s classify as genuine_quota with redacted reset evidence., 429 responses with healthy x-ratelimit buckets classify as upstream_capacity and do not trip cross-session breaker state., Missing or unparseable headers classify as insufficient_evidence and surface which header(s) failed parsing., No test in this slice opens a network connection or calls time.Sleep.
+- Source refs: ../hermes-agent/agent/nous_rate_guard.py@192e7eb2, ../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2, internal/hermes/errors.go
+- Unblocks: Provider rate guard — degraded-state + last-known-good evidence
+- Why now: Unblocks Provider rate guard — degraded-state + last-known-good evidence.
+
+## 4. Provider rate guard — degraded-state + last-known-good evidence
+
+- Phase: 4 / 4.H
+- Owner: `provider`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: Last-known-good bucket state distinguishes bare 429s; degraded modes (rate_guard_unavailable, budget_header_missing) are reported as visible provider status evidence without retry timing changes or shared mutable breaker state
+- Trust class: system
+- Ready when: Provider rate guard — x-ratelimit header classification is fixture-ready or validated, so this slice composes a typed classification result with last-known-good state.
+- Not ready when: The slice writes a process-global or cross-session breaker., The slice changes retry policy or treats every 429 as account-level quota exhaustion.
+- Degraded mode: Provider status reports last_known_good=present\|absent, plus rate_guard_unavailable or budget_header_missing when classification is unsafe; no retry amplification.
+- Fixture: `internal/hermes/provider_rate_guard_degraded_test.go`
+- Write scope: `internal/hermes/provider_rate_guard_degraded.go`, `internal/hermes/provider_rate_guard_degraded_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run TestProviderRateGuardDegraded -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: rate_guard degraded fixtures prove last-known-good composition, rate_guard_unavailable, and budget_header_missing evidence are all reachable without shared state or retry timing changes.
+- Acceptance: A bare 429 with last-known-good=exhausted classifies as genuine_quota; with last-known-good=healthy classifies as upstream_capacity., A bare 429 with no last-known-good record classifies as insufficient_evidence and reports rate_guard_unavailable., Malformed budget headers degrade visibly with budget_header_missing evidence and do not amplify retries or block unrelated models., No test in this slice writes process-global state or sleeps.
+- Source refs: ../hermes-agent/agent/nous_rate_guard.py@192e7eb2, ../hermes-agent/tests/agent/test_nous_rate_guard.py@192e7eb2, ../hermes-agent/run_agent.py@192e7eb2, internal/hermes/errors.go, internal/hermes/client.go
+- Unblocks: Provider rate guard + budget telemetry
+- Why now: Unblocks Provider rate guard + budget telemetry.
+
+## 5. Native TUI terminal-selection divergence contract
 
 - Phase: 5 / 5.Q
 - Owner: `gateway`
@@ -62,7 +125,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.ts@edc78e25, ../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.test.ts@edc78e25, ../hermes-agent/ui-tui/src/lib/platform.ts@edc78e25, ../hermes-agent/ui-tui/src/app/useInputHandlers.ts@edc78e25, ../hermes-agent/ui-tui/packages/hermes-ink/src/ink/selection.ts@31d7f195, internal/tui/, docs/content/upstream-hermes/user-guide/tui.md
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 3. BlueBubbles iMessage bubble formatting parity
+## 6. BlueBubbles iMessage bubble formatting parity
 
 - Phase: 7 / 7.E
 - Owner: `gateway`
@@ -83,7 +146,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: BlueBubbles iMessage session-context prompt guidance
 - Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
 
-## 4. CLI profile path and active-profile store
+## 7. CLI profile path and active-profile store
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -103,7 +166,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: CLI auth status read model before provider setup, Setup/uninstall dry-run command contracts
 - Why now: Unblocks CLI auth status read model before provider setup, Setup/uninstall dry-run command contracts.
 
-## 5. Gateway management CLI read-model closeout
+## 8. Gateway management CLI read-model closeout
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -123,7 +186,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Webhook/platform management CLI helpers, Cron management CLI over native store
 - Why now: Unblocks Webhook/platform management CLI helpers, Cron management CLI over native store.
 
-## 6. Doctor custom endpoint provider readiness
+## 9. Doctor custom endpoint provider readiness
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -144,7 +207,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: CLI status summary over native stores
 - Why now: Unblocks CLI status summary over native stores.
 
-## 7. CLI log snapshot reader
+## 10. CLI log snapshot reader
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -163,65 +226,5 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/hermes_cli/debug.py@edc78e25, ../hermes-agent/hermes_cli/logs.py@edc78e25, ../hermes-agent/tests/hermes_cli/test_debug.py@edc78e25, ../hermes-agent/tests/hermes_cli/test_logs.py@edc78e25, internal/cli/, internal/config/config.go, cmd/gormes/doctor.go
 - Unblocks: CLI status summary over native stores, Backup manifest dry-run contract
 - Why now: Unblocks CLI status summary over native stores, Backup manifest dry-run contract.
-
-## 8. TUI gateway progress/completion helpers
-
-- Phase: 5 / 5.Q
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Contract: Pure TUI gateway helper functions normalize tool-progress mode, completion paths, and tool summary formatting from fixed inputs
-- Trust class: operator, system
-- Ready when: No transport or lifecycle code is required; helpers can be implemented as pure functions under internal/tuigateway with table tests.
-- Not ready when: The slice opens HTTP/SSE connections, starts a Bubble Tea program, adds a remote client, or ports image/personality/platform-event helpers.
-- Degraded mode: Remote TUI streaming remains unavailable while status can report missing progress/completion helper coverage.
-- Fixture: `internal/tuigateway/progress_completion_test.go`
-- Write scope: `internal/tuigateway/`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/tuigateway -run 'Test.*Progress\|Test.*Completion\|Test.*ToolSummary' -count=1`, `go test ./internal/tuigateway -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Pure internal/tuigateway fixtures prove progress mode, completion path, and tool-summary helpers without transport or Bubble Tea dependencies.
-- Acceptance: Tool-progress mode parsing and enabled/disabled decisions match upstream fixtures., Completion paths normalize consistently for empty, relative, absolute, and home-directory-shaped inputs., Tool duration/count/list summary helpers are deterministic and side-effect free.
-- Source refs: ../hermes-agent/tui_gateway/server.py@edc78e25, ../hermes-agent/tui_gateway/render.py@edc78e25, ../hermes-agent/tests/test_tui_gateway_server.py@edc78e25, internal/tui/
-- Unblocks: TUI gateway image/personality/platform-event helpers
-- Why now: Unblocks TUI gateway image/personality/platform-event helpers.
-
-## 9. Planner backend noninteractive stdin failure guard
-
-- Phase: 5 / 5.N
-- Owner: `orchestrator`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Planner-loop and builder-loop backend launches fail fast with classified backend_failed evidence when Codex-style backends wait for stdin or emit no progress, without producing blank subphase audit rows
-- Trust class: operator, system
-- Ready when: The last-7-day audit shows 60 blank-subphase claims with 31 worker/backend failures and repeated backend_failed detail containing `Reading additional input from stdin`., The slice can use fake backend commands and fixture JSONL ledgers; no live Codex backend, upstream repo sync, or progress row mutation is required.
-- Not ready when: The slice changes roadmap selection, worker prompt content, progress item contracts, or runtime feature code outside builder/planner loop backend failure classification., The fix hides backend stdout/stderr or rewrites blank ledger entries instead of preserving evidence and classifying them deterministically.
-- Degraded mode: Planner status reports backend_waiting_for_stdin, backend_no_progress, backend_killed, and missing-task metadata separately so toxic-subphase analysis does not collapse into blank row IDs.
-- Fixture: `internal/builderloop/backend_noninteractive_test.go and internal/plannerloop/autoloop_audit_test.go`
-- Write scope: `internal/builderloop/backend.go`, `internal/builderloop/backend_noninteractive_test.go`, `internal/builderloop/failures.go`, `internal/plannerloop/autoloop_audit.go`, `internal/plannerloop/autoloop_audit_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/builderloop -run 'Test.*Backend.*Noninteractive\|Test.*Backend.*Failure\|Test.*Backend.*Degraded' -count=1`, `go test ./internal/plannerloop -run 'Test.*Autoloop.*Audit\|Test.*Blank.*Subphase\|Test.*Backend.*Failure' -count=1`, `go test ./internal/builderloop ./internal/plannerloop -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Backend/audit fixtures prove stdin-waiting and killed backends are classified with preserved evidence and no blank toxic-subphase buckets.
-- Acceptance: A fake backend that prints `Reading additional input from stdin` exits with a classified backend_waiting_for_stdin failure, non-empty task metadata when the selected row is known, and the original stderr excerpt preserved., A killed backend or backend with no progress heartbeat records backend_killed or backend_no_progress without producing an empty subphase_id in planner audit summaries., Planner audit fixtures group missing task metadata under an explicit control-plane bucket instead of the empty string and include remediation text for backend infrastructure failures., No progress.json health block is created, removed, or modified by this backend failure classification path.
-- Source refs: .codex/planner-loop/state/runs.jsonl:20260425T210430Z backend_failed Reading additional input from stdin, .codex/planner-loop/state/runs.jsonl:20260425T233746Z backend_failed signal: killed: Reading additional input from stdin, .codex/orchestrator/state/runs.jsonl, internal/builderloop/backend.go, internal/builderloop/failures.go, internal/plannerloop/autoloop_audit.go, internal/plannerloop/run.go
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
-
-## 10. Native TUI /save canonical session export
-
-- Phase: 5 / 5.Q
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Native Bubble Tea /save exports canonical persisted session history through a session-save service instead of serializing UI-shaped in-memory transcript rows
-- Trust class: operator, system
-- Ready when: `gormes session export <id> --format=markdown` and internal/transcript.ExportMarkdown already prove Gormes has a canonical persisted transcript read path., The slice can use a fake TUI model, temp session/transcript store, and injected clock/path generator; no SSE remote client, api_server, provider, or live terminal is required.
-- Not ready when: The slice writes UI-shaped message structs directly, starts remote TUI/SSE transport, changes command registry policy, or treats /save as ordinary model prompt text., The slice exports from transient screen rows instead of the persisted session/transcript store that CLI export and future JSON-RPC save share.
-- Degraded mode: TUI status reports no_conversation, no_active_session, save_failed, or session_store_unavailable instead of sending /save text to the model or writing partial UI-only transcripts.
-- Fixture: `internal/tui/session_save_test.go`
-- Write scope: `internal/tui/`, `internal/tui/session_save_test.go`, `internal/session/`, `internal/transcript/`, `cmd/gormes/session.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/tui ./internal/session ./internal/transcript -run 'Test.*Session.*Save\|Test.*Save.*Transcript\|Test.*Slash.*Save' -count=1`, `go test ./cmd/gormes ./internal/tui ./internal/session ./internal/transcript -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Native TUI fixtures prove /save uses canonical persisted session export, handles empty/no-session/failure states, and never submits /save to the model.
-- Acceptance: /save short-circuits before normal prompt submission; empty history returns no_conversation and a missing active session returns no_active_session., An active session invokes exactly one native session-save/export service and returns the written file path to the transcript without starting a provider turn., The saved artifact is produced from persisted session/transcript data, includes session_id and model/source metadata where available, and is deterministic under injected path/clock fixtures., Write failures remove partial files when possible and surface save_failed evidence without corrupting the session store.
-- Source refs: ../hermes-agent/ui-tui/src/app/slash/commands/core.ts@2536a36f:/save, ../hermes-agent/ui-tui/src/gatewayTypes.ts@2536a36f:SessionSaveResponse, ../hermes-agent/tui_gateway/server.py@2536a36f:session.save, cmd/gormes/session.go, internal/transcript/markdown.go, internal/session/
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
 <!-- PROGRESS:END -->
