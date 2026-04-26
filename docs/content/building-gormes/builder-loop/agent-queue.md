@@ -43,28 +43,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Watchdog dead-process vs slow-progress separation
 - Why now: Unblocks Watchdog dead-process vs slow-progress separation.
 
-## 2. PR-intake idle backoff
-
-- Phase: 1 / 1.C
-- Owner: `orchestrator`
-- Size: `small`
-- Status: `planned`
-- Priority: `P1`
-- Contract: Pure helper internal/builderloop/pr_intake_backoff.go exposes type BackoffState struct{ConsecutiveEmpty int; SuppressUntil time.Time; Threshold int; Baseline, Idle time.Duration} and methods (s BackoffState) ShouldPoll(now time.Time) bool and (s BackoffState) RecordResult(now time.Time, listed int) BackoffState. After Threshold consecutive listed=0 results, ShouldPoll returns false until now >= SuppressUntil; any listed > 0 result resets ConsecutiveEmpty and clears SuppressUntil. No GitHub API calls, no goroutines, no live clock in this slice.
-- Trust class: system
-- Ready when: pr_intake already emits pr_intake_started and pr_intake_completed ledger events, and pr_intake_completed carries listed=N evidence., A fake clock and a stub gh-list backend make backoff state observable without live network calls.
-- Not ready when: The slice changes how PRs are merged, classified, or evicted — only the schedule of intake runs is in scope., The slice removes pr_intake calls entirely or makes them event-driven (gh webhook); event-driven is a separate row.
-- Degraded mode: pr_intake_started/completed events carry an idle_backoff field with the active interval and the consecutive-empty count so dashboards can distinguish "intake was suppressed" from "intake ran and found nothing".
-- Fixture: `internal/builderloop/pr_intake_backoff_test.go`
-- Write scope: `internal/builderloop/pr_intake_backoff.go`, `internal/builderloop/pr_intake_backoff_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/builderloop -run TestBackoffState -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/builderloop/pr_intake_backoff_test.go fixtures prove threshold/suppress/reset/reactivation behavior under a fake clock with no GitHub API and no goroutines.
-- Acceptance: TestBackoffState_ShouldPollWhenNotSuppressed (fresh state, now=t0) returns true., TestBackoffState_RecordEmptyBelowThreshold accumulates ConsecutiveEmpty without suppressing., TestBackoffState_RecordEmptyAtThreshold sets SuppressUntil=now+Idle and ShouldPoll=false until SuppressUntil elapses., TestBackoffState_RecordNonEmptyResetsState restores baseline (ConsecutiveEmpty=0, SuppressUntil zero)., TestBackoffState_ShouldPollAfterSuppressionElapsed flips back to true when now >= SuppressUntil even if ConsecutiveEmpty is still at threshold., Helper is a pure function — caller injects the clock and the listed result count.
-- Source refs: internal/builderloop/pr_intake.go, internal/builderloop/pr_intake_test.go
-- Unblocks: Builder-loop self-improvement vs user-feature ratio metric
-- Why now: Unblocks Builder-loop self-improvement vs user-feature ratio metric.
-
-## 3. Watchdog dead-process vs slow-progress separation
+## 2. Watchdog dead-process vs slow-progress separation
 
 - Phase: 1 / 1.C
 - Owner: `orchestrator`
@@ -85,7 +64,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Builder-loop self-improvement vs user-feature ratio metric
 - Why now: Unblocks Builder-loop self-improvement vs user-feature ratio metric.
 
-## 4. Builder-loop self-improvement vs user-feature ratio metric
+## 3. Builder-loop self-improvement vs user-feature ratio metric
 
 - Phase: 1 / 1.C
 - Owner: `orchestrator`
@@ -105,7 +84,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: internal/builderloop/run.go, internal/builderloop/health_writer.go, internal/progress/health.go, internal/builderloop/ledger.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 5. Azure Foundry probe — path sniffing
+## 4. Azure Foundry probe — path sniffing
 
 - Phase: 4 / 4.A
 - Owner: `provider`
@@ -126,28 +105,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Azure Foundry probe — /models classification + Anthropic fallback
 - Why now: Unblocks Azure Foundry probe — /models classification + Anthropic fallback.
 
-## 6. Azure Foundry probe — /models classification + Anthropic fallback
-
-- Phase: 4 / 4.A
-- Owner: `provider`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Pure helper internal/hermes/azure_foundry_models_probe.go exposes type AzureProbeResult struct{Transport AzureTransport; Models []string; Reason string; Evidence []string} and ProbeAzureFoundry(ctx, client *http.Client, base, apiKey string) (AzureProbeResult, error). Probes <base>/models first; on 200 + OpenAI-shaped JSON returns openai_chat_completions with the model IDs. On non-200 or shape mismatch, probes <base>/v1/messages with a zero-token Anthropic Messages payload and classifies anthropic_messages on any 4xx that mentions 'messages' or 'model'. Otherwise returns Transport=unknown and Reason=manual_required. Tests use httptest.Server fakes only — no live Azure call, no credential storage, no config writes.
-- Trust class: operator, system
-- Ready when: Azure Foundry probe — path sniffing is fixture-ready or validated, so this slice consumes a typed sniff result instead of duplicating URL inspection., httptest.Server-driven fakes are acceptable; no live Azure call is permitted.
-- Not ready when: The slice persists deployment lists, mutates AZURE_FOUNDRY_* env, or runs interactive setup., The slice changes existing Azure OpenAI or Azure Anthropic request-builder behavior.
-- Degraded mode: Probe status reports azure_models_probe_failed, azure_anthropic_probe_failed, or azure_detect_manual_required when classification cannot be made; manual api_mode entry remains available.
-- Fixture: `internal/hermes/azure_foundry_models_probe_test.go`
-- Write scope: `internal/hermes/azure_foundry_models_probe.go`, `internal/hermes/azure_foundry_models_probe_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/hermes -run TestProbeAzureFoundry -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/hermes/azure_foundry_models_probe_test.go fixtures prove openai/anthropic/unknown classifications via httptest.Server fakes with no live Azure traffic.
-- Acceptance: TestProbeAzureFoundry_OpenAIModels200WithList classifies as openai_chat_completions with the model list captured in Evidence., TestProbeAzureFoundry_OpenAIModels200EmptyList still classifies as openai_chat_completions with empty Models and a 'shape OK, empty list' Reason., TestProbeAzureFoundry_AnthropicMessages400ValidShape classifies as anthropic_messages when /models 404s but /v1/messages returns 400 with body containing 'messages'., TestProbeAzureFoundry_BothFailReturnUnknown returns Transport=unknown with Reason=manual_required when both probes fail., TestProbeAzureFoundry_RespectsContextCancel cancels mid-probe and returns ctx.Err., Helper does not write to disk, does not mutate config, does not retry beyond the two named probes.
-- Source refs: ../hermes-agent/hermes_cli/azure_detect.py:_probe_openai_models:143, ../hermes-agent/hermes_cli/azure_detect.py:_probe_anthropic_messages:175, ../hermes-agent/hermes_cli/azure_detect.py:detect:221, ../hermes-agent/tests/hermes_cli/test_azure_detect.py, internal/hermes/http_client.go, internal/hermes/azure_openai_transport_test.go, internal/hermes/azure_anthropic_transport_test.go
-- Unblocks: Azure Foundry transport probe read model
-- Why now: Unblocks Azure Foundry transport probe read model.
-
-## 7. Provider rate guard — x-ratelimit header classification
+## 5. Provider rate guard — x-ratelimit header classification
 
 - Phase: 4 / 4.H
 - Owner: `provider`
@@ -168,7 +126,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Provider rate guard — degraded-state + last-known-good evidence
 - Why now: Unblocks Provider rate guard — degraded-state + last-known-good evidence.
 
-## 8. Skills list — enabled/disabled status column + --enabled-only filter
+## 6. Skills list — enabled/disabled status column + --enabled-only filter
 
 - Phase: 5 / 5.F
 - Owner: `skills`
@@ -188,28 +146,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Skills hub search read-model function over registry providers
 - Why now: Unblocks Skills hub search read-model function over registry providers.
 
-## 9. Gateway /reasoning command parser
-
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Pure parser internal/gateway/reasoning_command.go exposes type ReasoningAction int (ReasoningActionShow, ReasoningActionSet, ReasoningActionReset), type ReasoningEffort string (high\|low\|medium\|""), type ReasoningCommand struct{Action ReasoningAction; Effort ReasoningEffort; Global bool}, and ParseReasoningCommand(args []string) (ReasoningCommand, error). Empty args returns Action=Show. "high\|low\|medium" returns Action=Set with that Effort. Trailing "--global" sets Global=true. "reset" alone returns Action=Reset, Global=false. "reset --global" returns an error matching ErrResetGlobalUnsupported. Unknown effort returns ErrInvalidEffort. No state, no clock, no I/O.
-- Trust class: operator, gateway
-- Ready when: internal/gateway already compiles and has commands.go; this row adds a sibling reasoning_command.go and a _test.go., Pure-function table tests with synthetic []string args are sufficient.
-- Not ready when: The row touches manager.go, persists config, or wires gateway dispatch — those land in the follow-up apply/dispatch row.
-- Degraded mode: Parser surfaces typed errors (ErrInvalidEffort, ErrResetGlobalUnsupported) so the dispatcher can render the upstream warning class without re-parsing.
-- Fixture: `internal/gateway/reasoning_command_test.go`
-- Write scope: `internal/gateway/reasoning_command.go`, `internal/gateway/reasoning_command_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/gateway -run 'TestParseReasoningCommand' -count=1`, `go test ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: internal/gateway/reasoning_command_test.go fixtures prove parser correctness across show/set/global/reset/invalid forms.
-- Acceptance: TestParseReasoningCommand_ShowFormReturnsActionShow ([]) returns Action=Show., TestParseReasoningCommand_SetSessionScoped (["high"]) returns Action=Set, Effort=high, Global=false., TestParseReasoningCommand_SetGlobal (["low","--global"]) returns Action=Set, Effort=low, Global=true., TestParseReasoningCommand_ResetSession (["reset"]) returns Action=Reset, Global=false, no error., TestParseReasoningCommand_RejectGlobalReset (["reset","--global"]) returns ErrResetGlobalUnsupported., TestParseReasoningCommand_RejectInvalidEffort (["bogus"]) returns ErrInvalidEffort.
-- Source refs: ../hermes-agent/gateway/run.py:_parse_reasoning_command_args:1322
-- Unblocks: Gateway /reasoning apply + dispatch
-- Why now: Unblocks Gateway /reasoning apply + dispatch.
-
-## 10. CLI log redactor for known secret shapes
+## 7. CLI log redactor for known secret shapes
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -228,5 +165,67 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/hermes_cli/logs.py
 - Unblocks: CLI log snapshot reader using shared redactor
 - Why now: Unblocks CLI log snapshot reader using shared redactor.
+
+## 8. BlueBubbles iMessage bubble formatting parity
+
+- Phase: 7 / 7.E
+- Owner: `gateway`
+- Size: `small`
+- Status: `planned`
+- Priority: `P3`
+- Contract: BlueBubbles outbound iMessage sends are non-editable, markdown-stripped, paragraph-split bubbles without pagination suffixes
+- Trust class: gateway, system
+- Ready when: The first-pass BlueBubbles adapter already owns Send, markdown stripping, cached GUID resolution, and home-channel fallback in internal/channels/bluebubbles.
+- Not ready when: The slice attempts to add live BlueBubbles HTTP/webhook registration, attachment download, reactions, typing indicators, or edit-message support.
+- Degraded mode: BlueBubbles remains a usable first-pass adapter, but long replies may still arrive as one stripped text send until paragraph splitting and suffix-free chunking are fixture-locked.
+- Fixture: `internal/channels/bluebubbles/bot_test.go`
+- Write scope: `internal/channels/bluebubbles/bot.go`, `internal/channels/bluebubbles/bot_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/channels/bluebubbles -count=1`
+- Done signal: BlueBubbles adapter tests prove paragraph-to-bubble sends, suffix-free chunking, and no edit/placeholder capability.
+- Acceptance: Send splits blank-line-separated paragraphs into separate SendText calls while preserving existing chat GUID resolution and home-channel fallback., Long paragraph chunks omit `(n/m)` pagination suffixes and concatenate back to the stripped original text., Bot does not implement gateway.MessageEditor or gateway.PlaceholderCapable, preserving non-editable iMessage semantics.
+- Source refs: ../hermes-agent/gateway/platforms/bluebubbles.py@f731c2c2, ../hermes-agent/tests/gateway/test_bluebubbles.py@f731c2c2, internal/channels/bluebubbles/bot.go, internal/gateway/channel.go
+- Unblocks: BlueBubbles iMessage session-context prompt guidance
+- Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
+
+## 9. CLI profile name validator
+
+- Phase: 5 / 5.O
+- Owner: `tools`
+- Size: `small`
+- Status: `planned`
+- Contract: internal/cli adds a pure function `ValidateProfileName(name string) error` and an exported sentinel error set: ErrProfileNameEmpty, ErrProfileNameTooLong, ErrProfileNameInvalidChars, ErrProfileNameReserved; the function accepts names matching `^[a-z0-9][a-z0-9_-]{0,63}$`, treats 'default' as valid (special alias), and rejects the reserved subcommand names {'create','delete','list','use','export','import','show'}
+- Trust class: operator, system
+- Ready when: internal/cli already exposes pure helpers; adding one new file with one validator + sentinel errors compiles cleanly alongside them., This slice only defines validation; no path resolution, active-profile read/write, command wiring, alias wrapper, or env mutation is required.
+- Not ready when: The slice resolves filesystem paths, creates wrapper scripts, mutates provider credentials, modifies internal/config, or registers a Cobra command., The slice modifies any other internal/cli file beyond the new profile_name.go and profile_name_test.go.
+- Degraded mode: Callers report a typed sentinel error class instead of free-form text so the CLI can render uniform error messages later without re-parsing strings.
+- Fixture: `internal/cli/profile_name_test.go`
+- Write scope: `internal/cli/profile_name.go`, `internal/cli/profile_name_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/cli -run 'TestValidateProfileName_' -count=1`, `go test ./internal/cli -count=1`, `go vet ./internal/cli`, `go run ./cmd/builder-loop progress validate`
+- Done signal: internal/cli/profile_name.go declares ValidateProfileName plus the four sentinel errors; five named tests pass; no other internal/cli, internal/config, or cmd/gormes file is modified.
+- Acceptance: TestValidateProfileName_AcceptsValid: ValidateProfileName each of {'default','coder','work-1','tier_2','a','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'} returns nil (the last is exactly 64 chars)., TestValidateProfileName_RejectsEmpty: ValidateProfileName('') and ValidateProfileName('   ') (after caller-side trim) both return ErrProfileNameEmpty., TestValidateProfileName_RejectsTooLong: ValidateProfileName(strings.Repeat('a', 65)) returns ErrProfileNameTooLong., TestValidateProfileName_RejectsInvalidChars: each of {'Coder','my profile','-leading','_leading','dot.name','slash/name','tab\tname'} returns ErrProfileNameInvalidChars., TestValidateProfileName_RejectsReserved: each of {'create','delete','list','use','export','import','show'} returns ErrProfileNameReserved (these collide with subcommand names).
+- Source refs: ../hermes-agent/hermes_cli/profiles.py@edc78e25:_PROFILE_ID_RE, ../hermes-agent/hermes_cli/profiles.py@edc78e25:validate_profile_name, ../hermes-agent/tests/hermes_cli/test_profiles.py@edc78e25, internal/cli/banner.go
+- Unblocks: CLI active-profile store, CLI profile root resolver
+- Why now: Unblocks CLI active-profile store, CLI profile root resolver.
+
+## 10. doctorCustomEndpointReadiness check function
+
+- Phase: 5 / 5.O
+- Owner: `tools`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: cmd/gormes adds a pure function `doctorCustomEndpointReadiness(cfg config.Config) doctor.CheckResult` that returns Name='Custom endpoint', Status=Pass when Hermes.Endpoint and Hermes.APIKey and Hermes.Model are all non-empty, Status=Warn when any one is missing (with itemized evidence), and Status=Fail when Endpoint is set but Model is empty; doctorCmd RunE invokes this function after the existing Goncho/Slack checks; --offline still skips network probes elsewhere
+- Trust class: operator, system
+- Ready when: cmd/gormes/doctor.go already calls doctorGonchoConfig(cfg) and doctorSlackGatewayConfig(cfg, runtimeStatus) — adding a third helper alongside them is mechanical., internal/config/config.go declares HermesCfg{Endpoint, APIKey, Model} so the check has a stable typed input., internal/doctor/doctor.go already exposes CheckResult, ItemInfo, StatusPass/StatusWarn/StatusFail; this row only composes them.
+- Not ready when: The slice changes config schema, adds new HermesCfg fields, modifies provider routing, or introduces a live /v1/models or auth lookup., The slice changes any other doctor check's behaviour., The slice ports Hermes Python config.yaml reading.
+- Degraded mode: When endpoint is set but credentials or model are missing, the check emits Status=Warn with item-level notes (api_key=missing, model=missing) instead of exiting non-zero, so operators see precisely which field needs attention.
+- Fixture: `cmd/gormes/doctor_custom_provider_test.go`
+- Write scope: `cmd/gormes/doctor.go`, `cmd/gormes/doctor_custom_provider_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./cmd/gormes -run 'TestDoctorCustomEndpoint\|TestDoctorCmdInvokesCustomEndpointReadiness' -count=1`, `go test ./cmd/gormes -count=1`, `go vet ./cmd/gormes`, `go run ./cmd/builder-loop progress validate`
+- Done signal: doctorCustomEndpointReadiness is a pure function with five named tests; doctorCmd invokes it; no internal/config or internal/hermes files are modified.
+- Acceptance: TestDoctorCustomEndpointAllSet: cfg with Endpoint='https://example.invalid', APIKey='secret', Model='m' returns CheckResult{Name='Custom endpoint', Status=StatusPass, Summary contains 'configured'} and no items are flagged Warn., TestDoctorCustomEndpointMissingAPIKey: cfg with Endpoint set, APIKey empty, Model='m' returns Status=StatusWarn with an item Name='api_key' Status=StatusWarn Note='missing'., TestDoctorCustomEndpointMissingModel: cfg with Endpoint set, APIKey set, Model empty returns Status=StatusFail with an item Name='model' Status=StatusFail Note='missing' (Hermes considers this a hard error since requests cannot route)., TestDoctorCustomEndpointAllEmpty: cfg with all three empty returns Status=StatusWarn Summary='disabled' so doctor stays useful even when no endpoint is configured., TestDoctorCmdInvokesCustomEndpointReadiness: running doctorCmd.RunE against an in-memory cfg with custom endpoint emits the new check's Format() block to stdout in --offline mode and exits 0 when Status<=Warn.
+- Source refs: ../hermes-agent/hermes_cli/doctor.py@b2d3308f:_run_doctor, ../hermes-agent/tests/hermes_cli/test_doctor.py@b2d3308f:test_run_doctor_accepts_bare_custom_provider, cmd/gormes/doctor.go, cmd/gormes/goncho_doctor_test.go, internal/config/config.go:HermesCfg, internal/doctor/doctor.go:CheckResult
+- Unblocks: CLI status summary over native stores
+- Why now: Unblocks CLI status summary over native stores.
 
 <!-- PROGRESS:END -->

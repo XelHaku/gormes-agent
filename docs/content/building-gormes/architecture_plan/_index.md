@@ -74,7 +74,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Planner self-healing verdict loop
 - [x] Planner divergence and provenance awareness
 - [ ] Watchdog checkpoint coalescing
-- [ ] PR-intake idle backoff
+- [x] PR-intake idle backoff
 - [ ] Watchdog dead-process vs slow-progress separation
 - [ ] Builder-loop self-improvement vs user-feature ratio metric
 
@@ -348,7 +348,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Azure Anthropic Messages endpoint contract
 - [ ] Azure Foundry transport probe read model
 - [ ] Azure Foundry probe — path sniffing
-- [ ] Azure Foundry probe — /models classification + Anthropic fallback
+- [x] Azure Foundry probe — /models classification + Anthropic fallback
 - [ ] Azure Foundry runtime env/config read model
 - [ ] Azure Foundry CLI setup/status manual fallback
 - [ ] Bedrock
@@ -546,8 +546,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] CLI dump support-summary helper
 - [x] PTY bridge protocol adapter
 - [ ] CLI command registry parity + active-turn busy policy
-- [ ] Gateway /reasoning command parser
-- [ ] Gateway /reasoning apply + dispatch
+- [x] Gateway /reasoning command parser
+- [x] Gateway /reasoning apply + dispatch
 - [ ] Busy command guard for compression and long CLI actions
 - [ ] Config, profile, auth, and setup command surfaces
 - [ ] CLI profile name validator
@@ -583,7 +583,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Deterministic helper-file ports (tool-progress/image/completion-path/personality/platform-event)
 - [x] TUI gateway tool-progress mode normalizer
-- [ ] TUI gateway completion path normalizer
+- [x] TUI gateway completion path normalizer
 - [ ] TUI gateway tool summary formatter
 - [ ] TUI gateway image/personality/platform-event helpers
 - [x] TUI mouse tracking config + slash toggle

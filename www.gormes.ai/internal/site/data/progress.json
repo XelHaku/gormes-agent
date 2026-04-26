@@ -445,9 +445,9 @@
             {
               "name": "PR-intake idle backoff",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure helper internal/builderloop/pr_intake_backoff.go exposes type BackoffState struct{ConsecutiveEmpty int; SuppressUntil time.Time; Threshold int; Baseline, Idle time.Duration} and methods (s BackoffState) ShouldPoll(now time.Time) bool and (s BackoffState) RecordResult(now time.Time, listed int) BackoffState. After Threshold consecutive listed=0 results, ShouldPoll returns false until now >= SuppressUntil; any listed > 0 result resets ConsecutiveEmpty and clears SuppressUntil. No GitHub API calls, no goroutines, no live clock in this slice.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -493,8 +493,9 @@
                 "internal/builderloop/pr_intake_backoff_test.go fixtures prove threshold/suppress/reset/reactivation behavior under a fake clock with no GitHub API and no goroutines."
               ],
               "health": {
-                "attempt_count": 3,
-                "last_attempt": "2026-04-26T15:09:51Z",
+                "attempt_count": 4,
+                "last_attempt": "2026-04-26T17:12:26Z",
+                "last_success": "2026-04-26T17:12:26Z",
                 "last_failure": {
                   "run_id": "20260426T150941Z-113448856",
                   "category": "no_progress",
@@ -4672,9 +4673,9 @@
             {
               "name": "Azure Foundry probe — /models classification + Anthropic fallback",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure helper internal/hermes/azure_foundry_models_probe.go exposes type AzureProbeResult struct{Transport AzureTransport; Models []string; Reason string; Evidence []string} and ProbeAzureFoundry(ctx, client *http.Client, base, apiKey string) (AzureProbeResult, error). Probes <base>/models first; on 200 + OpenAI-shaped JSON returns openai_chat_completions with the model IDs. On non-200 or shape mismatch, probes <base>/v1/messages with a zero-token Anthropic Messages payload and classifies anthropic_messages on any 4xx that mentions 'messages' or 'model'. Otherwise returns Transport=unknown and Reason=manual_required. Tests use httptest.Server fakes only — no live Azure call, no credential storage, no config writes.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -4726,13 +4727,14 @@
                 "internal/hermes/azure_foundry_models_probe_test.go fixtures prove openai/anthropic/unknown classifications via httptest.Server fakes with no live Azure traffic."
               ],
               "health": {
-                "attempt_count": 3,
-                "last_attempt": "2026-04-26T15:09:01Z",
+                "attempt_count": 4,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T17:12:26Z",
                 "last_failure": {
-                  "run_id": "20260426T150848Z-251659260",
-                  "category": "no_progress",
+                  "run_id": "20260426T170202Z-170802377",
+                  "category": "worker_error",
                   "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry probe — /models classification + Anthropic fallback"
+                  "stderr_tail": "command 3 failed: exit status 1"
                 },
                 "backends_tried": [
                   "codexu"
@@ -8925,9 +8927,9 @@
             {
               "name": "Gateway /reasoning command parser",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure parser internal/gateway/reasoning_command.go exposes type ReasoningAction int (ReasoningActionShow, ReasoningActionSet, ReasoningActionReset), type ReasoningEffort string (high|low|medium|\"\"), type ReasoningCommand struct{Action ReasoningAction; Effort ReasoningEffort; Global bool}, and ParseReasoningCommand(args []string) (ReasoningCommand, error). Empty args returns Action=Show. \"high|low|medium\" returns Action=Set with that Effort. Trailing \"--global\" sets Global=true. \"reset\" alone returns Action=Reset, Global=false. \"reset --global\" returns an error matching ErrResetGlobalUnsupported. Unknown effort returns ErrInvalidEffort. No state, no clock, no I/O.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -8957,7 +8959,7 @@
                 "TestParseReasoningCommand_RejectGlobalReset ([\"reset\",\"--global\"]) returns ErrResetGlobalUnsupported.",
                 "TestParseReasoningCommand_RejectInvalidEffort ([\"bogus\"]) returns ErrInvalidEffort."
               ],
-              "note": "Split off from the larger /reasoning row. Worker can land the parser as 6 deterministic table tests in one cycle without any session/config wiring. The apply + dispatch slice depends on this row.",
+              "note": "Complete: TDD landed pure parser `internal/gateway/reasoning_command.go` and table tests in `internal/gateway/reasoning_command_test.go`. ParseReasoningCommand recognizes the show form on empty args, the set form for high|low|medium, the trailing --global modifier, and the reset form (session-scoped only). Unknown effort tokens return ErrInvalidEffort and `reset --global` returns ErrResetGlobalUnsupported, both wrapped via fmt.Errorf so dispatchers can errors.Is them without re-parsing. The parser stays pure: no manager.go, no config persistence, no gateway dispatch — the apply + dispatch slice consumes these typed errors next.",
               "write_scope": [
                 "internal/gateway/reasoning_command.go",
                 "internal/gateway/reasoning_command_test.go",
@@ -8971,6 +8973,20 @@
               "done_signal": [
                 "internal/gateway/reasoning_command_test.go fixtures prove parser correctness across show/set/global/reset/invalid forms."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T17:01:23Z",
+                "last_failure": {
+                  "run_id": "20260426T165159Z-793740952",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "git cherry-pick failed: exit status 128: error: Your local changes to the following files would be overwritten by merge:\n\tdocs/content/building-gormes/architecture_plan/progress.json\nPlease commit your changes or stash them before you merge.\nAborting\nfatal: cherry-pick failed"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "split",
                 "upstream_ref": "hermes:25ba6a4a gateway/run.py:_parse_reasoning_command_args",
@@ -8980,9 +8996,9 @@
             {
               "name": "Gateway /reasoning apply + dispatch",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/gateway/reasoning_command.go also exposes type SessionReasoningState struct{Effort ReasoningEffort; Source string} where Source is \"session\"|\"global\"|\"unset\", type ReasoningReply struct{Effort ReasoningEffort; Scope string; PersistFailed bool}, and ApplyReasoningCommand(state SessionReasoningState, cmd ReasoningCommand, persistGlobal func(ReasoningEffort) error) (SessionReasoningState, ReasoningReply). Action=Show returns current state unchanged. Action=Set with Global=false mutates session-only. Action=Set with Global=true calls persistGlobal; on failure falls back to session-only and sets PersistFailed=true. Action=Reset clears the session override. Internal/gateway/manager.go wires \"/reasoning\" through the existing command registry to ParseReasoningCommand + ApplyReasoningCommand for the calling session.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9018,7 +9034,7 @@
                 "TestApplyReasoningCommand_ResetClearsSessionState sets Source=\"unset\" and Effort=\"\".",
                 "TestGatewayManagerDispatchesReasoning verifies that the existing command registry routes \"/reasoning\" through Parse + Apply for the calling session only."
               ],
-              "note": "Apply + dispatch slice. Depends on the parser slice landing first so this row only needs to add the state-mutator and one wiring point in manager.go. The persistGlobal func is a callback so the test can stub config persistence without disk I/O.",
+              "note": "Complete: TDD landed `SessionReasoningState`, `ReasoningReply`, and `ApplyReasoningCommand` in `internal/gateway/reasoning_command.go` with `Source`/`Scope` tags `unset|session|global`. Show returns the injected state unchanged; session-only Set mutates without invoking persistGlobal; global Set calls persistGlobal once with the requested effort and pins Source=global on success; persistGlobal failure falls back to session-only state with PersistFailed=true; Reset clears Source to unset and Effort to \"\". `internal/gateway/manager.go` adds `ManagerConfig.PersistReasoningGlobal` plus `Manager.DispatchReasoning(sessionKey, args)` keyed by chat key, so per-session reasoning state is isolated and a missing callback degrades to the session-only fallback path. `TestGatewayManagerDispatchesReasoning` covers session-only set, show, cross-session isolation, --global persist, post-global isolation, reset, and invalid-effort error propagation; `TestGatewayManagerDispatchReasoningGlobalPersistFallback` proves a callback error becomes PersistFailed without surfacing the error to the caller.",
               "write_scope": [
                 "internal/gateway/reasoning_command.go",
                 "internal/gateway/reasoning_command_test.go",
@@ -9033,6 +9049,11 @@
               "done_signal": [
                 "internal/gateway/reasoning_command_test.go covers session-only set, global persist callback, persistGlobal fallback, and reset; manager test proves dispatch."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:12:26Z",
+                "last_success": "2026-04-26T17:12:26Z"
+              },
               "provenance": {
                 "origin_type": "split",
                 "upstream_ref": "hermes:25ba6a4a gateway/run.py:_handle_reasoning_command",
@@ -10328,9 +10349,9 @@
             {
               "name": "TUI gateway completion path normalizer",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure helper internal/tuigateway/completion_path.go exposes NormalizeCompletionPath(in string, isWindows bool) string. Mirrors upstream tui_gateway/server.py:_normalize_completion_path (line 428): expands a leading ~ to the operator's home dir (caller injects the home value via a small stubbable hook), and on non-Windows callers also rewrites Windows-style C:/foo into /mnt/c/foo. No filesystem stat, no os.UserHomeDir inside the helper — caller threads a HomeFn or homeDir string.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -10365,7 +10386,7 @@
                 "TestNormalizeCompletionPath_NoSlashConversionWithoutDriveColon leaves /usr/bin unchanged on Linux.",
                 "Helper does not call os.UserHomeDir, os.Stat, or runtime.GOOS — caller injects."
               ],
-              "note": "Second TUI gateway pure-helper slice. Mirrors upstream behavior including the WSL drive-mount rewrite.",
+              "note": "Complete: internal/tuigateway/completion_path.go exposes NormalizeCompletionPath(in string, isWindows bool) string and a stubbable package-level HomeFn hook. Tilde-only and tilde-slash forms are rewritten through the injected home; on non-Windows callers, expanded paths matching <letter>:/... are rewritten to /mnt/<lower-letter>/... (with backslash-to-slash normalisation gating the pattern check). Empty input returns empty without consulting HomeFn. The helper performs no filesystem I/O and never reads os.UserHomeDir, os.Stat, or runtime.GOOS — verified by table-driven tests in internal/tuigateway/completion_path_test.go covering TildeExpansion, BareTildeExpandsToHome, WindowsToMntOnLinux, BackslashWindowsToMntOnLinux, DriveLetterLowercased, NoExpansionOnWindows, EmptyInputReturnsEmpty, NoSlashConversionWithoutDriveColon, NonTildeNonDrivePassthrough, TildeOnWindowsStillExpands, and DriveColonWithoutSlashUntouched.",
               "write_scope": [
                 "internal/tuigateway/completion_path.go",
                 "internal/tuigateway/completion_path_test.go",
@@ -10379,6 +10400,11 @@
               "done_signal": [
                 "internal/tuigateway/completion_path_test.go fixtures prove tilde expansion and Windows→/mnt rewrite without runtime.GOOS or os.UserHomeDir calls."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-26T17:12:26Z",
+                "last_success": "2026-04-26T17:12:26Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:eaa7e2db tui_gateway/server.py:_normalize_completion_path",
