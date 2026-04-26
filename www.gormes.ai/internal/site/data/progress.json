@@ -4274,6 +4274,12 @@
                   "last_category": "no_progress"
                 }
               },
+              "planner_verdict": {
+                "needs_human": true,
+                "reason": "manual audit 2026-04-26: three no-progress worker attempts after fixture_ready row; remove from default queue until a human either lands internal/hermes/azure_foundry_probe_test.go fixtures or splits path-sniffing, /models probing, and Anthropic fallback into separate rows.",
+                "since": "2026-04-26T14:39:26Z",
+                "last_outcome": "still_failing"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:731e1ef8 hermes_cli/azure_detect.py",
@@ -6075,6 +6081,12 @@
                   "spec_hash": "25b39bdce6d1371988267d060360d7ba63c514dc221dbb2301fa09962fc112d9",
                   "last_category": "no_progress"
                 }
+              },
+              "planner_verdict": {
+                "needs_human": true,
+                "reason": "manual audit 2026-04-26: three no-progress attempts on draft rate-guard row; keep out of default builder selection until a human splits genuine-quota, upstream-capacity, last-known-state, and malformed-header fixtures or lands internal/hermes/provider_rate_guard_test.go first.",
+                "since": "2026-04-26T14:39:26Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "upstream",
