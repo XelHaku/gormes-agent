@@ -1,5 +1,10 @@
 package hermes
 
+import (
+	"sort"
+	"strings"
+)
+
 type ModelFactStatus string
 
 const (
@@ -147,11 +152,50 @@ func (r ModelRegistry) Lookup(query ModelRegistryQuery) ModelMetadataResult {
 	}
 	entry, ok := r.entries[key]
 	if !ok {
-		return result
+		entry, ok = r.lookupStaticAlias(key)
+		if !ok {
+			return result
+		}
 	}
 	result.Found = true
 	result.ModelRegistryEntry = entry
 	return result
+}
+
+type staticModelAlias struct {
+	provider string
+	prefix   string
+}
+
+func (r ModelRegistry) lookupStaticAlias(key ModelRegistryKey) (ModelRegistryEntry, bool) {
+	alias, ok := staticModelAliases[key.Model]
+	if !ok {
+		return ModelRegistryEntry{}, false
+	}
+	provider := key.Provider
+	if provider == "" {
+		provider = alias.provider
+	}
+	if provider == "" {
+		return ModelRegistryEntry{}, false
+	}
+
+	var candidates []ModelRegistryEntry
+	for _, entry := range r.entries {
+		if entry.Provider != provider {
+			continue
+		}
+		if strings.HasPrefix(entry.Model, alias.prefix) {
+			candidates = append(candidates, entry)
+		}
+	}
+	if len(candidates) == 0 {
+		return ModelRegistryEntry{}, false
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].Model > candidates[j].Model
+	})
+	return candidates[0], true
 }
 
 func (r ModelRegistry) Snapshot() ModelRegistrySnapshot {
@@ -243,6 +287,13 @@ func knownModelCapabilities(tools, vision, reasoning, pdf, audioInput, structure
 	})
 }
 
+var staticModelAliases = map[string]staticModelAlias{
+	"sonnet": {provider: "anthropic", prefix: "claude-sonnet"},
+	"opus":   {provider: "anthropic", prefix: "claude-opus"},
+	"haiku":  {provider: "anthropic", prefix: "claude-haiku"},
+	"claude": {provider: "anthropic", prefix: "claude"},
+}
+
 var defaultModelRegistry = NewStaticModelRegistry(ModelRegistrySnapshot{
 	Source:    ModelRegistrySourceEmbedded,
 	Freshness: ModelRegistryFreshnessCurrent,
@@ -288,6 +339,24 @@ var defaultModelRegistry = NewStaticModelRegistry(ModelRegistrySnapshot{
 			ModelPricingSourceOfficialDocsSnapshot,
 			"anthropic-prompt-caching-2026-03-16",
 		),
+		Capabilities: knownModelCapabilities(
+			ModelCapabilitySupported,
+			ModelCapabilitySupported,
+			ModelCapabilitySupported,
+			ModelCapabilityUnsupported,
+			ModelCapabilityUnsupported,
+			ModelCapabilityUnsupported,
+			ModelCapabilityUnsupported,
+		),
+	},
+	{
+		Provider:         "anthropic",
+		Model:            "claude-sonnet-4-20250514",
+		ProviderFamily:   "anthropic",
+		ModelFamily:      "claude-sonnet-4",
+		RawContextWindow: 200_000,
+		MaxOutputTokens:  32_000,
+		Pricing:          unknownModelPricing(),
 		Capabilities: knownModelCapabilities(
 			ModelCapabilitySupported,
 			ModelCapabilitySupported,
