@@ -10482,9 +10482,9 @@
             {
               "name": "TUI gateway tool summary formatter",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure helper internal/tuigateway/tool_summary.go exposes FormatToolSummary(name string, resultJSON []byte, durationSeconds *float64) (string, bool). Mirrors upstream tui_gateway/server.py:_tool_summary (line 996): for web_search returns 'Did N searches' (or 'Did 1 search'); for web_extract returns 'Extracted N pages'; for any other tool returns 'Completed' if duration is set, else (\"\", false). The duration suffix ' in 1.2s' is appended whenever durationSeconds is non-nil. Caller decides whether to emit; this helper never logs or writes.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -10522,7 +10522,7 @@
                 "TestFormatToolSummary_InvalidJSONFallsBackToCompleted treats malformed result as no-data.",
                 "Helper does not depend on time.Now or external services."
               ],
-              "note": "Third TUI gateway pure-helper slice. Mirrors the upstream summary contract for web_search and web_extract; future tools can be added incrementally.",
+              "note": "Complete: internal/tuigateway/tool_summary.go exposes FormatToolSummary(name string, resultJSON []byte, durationSeconds *float64) (string, bool) as a pure JSON-shape formatter with no registry, logging, wall-clock, or service dependency. Fixtures in internal/tuigateway/tool_summary_test.go prove web_search singular/plural summaries, web_extract plural summaries, unknown-tool duration fallback, unknown-tool no-duration suppression, and malformed JSON fallback to Completed when a duration is present.",
               "write_scope": [
                 "internal/tuigateway/tool_summary.go",
                 "internal/tuigateway/tool_summary_test.go",
