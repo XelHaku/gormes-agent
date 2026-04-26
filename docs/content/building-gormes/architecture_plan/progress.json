@@ -412,9 +412,9 @@
                 "internal/builderloop/watchdog_coalesce_test.go fixtures prove first/amend/first-after-rotation/noop decisions across a fake clock with no live git or systemd."
               ],
               "health": {
-                "attempt_count": 4,
-                "last_attempt": "2026-04-26T17:33:11Z",
-                "last_success": "2026-04-26T17:33:11Z",
+                "attempt_count": 5,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z",
                 "last_failure": {
                   "run_id": "20260426T150941Z-113448856",
                   "category": "no_progress",
@@ -5700,7 +5700,6 @@
                 "The slice introduces a runtime feature flag, environment variable, or config knob to switch between [SYSTEM: and [IMPORTANT: — the rename is unconditional.",
                 "The slice touches gateway prompt assembly, provider transports, or any runtime that does not currently emit the [SYSTEM: marker."
               ],
-              "unblocks": [],
               "acceptance": [
                 "TestCronHeartbeatBuildPromptUsesImportantPrefix asserts BuildPrompt output starts with \"[IMPORTANT:\" and contains the existing scheduled-cron-job description body unchanged.",
                 "TestCronHeartbeatPrefixConstantValue asserts CronHeartbeatPrefix is exactly the new \"[IMPORTANT: You are running as a scheduled cron job. \" prefix.",
@@ -5726,6 +5725,11 @@
               "done_signal": [
                 "internal/cron/heartbeat_test.go and internal/skills/preprocessing_commands_test.go assert the [IMPORTANT: prefix and the codebase contains zero remaining \"[SYSTEM:\" string literals under internal/skills and internal/cron."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:d7a34682 fix(prompts): replace [SYSTEM: with [IMPORTANT: to avoid Azure content filter",
@@ -7469,6 +7473,11 @@
               "done_signal": [
                 "internal/skills/list_test.go and internal/cli/skills_command_test.go fixtures prove the Status column, --enabled-only filter, and platform-arg guard."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:0e2a53ea hermes_cli/skills_hub.py do_list",
@@ -7870,6 +7879,11 @@
               "done_signal": [
                 "internal/tools/mcp_oauth_refresh.go declares RefreshMCPOAuth, MCPRefresher, MCPOAuthRefreshResult, and ErrMCPOAuthSessionExpired; five named tests pass; the store from the prior row is reused without modification."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:edc78e25 tools/mcp_oauth_manager.py",
@@ -8340,9 +8354,9 @@
                 "GuardCommand returns typed BlockedResult values; hardline beats recoverable; benign returns zero value; no side effects; execute_code.go is still unchanged."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-26T17:34:56Z",
-                "last_success": "2026-04-26T17:34:56Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -8523,6 +8537,11 @@
               "done_signal": [
                 "ControlPlaneSubphaseID is exported from internal/plannerloop and SummarizeAutoloopAudit attributes empty-Task events to it; four named tests pass; backend.go/backend_failure.go are unchanged."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "gormes",
                 "owned_since": "2026-04-26T01:23:57Z",
@@ -10166,6 +10185,11 @@
               "done_signal": [
                 "internal/cli/log_redact_test.go fixtures prove redaction across the five secret shapes plus no-match preservation."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "split",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/logs.py",
@@ -10533,6 +10557,11 @@
               "done_signal": [
                 "internal/tuigateway/tool_summary_test.go fixtures prove web_search singular/plural, web_extract plural, unknown-tool-with-duration, and unknown-tool-no-duration paths with no live tool registry."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:41:07Z",
+                "last_success": "2026-04-26T17:41:07Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:eaa7e2db tui_gateway/server.py:_tool_summary",
