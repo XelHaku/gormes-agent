@@ -9555,9 +9555,9 @@
                 "internal/cli/active_profile.go declares ReadActiveProfile/WriteActiveProfile/ClearActiveProfile and ErrActiveProfileUnset; six named tests pass; no other internal/cli, internal/config, or cmd/gormes file is modified."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-26T20:15:56Z",
-                "last_success": "2026-04-26T20:15:56Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-26T20:26:35Z",
+                "last_success": "2026-04-26T20:26:35Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -10233,9 +10233,9 @@
                 "doctorCustomEndpointReadiness is a pure function with five named tests; doctorCmd invokes it; no internal/config or internal/hermes files are modified."
               ],
               "health": {
-                "attempt_count": 2,
-                "last_attempt": "2026-04-26T20:15:56Z",
-                "last_success": "2026-04-26T20:15:56Z"
+                "attempt_count": 3,
+                "last_attempt": "2026-04-26T20:26:35Z",
+                "last_success": "2026-04-26T20:26:35Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -11241,6 +11241,20 @@
               "done_signal": [
                 "All 5 TestSlashSave_* fixtures pass; the existing TestSlashRegistry_SaveStubReturnsNotImplemented assertion is updated or removed because the stub is replaced; no test in internal/tui opens a real network or DB connection."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-26T20:26:35Z",
+                "last_failure": {
+                  "run_id": "20260426T201556Z-870526464",
+                  "category": "report_validation_failed",
+                  "backend": "codexu",
+                  "stderr_tail": "worker changed paths outside declared write scope: internal/tui/slash_dispatch_test.go (allowed: internal/tui/slash_dispatch.go, internal/tui/slash_save.go, internal/tui/slash_save_test.go, internal/tui/model.go, docs/content/building-gormes/architecture_plan/progress.json)"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:2536a36f ui-tui/src/app/slash/commands/core.ts",
