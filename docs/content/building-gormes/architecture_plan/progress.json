@@ -9503,9 +9503,9 @@
             },
             {
               "name": "CLI active-profile store",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli adds an active-profile read/write store with `ReadActiveProfile(rootFile string) (string, error)` returning ErrActiveProfileUnset when missing, `WriteActiveProfile(rootFile, name string) error` that calls ValidateProfileName before writing, and `ClearActiveProfile(rootFile string) error`; both write paths use a temp-file + rename pattern so partial writes never produce a half-written file",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9554,6 +9554,11 @@
               "done_signal": [
                 "internal/cli/active_profile.go declares ReadActiveProfile/WriteActiveProfile/ClearActiveProfile and ErrActiveProfileUnset; six named tests pass; no other internal/cli, internal/config, or cmd/gormes file is modified."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T20:15:56Z",
+                "last_success": "2026-04-26T20:15:56Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 hermes_cli/profiles.py",
