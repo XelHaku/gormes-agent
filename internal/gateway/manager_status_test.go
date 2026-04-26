@@ -69,10 +69,20 @@ func TestManager_RunWritesStartupFailureToRuntimeStatus(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := m.Run(ctx)
+	done := make(chan error, 1)
+	go func() {
+		done <- m.Run(ctx)
+	}()
+
+	var err error
+	select {
+	case err = <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Run did not return startup error")
+	}
 	if !errors.Is(err, startupErr) {
 		t.Fatalf("Run error = %v, want startup error %v", err, startupErr)
 	}
