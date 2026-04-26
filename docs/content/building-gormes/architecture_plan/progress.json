@@ -4101,7 +4101,7 @@
                 "The slice removes the existing generic unsupported-parameter retry instead of adding Azure-specific first-request and routing fixtures."
               ],
               "unblocks": [
-                "Azure Foundry endpoint autodetect + model context read model"
+                "Azure Foundry transport probe read model"
               ],
               "acceptance": [
                 "A legacy Azure base URL with ?api-version=... sends POST requests to a clean /v1/chat/completions path while preserving the query parameters.",
@@ -4165,7 +4165,7 @@
                 "The slice reads or mutates ~/.claude, ~/.hermes, or hosted Anthropic OAuth state in unit tests."
               ],
               "unblocks": [
-                "Azure Foundry endpoint autodetect + model context read model"
+                "Azure Foundry transport probe read model"
               ],
               "acceptance": [
                 "A https://.../anthropic/v1 base URL stores and uses the Azure Anthropic base stripped to /anthropic before appending /v1/messages.",
@@ -4200,10 +4200,69 @@
               }
             },
             {
-              "name": "Azure Foundry endpoint autodetect + model context read model",
+              "name": "Azure Foundry transport probe read model",
               "priority": "P2",
               "status": "planned",
-              "contract": "Azure Foundry setup/runtime resolution records endpoint transport, advisory model list, and context-length evidence from deterministic probes while keeping manual fallback usable",
+              "contract": "Azure Foundry endpoint probing determines OpenAI-style, Anthropic-style, or manual-required transport from deterministic inputs without reading credentials or writing config",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Probe status reports azure_transport_detected, azure_models_probe_failed, azure_anthropic_probe_failed, or azure_detect_manual_required evidence while preserving manual endpoint entry.",
+              "fixture": "internal/hermes/azure_foundry_probe_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
+                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
+                "../hermes-agent/website/docs/guides/azure-foundry.md@7c50ed70",
+                "internal/hermes/http_client.go",
+                "internal/hermes/azure_openai_transport_test.go",
+                "internal/hermes/azure_anthropic_transport_test.go"
+              ],
+              "ready_when": [
+                "Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are validated, so each detected transport has a request-builder contract.",
+                "The worker can implement pure probe functions with injected fake HTTP responses; no config mutation or provider runtime resolver is needed."
+              ],
+              "not_ready_when": [
+                "The slice requires ARM deployment-list credentials, live Azure network calls, browser auth, or hosted provider credentials in unit tests.",
+                "The slice reads or writes AZURE_FOUNDRY_BASE_URL, AZURE_FOUNDRY_API_KEY, deployment config, or model context metadata."
+              ],
+              "unblocks": [
+                "Azure Foundry runtime env/config read model"
+              ],
+              "acceptance": [
+                "Path sniffing detects /anthropic endpoints as anthropic_messages without HTTP.",
+                "A fake /models OpenAI-shaped response selects chat_completions and records advisory model IDs without persisting them.",
+                "Failed /models plus a fake Anthropic Messages-shaped error selects anthropic_messages with explicit probe evidence.",
+                "Total probe failure returns manual-required evidence, not a fatal error, and does not hide manual api_mode selection."
+              ],
+              "note": "Split from the quarantined Azure Foundry umbrella after 86 attempts/no-progress quarantine. This first slice owns only deterministic transport probing and advisory model evidence; runtime env/config, context length, and CLI setup/status are separate dependent rows.",
+              "write_scope": [
+                "internal/hermes/azure_foundry_probe.go",
+                "internal/hermes/azure_foundry_probe_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestAzureFoundryProbe -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Azure Foundry probe fixtures prove path sniffing, OpenAI /models detection, Anthropic Messages fallback detection, manual-required evidence, and zero config/credential mutation."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:731e1ef8 hermes_cli/azure_detect.py",
+                "note": "Hermes defines Azure Foundry probing semantics; Gormes ports the pure read model first to avoid another setup/runtime umbrella attempt."
+              }
+            },
+            {
+              "name": "Azure Foundry runtime env/config read model",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Azure Foundry runtime resolution combines detected api_mode, deployment/model, redacted env/config evidence, and provider context metadata without contacting Azure or storing plaintext secrets",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -4211,80 +4270,117 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Setup and status report azure_detect_manual_required, azure_models_probe_failed, azure_context_unknown, and azure_transport_detected evidence without blocking manual endpoint configuration.",
-              "fixture": "internal/cli/azure_foundry_detect_test.go",
+              "degraded_mode": "Provider status reports azure_foundry_base_url_missing, azure_foundry_key_missing, azure_context_known, azure_context_unknown, and azure_secret_redacted evidence before any live request.",
+              "fixture": "internal/hermes/azure_foundry_runtime_test.go",
               "source_refs": [
-                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
-                "../hermes-agent/tests/hermes_cli/test_azure_detect.py@731e1ef8",
-                "../hermes-agent/hermes_cli/main.py@731e1ef8:_model_flow_azure_foundry",
                 "../hermes-agent/hermes_cli/runtime_provider.py@731e1ef8:_resolve_azure_foundry_runtime",
+                "../hermes-agent/hermes_cli/main.py@731e1ef8:_model_flow_azure_foundry",
+                "../hermes-agent/hermes_cli/config.py@731e1ef8:AZURE_FOUNDRY_API_KEY",
+                "../hermes-agent/hermes_cli/config.py@731e1ef8:AZURE_FOUNDRY_BASE_URL",
                 "../hermes-agent/website/docs/guides/azure-foundry.md@7c50ed70",
                 "internal/config/config.go",
                 "internal/hermes/model_context_resolver.go"
               ],
               "ready_when": [
-                "Azure OpenAI query/default_query transport contract and Azure Anthropic Messages endpoint contract are fixture-ready or validated so detected transport modes have request-builder contracts.",
+                "Azure Foundry transport probe read model is fixture-ready or validated, so this row can consume a typed probe result instead of reimplementing transport detection.",
                 "Provider-enforced context-length resolver is validated and can resolve model context from pure registry fixtures."
               ],
               "not_ready_when": [
-                "The slice requires ARM deployment-list credentials, live Azure network calls, browser auth, or hosted provider credentials in unit tests.",
-                "The slice treats failed probes as fatal instead of preserving manual API mode and deployment-name entry."
+                "The slice starts interactive setup, runs live Azure probes, persists API keys in status output, or changes OpenAI/Anthropic request builders.",
+                "The slice treats missing env/config as fatal before producing operator-readable degraded evidence."
               ],
               "blocked_by": [
-                "Azure OpenAI query/default_query transport contract",
-                "Azure Anthropic Messages endpoint contract",
+                "Azure Foundry transport probe read model",
                 "Provider-enforced context-length resolver"
               ],
-              "acceptance": [
-                "Path sniffing detects /anthropic endpoints as anthropic_messages without HTTP.",
-                "A fake /models OpenAI-shaped response selects chat_completions and records advisory model IDs.",
-                "Failed /models plus a fake Anthropic error shape selects anthropic_messages; total probe failure returns manual-required evidence, not a fatal error.",
-                "Context-length lookup records a known length when resolver metadata exists and explicit unknown evidence when fallback/default metadata is all that exists.",
-                "Resolver config honors AZURE_FOUNDRY_BASE_URL and AZURE_FOUNDRY_API_KEY without storing plaintext secrets in status output."
+              "unblocks": [
+                "Azure Foundry CLI setup/status manual fallback"
               ],
-              "note": "Hermes 731e1ef8 added Azure Foundry endpoint transport detection, advisory model discovery, deployment/context handling, and manual fallback; 7c50ed70 documents the operator flow and environment variables. Gormes should add a pure read-model/probe contract after the request builders are fixture-backed, not a live Azure setup wizard first.",
+              "acceptance": [
+                "AZURE_FOUNDRY_BASE_URL and AZURE_FOUNDRY_API_KEY override empty config values while status output redacts key material.",
+                "Configured deployment/model and api_mode combine with the typed probe result without changing request-builder behavior.",
+                "Known model context resolves to an explicit token length; missing or fallback-only metadata records azure_context_unknown evidence.",
+                "Missing base URL or API key returns degraded runtime evidence that keeps manual endpoint configuration possible."
+              ],
+              "note": "Second Azure Foundry split slice: keep env/config/context evidence separate from pure transport probing and CLI setup UX so one worker can land a bounded read model.",
               "write_scope": [
-                "internal/cli/azure_foundry_detect.go",
-                "internal/cli/azure_foundry_detect_test.go",
                 "internal/config/",
+                "internal/hermes/azure_foundry_runtime.go",
+                "internal/hermes/azure_foundry_runtime_test.go",
                 "internal/hermes/model_context_resolver.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/cli ./internal/config ./internal/hermes -run 'TestAzureFoundry|TestModelContext' -count=1",
-                "go test ./internal/cli ./internal/config ./internal/hermes -count=1",
+                "go test ./internal/config ./internal/hermes -run 'TestAzureFoundryRuntime|TestModelContext' -count=1",
+                "go test ./internal/config ./internal/hermes -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Azure Foundry fixtures prove deterministic transport detection, advisory model/context evidence, manual fallback, env-var resolution, and redacted status with no live Azure dependency."
+                "Runtime fixtures prove env/config precedence, redacted credential evidence, api_mode/deployment read model, context-known/context-unknown status, and no live Azure dependency."
               ],
-              "health": {
-                "attempt_count": 86,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-26T07:02:13Z",
-                "last_success": "2026-04-26T06:37:27Z",
-                "last_failure": {
-                  "run_id": "20260426T070200Z-648518425",
-                  "category": "no_progress",
-                  "backend": "codexu",
-                  "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry endpoint autodetect + model context read model"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category no_progress",
-                  "since": "2026-04-26T07:02:13Z",
-                  "after_run_id": "20260426T070200Z-648518425",
-                  "threshold": 3,
-                  "spec_hash": "e6c06908eb6e7fbfea0aedac122b37434bc0a16159e14f3ffa1b39cf7eb97f35",
-                  "last_category": "no_progress"
-                }
-              },
               "provenance": {
                 "origin_type": "upstream",
-                "upstream_ref": "hermes:731e1ef8 hermes_cli/azure_detect.py",
-                "note": "Hermes now has an Azure Foundry setup/runtime detection surface; Gormes should port the behavior as a pure native read-model before live setup UX."
+                "upstream_ref": "hermes:731e1ef8 hermes_cli/runtime_provider.py",
+                "note": "Hermes defines Azure Foundry runtime config resolution; Gormes keeps it as a redacted Go read model before CLI setup wiring."
+              }
+            },
+            {
+              "name": "Azure Foundry CLI setup/status manual fallback",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Azure Foundry CLI/status surfaces expose probe/runtime evidence and manual api_mode/deployment fallback without running a live setup wizard in tests",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator"
+              ],
+              "degraded_mode": "CLI status reports azure_detect_manual_required, azure_models_probe_failed, azure_context_unknown, and secret-redacted runtime evidence while preserving manual api_mode and model entry.",
+              "fixture": "internal/cli/azure_foundry_status_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/main.py@731e1ef8:_model_flow_azure_foundry",
+                "../hermes-agent/hermes_cli/azure_detect.py@731e1ef8",
+                "../hermes-agent/website/docs/guides/azure-foundry.md@7c50ed70",
+                "internal/cli/",
+                "internal/config/config.go",
+                "internal/hermes/azure_foundry_runtime.go"
+              ],
+              "ready_when": [
+                "Azure Foundry runtime env/config read model is validated and can emit redacted operator evidence.",
+                "CLI command registry parity or a focused internal/cli helper seam can render provider setup/status without broad command wiring."
+              ],
+              "not_ready_when": [
+                "The slice opens browser auth, writes real home config, performs live Azure network probes, or ports the whole Hermes model wizard.",
+                "The slice mixes OpenAI/Anthropic transport changes with CLI rendering."
+              ],
+              "blocked_by": [
+                "Azure Foundry runtime env/config read model"
+              ],
+              "acceptance": [
+                "CLI/status fixtures render detected OpenAI-style, detected Anthropic-style, and manual-required states from fake probe/runtime data.",
+                "Manual api_mode and deployment/model entry stay available when every probe fails.",
+                "Status redacts AZURE_FOUNDRY_API_KEY and other key material while naming which env/config source was used.",
+                "The focused fixtures do not require live Azure credentials, TTY prompts, browser auth, or broad provider setup command wiring."
+              ],
+              "note": "Final Azure Foundry split slice: operator-visible setup/status fallback after probe and runtime read models exist. This prevents workers from reopening the full Hermes model wizard while preserving manual fallback behavior.",
+              "write_scope": [
+                "internal/cli/azure_foundry_status.go",
+                "internal/cli/azure_foundry_status_test.go",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli ./internal/config -run TestAzureFoundryStatus -count=1",
+                "go test ./internal/cli ./internal/config -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "CLI/status fixtures prove detected/manual Azure Foundry states, deployment/model fallback, secret redaction, and no live setup or provider calls."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:731e1ef8 hermes_cli/main.py",
+                "note": "Hermes defines the operator flow; Gormes adapts it to native CLI/status helpers after read-model contracts land."
               }
             },
             {
