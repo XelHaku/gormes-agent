@@ -66,6 +66,9 @@ type oneshotInvocation struct {
 }
 
 func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
+	if runtime.tuiProgramFactory == nil {
+		runtime.tuiProgramFactory = defaultTUIProgramFactory
+	}
 	if runtime.runResolvedTUI == nil {
 		if runtime.runTUI != nil {
 			runLegacyTUI := runtime.runTUI
@@ -73,7 +76,9 @@ func newRootCommandWithRuntime(runtime rootRuntime) *cobra.Command {
 				return runLegacyTUI(cmd, nil)
 			}
 		} else {
-			runtime.runResolvedTUI = runResolvedTUI
+			runtime.runResolvedTUI = func(cmd *cobra.Command, invocation tuiInvocation) error {
+				return runResolvedTUIWithRuntime(cmd, invocation, runtime)
+			}
 		}
 	}
 	if runtime.newOneshotClient == nil {
@@ -319,6 +324,26 @@ func runTUI(cmd *cobra.Command, _ []string) error {
 }
 
 func runResolvedTUI(cmd *cobra.Command, invocation tuiInvocation) error {
+	return runResolvedTUIWithRuntime(cmd, invocation, rootRuntime{})
+}
+
+type tuiProgram interface {
+	Run() (tea.Model, error)
+	Quit()
+}
+
+type tuiProgramFactory func(tea.Model, ...tea.ProgramOption) tuiProgram
+
+func defaultTUIProgramFactory(model tea.Model, options ...tea.ProgramOption) tuiProgram {
+	return tea.NewProgram(model, options...)
+}
+
+func runResolvedTUIWithRuntime(cmd *cobra.Command, invocation tuiInvocation, runtime rootRuntime) error {
+	runNativeTUIStartupPreflight(context.Background(), tuiStartupPreflightOptions{})
+	if runtime.tuiProgramFactory == nil {
+		runtime.tuiProgramFactory = defaultTUIProgramFactory
+	}
+
 	cfg := invocation.Config
 	if p, ok := config.LegacyHermesHome(); ok {
 		slog.Info("detected upstream Hermes home — Gormes uses XDG paths and does NOT read state from it; run `gormes migrate --from-hermes` (planned Phase 5.O) to import sessions and memory", "hermes_home", p)
