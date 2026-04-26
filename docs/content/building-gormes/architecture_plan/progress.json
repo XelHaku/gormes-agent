@@ -4253,11 +4253,11 @@
                 "Azure Foundry probe fixtures prove path sniffing, OpenAI /models detection, Anthropic Messages fallback detection, manual-required evidence, and zero config/credential mutation."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T12:47:19Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T12:48:18Z",
                 "last_failure": {
-                  "run_id": "20260426T124706Z-429870921",
+                  "run_id": "20260426T124806Z-473506558",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 4/4.A/Azure Foundry transport probe read model"
@@ -6047,11 +6047,11 @@
                 "Provider rate-guard fixtures prove genuine quota, upstream-capacity, last-known-state, malformed-header, and no-sleep degraded decisions with visible status evidence."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-26T12:47:19Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-26T12:48:18Z",
                 "last_failure": {
-                  "run_id": "20260426T124706Z-429870921",
+                  "run_id": "20260426T124806Z-473506558",
                   "category": "no_progress",
                   "backend": "codexu",
                   "stderr_tail": "worker made no changes: 4/4.H/Provider rate guard + budget telemetry"
