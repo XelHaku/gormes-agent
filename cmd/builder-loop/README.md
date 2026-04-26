@@ -22,6 +22,11 @@ When the command selects work, it should select from progress rows and pass row
 metadata into worker prompts so worker agents develop the full `gormes-agent`
 one phase slice at a time.
 
+Non-dry-run builder cycles take the shared planner-loop `run.lock` before
+checkpointing, PR intake, worker claims, promotions, or health writes. If the
+planner loop is already regenerating the control plane, builder emits
+`run_blocked:control_plane_locked` and exits before touching the queue.
+
 ## Run Modes
 
 Preview selected work without launching worker agents:
@@ -138,9 +143,10 @@ finished branches in worker order. Before candidate selection, the builder
 loop checkpoints any dirty control-checkout changes by default, then runs
 the clean-worktree preflight. The flow per worker is:
 
-1. Pre-flight: refuse to launch if the repo has unmerged paths or, after the
-   checkpoint attempt, still has uncommitted changes (emits
-   `run_failed:worktree_unmerged` / `run_failed:worktree_dirty`).
+1. Pre-flight: refuse to launch if the repo has unmerged paths, after the
+   checkpoint attempt still has uncommitted changes, or the current branch is
+   behind its upstream (emits `run_failed:worktree_unmerged`,
+   `run_failed:worktree_dirty`, or `run_failed:branch_behind_upstream`).
 2. Create a fresh worker branch in an isolated worktree and record its base
    commit.
 3. Run the backend with the worker prompt (which tells the agent the branch

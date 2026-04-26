@@ -108,6 +108,73 @@ func TestRunOnceRefusesToStartWhilePlannerRunLockHeld(t *testing.T) {
 	}
 }
 
+func TestRunOnceRefusesBehindUpstreamBranch(t *testing.T) {
+	dir := t.TempDir()
+	origin := filepath.Join(dir, "origin.git")
+	if output, err := exec.Command("git", "init", "--bare", origin).CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare failed: %v\n%s", err, output)
+	}
+
+	seedRoot := filepath.Join(dir, "seed")
+	if err := os.MkdirAll(seedRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	initCleanRepo(t, seedRoot)
+	runGitCommand(t, seedRoot, "remote", "add", "origin", origin)
+	runGitCommand(t, seedRoot, "push", "-u", "origin", "HEAD")
+
+	repoRoot := filepath.Join(dir, "repo")
+	if output, err := exec.Command("git", "clone", origin, repoRoot).CombinedOutput(); err != nil {
+		t.Fatalf("git clone failed: %v\n%s", err, output)
+	}
+	runGitCommand(t, repoRoot, "config", "user.email", "test@example.com")
+	runGitCommand(t, repoRoot, "config", "user.name", "Test User")
+
+	if err := os.WriteFile(filepath.Join(seedRoot, "remote.txt"), []byte("remote\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGitCommand(t, seedRoot, "add", "remote.txt")
+	runGitCommand(t, seedRoot, "commit", "-m", "remote")
+	runGitCommand(t, seedRoot, "push")
+	runGitCommand(t, repoRoot, "fetch", "origin")
+
+	progressPath := writeProgressJSON(t, `{"phases": {}}`)
+	runRoot := filepath.Join(dir, "builder-loop")
+	plannerRoot := filepath.Join(dir, "planner-loop")
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:              repoRoot,
+			ProgressJSON:          progressPath,
+			RunRoot:               runRoot,
+			Backend:               "codexu",
+			Mode:                  "safe",
+			MaxAgents:             1,
+			MergeOpenPullRequests: false,
+			PlannerTriggersPath:   filepath.Join(plannerRoot, "triggers.jsonl"),
+		},
+		Runner: &FakeRunner{},
+	})
+	if err == nil {
+		t.Fatal("RunOnce() error = nil, want behind-upstream preflight error")
+	}
+	if !strings.Contains(err.Error(), "behind upstream") {
+		t.Fatalf("RunOnce() error = %q, want behind upstream context", err)
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	var got []string
+	for _, event := range events {
+		got = append(got, event.Event+":"+event.Status)
+	}
+	want := []string{"run_started:started", "run_failed:branch_behind_upstream"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ledger events = %#v, want %#v", got, want)
+	}
+	if !strings.Contains(events[1].Detail, "@{upstream}") {
+		t.Fatalf("ledger detail = %q, want upstream revision context", events[1].Detail)
+	}
+}
+
 func TestRunOnceMergesOpenPullRequestsBeforeSelectingWork(t *testing.T) {
 	repoRoot := t.TempDir()
 	initCleanRepo(t, repoRoot)

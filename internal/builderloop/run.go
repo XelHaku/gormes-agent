@@ -1662,6 +1662,18 @@ func preflightCleanWorktree(cfg Config, runID string) error {
 		}
 		return err
 	}
+	if err := ensureUpstreamNotBehind(cfg.RepoRoot); err != nil {
+		if ledgerErr := appendRunLedgerEvent(cfg, LedgerEvent{
+			TS:     time.Now().UTC(),
+			RunID:  runID,
+			Event:  "run_failed",
+			Status: "branch_behind_upstream",
+			Detail: err.Error(),
+		}); ledgerErr != nil {
+			return ledgerErr
+		}
+		return err
+	}
 
 	return nil
 }

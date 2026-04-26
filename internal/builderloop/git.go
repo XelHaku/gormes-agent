@@ -63,6 +63,37 @@ func gitHeadSha(repoRoot string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+func ensureUpstreamNotBehind(repoRoot string) error {
+	if !repoHasGit(repoRoot) {
+		return nil
+	}
+
+	upstreamCmd := exec.Command("git", "-C", repoRoot, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+	upstreamOut, err := upstreamCmd.Output()
+	if err != nil {
+		// Branches without an upstream can still be local integration branches.
+		return nil
+	}
+	upstream := strings.TrimSpace(string(upstreamOut))
+	if upstream == "" {
+		return nil
+	}
+
+	countCmd := exec.Command("git", "-C", repoRoot, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	countOut, err := countCmd.Output()
+	if err != nil {
+		return fmt.Errorf("check git upstream divergence: %w", err)
+	}
+	var ahead, behind int
+	if _, err := fmt.Sscanf(strings.TrimSpace(string(countOut)), "%d\t%d", &ahead, &behind); err != nil {
+		return fmt.Errorf("parse git upstream divergence %q: %w", strings.TrimSpace(string(countOut)), err)
+	}
+	if behind > 0 {
+		return fmt.Errorf("current branch is behind upstream %s (@{upstream}) by %d commit(s), ahead by %d; reconcile before running builder-loop", upstream, behind, ahead)
+	}
+	return nil
+}
+
 func gitChangedPaths(repoRoot, baseCommit, headCommit string) ([]string, error) {
 	cmd := exec.Command("git", "-C", repoRoot, "diff", "--name-only", "-z", baseCommit, headCommit)
 	out, err := cmd.Output()
