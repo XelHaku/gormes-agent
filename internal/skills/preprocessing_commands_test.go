@@ -126,7 +126,7 @@ Bad !`+"`exit 7`"+``)
 	}
 }
 
-func TestSkillSlashCommandsSkipUnavailableSkillsAndBuildStableMessage(t *testing.T) {
+func TestPreprocessingCommandsRendersImportantMarker(t *testing.T) {
 	root := t.TempDir()
 	mediaDir := writeSkill(t, root, "active/media", `---
 name: Jellyfin + Jellystat 24h Summary
@@ -178,7 +178,7 @@ mac body`)
 		RuntimeNote: "telegram",
 	})
 	for _, want := range []string{
-		`[SYSTEM: The user has invoked the "Jellyfin + Jellystat 24h Summary" skill`,
+		`[IMPORTANT: The user has invoked the "Jellyfin + Jellystat 24h Summary" skill`,
 		"Run " + mediaDir + "/scripts/report.sh.",
 		"[Skill directory: " + mediaDir + "]",
 		"The user has provided the following instruction alongside the skill invocation: compose now",
@@ -187,6 +187,10 @@ mac body`)
 		if !strings.Contains(message, want) {
 			t.Fatalf("message missing %q:\n%s", want, message)
 		}
+	}
+	legacyMarker := "[" + "SYSTEM:"
+	if strings.Contains(message, legacyMarker) {
+		t.Fatalf("message emitted legacy marker:\n%s", message)
 	}
 	if strings.Contains(message, "disabled body") || strings.Contains(message, "mac body") {
 		t.Fatalf("message injected unavailable skill content:\n%s", message)
@@ -207,6 +211,29 @@ mac body`)
 	}
 	if _, ok := slack["disabled-skill"]; ok {
 		t.Fatalf("SlackSubcommandMapWith exposed disabled skill: %#v", slack)
+	}
+}
+
+func TestSkillsCommandsBuildBlockNeverEmitsLegacyMarker(t *testing.T) {
+	root := t.TempDir()
+	writeSkill(t, root, "active/review", `---
+name: review-skill
+description: Review files
+---
+
+Review the selected files.`)
+
+	runtime := skills.NewRuntime(root, 8*1024, 5, "")
+	out, names, err := runtime.BuildSkillBlock(context.Background(), "please review these files")
+	if err != nil {
+		t.Fatalf("BuildSkillBlock() error = %v", err)
+	}
+	if !reflect.DeepEqual(names, []string{"review-skill"}) {
+		t.Fatalf("names = %#v, want review-skill", names)
+	}
+	legacyMarker := "[" + "SYSTEM:"
+	if strings.Contains(out, legacyMarker) {
+		t.Fatalf("BuildSkillBlock emitted legacy marker:\n%s", out)
 	}
 }
 

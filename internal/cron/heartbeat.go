@@ -11,9 +11,9 @@ import "strings"
 //
 // Matching upstream byte-for-byte matters: if a future Hermes bump
 // changes the wording, we want to notice (the byte-match test
-// TestHeartbeatPrefix_ContainsLoadBearingPhrases flags drift on
+// TestCronHeartbeatPrefixConstantValue flags drift on
 // any of the load-bearing phrases).
-const CronHeartbeatPrefix = "[SYSTEM: You are running as a scheduled cron job. " +
+const CronHeartbeatPrefix = "[IMPORTANT: You are running as a scheduled cron job. " +
 	"DELIVERY: Your final response will be automatically delivered " +
 	"to the user — do NOT use send_message or try to deliver " +
 	"the output yourself. Just produce your report/output as your " +
