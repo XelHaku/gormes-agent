@@ -10342,9 +10342,9 @@
             {
               "name": "TUI gateway completion path normalizer",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Pure helper internal/tuigateway/completion_path.go exposes NormalizeCompletionPath(in string, isWindows bool) string. Mirrors upstream tui_gateway/server.py:_normalize_completion_path (line 428): expands a leading ~ to the operator's home dir (caller injects the home value via a small stubbable hook), and on non-Windows callers also rewrites Windows-style C:/foo into /mnt/c/foo. No filesystem stat, no os.UserHomeDir inside the helper — caller threads a HomeFn or homeDir string.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -10379,7 +10379,7 @@
                 "TestNormalizeCompletionPath_NoSlashConversionWithoutDriveColon leaves /usr/bin unchanged on Linux.",
                 "Helper does not call os.UserHomeDir, os.Stat, or runtime.GOOS — caller injects."
               ],
-              "note": "Second TUI gateway pure-helper slice. Mirrors upstream behavior including the WSL drive-mount rewrite.",
+              "note": "Complete: internal/tuigateway/completion_path.go exposes NormalizeCompletionPath(in string, isWindows bool) string and a stubbable package-level HomeFn hook. Tilde-only and tilde-slash forms are rewritten through the injected home; on non-Windows callers, expanded paths matching <letter>:/... are rewritten to /mnt/<lower-letter>/... (with backslash-to-slash normalisation gating the pattern check). Empty input returns empty without consulting HomeFn. The helper performs no filesystem I/O and never reads os.UserHomeDir, os.Stat, or runtime.GOOS — verified by table-driven tests in internal/tuigateway/completion_path_test.go covering TildeExpansion, BareTildeExpandsToHome, WindowsToMntOnLinux, BackslashWindowsToMntOnLinux, DriveLetterLowercased, NoExpansionOnWindows, EmptyInputReturnsEmpty, NoSlashConversionWithoutDriveColon, NonTildeNonDrivePassthrough, TildeOnWindowsStillExpands, and DriveColonWithoutSlashUntouched.",
               "write_scope": [
                 "internal/tuigateway/completion_path.go",
                 "internal/tuigateway/completion_path_test.go",
@@ -10393,6 +10393,11 @@
               "done_signal": [
                 "internal/tuigateway/completion_path_test.go fixtures prove tilde expansion and Windows→/mnt rewrite without runtime.GOOS or os.UserHomeDir calls."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T17:05:21Z",
+                "last_success": "2026-04-26T17:05:21Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:eaa7e2db tui_gateway/server.py:_normalize_completion_path",
