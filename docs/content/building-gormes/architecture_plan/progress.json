@@ -9740,6 +9740,7 @@
                 "Portable SKILL.md format"
               ],
               "unblocks": [
+                "Source-aware retrieval damping fixtures",
                 "Code Cathedral II code-context retrieval fixtures",
                 "Skill effectiveness scoring"
               ],
@@ -9771,6 +9772,71 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:f718c59 src/core/search/hybrid.ts",
                 "note": "GBrain informs retrieval scoring; Gormes adapts it to reviewed SKILL.md assets and SQLite/optional embeddings."
+              }
+            },
+            {
+              "name": "Source-aware retrieval damping fixtures",
+              "status": "planned",
+              "contract": "Skill and memory retrieval can prefer curated/reviewed sources over bulky chat or raw imports while preserving high-detail temporal lookup and explaining every source boost or exclusion",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Retrieval status reports source_boost_unavailable, source_excluded, source_dampened, or temporal_bypass evidence instead of silently letting transcript bulk swamp curated knowledge.",
+              "fixture": "internal/skills/source_aware_retrieval_test.go",
+              "source_refs": [
+                "../gbrain/CHANGELOG.md@172b55b:v0.22.0",
+                "../gbrain/src/core/search/sql-ranking.ts@172b55b",
+                "../gbrain/test/sql-ranking.test.ts@172b55b",
+                "../gbrain/test/e2e/search-swamp.test.ts@172b55b",
+                "docs/content/upstream-gbrain/gormes-takeaways.md",
+                "internal/skills/selector.go",
+                "internal/memory/semantic_sql.go"
+              ],
+              "ready_when": [
+                "Hybrid lexical + semantic lookup is validated and returns score explanations that can carry source-tier evidence.",
+                "The worker can use synthetic skill/memory sources and fake scores; no GBrain SQL engine, PGLite, Postgres, or tree-sitter runtime is required."
+              ],
+              "not_ready_when": [
+                "The slice copies GBrain SQL builders, introduces Postgres/PGLite, or applies hard excludes without operator-visible evidence.",
+                "The slice dampens high-detail temporal/history queries that should intentionally search chat-like sources."
+              ],
+              "blocked_by": [
+                "Hybrid lexical + semantic lookup"
+              ],
+              "unblocks": [
+                "Code Cathedral II code-context retrieval fixtures",
+                "Skill effectiveness scoring"
+              ],
+              "acceptance": [
+                "Synthetic curated/reviewed skill or memory entries outrank bulk transcript/raw-import entries when lexical and semantic scores are otherwise close.",
+                "Configured hard-exclude source prefixes are removed before ranking and reported in source_excluded evidence.",
+                "High-detail or temporal lookup mode bypasses damping so recent chat/history sources can still surface.",
+                "Score explanations include source tier, boost/damping factor, and bypass/exclusion reason without importing GBrain's SQL runtime."
+              ],
+              "note": "GBrain 172b55b/v0.22.0 added source-aware ranking to prevent chat/source swamp. Gormes should borrow the source-tier idea for reviewed skills and memory retrieval explanations, not the Postgres/PGLite SQL implementation.",
+              "write_scope": [
+                "internal/skills/source_aware_retrieval.go",
+                "internal/skills/source_aware_retrieval_test.go",
+                "internal/memory/",
+                "docs/content/upstream-gbrain/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/skills ./internal/memory -run 'Test.*Source.*Aware|Test.*Retrieval.*Damping|Test.*Temporal.*Bypass' -count=1",
+                "go test ./internal/skills ./internal/memory -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Source-aware retrieval fixtures prove curated/reviewed boost, bulk-source damping, hard-exclude evidence, temporal bypass, and score explanations without GBrain runtime imports."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:172b55b src/core/search/sql-ranking.ts",
+                "note": "GBrain defines source-swamp resistance; Gormes adapts it as explainable source-tier scoring for skills and memory."
               }
             },
             {
