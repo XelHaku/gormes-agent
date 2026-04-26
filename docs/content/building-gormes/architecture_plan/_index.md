@@ -346,7 +346,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Anthropic
 - [x] Azure OpenAI query/default_query transport contract
 - [x] Azure Anthropic Messages endpoint contract
-- [ ] Azure Foundry transport probe read model
+- [x] Azure Foundry transport probe read model
 - [x] Azure Foundry probe — path sniffing
 - [x] Azure Foundry probe — /models classification + Anthropic fallback
 - [ ] Azure Foundry runtime env/config read model
@@ -487,7 +487,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] MCP client
 - [x] MCP server config/env resolver
 - [x] MCP stdio transport + tool/list discovery
-- [ ] MCP HTTP transport + tool/list discovery
+- [x] MCP HTTP transport + tool/list discovery
 - [ ] MCP schema normalization + structured-content adapter
 - [x] MCP OAuth state store + noninteractive auth errors
 - [x] MCP OAuth refresh + 401 session-expired recovery
