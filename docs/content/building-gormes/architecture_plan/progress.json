@@ -11660,12 +11660,72 @@
                 "upstream_ref": "hermes:a32b325d+977d5f56+ced8f44c tools/file_tools.py",
                 "note": "Direct file-tool safety drift from Hermes, deliberately split before broader Go file-tool handler ports."
               }
+            },
+            {
+              "name": "File read repeated-stub BLOCKED escalation",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Native file-read safety detects repeated model-visible read_file dedup/status stubs and escalates them as BLOCKED evidence before the text can be returned or persisted as normal file content.",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Repeated stubs return read_dedup_stub_blocked or blocked_result evidence, while legitimate file bytes and first-seen read status remain separate from returned content.",
+              "fixture": "internal/tools/file_read_blocked_stub_test.go::TestFileReadRepeatedStubBlocked_*",
+              "source_refs": [
+                "../hermes-agent/tools/file_tools.py@a32d0752",
+                "../hermes-agent/tests/tools/test_file_read_guards.py@a32d0752",
+                "internal/tools/file_read_guard.go",
+                "internal/tools/file_read_guard_test.go"
+              ],
+              "ready_when": [
+                "File read dedup cache invalidation and wrapper guard is validated, so file-read status already has a content/evidence split.",
+                "This slice is a pure helper/test addition under internal/tools and does not require the model-visible read_file handler.",
+                "Tests use string fixtures for repeated stub text, legitimate file content, and single-status evidence only."
+              ],
+              "not_ready_when": [
+                "The slice ports write_file, patch, checkpoint restore, binary detection, or the full Hermes file_tools.py handler.",
+                "The slice writes BLOCKED text into returned file content or mutates file contents on disk.",
+                "The slice changes cache invalidation semantics for ordinary duplicate reads."
+              ],
+              "blocked_by": [
+                "File read dedup cache invalidation and wrapper guard"
+              ],
+              "acceptance": [
+                "TestFileReadRepeatedStubBlocked_RepeatedDedupStatus detects the second repeated stub and returns blocked evidence outside Content.",
+                "TestFileReadRepeatedStubBlocked_LegitimateContentPreserved proves normal file bytes containing similar words are not blocked.",
+                "TestFileReadRepeatedStubBlocked_SingleStatusAllowed proves one read status/evidence result remains non-blocking.",
+                "Existing TestFileReadGuard_* fixtures still pass unchanged."
+              ],
+              "note": "Hermes a32d0752 escalates repeated read_file dedup stubs to BLOCKED so agents stop persisting tool-status text as source content. Gormes should add the same guard after the validated FileReadGuard helper, before exposing broader write/patch tools.",
+              "write_scope": [
+                "internal/tools/file_read_guard.go",
+                "internal/tools/file_read_blocked_stub_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestFileReadRepeatedStubBlocked_|^TestFileReadGuard_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "File-read blocked-stub fixtures prove repeated dedup/status stubs become blocked evidence, legitimate file content is preserved, a single status is not blocked, and FileReadGuard tests remain green."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:a32d0752 tools/file_tools.py",
+                "note": "Direct upstream file-read safety regression, kept as a small helper row after the already validated dedup/cache guard."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T02:20:01Z",
-            "origin_decision": "Hermes 478444c2 adds checkpoint shadow-repo GC and a32b325d/977d5f56/ced8f44c tighten read dedup/cache guards. Gormes still has only the Phase 5.L inventory row, so this subphase remains upstream-led and is split into checkpoint cleanup first, then read-dedup guard behavior, before write_file/patch/restore tools become executable."
+            "last_upstream_check": "2026-04-27T12:56:05Z",
+            "origin_decision": "Hermes 478444c2 adds checkpoint shadow-repo GC, a32b325d/977d5f56/ced8f44c tighten read dedup/cache guards, and a32d0752 escalates repeated read_file dedup stubs to BLOCKED. Gormes has checkpoint cleanup and the read-dedup guard validated, so the new drift is a follow-on blocked-stub helper before write_file/patch/restore tools become executable."
           }
         },
         "5.M": {
