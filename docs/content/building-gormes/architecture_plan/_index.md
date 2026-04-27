@@ -128,7 +128,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway stream consumer for agent-event fan-out
 - [x] Non-editable gateway progress/commentary send fallback
 - [x] WhatsApp identifier safety predicate
-- [ ] WhatsApp unsafe sender/chat inbound evidence
+- [x] WhatsApp unsafe sender/chat inbound evidence
 - [ ] WhatsApp unsafe alias endpoint inbound evidence
 - [x] Gateway fresh-final eligibility helper
 - [x] Gateway fresh-final send/delete fallback
@@ -140,7 +140,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Slack thread-parent context + team-scoped cache key
 - [x] Gateway message deduplicator bounded helper
 - [x] Gateway inbound dedup key helper
-- [ ] Gateway inbound dedup manager binding
+- [x] Gateway inbound dedup manager binding
+- [ ] Email outbound Date header contract
 
 ### 2.B.10 — WeChat Adapter ✅
 
@@ -399,6 +400,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Tool-result pruning + protected head/tail summary
 - [x] Aux compression single-prompt threshold reconciliation
 - [x] Compression protected-tail multimodal length estimator
+- [ ] Context compressor image-token budget charge
 - [ ] Manual compression feedback + context references
 - [ ] ContextEngine compression-boundary callback vocabulary
 - [ ] Kernel compression-boundary callback binding
@@ -444,6 +446,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Provider-side resilience
 - [x] Classified provider-error taxonomy
+- [ ] Provider image-too-large error classification
 - [x] Unsupported temperature retry + Codex no-temperature guard
 - [x] Codex Responses temperature guard after flush removal
 - [x] Generic unsupported-parameter retry + max_tokens guard
@@ -495,7 +498,8 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.D — Vision + Image Generation ⏳
 
 - [ ] Multimodal in/out
-- [ ] Vision input normalization + token budget
+- [ ] Image input mode router + native content parts
+- [ ] Image-too-large shrink retry helper
 - [ ] Image generation result contract
 
 ### 5.E — TTS / Voice / Transcription ⏳
@@ -539,6 +543,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Dashboard page-scoped plugin slot inventory
 - [ ] Third-party extensions
 - [x] First-party Spotify plugin fixture
+- [ ] First-party Google Meet plugin metadata fixture
 - [ ] Hindsight memory setup blank-input preservation
 
 ### 5.J — Approval / Security Guards 🔨
@@ -549,6 +554,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Approval mode config normalization
 - [x] Gateway hook auto-accept strict parser
 - [ ] Subagent dangerous-command non-interactive approval policy
+- [ ] Concurrent tool approval callback propagation
+- [ ] Background review toolset restriction
 - [ ] Cron dangerous-command approval mode
 - [ ] Tirith, path, URL, and website policy integration
 
@@ -573,6 +580,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Clarify
 - [x] Session search tool schema and argument validation
 - [x] Session search tool execution wrapper
+- [ ] Session shutdown memory transcript handoff
 - [ ] Debug helpers
 - [ ] Debug share paste sweep scheduler contract
 - [x] Planner audit blank-subphase control-plane bucket
@@ -596,6 +604,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] CLI OpenClaw residue detection and hint text
 - [x] CLI onboarding seen-state map helpers
 - [x] CLI bracketed-paste wrapper sanitizer
+- [ ] CLI slow bracketed-paste diagnostic threshold
 - [x] CLI webhook URL normalizer
 - [x] CLI dump support-summary helper
 - [x] PTY bridge protocol adapter
@@ -619,6 +628,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Service RestartSec parser helper
 - [x] Service restart active-status poller
 - [ ] Diagnostics, backup, logs, and status CLI
+- [ ] Backup/update opt-in and exclusion policy
 - [x] doctorCustomEndpointReadiness check function
 - [x] Custom provider model-switch credential preservation
 - [ ] Custom provider model-switch key_env write guard

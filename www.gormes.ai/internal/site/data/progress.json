@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T13:21:48Z",
+    "last_updated": "2026-04-27T13:57:25Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1323,9 +1323,9 @@
             {
               "name": "WhatsApp unsafe sender/chat inbound evidence",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "WhatsApp inbound normalization in internal/channels/whatsapp/inbound.go uses the validated NormalizeSafeWhatsAppIdentifier helper to reject unsafe raw sender, chat, and reply target identifiers before Event.UserID, Event.ChatID, Reply.ChatID, or outbound pairing targets are created",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1360,7 +1360,7 @@
                 "TestNormalizeInboundWithIdentity_UnsafeReplyTargetRejected proves unsafe reply targets are dropped with evidence while safe sender/chat IDs still normalize.",
                 "Existing identity_contract.json fixtures still pass unchanged for safe bridge/native DM and group cases."
               ],
-              "note": "Split 2026-04-27T13:21:48Z from the broader unsafe inbound row after repeated report/write-scope failures. This first slice is raw sender/chat/reply evidence only; alias graph expansion is the dependent row.",
+              "note": "Complete: TDD landed inbound safety fixtures for unsafe raw sender, chat, and reply target IDs. NormalizeInboundWithIdentity now validates raw sender/chat/reply peer identifiers with NormalizeSafeWhatsAppIdentifier before creating Event.UserID, Event.ChatID, Reply.ChatID, or outbound pairing targets, returning unresolved_identity with whatsapp_identifier_unsafe evidence while preserving existing safe identity_contract.json behavior. Alias graph endpoint filtering remains the dependent row.",
               "write_scope": [
                 "internal/channels/whatsapp/inbound.go",
                 "internal/channels/whatsapp/identity_inbound_safety_test.go",
@@ -1374,6 +1374,11 @@
               "done_signal": [
                 "Inbound safety fixtures prove unsafe sender, chat, and reply identifiers are rejected with whatsapp_identifier_unsafe evidence while safe identity contracts remain green."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T13:50:19Z",
+                "last_success": "2026-04-27T13:50:19Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:91512b82+6993e566 gateway/whatsapp_identity.py",
@@ -2165,9 +2170,9 @@
             {
               "name": "Gateway inbound dedup manager binding",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway manager owns one in-memory MessageDeduplicator instance, derives tracking keys through the validated InboundDedupKey helper, drops repeated inbound submissions with duplicate_message evidence, and lets missing-ID events continue with dedup_unavailable_missing_message_id evidence",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -2205,7 +2210,7 @@
                 "TestGatewayInboundDedup_MissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable_missing_message_id evidence.",
                 "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green without editing helper files."
               ],
-              "note": "Refined 2026-04-27T13:21:48Z after the helper row landed and the prior worker attempted out-of-scope helper/event edits. This row owns only Manager/fake-test wiring; event.go, inbound_dedup_key.go, and message_deduplicator.go are read-only.",
+              "note": "Complete: TDD landed the manager-owned in-memory inbound MessageDeduplicator binding at EventSubmit. Manager now derives keys through InboundDedupKey, records duplicate_message or dedup_unavailable_missing_message_id evidence through runtime status updates, drops duplicate submissions before follow-up queuing, and lets empty MessageID submissions continue without touching event/helper/platform adapter files.",
               "write_scope": [
                 "internal/gateway/message_deduplicator_manager_test.go",
                 "internal/gateway/manager.go",
@@ -2220,17 +2225,88 @@
               "done_signal": [
                 "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior without editing event or dedup helper files."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T13:50:19Z",
+                "last_success": "2026-04-27T13:50:19Z"
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T13:21:48Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 tests/gateway/test_message_deduplicator.py",
                 "note": "Hermes applies deduplication inside platform helpers; Gormes wires the shared Go helper at the gateway manager boundary after the key helper is fixture-backed."
               }
+            },
+            {
+              "name": "Email outbound Date header contract",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Email outbound message construction always supplies an RFC 5322 Date header with an injectable clock when one is absent, while preserving caller-supplied Date values and leaving reply threading unchanged",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Email delivery status reports email_date_header_unavailable if the outbound builder cannot compute a Date header, instead of emitting provider-rejected messages without Date.",
+              "fixture": "internal/channels/email/outbound_date_test.go::TestEmailOutboundDateHeader_*",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/email.py@75b460bc:formatdate(localtime=True)",
+                "../hermes-agent/tests/gateway/test_email.py@75b460bc",
+                "internal/channels/email/contract.go",
+                "internal/channels/email/contract_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json:7.B Email ingress + outbound delivery contract"
+              ],
+              "ready_when": [
+                "Email ingress + outbound delivery contract in Phase 7.B is complete, so reply target derivation and outbound body shape already exist.",
+                "Phase 7.B stays closed; this open Phase 2.B.5 gateway-row tracks the upstream email delivery drift without reopening the completed adapter baseline.",
+                "The row only adds outbound header construction tests with an injected clock; no SMTP send, IMAP fetch, DNS, or gateway manager binding is required."
+              ],
+              "not_ready_when": [
+                "The slice starts an SMTP client, changes inbound parsing, rewrites reply-thread target logic, or adds provider credentials.",
+                "The Date header uses wall-clock time directly in tests instead of an injected clock.",
+                "The builder overwrites a caller-supplied Date header."
+              ],
+              "blocked_by": [
+                "Email ingress + outbound delivery contract"
+              ],
+              "acceptance": [
+                "TestEmailOutboundDateHeader_AddsWhenMissing uses a fixed clock and proves outbound MIME/header output includes one Date header in RFC 5322 format.",
+                "TestEmailOutboundDateHeader_PreservesExisting proves an explicit Date header is not overwritten or duplicated.",
+                "TestEmailOutboundDateHeader_ReplyHeadersUnchanged proves In-Reply-To, References, To, Subject, and body fields still match existing outbound contract fixtures.",
+                "No test opens SMTP/IMAP/network connections or reads real system time."
+              ],
+              "note": "Moved to Phase 2.B.5 on 2026-04-27T13:57:25Z after progress tests confirmed Phase 7.B is intentionally closed. Added after Hermes 75b460bc fixed outbound email Date header omission. Gormes has email contract tests but no explicit Date-header row, so this becomes a narrow outbound builder slice under the still-open gateway drift phase.",
+              "write_scope": [
+                "internal/channels/email/contract.go",
+                "internal/channels/email/contract_test.go",
+                "internal/channels/email/outbound_date_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/channels/email -run '^TestEmailOutboundDateHeader_|^TestBuildDelivery' -count=1",
+                "go test ./internal/channels/email -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Email outbound fixtures prove missing Date headers are added with an injected clock, existing Date headers are preserved, reply headers remain stable, and no network/system clock dependency is introduced."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:75b460bc gateway/platforms/email.py",
+                "note": "Hermes fixed outbound Date header generation; Gormes ports the invariant into its native email adapter contract without reopening completed Phase 7.B."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T12:56:05Z",
-            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, and message deduplication. Telegram group command-suffix behavior from 3ff3dfb5 is split into helper, config, and adapter-binding rows; the helper/config slices are complete and the adapter binding remains fixture-ready. WhatsApp unsafe inbound evidence is now split into raw sender/chat/reply rejection first and alias-endpoint filtering second, both scoped to inbound.go plus a new safety fixture with identity.go read-only. Gateway inbound dedup now has the helper-only key row validated and a manager-binding row with event/helper files explicitly read-only after the last write-scope violation."
+            "last_upstream_check": "2026-04-27T13:57:25Z",
+            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, message deduplication, and outbound email Date headers. Telegram group command-suffix behavior from 3ff3dfb5 is split into helper, config, and adapter-binding rows; the helper/config slices are complete and the adapter binding remains fixture-ready. WhatsApp unsafe inbound evidence is now split into raw sender/chat/reply rejection first and alias-endpoint filtering second, both scoped to inbound.go plus a new safety fixture with identity.go read-only. Gateway inbound dedup now has the helper-only key row validated and a manager-binding row with event/helper files explicitly read-only after the last write-scope violation. The email Date-header row lives here, rather than reopening completed Phase 7.B, because it is upstream gateway-delivery drift over an already-complete adapter baseline."
           }
         },
         "2.B.10": {
@@ -4030,8 +4106,8 @@
                 "needs_human": true,
                 "reason": "auto: 6 reshapes without unsticking; last category ",
                 "since": "2026-04-27T12:01:21Z",
-                "reshape_count": 6,
-                "last_reshape": "2026-04-27T11:38:55Z",
+                "reshape_count": 7,
+                "last_reshape": "2026-04-27T13:21:48Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -7462,6 +7538,71 @@
               }
             },
             {
+              "name": "Context compressor image-token budget charge",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Context-compression budget accounting charges a flat image token equivalent for image_url, input_image, and image content parts while keeping raw base64 payload length out of text-char estimates and preserving the existing text-only estimator boundary",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Context status reports image_budget_estimator_unavailable and uses conservative compression thresholds instead of treating image-heavy turns as near-empty.",
+              "fixture": "internal/hermes/context_compressor_image_budget_test.go::TestCompressionContentBudgetLength_ImageParts",
+              "source_refs": [
+                "../hermes-agent/agent/context_compressor.py@ec671c41:_IMAGE_TOKEN_ESTIMATE",
+                "../hermes-agent/agent/context_compressor.py@ec671c41:_content_length_for_budget",
+                "../hermes-agent/tests/agent/test_compressor_image_tokens.py@ec671c41",
+                "internal/hermes/context_compressor_content.go:compressionContentLength",
+                "internal/hermes/context_compressor_budget.go"
+              ],
+              "ready_when": [
+                "Compression protected-tail multimodal length estimator is validated on main and remains the text-only helper for tail-cut decisions.",
+                "The worker can add a budget-length helper or extend the existing estimator with named tests; no provider, kernel, summarizer, transcript mutation, or live image decoding is required.",
+                "Use a flat 1600-token image estimate converted through the existing four-chars-per-token budget currency; never count raw data URL base64 bytes."
+              ],
+              "not_ready_when": [
+                "The slice rewrites compression execution, summarization prompts, context references, provider routing, or Goncho/Honcho memory extraction.",
+                "The implementation charges image tokens by base64 string length, image dimensions, or number of content blocks.",
+                "The tests depend on live provider image requests, Pillow, libvips, or actual image resizing."
+              ],
+              "blocked_by": [
+                "Compression protected-tail multimodal length estimator"
+              ],
+              "unblocks": [
+                "Image input mode router + native content parts"
+              ],
+              "acceptance": [
+                "TestCompressionContentBudgetLength_ImageURLAddsFlatCharge proves one image_url block adds 1600 tokens converted to character-budget units, independent of data URL byte length.",
+                "TestCompressionContentBudgetLength_InputImageAndImageTypes covers input_image and image aliases with the same flat charge.",
+                "TestCompressionContentBudgetLength_TextAndImagesSumsBoth proves text fields keep their rune count while each image part adds exactly one flat charge.",
+                "TestCompressionContentBudgetLength_RawBase64Ignored proves a huge base64 payload does not dominate the budget length beyond the flat image estimate.",
+                "Existing TestCompressionContentLength_* fixtures remain unchanged and continue to report image-only blocks as zero text chars for tail-estimator callers."
+              ],
+              "note": "Added after Hermes ec671c41 separated multimodal text length from compression budget pressure by charging a flat image-token estimate. This keeps the completed text-tail estimator stable while giving the budget trigger a separate image-aware contract.",
+              "write_scope": [
+                "internal/hermes/context_compressor_content.go",
+                "internal/hermes/context_compressor_image_budget_test.go",
+                "internal/hermes/context_compressor_budget.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestCompressionContent(BudgetLength|Length)_' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Image-budget fixtures prove image_url/input_image/image parts add a flat 1600-token charge in budget accounting while the existing text-only length estimator stays unchanged."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ec671c41 agent/context_compressor.py",
+                "note": "Hermes added image-token budget pressure after native image routing; Gormes ports the accounting separately from tail text-length estimation."
+              }
+            },
+            {
               "name": "Manual compression feedback + context references",
               "status": "planned",
               "note": "TDD: port `manual_compression_feedback.py` and `context_references.py` as separate read/write contracts so user-visible compression feedback and reference handles are testable without a provider call."
@@ -7484,17 +7625,19 @@
                 "../hermes-agent/run_agent.py@e85b7525",
                 "../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525",
                 "internal/hermes/context_engine.go:ContextEngine",
-                "internal/hermes/context_engine_test.go"
+                "internal/hermes/context_engine_test.go",
+                "internal/hermes/testdata/context_status/disabled_pressure_unknown_tool.json"
               ],
               "ready_when": [
                 "ContextEngine interface + status tool contract is validated on main.",
                 "Compression token-budget and single-prompt threshold fixtures are validated, so this slice only adds callback vocabulary and status evidence.",
-                "The worker edits only internal/hermes context-engine files; no kernel, transcript storage, summarizer, or Goncho/Honcho memory behavior is in scope."
+                "The worker edits only internal/hermes context-engine files and the declared context_status JSON fixture; no kernel, transcript storage, summarizer, or Goncho/Honcho memory behavior is in scope."
               ],
               "not_ready_when": [
                 "The slice edits internal/kernel/kernel.go, creates internal/kernel/context_engine.go, implements summarization, mutates transcript history, or binds live compression execution.",
                 "The slice hides boundary failures or lets status imply a boundary callback ran before the kernel binding row is complete.",
-                "The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern."
+                "The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern.",
+                "The slice edits any testdata fixture except internal/hermes/testdata/context_status/disabled_pressure_unknown_tool.json."
               ],
               "unblocks": [
                 "ContextEngine compression-boundary notification"
@@ -7503,23 +7646,39 @@
                 "A new CompressionBoundary value carries old_session_id, new_session_id, reason, and compressed_at or equivalent stable lineage evidence.",
                 "DisabledContextEngine or an in-package fake can record one boundary callback and expose last boundary evidence through Status without contacting a provider.",
                 "Status reports compression_boundary_unavailable or last_boundary_missing when no boundary has been recorded.",
-                "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
+                "Existing context_status tool fixtures remain stable except for the added boundary evidence fields.",
+                "The disabled_pressure_unknown_tool.json fixture is updated only as needed to include explicit missing-boundary or unavailable-boundary evidence."
               ],
-              "note": "Added 2026-04-27T13:21:48Z after repeated worker_error attempts exposed a bad source reference: internal/kernel/context_engine.go does not exist. This row is hermes package vocabulary only; kernel binding stays in the existing dependent row.",
+              "note": "Refined 2026-04-27T13:57:25Z after report validation showed the worker needed to update internal/hermes/testdata/context_status/disabled_pressure_unknown_tool.json but the fixture was outside write_scope. This row is hermes package vocabulary plus that one declared status fixture only; kernel binding stays in the existing dependent row.",
               "write_scope": [
                 "internal/hermes/context_engine.go",
                 "internal/hermes/context_engine_test.go",
                 "internal/hermes/context_engine_boundary_test.go",
+                "internal/hermes/testdata/context_status/disabled_pressure_unknown_tool.json",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/hermes -run 'Test.*ContextEngine.*Boundary|TestDisabledContextEngine_StatusToolFixture' -count=1",
+                "go test ./internal/hermes -run 'Test.*ContextEngine.*Boundary|TestDisabledContextEngine_StatusToolFixture|TestContextStatusFixtures' -count=1",
                 "go test ./internal/hermes -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Hermes package fixtures prove boundary vocabulary, status evidence, unavailable/missing degraded modes, and no kernel or memory side effects."
+                "Hermes package fixtures and the disabled_pressure_unknown_tool.json status fixture prove boundary vocabulary, status evidence, unavailable/missing degraded modes, and no kernel or memory side effects."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-27T13:50:19Z",
+                "last_failure": {
+                  "run_id": "20260427T133758Z-713745728",
+                  "category": "report_validation_failed",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:e85b7525 run_agent.py",
@@ -8186,7 +8345,7 @@
               "planner_verdict": {
                 "reshape_count": 2,
                 "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "still_failing"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -8564,6 +8723,71 @@
               "done_signal": [
                 "Fixture tables classify rate-limit, auth, context, retryable, and fatal provider errors deterministically."
               ]
+            },
+            {
+              "name": "Provider image-too-large error classification",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Provider error classification distinguishes image_too_large failures from generic context overflow and retryable errors so multimodal callers can trigger bounded image-shrink recovery without retry loops",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Provider status reports image_too_large_unclassified and refuses automatic image retry instead of retrying the same oversized payload or misreporting a text context overflow.",
+              "fixture": "internal/hermes/errors_image_test.go::TestClassifyProviderError_ImageTooLarge",
+              "source_refs": [
+                "../hermes-agent/agent/error_classifier.py@ec671c41:FailoverReason.image_too_large",
+                "../hermes-agent/run_agent.py@ec671c41:_try_shrink_image_parts_in_messages",
+                "../hermes-agent/tests/run_agent/test_image_shrink_recovery.py@ec671c41",
+                "internal/hermes/errors.go:ClassifyProviderError",
+                "internal/hermes/errors_test.go"
+              ],
+              "ready_when": [
+                "Classified provider-error taxonomy is validated on main and exposes stable ProviderErrorKind values.",
+                "The row is classification-only: workers add a new image_too_large kind and fixtures, but do not resize images or change provider retry loops.",
+                "Tests use synthetic HTTP/body strings and wrapped errors; no image files, provider credentials, or network calls are required."
+              ],
+              "not_ready_when": [
+                "The slice implements image resizing, message mutation, native image routing, or provider retry loops.",
+                "The slice collapses image_too_large into existing context overflow behavior.",
+                "The tests depend on real model responses or image decoding."
+              ],
+              "blocked_by": [
+                "Classified provider-error taxonomy"
+              ],
+              "unblocks": [
+                "Image-too-large shrink retry helper"
+              ],
+              "acceptance": [
+                "TestClassifyProviderError_ImageTooLargeBodyHints covers provider bodies containing image too large, image payload too large, max image size, and unsupported image dimensions.",
+                "TestClassifyProviderError_ImageTooLargeStatusAndBodyWins proves an oversized-image body is classified as image_too_large before generic context overflow or retryable server handling.",
+                "TestClassifyProviderError_TextContextStillContext proves token/context-length errors remain context and are not reclassified as image_too_large.",
+                "ProviderStatus or equivalent status evidence can render image_too_large separately from context and retryable kinds.",
+                "Existing rate_limit, auth, context, retryable, non_retryable, and unknown fixture tables remain green."
+              ],
+              "note": "Added after Hermes ec671c41 introduced image_too_large as a failover reason before shrink/retry recovery. Gormes should first fixture-lock the provider taxonomy so later image retry helpers do not infer behavior from free-form strings.",
+              "write_scope": [
+                "internal/hermes/errors.go",
+                "internal/hermes/errors_test.go",
+                "internal/hermes/errors_image_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestClassifyProviderError_(ImageTooLarge|TextContext|.*Rate|.*Auth|.*Context)' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Provider error fixtures prove image_too_large is a distinct kind, wins before generic context/retry classification for image payload hints, and leaves existing taxonomy behavior unchanged."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ec671c41 agent/error_classifier.py",
+                "note": "Hermes added multimodal image-size recovery; Gormes starts with the provider classification contract before routing or shrink behavior."
+              }
             },
             {
               "name": "Unsupported temperature retry + Codex no-temperature guard",
@@ -9892,19 +10116,207 @@
             {
               "name": "Multimodal in/out",
               "status": "planned",
-              "note": "Umbrella only: split into image input normalization, vision request routing, image-generation request/result storage, and safety/error envelopes before exposing multimodal tools."
+              "slice_size": "umbrella",
+              "execution_owner": "provider",
+              "not_ready_when": [
+                "The row is assigned directly instead of the smaller image-routing, image-shrink, and image-generation contracts below."
+              ],
+              "unblocks": [
+                "Image input mode router + native content parts",
+                "Image-too-large shrink retry helper",
+                "Image generation result contract"
+              ],
+              "note": "Umbrella only: upstream Hermes ec671c41 made multimodal routing concrete. Execute the smaller rows below instead of trying to port image input, provider routing, shrink retry, generation, and storage in one change."
             },
             {
-              "name": "Vision input normalization + token budget",
+              "name": "Image input mode router + native content parts",
+              "priority": "P2",
               "status": "planned",
-              "note": "TDD: port `tools/vision_tools.py` image path/URL/base64 normalization, size/token estimation, and unsupported-provider errors using local fixture images."
+              "contract": "internal/hermes exposes a pure image input routing helper that resolves agent.image_input_mode auto/native/text from model vision capability and auxiliary vision override, then builds native provider content parts with text plus data-url image_url entries without invoking a live provider",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Multimodal status reports image_input_text_fallback, image_input_native_forced, image_input_native_unavailable, or image_input_auxiliary_vision_override instead of silently dropping images.",
+              "fixture": "internal/hermes/image_routing_test.go::TestImageInputRouting_*",
+              "source_refs": [
+                "../hermes-agent/agent/image_routing.py@ec671c41",
+                "../hermes-agent/tests/agent/test_image_routing.py@ec671c41",
+                "../hermes-agent/run_agent.py@ec671c41:_model_supports_vision",
+                "../hermes-agent/run_agent.py@ec671c41:vision-aware preprocessing",
+                "internal/hermes/client.go:MessageContentPart",
+                "internal/hermes/model_registry.go"
+              ],
+              "ready_when": [
+                "The worker can add a pure helper under internal/hermes with injected model capability and auxiliary-vision config values; no run_agent, kernel, gateway, or config-file binding is required.",
+                "Tests create temp fixture image bytes and inspect generated data URLs; no provider request, image resizing, OCR, or external binary is required.",
+                "Auto mode must choose native only when the active model is known to support vision and no auxiliary vision provider/model/base_url override is configured."
+              ],
+              "not_ready_when": [
+                "The slice changes provider HTTP request builders, kernel message history, TUI file-drop behavior, gateway media ingestion, or image generation tools.",
+                "The slice implements text OCR/vision-tool fallback, image resizing, or shrink retry.",
+                "The slice treats unknown model capability as native vision support in auto mode."
+              ],
+              "unblocks": [
+                "Image-too-large shrink retry helper"
+              ],
+              "acceptance": [
+                "TestImageInputRouting_AutoNativeWhenModelSupportsVision proves auto mode returns native for a vision-capable active model with no auxiliary vision override.",
+                "TestImageInputRouting_AutoTextWhenAuxVisionConfigured proves auxiliary vision provider/model/base_url config forces text fallback even when the active model supports vision.",
+                "TestImageInputRouting_AutoTextForUnknownOrNonVisionModel proves unknown and non-vision model capabilities choose text fallback.",
+                "TestBuildNativeImageContentParts_TextAndImages emits one text part plus image_url data-url parts in input order, skipping unreadable paths with evidence.",
+                "TestBuildNativeImageContentParts_DefaultPrompt inserts a short default prompt when user text is empty and at least one image is present."
+              ],
+              "note": "Added after Hermes ec671c41 introduced agent.image_input_mode auto/native/text and native content-part construction. Gormes keeps this as a pure provider-routing helper before wiring CLI/TUI/gateway image ingestion.",
+              "write_scope": [
+                "internal/hermes/image_routing.go",
+                "internal/hermes/image_routing_test.go",
+                "internal/hermes/client.go",
+                "internal/hermes/model_registry.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run '^TestImageInputRouting_|^TestBuildNativeImageContentParts_' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Image routing fixtures prove auto/native/text selection, auxiliary-vision fallback, model capability handling, native data-url content part construction, unreadable-image evidence, and default prompt behavior without live providers."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ec671c41 agent/image_routing.py",
+                "note": "Hermes added native multimodal routing; Gormes starts with a Go-native pure helper before request-builder or UI binding."
+              }
+            },
+            {
+              "name": "Image-too-large shrink retry helper",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "internal/hermes exposes a pure image retry planner that, after a provider image_too_large classification, returns a single bounded retry plan with smaller image content parts and explicit no-retry evidence when shrinking is unavailable",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Provider status reports image_shrink_unavailable, image_shrink_no_images, image_shrink_limit_reached, or image_shrink_failed instead of retrying the same oversized request.",
+              "fixture": "internal/hermes/image_shrink_retry_test.go::TestImageShrinkRetry_*",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@ec671c41:_try_shrink_image_parts_in_messages",
+                "../hermes-agent/tests/run_agent/test_image_shrink_recovery.py@ec671c41",
+                "internal/hermes/errors.go:ProviderErrorKind",
+                "internal/hermes/image_routing.go"
+              ],
+              "ready_when": [
+                "Provider image-too-large error classification is validated so retry planning can key off a structured image_too_large kind.",
+                "Image input mode router + native content parts is validated or fixture-ready, so native image content-part shape is known.",
+                "The first slice may use a deterministic fake shrinker callback in tests; real image decoding/resizing can stay out of scope."
+              ],
+              "not_ready_when": [
+                "The slice changes provider transport retries, opens live providers, or adds a real image-resize dependency before the pure retry plan is fixture-backed.",
+                "The slice retries non-image_too_large provider errors.",
+                "The slice permits more than one automatic shrink retry for the same message set."
+              ],
+              "blocked_by": [
+                "Provider image-too-large error classification",
+                "Image input mode router + native content parts"
+              ],
+              "acceptance": [
+                "TestImageShrinkRetry_PlansOneRetryForImageTooLarge proves the planner calls an injected shrinker once and returns retry evidence for image_too_large.",
+                "TestImageShrinkRetry_DoesNotRetryOtherProviderKinds proves context, rate_limit, auth, retryable, and unknown classifications return no retry.",
+                "TestImageShrinkRetry_NoImagesReturnsEvidence proves image_too_large without image content returns image_shrink_no_images.",
+                "TestImageShrinkRetry_LimitReachedAfterOneAttempt proves a second image_too_large on an already-shrunk request returns image_shrink_limit_reached.",
+                "The helper does not mutate the original message slice; retry content is returned as a new value."
+              ],
+              "note": "Tracks Hermes ec671c41 image shrink recovery, but scopes the first Gormes slice to a pure retry plan with an injected shrinker so dependency choice and provider retry wiring remain separate.",
+              "write_scope": [
+                "internal/hermes/image_shrink_retry.go",
+                "internal/hermes/image_shrink_retry_test.go",
+                "internal/hermes/errors.go",
+                "internal/hermes/image_routing.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run '^TestImageShrinkRetry_|^TestClassifyProviderError_ImageTooLarge' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Image shrink retry fixtures prove one bounded retry is planned only for structured image_too_large failures, original messages are immutable, and degraded no-retry evidence is explicit."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ec671c41 run_agent.py",
+                "note": "Hermes added image shrink recovery; Gormes decomposes it into classification, routing shape, and a pure retry planner before transport wiring."
+              }
             },
             {
               "name": "Image generation result contract",
+              "priority": "P3",
               "status": "planned",
-              "note": "TDD: port `tools/image_generation_tool.py` schema, output-path handling, binary/result envelope, and provider error mapping before any live image model call."
+              "contract": "Image-generation tool results use a stable local artifact envelope with provider name, model, prompt hash, media type, output path, and redacted error evidence before any live image model call is wired",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Image generation returns image_generation_unavailable or image_generation_provider_error envelopes instead of embedding raw binary data or provider secrets in transcripts.",
+              "fixture": "internal/tools/image_generation_result_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/image_generation_tool.py",
+                "../hermes-agent/tools/vision_tools.py@ec671c41",
+                "internal/tools/registry.go",
+                "internal/transcript/markdown.go"
+              ],
+              "ready_when": [
+                "Image input mode router + native content parts is fixture-ready or complete, so multimodal artifact vocabulary is no longer ambiguous.",
+                "The row defines result schema only; workers can use fake binary bytes and temp output directories without provider calls."
+              ],
+              "not_ready_when": [
+                "The slice calls OpenAI image generation, adds live provider credentials, changes transcript export format, or writes outside a temp artifact directory in tests.",
+                "The slice stores raw provider API keys, full prompts, or raw binary blobs directly in message content."
+              ],
+              "blocked_by": [
+                "Image input mode router + native content parts"
+              ],
+              "acceptance": [
+                "TestImageGenerationResult_WritesArtifactEnvelope proves fake image bytes are written under an injected directory and the returned envelope contains media type, relative path, provider, model, and prompt hash.",
+                "TestImageGenerationResult_RedactsPromptAndSecrets proves full prompt text and provider API keys are absent from JSON/result strings.",
+                "TestImageGenerationResult_ErrorEnvelope proves provider errors return a typed degraded envelope without partial binary content.",
+                "No test calls a live image model, reads real operator config, or writes outside t.TempDir()."
+              ],
+              "note": "Refined from the prior note-only row so image generation can advance as a schema/artifact boundary before provider-specific image model calls are implemented.",
+              "write_scope": [
+                "internal/tools/image_generation_result.go",
+                "internal/tools/image_generation_result_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestImageGenerationResult_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Image generation result fixtures prove artifact envelope fields, prompt/secret redaction, typed error envelopes, and temp-dir-only writes without live provider calls."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "note": "Hermes has Python image tooling; Gormes first owns a Go-native artifact/result envelope before binding any provider-specific image model."
+              }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T13:57:25Z",
+            "origin_decision": "Hermes ec671c41 added native image routing, image-aware compression pressure, image-too-large classification, and shrink recovery. Gormes still lacks the full multimodal surface, so Phase 5.D remains upstream-led but split into pure routing, classification/retry, and result-envelope rows before any UI/gateway/provider transport binding."
+          }
         },
         "5.E": {
           "name": "TTS / Voice / Transcription",
@@ -11291,6 +11703,77 @@
               }
             },
             {
+              "name": "First-party Google Meet plugin metadata fixture",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "First-party Google Meet plugin manifests, tool metadata, realtime/node capability flags, and safety constraints load as disabled plugin inventory through the Plugin SDK without importing Python, starting Chrome, joining meetings, or registering built-in Go tools",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Plugin status reports google_meet_runtime_unavailable, google_meet_realtime_unconfigured, node_auth_required, or browser_profile_required instead of exposing meeting tools that cannot run.",
+              "fixture": "internal/plugins/google_meet_plugin_test.go::TestGoogleMeetPluginMetadata",
+              "source_refs": [
+                "../hermes-agent/plugins/google_meet/plugin.yaml@df3c9593",
+                "../hermes-agent/plugins/google_meet/tools.py@df3c9593",
+                "../hermes-agent/plugins/google_meet/README.md@df3c9593",
+                "../hermes-agent/plugins/google_meet/realtime/openai_client.py@df3c9593",
+                "../hermes-agent/plugins/google_meet/node/protocol.py@df3c9593",
+                "../hermes-agent/tests/plugins/test_google_meet_plugin.py@df3c9593",
+                "internal/plugins/spotify_plugin_test.go",
+                "internal/tools/registry.go"
+              ],
+              "ready_when": [
+                "Plugin SDK and First-party Spotify plugin fixture are validated on main, so disabled first-party plugin metadata and tool schemas already have a pattern.",
+                "The row is metadata-only: workers parse static upstream files or local fixtures and emit disabled inventory, with no meet bot, Chrome, audio bridge, OpenAI Realtime client, node server, or process manager execution.",
+                "Safety evidence must record explicit URL-only join behavior and one-active-meeting/runtime requirements without claiming calendar scanning or automatic consent announcements."
+              ],
+              "not_ready_when": [
+                "The slice starts a browser, opens a microphone/speaker device, calls OpenAI Realtime, launches a node process, joins meet.google.com, or imports Hermes Python plugin code.",
+                "The slice registers Google Meet as a core built-in tool instead of plugin-backed disabled inventory.",
+                "The slice changes internal Goncho/Honcho memory behavior; meeting transcript persistence is a later gateway/memory contract."
+              ],
+              "blocked_by": [
+                "Plugin SDK",
+                "First-party Spotify plugin fixture"
+              ],
+              "unblocks": [
+                "Google Meet process/node lifecycle contract",
+                "Meeting transcript memory handoff contract"
+              ],
+              "acceptance": [
+                "TestGoogleMeetPluginMetadata_LoadsManifest proves plugin name google_meet, version, standalone capability, linux/macos platform support, and required runtime evidence round-trip through internal/plugins.",
+                "TestGoogleMeetPluginMetadata_ToolInventory proves meet_join, meet_leave, meet_status, meet_transcript, and meet_say appear as disabled plugin tool capabilities with upstream-style argument metadata and missing-runtime evidence.",
+                "TestGoogleMeetPluginMetadata_RealtimeAndNodeCapabilities records realtime audio and remote node capability flags as inert metadata, including bearer-token/node auth evidence.",
+                "TestGoogleMeetPluginMetadata_SafetyEvidence proves URL gate, no calendar auto-dial, one-active-meeting constraint, and meet_say realtime requirement are represented in status/degraded evidence.",
+                "No test imports Python, starts Chrome, starts a node server, opens audio devices, calls OpenAI Realtime, or joins a meeting."
+              ],
+              "note": "Added after Hermes df3c9593 introduced a large Google Meet plugin. Gormes should first extend plugin metadata/status coverage so workers do not try to port browser, audio, realtime, and remote-node runtime behavior in one slice.",
+              "write_scope": [
+                "internal/plugins/google_meet_plugin_test.go",
+                "internal/plugins/",
+                "internal/tools/registry.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/plugins ./internal/tools -run 'TestGoogleMeetPluginMetadata|TestSpotifyPlugin|TestManifest' -count=1",
+                "go test ./internal/plugins ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Google Meet plugin metadata fixtures prove manifest, disabled tool inventory, realtime/node capability evidence, and safety constraints without executing browser/audio/realtime/node runtime code."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:df3c9593 plugins/google_meet/plugin.yaml",
+                "note": "Hermes added the Google Meet plugin; Gormes decomposes the port by first fixture-locking plugin metadata and disabled safety evidence."
+              }
+            },
+            {
               "name": "Hindsight memory setup blank-input preservation",
               "priority": "P4",
               "status": "planned",
@@ -11351,8 +11834,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T12:07:47Z",
-            "origin_decision": "Hermes still leads plugin and dashboard-extension contracts. af22421e/cf2fabc4 page-scoped built-in slots are validated; 64a497bf adds a Hindsight setup preservation regression, now tracked as a blocked external-memory-plugin config row. Internal Gormes memory remains Goncho with honcho_* compatibility; do not route Hindsight drift into internal/goncho."
+            "last_upstream_check": "2026-04-27T13:57:25Z",
+            "origin_decision": "Hermes still leads plugin and dashboard-extension contracts. af22421e/cf2fabc4 page-scoped built-in slots are validated; 64a497bf adds Hindsight setup preservation as a blocked external-memory-plugin config row; df3c9593 adds Google Meet and is now split into metadata/status before any browser/audio/realtime/node runtime work. Internal Gormes memory remains Goncho with honcho_* compatibility; do not route Hindsight or meeting drift into internal/goncho."
           }
         },
         "5.J": {
@@ -11618,6 +12101,138 @@
               "done_signal": [
                 "Subagent approval fixtures prove dangerous child commands auto-deny by default, audited opt-in approve works, and no child path waits on stdin."
               ]
+            },
+            {
+              "name": "Concurrent tool approval callback propagation",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Concurrent tool workers inherit only an explicit approval callback and otherwise fail closed with noninteractive denial, so approval prompts never fall back to stdin while a CLI/TUI turn owns the terminal",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Tool execution reports approval_callback_missing, approval_denied_noninteractive, or approval_callback_error instead of blocking on stdin or approving dangerous commands implicitly.",
+              "fixture": "internal/tools/approval_callback_test.go::TestApprovalCallbackPropagation_*",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@0046d170:concurrent tool worker approval callback propagation",
+                "../hermes-agent/tools/approval.py@008860a2:prompt_toolkit stdin deadlock guard",
+                "../hermes-agent/tools/approval.py@0046d170:clear approval callback",
+                "../hermes-agent/tests/tools/test_approval.py@008860a2",
+                "../hermes-agent/tests/run_agent/test_background_review_toolset_restriction.py@8ad29a93",
+                "internal/tools/dangerous_command.go",
+                "internal/subagent/manager.go"
+              ],
+              "ready_when": [
+                "Recoverable dangerous patterns + blocked-result schema is validated, so approval decisions can reuse GuardCommand evidence.",
+                "Subagent dangerous-command non-interactive approval policy is fixture-ready or validated; this row focuses on concurrent tool worker callback inheritance and fail-closed fallback.",
+                "Tests use fake callbacks and fake worker functions only; no real terminal, prompt toolkit, shell command, or subagent backend is required."
+              ],
+              "not_ready_when": [
+                "The slice starts interactive prompts, reads from os.Stdin, executes dangerous shell commands, or changes the dangerous-pattern tables.",
+                "The slice grants approval when no callback is installed and the caller is noninteractive.",
+                "The slice changes provider, memory, or gateway command dispatch behavior beyond approval evidence."
+              ],
+              "blocked_by": [
+                "Recoverable dangerous patterns + blocked-result schema",
+                "Subagent dangerous-command non-interactive approval policy"
+              ],
+              "unblocks": [
+                "Background review toolset restriction"
+              ],
+              "acceptance": [
+                "TestApprovalCallbackPropagation_ConcurrentWorkerUsesInjectedCallback proves a fake concurrent worker receives the callback and records one approval decision.",
+                "TestApprovalCallbackPropagation_MissingCallbackFailsClosed proves dangerous commands return approval_denied_noninteractive or approval_callback_missing without stdin reads.",
+                "TestApprovalCallbackPropagation_CallbackClearedAfterWorker proves callbacks do not leak into the next worker after cleanup.",
+                "TestApprovalCallbackPropagation_CallbackErrorDenied proves callback errors deny the command with evidence.",
+                "No test reads from os.Stdin, uses prompt_toolkit equivalents, or executes a shell command."
+              ],
+              "note": "Added after Hermes 0046d170 propagated approval callbacks into concurrent tool workers and 008860a2 closed remaining prompt_toolkit/stdin deadlock vectors. Gormes should fixture-lock the callback propagation boundary before widening approval wiring.",
+              "write_scope": [
+                "internal/tools/approval_callback.go",
+                "internal/tools/approval_callback_test.go",
+                "internal/tools/dangerous_command.go",
+                "internal/subagent/manager.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools ./internal/subagent -run 'TestApprovalCallbackPropagation_|TestGuardCommand' -count=1",
+                "go test ./internal/tools ./internal/subagent -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Approval callback fixtures prove concurrent workers use injected callbacks, missing callbacks fail closed without stdin, callback cleanup prevents leakage, and callback errors deny with evidence."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:0046d170+008860a2 approval callback propagation",
+                "note": "Hermes hardened concurrent approvals and terminal ownership; Gormes ports the same invariant at the Go tool/subagent boundary."
+              }
+            },
+            {
+              "name": "Background review toolset restriction",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Background review workers run with an explicit allowlist limited to memory and skills toolsets, deny executable/file/network toolsets by default, and surface restriction evidence in review telemetry",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Background review status reports background_review_toolset_restricted or background_review_toolset_unavailable instead of silently granting full tool access.",
+              "fixture": "internal/subagent/background_review_toolset_test.go::TestBackgroundReviewToolsetRestriction",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@8ad29a93:background review agent toolset restriction",
+                "../hermes-agent/tests/run_agent/test_background_review_toolset_restriction.py@8ad29a93",
+                "internal/subagent/manager.go",
+                "internal/tools/registry.go",
+                "internal/skills/"
+              ],
+              "ready_when": [
+                "Concurrent tool approval callback propagation is fixture-ready or validated so noninteractive denial has a shared evidence shape.",
+                "The row only constructs a background-review worker config or policy object with a toolset allowlist; no provider call, review prompt execution, or live subagent backend is required."
+              ],
+              "not_ready_when": [
+                "The slice grants execute_code, file mutation, network/browser, or provider-management tools to background review workers.",
+                "The slice changes foreground subagent tool policy or general skill-selection scoring.",
+                "The slice calls a real model or spawns a backend worker in tests."
+              ],
+              "blocked_by": [
+                "Concurrent tool approval callback propagation"
+              ],
+              "acceptance": [
+                "TestBackgroundReviewToolsetRestriction_DefaultAllowlist proves generated background-review config contains only memory and skills toolsets.",
+                "TestBackgroundReviewToolsetRestriction_DeniesExecutableToolsets proves execute_code, shell, browser, file_write, and provider-management requests are rejected with restriction evidence.",
+                "TestBackgroundReviewToolsetRestriction_TelemetryIncludesEvidence proves review telemetry/status includes the allowlist and denied toolset names without prompt content.",
+                "Foreground subagent policy fixtures remain unchanged."
+              ],
+              "note": "Added after Hermes 8ad29a93 restricted background review agents to memory and skills. Gormes should make the background review policy explicit before review automation gains broader tool access.",
+              "write_scope": [
+                "internal/subagent/background_review_toolset.go",
+                "internal/subagent/background_review_toolset_test.go",
+                "internal/subagent/manager.go",
+                "internal/tools/registry.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/subagent ./internal/tools -run '^TestBackgroundReviewToolsetRestriction' -count=1",
+                "go test ./internal/subagent ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Background review fixtures prove memory+skills-only allowlist, denial of executable/file/network/tool-management toolsets, telemetry evidence, and unchanged foreground subagent policy."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:8ad29a93 run_agent.py",
+                "note": "Hermes restricted background review tools; Gormes tracks the same safety boundary before enabling automated review workers."
+              }
             },
             {
               "name": "Cron dangerous-command approval mode",
@@ -12020,6 +12635,74 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:dbe50155 tools/session_search_tool.py",
                 "note": "Hermes provides the recent-mode exclusion regression; Gormes maps it onto Go memory search after the local tool schema is validated."
+              }
+            },
+            {
+              "name": "Session shutdown memory transcript handoff",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Session-end memory handoff receives the completed transcript/message slice explicitly, while skip_memory, interrupted turns, and expiry-only cleanup still prevent hidden GONCHO or Honcho-compatible memory writes",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "memory",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Memory shutdown status reports shutdown_messages_unavailable, shutdown_memory_skipped, or shutdown_memory_interrupted instead of calling a no-arg provider that silently loses transcript context.",
+              "fixture": "internal/memory/shutdown_handoff_test.go::TestShutdownMemoryHandoff_*",
+              "source_refs": [
+                "../hermes-agent/gateway/run.py@500774e3:shutdown_memory_provider(session_messages)",
+                "../hermes-agent/cli.py@a59a98b1:shutdown_memory_provider(session_messages)",
+                "../hermes-agent/tests/gateway/test_shutdown_memory_provider_messages.py@500774e3",
+                "../hermes-agent/tests/cli/test_cli_shutdown_memory_messages.py@a59a98b1",
+                "internal/memory/shutdown_test.go",
+                "internal/gateway/session_expiry_hooks_test.go"
+              ],
+              "ready_when": [
+                "Interrupted-turn memory sync suppression is validated, so completed vs interrupted turn state is already observable.",
+                "Phase 3 memory stays complete; this Phase 5.N row tracks operator/runtime shutdown handoff drift without reopening the completed memory baseline.",
+                "The slice first lands a pure memory handoff helper using a small local message struct with Role and Content fields; gateway/CLI runtime binding is a dependent row.",
+                "Tests use synthetic completed, empty, interrupted, and skip_memory inputs only; no provider, gateway manager, SQLite extractor, or live Goncho service is required."
+              ],
+              "not_ready_when": [
+                "The slice calls a live memory provider, opens the transcript database, changes expiry hooks, or flushes memory from session timeout cleanup.",
+                "The slice renames public honcho_* tools or internal GONCHO packages.",
+                "The slice reintroduces no-argument shutdown_memory_provider behavior for completed sessions."
+              ],
+              "blocked_by": [
+                "Interrupted-turn memory sync suppression"
+              ],
+              "unblocks": [
+                "Cross-chat operator evidence"
+              ],
+              "acceptance": [
+                "TestShutdownMemoryHandoff_CompletedPassesMessages builds two synthetic role/content messages and proves the provider callback receives both in order.",
+                "TestShutdownMemoryHandoff_EmptyCompletedStillCallsProvider proves an empty completed transcript calls the provider with an empty slice and explicit evidence rather than falling back to no-arg behavior.",
+                "TestShutdownMemoryHandoff_SkipMemorySuppressesProvider proves skip_memory returns shutdown_memory_skipped evidence and does not call the provider.",
+                "TestShutdownMemoryHandoff_InterruptedSuppressesProvider proves interrupted sessions do not write GONCHO conclusions or call external Honcho-compatible memory hooks.",
+                "Existing session-expiry hook tests keep proving expiry cleanup does not perform hidden memory flushes."
+              ],
+              "note": "Moved to Phase 5.N on 2026-04-27T13:57:25Z after progress tests confirmed Phase 3 is intentionally closed. Added after Hermes 500774e3/a59a98b1 fixed gateway and CLI shutdown paths that lost session messages before calling shutdown_memory_provider. Gormes should encode the transcript handoff as an internal memory contract first while preserving internal GONCHO naming and external honcho_* compatibility.",
+              "write_scope": [
+                "internal/memory/shutdown_handoff.go",
+                "internal/memory/shutdown_handoff_test.go",
+                "internal/gateway/session_expiry_hooks_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/memory -run '^TestShutdownMemoryHandoff_' -count=1",
+                "go test ./internal/memory ./internal/gateway -run 'TestShutdownMemoryHandoff_|TestSessionExpiry' -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Shutdown handoff fixtures prove completed transcripts are passed explicitly, empty transcripts do not fall back to no-arg behavior, skip/interrupted sessions suppress provider calls, and expiry cleanup remains memory-silent."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:500774e3+a59a98b1 shutdown_memory_provider",
+                "note": "Hermes supplies the session-message shutdown fix; Gormes adapts it to internal Goncho memory while preserving external Honcho-compatible tool names."
               }
             },
             {
@@ -12747,8 +13430,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T12:07:47Z",
-            "origin_decision": "Hermes 90a3e73d moves paste.rs debug-share deletion from opportunistic-only cleanup to a gateway cron ticker; Gormes now tracks that as a blocked Debug share paste sweep scheduler contract behind the native Debug helpers row. Hermes dbe50155 session-search recent-mode exclusion is split into schema/argument validation first, then the memory execution wrapper over internal/memory and Goncho/Honcho-compatible scope rules. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, CRON.md mirror, and backend health bypass; cron rows remain split so autoloop workers can advance Phase 5.N without guessing."
+            "last_upstream_check": "2026-04-27T13:57:25Z",
+            "origin_decision": "Hermes 90a3e73d moves paste.rs debug-share deletion from opportunistic-only cleanup to a gateway cron ticker; Gormes tracks that as a blocked Debug share paste sweep scheduler contract behind the native Debug helpers row. Hermes dbe50155 session-search recent-mode exclusion is split into schema/argument validation first, then the memory execution wrapper over internal/memory and Goncho/Honcho-compatible scope rules. Hermes 500774e3/a59a98b1 fixed shutdown memory handoff to pass session messages; Gormes tracks that operator/runtime drift here rather than reopening completed Phase 3 memory. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, CRON.md mirror, and backend health bypass; cron/session rows remain split so autoloop workers can advance Phase 5.N without guessing."
           }
         },
         "5.O": {
@@ -13096,6 +13779,66 @@
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:a0fe73ba cli.py",
                 "note": "Hermes supplies the bracketed-paste leak regression; Gormes adapts it as a pure Go CLI helper before input-loop wiring."
+              }
+            },
+            {
+              "name": "CLI slow bracketed-paste diagnostic threshold",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "internal/cli exposes a pure slow-paste diagnostic helper that emits structured evidence only when bracketed-paste handling exceeds a 500ms threshold and never logs pasted content bytes",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "CLI diagnostics report paste_handler_slow with duration_ms and threshold_ms only; prompt content, clipboard content, and image paths are redacted.",
+              "fixture": "internal/cli/paste_diagnostic_test.go::TestSlowBracketedPasteDiagnostic_*",
+              "source_refs": [
+                "../hermes-agent/cli.py@ac0325c2:slow bracketed-paste handler diagnostic",
+                "../hermes-agent/cli.py@a0fe73ba:_strip_leaked_bracketed_paste_wrappers",
+                "internal/cli/paste_sanitizer.go",
+                "internal/cli/log_redactor.go"
+              ],
+              "ready_when": [
+                "CLI bracketed-paste wrapper sanitizer is validated, so paste handling has a local helper seam.",
+                "The row is diagnostic-only: tests inject durations and a fake logger; no TTY, prompt toolkit, clipboard, or timer sleeps are required."
+              ],
+              "not_ready_when": [
+                "The slice changes command dispatch, file-drop parsing, TUI input handling, paste sanitizer behavior, or terminal modes.",
+                "The diagnostic logs raw pasted content, file paths from paste payloads, or prompt text.",
+                "Tests wait for real 500ms sleeps instead of injecting durations."
+              ],
+              "blocked_by": [
+                "CLI bracketed-paste wrapper sanitizer"
+              ],
+              "acceptance": [
+                "TestSlowBracketedPasteDiagnostic_BelowThresholdNoLog injects 499ms and proves no diagnostic event is emitted.",
+                "TestSlowBracketedPasteDiagnostic_AtOrAboveThresholdLogsEvidence injects 500ms and 750ms and proves paste_handler_slow evidence contains duration_ms and threshold_ms.",
+                "TestSlowBracketedPasteDiagnostic_RedactsPasteContent passes sensitive pasted text and proves the emitted event omits content bytes and file paths.",
+                "TestSlowBracketedPasteDiagnostic_CustomThreshold proves callers can inject a threshold while default remains 500ms.",
+                "No test opens a terminal, reads from stdin, sleeps, or depends on prompt_toolkit."
+              ],
+              "note": "Added after Hermes ac0325c2 added diagnostics for bracketed-paste handlers slower than 500ms. Gormes keeps this as a pure diagnostic helper so terminal input wiring remains separate.",
+              "write_scope": [
+                "internal/cli/paste_diagnostic.go",
+                "internal/cli/paste_diagnostic_test.go",
+                "internal/cli/paste_sanitizer.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run '^TestSlowBracketedPasteDiagnostic_|^TestStripLeakedBracketedPasteWrappers_' -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Slow paste diagnostic fixtures prove 500ms default threshold, injected threshold behavior, no-log below threshold, structured duration evidence, and pasted-content redaction without terminal dependencies."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ac0325c2 cli.py",
+                "note": "Hermes added slow-paste diagnostics; Gormes ports it as a redacted pure CLI diagnostic helper."
               }
             },
             {
@@ -14333,6 +15076,67 @@
               "note": "Umbrella only: read-mostly diagnostics, log capture, status, backup, and optional support-upload behavior must be split so workers do not mix local redaction and filesystem inventory with network uploads or archive writes."
             },
             {
+              "name": "Backup/update opt-in and exclusion policy",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "CLI backup/update policy defaults pre-update backups off unless explicitly requested, honors --no-backup over --backup, and excludes checkpoints plus SQLite WAL/SHM/journal sidecars from backup manifests",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Update status reports backup_skipped_default, backup_forced, backup_disabled_by_flag, or backup_manifest_excluded_paths instead of silently archiving large or unsafe runtime files.",
+              "fixture": "internal/cli/backup_policy_test.go::TestBackupPolicy_*",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/main.py@ea3c5a14:update backup flags",
+                "../hermes-agent/hermes_cli/backup.py@a9033c92:exclude checkpoints",
+                "../hermes-agent/hermes_cli/backup.py@817633bc:exclude SQLite sidecars",
+                "../hermes-agent/tests/hermes_cli/test_backup.py@817633bc",
+                "internal/cli/log_snapshot.go",
+                "cmd/gormes/doctor.go"
+              ],
+              "ready_when": [
+                "Diagnostics, backup, logs, and status CLI remains an umbrella; this row is the first pure backup policy helper and does not require a real update command.",
+                "Tests use synthetic flag values and temp path lists; no archive writer, git pull, network, package manager, or real Gormes home is required."
+              ],
+              "not_ready_when": [
+                "The slice implements update execution, writes archives, contacts git remotes, changes installer scripts, or scans the real operator home directory.",
+                "The slice includes checkpoints/, *.db-wal, *.db-shm, or *.db-journal files in a default backup manifest.",
+                "The slice changes log redaction or support-upload behavior."
+              ],
+              "unblocks": [
+                "Backup manifest dry-run contract"
+              ],
+              "acceptance": [
+                "TestBackupPolicy_DefaultSkipsPreUpdateBackup proves no backup is requested when neither --backup nor --no-backup is set.",
+                "TestBackupPolicy_ExplicitBackupEnables proves --backup requests a backup and emits backup_forced evidence.",
+                "TestBackupPolicy_NoBackupWins proves --no-backup suppresses backup even when --backup is also true.",
+                "TestBackupManifestExclusions_SkipsCheckpointsAndSQLiteSidecars proves checkpoints/, *.db-wal, *.db-shm, and *.db-journal are excluded while ordinary .db files remain eligible.",
+                "Tests use synthetic paths/temp dirs only and do not create archives or invoke git."
+              ],
+              "note": "Added after Hermes ea3c5a14 made pre-update backups opt-in, a9033c92 excluded checkpoints, and 817633bc excluded SQLite sidecars. Gormes should pin the policy before update/backup commands are wired.",
+              "write_scope": [
+                "internal/cli/backup_policy.go",
+                "internal/cli/backup_policy_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run '^TestBackupPolicy_|^TestBackupManifestExclusions_' -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Backup policy fixtures prove pre-update backups are opt-in, --no-backup wins, and checkpoints plus SQLite WAL/SHM/journal sidecars are excluded from manifests without archive or network side effects."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ea3c5a14+a9033c92+817633bc hermes_cli/backup.py",
+                "note": "Hermes tightened backup/update behavior; Gormes ports the policy as a pure CLI helper before implementing update/archive commands."
+              }
+            },
+            {
               "name": "doctorCustomEndpointReadiness check function",
               "priority": "P2",
               "status": "complete",
@@ -14531,8 +15335,11 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-27T11:38:55Z",
+                "needs_human": true,
+                "reason": "auto: 3 reshapes without unsticking; last category ",
+                "since": "2026-04-27T13:21:48Z",
+                "reshape_count": 3,
+                "last_reshape": "2026-04-27T13:21:48Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -16392,11 +17199,15 @@
                 "API server detailed health snapshot contract is validated on main; detailed_health.go is a read-only dependency for this row.",
                 "This row only binds GET /health/detailed and GET /v1/health/detailed routes and intentionally follows Hermes' unauthenticated /health/detailed behavior.",
                 "The slice can use httptest against Server.Handler with fake snapshot inputs; no provider, live gateway, scheduler goroutine, cron admin endpoint, or cron mutation endpoint is required.",
-                "Existing /health and /v1/health fixtures remain byte-compatible except for explicitly allowed internal refactoring."
+                "Existing /health and /v1/health fixtures remain byte-compatible except for explicitly allowed internal refactoring.",
+                "If an existing flat-health fixture must be updated to account for route registration, only internal/apiserver/chat_completions_test.go is in scope."
               ],
               "not_ready_when": [
                 "The slice edits detailed_health.go, creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, adds auth requirements to health routes, changes OpenAI-style error envelopes, or weakens auth/body-size checks on non-health routes.",
                 "The slice changes dashboard client behavior or imports Hermes Python."
+              ],
+              "blocked_by": [
+                "API server detailed health snapshot contract"
               ],
               "unblocks": [
                 "API server cron admin read-only endpoints"
@@ -16408,10 +17219,11 @@
                 "TestAPIServerDetailedHealthEndpoint_RedactsSecrets proves the HTTP response body omits provider keys, cron script bodies, gateway tokens, and raw request payloads.",
                 "Existing /health and /v1/health tests continue to report status/platform/responses/runs as before."
               ],
-              "note": "Refined 2026-04-27T13:21:48Z after worker_error attempts: the snapshot row is complete and read-only. Workers should bind only GET /health/detailed and /v1/health/detailed in server.go plus endpoint tests, prove no-auth behavior even when APIKey is configured, and preserve flat /health behavior.",
+              "note": "Refined 2026-04-27T13:57:25Z after repeated worker_error attempts: the snapshot row is complete and now an explicit blocked_by dependency. Workers should bind only GET /health/detailed and /v1/health/detailed in server.go plus endpoint tests, may adjust the existing flat-health fixture in chat_completions_test.go if route registration requires it, must not edit detailed_health.go, must prove no-auth behavior even when APIKey is configured, and must preserve flat /health behavior.",
               "write_scope": [
                 "internal/apiserver/detailed_health_endpoint_test.go",
                 "internal/apiserver/server.go",
+                "internal/apiserver/chat_completions_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
@@ -16436,8 +17248,8 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z",
+                "reshape_count": 3,
+                "last_reshape": "2026-04-27T13:57:25Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {

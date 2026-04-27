@@ -22,28 +22,7 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. WhatsApp unsafe sender/chat inbound evidence
-
-- Phase: 2 / 2.B.5
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: WhatsApp inbound normalization in internal/channels/whatsapp/inbound.go uses the validated NormalizeSafeWhatsAppIdentifier helper to reject unsafe raw sender, chat, and reply target identifiers before Event.UserID, Event.ChatID, Reply.ChatID, or outbound pairing targets are created
-- Trust class: gateway, operator, system
-- Ready when: WhatsApp identifier safety predicate is validated on main; identity.go is a read-only dependency for this slice., The worker edits only inbound.go and a new inbound safety fixture; no platform runtime, bridge process, native WhatsApp client, send/reconnect path, or gateway manager dispatch is needed., Safe identity_contract.json fixtures must remain unchanged.
-- Not ready when: The slice edits identity.go, identity_test.go, send.go, reconnect code, gateway manager code, or live WhatsApp client setup., The slice accepts unsafe IDs after stripping dangerous characters instead of returning whatsapp_identifier_unsafe evidence., The slice rewrites the existing identity_contract.json safe-case fixture.
-- Degraded mode: Unsafe inbound WhatsApp sender/chat/reply IDs produce whatsapp_identifier_unsafe evidence and an unresolved event shape instead of a session key or pairing target.
-- Fixture: `internal/channels/whatsapp/identity_inbound_safety_test.go::TestNormalizeInboundWithIdentity_UnsafeRawIDs`
-- Write scope: `internal/channels/whatsapp/inbound.go`, `internal/channels/whatsapp/identity_inbound_safety_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/channels/whatsapp -run '^TestNormalizeInboundWithIdentity_UnsafeRaw\|^TestNormalizeInboundWithIdentity_UnsafeChat\|^TestNormalizeInboundWithIdentity_UnsafeReply' -count=1`, `go test ./internal/channels/whatsapp -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Inbound safety fixtures prove unsafe sender, chat, and reply identifiers are rejected with whatsapp_identifier_unsafe evidence while safe identity contracts remain green.
-- Acceptance: TestNormalizeInboundWithIdentity_UnsafeRawSenderRejected proves unsafe sender/user IDs return whatsapp_identifier_unsafe evidence and leave Event.UserID empty., TestNormalizeInboundWithIdentity_UnsafeChatRejected proves unsafe chat IDs do not produce Event.ChatID, Reply.ChatID, or an outbound pairing target., TestNormalizeInboundWithIdentity_UnsafeReplyTargetRejected proves unsafe reply targets are dropped with evidence while safe sender/chat IDs still normalize., Existing identity_contract.json fixtures still pass unchanged for safe bridge/native DM and group cases.
-- Source refs: ../hermes-agent/gateway/whatsapp_identity.py@91512b82:expand_whatsapp_aliases path traversal guard, ../hermes-agent/gateway/whatsapp_identity.py@6993e566:_SAFE_IDENTIFIER_RE ASCII guard, internal/channels/whatsapp/inbound.go:NormalizeInboundWithIdentity, internal/channels/whatsapp/identity.go:NormalizeSafeWhatsAppIdentifier
-- Unblocks: WhatsApp unsafe alias endpoint inbound evidence
-- Why now: Unblocks WhatsApp unsafe alias endpoint inbound evidence.
-
-## 2. ContextEngine compression-boundary callback vocabulary
+## 1. ContextEngine compression-boundary callback vocabulary
 
 - Phase: 4 / 4.B
 - Owner: `provider`
@@ -52,19 +31,61 @@ tests, and candidate policy. Keep those control-plane facts in
 - Priority: `P2`
 - Contract: internal/hermes defines a compression-boundary callback vocabulary on ContextEngine with stable lineage evidence and status fields, without binding kernel compression execution yet
 - Trust class: operator, system
-- Ready when: ContextEngine interface + status tool contract is validated on main., Compression token-budget and single-prompt threshold fixtures are validated, so this slice only adds callback vocabulary and status evidence., The worker edits only internal/hermes context-engine files; no kernel, transcript storage, summarizer, or Goncho/Honcho memory behavior is in scope.
-- Not ready when: The slice edits internal/kernel/kernel.go, creates internal/kernel/context_engine.go, implements summarization, mutates transcript history, or binds live compression execution., The slice hides boundary failures or lets status imply a boundary callback ran before the kernel binding row is complete., The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern.
+- Ready when: ContextEngine interface + status tool contract is validated on main., Compression token-budget and single-prompt threshold fixtures are validated, so this slice only adds callback vocabulary and status evidence., The worker edits only internal/hermes context-engine files and the declared context_status JSON fixture; no kernel, transcript storage, summarizer, or Goncho/Honcho memory behavior is in scope.
+- Not ready when: The slice edits internal/kernel/kernel.go, creates internal/kernel/context_engine.go, implements summarization, mutates transcript history, or binds live compression execution., The slice hides boundary failures or lets status imply a boundary callback ran before the kernel binding row is complete., The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern., The slice edits any testdata fixture except internal/hermes/testdata/context_status/disabled_pressure_unknown_tool.json.
 - Degraded mode: Context status reports compression_boundary_unavailable or last_boundary_missing evidence until kernel compression execution binds the callback.
 - Fixture: `internal/hermes/context_engine_boundary_test.go::TestContextEngineCompressionBoundaryVocabulary`
-- Write scope: `internal/hermes/context_engine.go`, `internal/hermes/context_engine_test.go`, `internal/hermes/context_engine_boundary_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/hermes -run 'Test.*ContextEngine.*Boundary\|TestDisabledContextEngine_StatusToolFixture' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Hermes package fixtures prove boundary vocabulary, status evidence, unavailable/missing degraded modes, and no kernel or memory side effects.
-- Acceptance: A new CompressionBoundary value carries old_session_id, new_session_id, reason, and compressed_at or equivalent stable lineage evidence., DisabledContextEngine or an in-package fake can record one boundary callback and expose last boundary evidence through Status without contacting a provider., Status reports compression_boundary_unavailable or last_boundary_missing when no boundary has been recorded., Existing context_status tool fixtures remain stable except for the added boundary evidence fields.
-- Source refs: ../hermes-agent/run_agent.py@e85b7525, ../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525, internal/hermes/context_engine.go:ContextEngine, internal/hermes/context_engine_test.go
+- Write scope: `internal/hermes/context_engine.go`, `internal/hermes/context_engine_test.go`, `internal/hermes/context_engine_boundary_test.go`, `internal/hermes/testdata/context_status/disabled_pressure_unknown_tool.json`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run 'Test.*ContextEngine.*Boundary\|TestDisabledContextEngine_StatusToolFixture\|TestContextStatusFixtures' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Hermes package fixtures and the disabled_pressure_unknown_tool.json status fixture prove boundary vocabulary, status evidence, unavailable/missing degraded modes, and no kernel or memory side effects.
+- Acceptance: A new CompressionBoundary value carries old_session_id, new_session_id, reason, and compressed_at or equivalent stable lineage evidence., DisabledContextEngine or an in-package fake can record one boundary callback and expose last boundary evidence through Status without contacting a provider., Status reports compression_boundary_unavailable or last_boundary_missing when no boundary has been recorded., Existing context_status tool fixtures remain stable except for the added boundary evidence fields., The disabled_pressure_unknown_tool.json fixture is updated only as needed to include explicit missing-boundary or unavailable-boundary evidence.
+- Source refs: ../hermes-agent/run_agent.py@e85b7525, ../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525, internal/hermes/context_engine.go:ContextEngine, internal/hermes/context_engine_test.go, internal/hermes/testdata/context_status/disabled_pressure_unknown_tool.json
 - Unblocks: ContextEngine compression-boundary notification
 - Why now: Unblocks ContextEngine compression-boundary notification.
 
-## 3. Custom provider model-switch key_env write guard
+## 2. Image input mode router + native content parts
+
+- Phase: 5 / 5.D
+- Owner: `provider`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: internal/hermes exposes a pure image input routing helper that resolves agent.image_input_mode auto/native/text from model vision capability and auxiliary vision override, then builds native provider content parts with text plus data-url image_url entries without invoking a live provider
+- Trust class: operator, system
+- Ready when: The worker can add a pure helper under internal/hermes with injected model capability and auxiliary-vision config values; no run_agent, kernel, gateway, or config-file binding is required., Tests create temp fixture image bytes and inspect generated data URLs; no provider request, image resizing, OCR, or external binary is required., Auto mode must choose native only when the active model is known to support vision and no auxiliary vision provider/model/base_url override is configured.
+- Not ready when: The slice changes provider HTTP request builders, kernel message history, TUI file-drop behavior, gateway media ingestion, or image generation tools., The slice implements text OCR/vision-tool fallback, image resizing, or shrink retry., The slice treats unknown model capability as native vision support in auto mode.
+- Degraded mode: Multimodal status reports image_input_text_fallback, image_input_native_forced, image_input_native_unavailable, or image_input_auxiliary_vision_override instead of silently dropping images.
+- Fixture: `internal/hermes/image_routing_test.go::TestImageInputRouting_*`
+- Write scope: `internal/hermes/image_routing.go`, `internal/hermes/image_routing_test.go`, `internal/hermes/client.go`, `internal/hermes/model_registry.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run '^TestImageInputRouting_\|^TestBuildNativeImageContentParts_' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Image routing fixtures prove auto/native/text selection, auxiliary-vision fallback, model capability handling, native data-url content part construction, unreadable-image evidence, and default prompt behavior without live providers.
+- Acceptance: TestImageInputRouting_AutoNativeWhenModelSupportsVision proves auto mode returns native for a vision-capable active model with no auxiliary vision override., TestImageInputRouting_AutoTextWhenAuxVisionConfigured proves auxiliary vision provider/model/base_url config forces text fallback even when the active model supports vision., TestImageInputRouting_AutoTextForUnknownOrNonVisionModel proves unknown and non-vision model capabilities choose text fallback., TestBuildNativeImageContentParts_TextAndImages emits one text part plus image_url data-url parts in input order, skipping unreadable paths with evidence., TestBuildNativeImageContentParts_DefaultPrompt inserts a short default prompt when user text is empty and at least one image is present.
+- Source refs: ../hermes-agent/agent/image_routing.py@ec671c41, ../hermes-agent/tests/agent/test_image_routing.py@ec671c41, ../hermes-agent/run_agent.py@ec671c41:_model_supports_vision, ../hermes-agent/run_agent.py@ec671c41:vision-aware preprocessing, internal/hermes/client.go:MessageContentPart, internal/hermes/model_registry.go
+- Unblocks: Image-too-large shrink retry helper
+- Why now: Unblocks Image-too-large shrink retry helper.
+
+## 3. Backup/update opt-in and exclusion policy
+
+- Phase: 5 / 5.O
+- Owner: `tools`
+- Size: `small`
+- Status: `planned`
+- Priority: `P3`
+- Contract: CLI backup/update policy defaults pre-update backups off unless explicitly requested, honors --no-backup over --backup, and excludes checkpoints plus SQLite WAL/SHM/journal sidecars from backup manifests
+- Trust class: operator, system
+- Ready when: Diagnostics, backup, logs, and status CLI remains an umbrella; this row is the first pure backup policy helper and does not require a real update command., Tests use synthetic flag values and temp path lists; no archive writer, git pull, network, package manager, or real Gormes home is required.
+- Not ready when: The slice implements update execution, writes archives, contacts git remotes, changes installer scripts, or scans the real operator home directory., The slice includes checkpoints/, *.db-wal, *.db-shm, or *.db-journal files in a default backup manifest., The slice changes log redaction or support-upload behavior.
+- Degraded mode: Update status reports backup_skipped_default, backup_forced, backup_disabled_by_flag, or backup_manifest_excluded_paths instead of silently archiving large or unsafe runtime files.
+- Fixture: `internal/cli/backup_policy_test.go::TestBackupPolicy_*`
+- Write scope: `internal/cli/backup_policy.go`, `internal/cli/backup_policy_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/cli -run '^TestBackupPolicy_\|^TestBackupManifestExclusions_' -count=1`, `go test ./internal/cli -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Backup policy fixtures prove pre-update backups are opt-in, --no-backup wins, and checkpoints plus SQLite WAL/SHM/journal sidecars are excluded from manifests without archive or network side effects.
+- Acceptance: TestBackupPolicy_DefaultSkipsPreUpdateBackup proves no backup is requested when neither --backup nor --no-backup is set., TestBackupPolicy_ExplicitBackupEnables proves --backup requests a backup and emits backup_forced evidence., TestBackupPolicy_NoBackupWins proves --no-backup suppresses backup even when --backup is also true., TestBackupManifestExclusions_SkipsCheckpointsAndSQLiteSidecars proves checkpoints/, *.db-wal, *.db-shm, and *.db-journal are excluded while ordinary .db files remain eligible., Tests use synthetic paths/temp dirs only and do not create archives or invoke git.
+- Source refs: ../hermes-agent/hermes_cli/main.py@ea3c5a14:update backup flags, ../hermes-agent/hermes_cli/backup.py@a9033c92:exclude checkpoints, ../hermes-agent/hermes_cli/backup.py@817633bc:exclude SQLite sidecars, ../hermes-agent/tests/hermes_cli/test_backup.py@817633bc, internal/cli/log_snapshot.go, cmd/gormes/doctor.go
+- Unblocks: Backup manifest dry-run contract
+- Why now: Unblocks Backup manifest dry-run contract.
+
+## 4. Custom provider model-switch key_env write guard
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -83,27 +104,6 @@ tests, and candidate policy. Keep those control-plane facts in
 - Acceptance: TestCustomProviderModelSwitchPatch_KeyEnvDoesNotSynthesizeAPIKey starts with {default_model:'old', key_env:'ACME_KEY'} and proves the patch sets default_model='new', preserves key_env, omits api_key, and returns credential_write_skipped_key_env evidence., TestCustomProviderModelSwitchPatch_InlineEnvRefPreserved starts with {api_key:'${ACME_KEY}'} and proves the patch keeps api_key='${ACME_KEY}' without resolving or overwriting it., TestCustomProviderModelSwitchPatch_PlaintextPreserved starts with {api_key:'sk-plain'} and proves plaintext is preserved only because it was already present., TestCustomProviderModelSwitchPatch_MissingCredentialStillUpdatesModelWithEvidence proves model changes remain possible while credential_missing evidence is returned for setup/status guidance., Existing TestResolveCustomProviderSecret_* fixtures remain green; this row does not redefine resolver semantics.
 - Source refs: ../hermes-agent/hermes_cli/main.py@8258f4dc:_model_flow_named_custom, ../hermes-agent/tests/hermes_cli/test_custom_provider_model_switch.py@8258f4dc, ../hermes-agent/hermes_cli/main.py@8bbeaea6:_named_custom_provider_map, internal/cli/custom_provider_secret.go:CustomProviderRef,ResolveCustomProviderSecret, internal/cli/custom_provider_secret_test.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
-
-## 4. API server detailed health endpoint
-
-- Phase: 5 / 5.Q
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Native API server binds the validated DetailedHealthSnapshot value model to unauthenticated GET /health/detailed and /v1/health/detailed routes while preserving existing flat /health and /v1/health behavior
-- Trust class: operator, gateway, system
-- Ready when: API server detailed health snapshot contract is validated on main; detailed_health.go is a read-only dependency for this row., This row only binds GET /health/detailed and GET /v1/health/detailed routes and intentionally follows Hermes' unauthenticated /health/detailed behavior., The slice can use httptest against Server.Handler with fake snapshot inputs; no provider, live gateway, scheduler goroutine, cron admin endpoint, or cron mutation endpoint is required., Existing /health and /v1/health fixtures remain byte-compatible except for explicitly allowed internal refactoring.
-- Not ready when: The slice edits detailed_health.go, creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, adds auth requirements to health routes, changes OpenAI-style error envelopes, or weakens auth/body-size checks on non-health routes., The slice changes dashboard client behavior or imports Hermes Python.
-- Degraded mode: HTTP detailed health returns per-section degraded evidence through stable JSON without requiring an API key, while flat /health remains backward-compatible.
-- Fixture: `internal/apiserver/detailed_health_endpoint_test.go`
-- Write scope: `internal/apiserver/detailed_health_endpoint_test.go`, `internal/apiserver/server.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/apiserver -run '^TestAPIServerDetailedHealthEndpoint_' -count=1`, `go test ./internal/apiserver -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: API server endpoint fixtures prove /health/detailed and /v1/health/detailed route binding, unauthenticated health access, error-envelope compatibility, redaction, and unchanged flat health routes.
-- Acceptance: TestAPIServerDetailedHealthEndpoint_OK GETs /health/detailed and /v1/health/detailed and decodes provider, response_store, run_events, gateway, and cron sections., TestAPIServerDetailedHealthEndpoint_NoAuthRequired configures APIKey="sk-test" and proves both detailed health routes return 200 without Authorization or X-API-Key headers., TestAPIServerDetailedHealthEndpoint_MethodNotAllowed reuses the shared OpenAI-style method-not-allowed error envelope., TestAPIServerDetailedHealthEndpoint_RedactsSecrets proves the HTTP response body omits provider keys, cron script bodies, gateway tokens, and raw request payloads., Existing /health and /v1/health tests continue to report status/platform/responses/runs as before.
-- Source refs: ../hermes-agent/gateway/platforms/api_server.py@ee1a07f9:_handle_health_detailed no authentication required, internal/apiserver/detailed_health.go:DetailedHealthSnapshot, internal/apiserver/server.go:NewServer,handleHealth, internal/apiserver/chat_completions_test.go:health fixtures
-- Unblocks: API server cron admin read-only endpoints
-- Why now: Unblocks API server cron admin read-only endpoints.
 
 ## 5. BlueBubbles iMessage bubble formatting parity
 
