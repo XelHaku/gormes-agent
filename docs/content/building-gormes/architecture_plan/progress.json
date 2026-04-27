@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T13:57:25Z",
+    "last_updated": "2026-04-27T14:55:00Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -9377,12 +9377,10 @@
                 ]
               },
               "planner_verdict": {
-                "needs_human": true,
-                "reason": "auto: 13 reshapes without unsticking; last category ",
-                "since": "2026-04-26T23:34:04Z",
+                "reason": "Row landed on main: internal/hermes/provider_rate_guard_degraded.go and provider_rate_guard_degraded_test.go both exist; status=complete, contract_status=validated, last_success=2026-04-26T19:42:54Z. Prior needs_human verdicts came from no_progress/codexu stalls after the row was already shipped. Cleared 2026-04-27T14:55:00Z by Gormes Architecture Planner Loop after on-disk evidence verified.",
                 "reshape_count": 13,
                 "last_reshape": "2026-04-26T19:13Z",
-                "last_outcome": "still_failing"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -13317,6 +13315,139 @@
               }
             },
             {
+              "name": "Cron run resource release contract",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "internal/cron exposes a typed per-run resource-release ledger helper that records spawned subprocess PIDs (via an injected killer interface), io.Closer values for SQLite session DBs, and outbound HTTP RoundTripper idle-closables. The helper guarantees deterministic close ordering, idempotent re-entry, partial-failure continuation, and explicit evidence vocabulary so a later Executor binding can release every per-run resource exactly once. The helper does not start a kernel turn, hit a provider, manage MCP stdio runtimes, or change the Scheduler goroutine lifecycle.",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Cron run completion records cron_release_subprocess_killed, cron_release_session_db_closed, cron_release_http_idle_closed, cron_release_http_idle_closed_failed, or cron_release_skipped_no_resource evidence so operator-facing health surfaces show whether ephemeral resources were reaped, instead of silently leaking fds across ticks.",
+              "fixture": "internal/cron/run_release_test.go::TestRunReleaseLedger_*",
+              "source_refs": [
+                "../hermes-agent/cron/scheduler.py@9b55365f:run_job",
+                "../hermes-agent/gateway/run.py@9b55365f:close ephemeral agents",
+                "../hermes-agent/tests/cron/test_scheduler.py@9b55365f",
+                "../hermes-agent/tests/gateway/test_gateway_shutdown.py@9b55365f",
+                "../hermes-agent/tests/gateway/test_status.py@9b55365f",
+                "internal/cron/executor.go:Executor.Run",
+                "internal/cron/run_completion.go",
+                "internal/cron/heartbeat.go",
+                "internal/tools/mcp_stdio.go"
+              ],
+              "ready_when": [
+                "Cronjob tool action envelope over native store, MCP stdio orphan cleanup after cron ticks, and Cron schedule parser + repeat state fixtures are all validated on main; this slice only adds a per-run release ledger helper plus a fixture file.",
+                "internal/cron/run_release.go and internal/cron/run_release_test.go are absent on main; the worker's first edit is the failing fixture.",
+                "Tests use synthetic Closer slices, fake subprocess-PID killer fakes, and an injected clock; no real os/exec spawn, real *sql.DB open, real http.Client request, real MCP stdio runtime, or live scheduler goroutine is required."
+              ],
+              "not_ready_when": [
+                "The slice changes Scheduler.tick goroutine lifecycle, kernel turn submission, MCP stdio orphan-cleanup semantics in internal/tools/mcp_stdio.go, executor cron.Job persistence, run heartbeat or run_completion ordering, or kernel/Render() consumer behavior.",
+                "The slice depends on real subprocess spawn, real network connections, or live MCP stdio servers in the unit tests.",
+                "The slice promotes cron_release_* evidence to a different surface than the existing internal/cron run completion + heartbeat ledger; cross-package telemetry binding is a dependent row.",
+                "The slice changes Goncho/Honcho memory release semantics; memory cleanup remains the Phase 3/5.N session shutdown row."
+              ],
+              "blocked_by": [
+                "Cronjob tool action envelope over native store",
+                "MCP stdio orphan cleanup after cron ticks"
+              ],
+              "unblocks": [
+                "Cron run resource release executor binding"
+              ],
+              "acceptance": [
+                "TestRunReleaseLedger_ClosesAllRegisteredClosers registers three io.Closer fakes, runs the release ledger once, and proves all three Close() calls happened in registration order with cron_release_session_db_closed evidence per closable.",
+                "TestRunReleaseLedger_KillsRegisteredSubprocesses registers two synthetic PID-killer fakes (no real os.Process), proves both received SIGTERM-equivalent calls, and records cron_release_subprocess_killed evidence with the PID values.",
+                "TestRunReleaseLedger_PartialFailureContinues makes the second of three closers return an error; the helper still calls the third, records cron_release_http_idle_closed_failed evidence with the error, and returns the aggregate failure without panicking.",
+                "TestRunReleaseLedger_NoResourceRecordsSkippedEvidence calls the helper with empty closer/PID slices and proves cron_release_skipped_no_resource evidence is emitted exactly once.",
+                "TestRunReleaseLedger_IsIdempotent calls the helper twice on the same ledger and proves the second call is a no-op with cron_release_skipped_no_resource evidence (no double-close, no double-kill).",
+                "Existing internal/cron Executor, run_completion, heartbeat, and integration tests remain green without editing executor.go, run_completion.go, heartbeat.go, or scheduler.go."
+              ],
+              "note": "Added 2026-04-27T14:55:00Z after Hermes 9b55365f added agent.close() + ThreadPoolExecutor event-loop httpx-client reaping in Python cron run_job and gateway shutdown, citing #10200 fd-leak (\"too many open files\") on long-running cron tickers. Gormes does not have Python's threadlocal httpx accumulation problem, but it does have spawned tool subprocess and SQLite session-DB lifetimes that must be released per-run. This first slice is helper-only: a typed release ledger with deterministic close ordering and explicit evidence vocabulary. Executor binding (so Executor.Run actually pushes its closables/PIDs into the ledger) is a dependent row.",
+              "write_scope": [
+                "internal/cron/run_release.go",
+                "internal/cron/run_release_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cron -run '^TestRunReleaseLedger_' -count=1",
+                "go test ./internal/cron -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/cron/run_release_test.go fixtures prove deterministic close ordering, subprocess kill evidence, partial-failure continuation, no-resource skipped evidence, and idempotent re-entry without editing executor.go, run_completion.go, heartbeat.go, scheduler.go, or internal/tools/mcp_stdio.go."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:9b55365f cron/scheduler.py+gateway/run.py",
+                "note": "Hermes fixed long-running cron fd accumulation by closing agents and reaping aux clients per run; Gormes adapts the lesson to a release ledger over native Closer/PID lifetimes before binding it into Executor.Run."
+              }
+            },
+            {
+              "name": "Cron run resource release executor binding",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "internal/cron Executor.Run pushes per-run *sql.DB session stores, tool subprocess handles, and outbound RoundTripper idle-closables into the validated Cron run resource release ledger before returning, so the next Scheduler tick observes no leaked fds; success, kernel-error, ctx-cancel, and timeout paths all release through the same ledger exactly once.",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Cron run completion ledger reports cron_release_executor_skipped, cron_release_executor_panicked, or cron_release_executor_partial when the executor binding cannot guarantee per-run release, instead of silently leaking handles across ticks.",
+              "fixture": "internal/cron/executor_release_test.go::TestExecutorRunReleasesPerRunResources_*",
+              "source_refs": [
+                "../hermes-agent/cron/scheduler.py@9b55365f:run_job",
+                "../hermes-agent/gateway/run.py@9b55365f:close ephemeral agents",
+                "internal/cron/executor.go:Executor.Run",
+                "internal/cron/run_release.go",
+                "internal/cron/run_completion.go"
+              ],
+              "ready_when": [
+                "Cron run resource release contract is complete on main and run_release.go exposes the typed ledger.",
+                "The worker can use fake KernelAPI, fake DeliverySink, and fake LiveDeliveryAdapter values; no real SQLite open, real provider HTTP, real MCP stdio runtime, or real Scheduler goroutine is required.",
+                "ExecutorConfig may grow only the minimum dependency-injection surface (a release ledger factory or a Closer/PID register hook) needed for tests; no schedule-engine, kernel, store, or run-completion semantics are in scope."
+              ],
+              "not_ready_when": [
+                "Cron run resource release contract is still planned/draft on the worker checkout.",
+                "The slice changes Scheduler tick goroutine lifecycle, kernel turn submission, run_completion ordering, heartbeat semantics, MCP stdio orphan cleanup, or cron Job persistence.",
+                "The slice introduces a process-global release ledger or shared cache instead of one per-Executor-Run instance.",
+                "The slice changes Goncho/Honcho memory release semantics; memory cleanup remains the Phase 3/5.N session shutdown row."
+              ],
+              "blocked_by": [
+                "Cron run resource release contract"
+              ],
+              "acceptance": [
+                "TestExecutorRunReleasesPerRunResources_SuccessPath runs Executor.Run with a job that registers two fake closers and one fake PID, proves both Close() calls and the SIGTERM-equivalent kill happened before Run returned, and records cron_release_session_db_closed/cron_release_http_idle_closed/cron_release_subprocess_killed evidence in the ledger.",
+                "TestExecutorRunReleasesPerRunResources_KernelErrorPath proves a forced KernelAPI.Submit failure still releases all registered resources before Run returns, with the kernel error returned to the caller unchanged.",
+                "TestExecutorRunReleasesPerRunResources_CtxCancelPath cancels the run context after registration but before completion, proves all registered resources are released exactly once, and records cron_release_executor_partial evidence.",
+                "TestExecutorRunReleasesPerRunResources_NoRegisteredResources runs a minimal job with no registrations and proves the ledger reports cron_release_skipped_no_resource without errors.",
+                "Existing internal/cron Executor, run_completion, heartbeat, integration_test, and durable_ledger tests remain green without editing run_completion.go, heartbeat.go, scheduler.go, or kernel package code."
+              ],
+              "note": "Dependent binding: keep this draft until the helper-only ledger row is validated, so workers cannot collapse the helper and the Executor wiring into one umbrella diff. Hermes had to land both pieces over multiple PRs for the same reason (#16598 + earlier shutdown fixes).",
+              "write_scope": [
+                "internal/cron/executor.go",
+                "internal/cron/executor_release_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cron -run '^TestExecutorRunReleasesPerRunResources_' -count=1",
+                "go test ./internal/cron -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "internal/cron/executor_release_test.go fixtures prove success, kernel-error, and ctx-cancel paths all release per-run closers/PIDs through the validated ledger exactly once with stable evidence, while existing executor/run_completion/heartbeat/durable_ledger tests stay green."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:9b55365f cron/scheduler.py+gateway/run.py",
+                "note": "Hermes binds the close+reap behavior directly inside Python run_job; Gormes binds the validated Go release ledger inside Executor.Run after the helper is fixture-locked."
+              }
+            },
+            {
               "name": "Cron context_from output chaining",
               "status": "complete",
               "contract": "Cron jobs can reference prior job outputs as bounded prompt context without waiting for same-tick jobs or reading outside the cron output store",
@@ -15881,7 +16012,8 @@
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-26T16:17:18Z",
-                "last_outcome": "still_failing"
+                "last_outcome": "unstuck",
+                "reason": "Row landed on main: internal/tuigateway/media_personality_event_test.go and helpers (image.go, personality.go, platform_event.go) all present; status=complete, contract_status=validated, last_success=2026-04-26T19:51:20Z. Stale still_failing outcome cleared 2026-04-27T14:55:00Z by Gormes Architecture Planner Loop."
               },
               "provenance": {
                 "origin_type": "hybrid",

@@ -591,6 +591,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Cron recurring next-run failure preservation
 - [x] Cron prompt/script safety + pre-run script contract
 - [x] Cronjob tool action envelope over native store
+- [ ] Cron run resource release contract
+- [ ] Cron run resource release executor binding
 - [x] Cron context_from output chaining
 - [ ] Cron prompt/script safety + pre-run script contract (deprecated umbrella)
 - [x] Cron multi-target delivery + media/live-adapter fallback
