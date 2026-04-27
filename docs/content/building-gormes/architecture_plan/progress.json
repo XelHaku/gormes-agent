@@ -15313,9 +15313,9 @@
             {
               "name": "API server detailed health snapshot contract",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Native API server defines a pure detailed-health snapshot model that reports provider, response-store, run-event stream, gateway, and cron availability/degradation without binding HTTP routes or cron mutations",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -15350,7 +15350,7 @@
                 "TestDetailedHealthSnapshot_RedactsSecrets proves provider keys, cron script bodies, gateway tokens, and raw request payloads are absent after JSON marshal.",
                 "The helper is pure and does not register routes, start schedulers, or mutate cron/response/run stores."
               ],
-              "note": "Reshaped 2026-04-27 after still-failing outcomes: the old detailed-health row still mixed model design with HTTP route behavior. This first replacement row is pure snapshot construction only; the endpoint row below binds it to HTTP after the shape is fixture-locked.",
+              "note": "Complete: TDD landed internal/apiserver/detailed_health.go with a pure DetailedHealthSnapshot value model plus fixture coverage for ready provider/response_store/run_events/gateway/cron sections, degraded evidence codes, JSON redaction of provider keys/gateway tokens/cron scripts/raw request payloads, and immutable value-only inputs. This replacement row remains snapshot-only; the endpoint row below binds it to HTTP after this shape is fixture-locked.",
               "write_scope": [
                 "internal/apiserver/detailed_health.go",
                 "internal/apiserver/detailed_health_snapshot_test.go",
