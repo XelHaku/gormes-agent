@@ -1,4 +1,4 @@
-package tools
+package sessionsearchtool
 
 import (
 	"context"
@@ -6,11 +6,13 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/internal/tools"
 )
 
 func TestSessionSearchToolSchema_Descriptor(t *testing.T) {
 	tool := &SessionSearchTool{}
-	var _ Tool = tool
+	var _ tools.Tool = tool
 
 	if got := tool.Name(); got != "session_search" {
 		t.Fatalf("Name() = %q, want session_search", got)
@@ -149,12 +151,12 @@ func TestSessionSearchToolSchema_RejectsUnsafeScope(t *testing.T) {
 }
 
 func TestSessionSearchToolSchema_NotRegisteredGlobally(t *testing.T) {
-	reg := NewRegistry()
+	reg := tools.NewRegistry()
 	if _, ok := reg.Get("session_search"); ok {
 		t.Fatal("new registry unexpectedly contains session_search")
 	}
 
-	for _, tool := range []Tool{&EchoTool{}, &NowTool{}, &RandIntTool{}} {
+	for _, tool := range []tools.Tool{&tools.EchoTool{}, &tools.NowTool{}, &tools.RandIntTool{}} {
 		if tool.Name() == "session_search" {
 			t.Fatalf("builtin tool list unexpectedly contains %T as session_search", tool)
 		}
