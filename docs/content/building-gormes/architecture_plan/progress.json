@@ -1311,6 +1311,20 @@
               "done_signal": [
                 "Gateway coalescer fixtures prove old-preview fresh finalization, delete best-effort behavior, young-preview edit-in-place behavior, and fresh-send failure fallback without touching Telegram SDK code."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-27T01:04:55Z",
+                "last_failure": {
+                  "run_id": "20260427T005142Z-098610933",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:b16f9d43 gateway/stream_consumer.py",
