@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T05:26:06Z",
+    "last_updated": "2026-04-27T05:46:49Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -674,12 +674,79 @@
                 "owned_since": "2026-04-26T17:47:44Z",
                 "note": "Surfaces the self-improvement vs user-feature skew observed in the overnight 2026-04-26 post-mortem (9 ships, almost all on the loop itself)."
               }
+            },
+            {
+              "name": "Backend usage-limit stdin health bypass",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Builder-loop treats backend usage-limit/stdin-wait exits that produce no worker diff as backend infrastructure degradation, emits run-level backend evidence, and avoids charging the selected feature row as a worker_error quarantine candidate",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "When every configured backend is usage-limited or waiting for stdin, the loop emits backend_degraded/backend_waiting_for_stdin evidence and leaves feature-row health unchanged so the planner sees an infrastructure outage instead of a toxic implementation row.",
+              "fixture": "internal/builderloop/run_health_test.go::TestRunOnce_BackendUsageLimitDoesNotQuarantineRow",
+              "source_refs": [
+                "internal/builderloop/backend_failure.go:ClassifyBackendFailure",
+                "internal/builderloop/backend_failure_test.go",
+                "internal/builderloop/run.go:recordWorkerOutcome",
+                "internal/builderloop/run_health_test.go:TestRunOnce_BackendDegradedEventEmittedAfterThreshold",
+                "internal/builderloop/health_writer.go:RecordFailure",
+                ".codex/builder-loop/state/runs.jsonl recent backend_waiting_for_stdin usage-limit entries"
+              ],
+              "ready_when": [
+                "Autoloop audit shows backend_waiting_for_stdin rows whose detail contains `You've hit your usage limit` and no promoted diff.",
+                "Existing backend failure classification already detects killed, deadline, and stdin-wait exits; this slice only adds the usage-limit/no-diff health bypass around that path.",
+                "The test can use FakeRunner with a backend Result{Err: errors.New(\"exit status 1\"), Stdout: usage-limit text plus `Reading additional input from stdin...`} and a one-row progress fixture; no real backend, git remote, provider, or worktree promotion is required."
+              ],
+              "not_ready_when": [
+                "The slice changes feature-row contracts, candidate ranking, post-promotion gates, planner prompt generation, or backend command construction.",
+                "The slice suppresses real row failures that produced a commit, dirty worktree, write-scope violation, validation failure, or no-progress diff.",
+                "The slice retries forever instead of emitting bounded backend_degraded evidence when no fallback backend remains."
+              ],
+              "unblocks": [
+                "Steer slash command registry + queue fallback",
+                "ContextEngine compression-boundary notification",
+                "Custom provider model-switch key_env write guard",
+                "Native TUI /save XDG file writer binding",
+                "Native TUI bounded conversation viewport"
+              ],
+              "acceptance": [
+                "TestClassifyBackendFailureDetectsUsageLimitStdinExit proves usage-limit text is classified distinctly from ordinary stdin wait while preserving the original detail tail.",
+                "TestRunOnce_BackendUsageLimitDoesNotQuarantineRow runs a selected feature row through FakeRunner usage-limit/stdin output and proves the row's health block is not incremented or quarantined.",
+                "The same run emits a ledger event with backend_waiting_for_stdin or backend_usage_limited detail plus backend_degraded evidence when fallback switching is configured.",
+                "A separate worker_error fixture with a non-backend row failure still increments row health, so real implementation failures remain visible to quarantine math.",
+                "Existing TestRunOnce_BackendDegradedEventEmittedAfterThreshold and backend_failure_test.go fixtures remain green."
+              ],
+              "note": "Added 2026-04-27T11:18:57Z after the last 7-day audit showed 37 backend_waiting_for_stdin failures, including repeated usage-limit/stdin exits against otherwise TDD-ready feature rows. This is a Gormes-owned control-plane repair row; it should land before reopening the quarantined feature slices.",
+              "write_scope": [
+                "internal/builderloop/backend_failure.go",
+                "internal/builderloop/backend_failure_test.go",
+                "internal/builderloop/run.go",
+                "internal/builderloop/run_health_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run '^(TestClassifyBackendFailureDetectsUsageLimitStdinExit|TestRunOnce_BackendUsageLimitDoesNotQuarantineRow|TestRunOnce_BackendDegradedEventEmittedAfterThreshold)$' -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Builder-loop usage-limit fixtures prove backend stdin/usage-limit outages produce run-level degraded evidence without mutating feature-row health, while ordinary worker_error paths still update row health."
+              ],
+              "provenance": {
+                "origin_type": "gormes",
+                "owned_since": "2026-04-27T11:18:57Z",
+                "note": "Backend outage shielding is Gormes-owned planner-builder control-plane behavior with no upstream Hermes, Honcho, or GBrain analog."
+              }
             }
           ],
           "drift_state": {
             "status": "owned",
-            "last_upstream_check": "2026-04-27T00:18:30Z",
-            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes 755a2804, GBrain c78c3d0, and Honcho e659b6b were checked this run; this subphase remains owned and complete. GBrain's v0.22.1/v0.22.2 durable-worker lessons are tracked as small future rows in 2.E.3, and delta-maintenance remains in 6.D rather than reopening Phase 1 control-plane closeout."
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, drift/provenance awareness, and backend-outage shielding are Gormes-original control-plane surfaces. Upstream Hermes ee1a07f9, GBrain 891c28b, and Honcho e659b6b were checked this run; no upstream code owns the planner-builder health bypass. GBrain's durable-worker lessons remain tracked as small future rows in 2.E.3, while the new backend usage-limit/stdin row reopens this owned subphase only to stop infrastructure failures from quarantining feature rows."
           }
         }
       }
@@ -1374,6 +1441,28 @@
               "done_signal": [
                 "Inbound safety fixtures prove unsafe WhatsApp sender/chat/alias values are rejected with whatsapp_identifier_unsafe evidence while safe identity contracts stay green."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:31:12Z",
+                "last_failure": {
+                  "run_id": "20260427T063105Z-875657968",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:31:12Z",
+                  "after_run_id": "20260427T063105Z-875657968",
+                  "threshold": 3,
+                  "spec_hash": "0d3ac470a9cc359e82c25f20d1aa490645920a6f5d9964a3d3b5c258f3bfd732",
+                  "last_category": "worker_error"
+                }
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:91512b82+6993e566 gateway/whatsapp_identity.py",
@@ -1609,9 +1698,9 @@
             {
               "name": "Telegram group bot-command mention gate helper",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Telegram ingress exposes a pure mention-gate helper that treats `/cmd@botname` bot_command entities as direct address when group require-mention policy is enabled, rejects commands addressed to other bots, and keeps bare group slash commands gated",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1648,7 +1737,7 @@
                 "TestTelegramGroupMentionGate_MentionEntityStillAllowsText proves normal text containing an @gormes_bot mention entity is still accepted.",
                 "Existing TestBot_ToInboundEvent_Commands and fresh-final delete tests keep passing; no live Telegram token or network call is required."
               ],
-              "note": "Added after Hermes 3ff3dfb5 fixed Telegram's group command menu path: Telegram emits `/cmd@botname` as a single bot_command entity, not a separate mention. Gormes currently has no group require-mention gate, so the first safe slice is a pure helper before any config or runtime binding.",
+              "note": "TDD landed: Telegram group mention gate now has a pure entity-based helper that accepts `/cmd@gormes_bot` bot_command suffixes for `gormes_bot` or `@gormes_bot`, rejects other-bot command suffixes and bare slash commands when require_mention is enabled, preserves mention-entity matching, and remains unbound from production ingress until the config binding slice.",
               "write_scope": [
                 "internal/channels/telegram/group_mention.go",
                 "internal/channels/telegram/group_mention_test.go",
@@ -1663,6 +1752,11 @@
               "done_signal": [
                 "Telegram group mention fixtures prove bot_command suffix matching, other-bot rejection, bare-command gating, mention-entity compatibility, and unchanged existing Telegram command tests without production gateway binding."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T05:58:48Z",
+                "last_success": "2026-04-27T05:58:48Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:3ff3dfb5 gateway/platforms/telegram.py",
@@ -1730,6 +1824,28 @@
               "done_signal": [
                 "Config and Telegram adapter fixtures prove opt-in group require-mention policy gates bare group commands, accepts `/cmd@botname` bot_command entities, preserves DM behavior, and leaves existing Telegram streaming/command tests green."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:32:03Z",
+                "last_failure": {
+                  "run_id": "20260427T063156Z-200841618",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:32:03Z",
+                  "after_run_id": "20260427T063156Z-200841618",
+                  "threshold": 3,
+                  "spec_hash": "f653811b7ca9ccc6edf34fb0656e85a73fb1c12b1edda770bb5b5c22fe282990",
+                  "last_category": "worker_error"
+                }
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:3ff3dfb5 gateway/platforms/telegram.py",
@@ -2024,6 +2140,28 @@
               "done_signal": [
                 "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:30:21Z",
+                "last_failure": {
+                  "run_id": "20260427T063013Z-132521214",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:30:21Z",
+                  "after_run_id": "20260427T063013Z-132521214",
+                  "threshold": 3,
+                  "spec_hash": "19fe2dfc314b1dd10ccddd7e4250f5ff4cc9489f31f52b60177fcaec4639b8d3",
+                  "last_category": "worker_error"
+                }
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 tests/gateway/test_message_deduplicator.py",
@@ -2699,9 +2837,9 @@
             {
               "name": "Durable worker RSS watchdog policy helper",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes durable worker exposes a pure RSS watchdog policy helper that classifies disabled mode, unavailable RSS reads, threshold exceeded evidence, and stable watchdog restart reset without integrating with the worker loop yet",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -2739,7 +2877,7 @@
                 "TestDurableWorkerRSSWatchdog_RSSReadFailure returns rss_watchdog_unavailable evidence and does not request a drain.",
                 "TestDurableWorkerWatchdogRestartPolicy_StableRunReset classifies a watchdog exit after at least five minutes as stable_watchdog_restart and does not increment crash count past one."
               ],
-              "note": "Reshaped 2026-04-27: removed duplicate absolute GBrain source refs that were sending workers into brittle lookup paths, and inlined the exact policy constants. This row is helper-only and fixture-ready; it creates the policy vocabulary before any worker-loop or doctor wiring.",
+              "note": "Complete: TDD landed a helper-only durable worker RSS watchdog policy in internal/subagent/durable_worker_rss_watchdog.go. The policy records rss_watchdog_disabled without reading RSS when max_rss_mb=0, degrades RSS read errors as rss_watchdog_unavailable without requesting drain, emits rss_threshold_exceeded evidence with observed_mb/max_mb/checked_at and a drain request, and classifies watchdog exits after at least five minutes as stable_watchdog_restart with crash count reset to one. This slice did not touch DurableWorker.RunOne, doctor/status, cmd/gormes lifecycle, builder-loop backend watchdogs, delegate_task behavior, cron semantics, process self-termination, Goncho memory service code, or GBrain imports.",
               "write_scope": [
                 "internal/subagent/durable_worker_rss_watchdog.go",
                 "internal/subagent/durable_worker_rss_watchdog_test.go",
@@ -2753,6 +2891,11 @@
               "done_signal": [
                 "Durable worker RSS policy fixtures prove disabled mode, threshold evidence, read-failure degradation, and stable watchdog restart classification without runtime drain or doctor/status edits."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T05:58:48Z",
+                "last_success": "2026-04-27T05:58:48Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:c78c3d0 src/core/minions/worker.ts",
@@ -2818,6 +2961,28 @@
               "done_signal": [
                 "Durable worker fixtures prove post-job and injected periodic RSS drains cancel handlers through the existing abort path, preserve read-failure degradation, and avoid real RSS/sleeps/supervisors."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:29:28Z",
+                "last_failure": {
+                  "run_id": "20260427T062919Z-508672540",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:29:28Z",
+                  "after_run_id": "20260427T062919Z-508672540",
+                  "threshold": 3,
+                  "spec_hash": "79254370ab00c6cbde7e15ac4084f8aed91a8444c7051d5d01670e05a7aa9963",
+                  "last_category": "worker_error"
+                }
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:c78c3d0 src/core/minions/worker.ts",
@@ -3733,16 +3898,16 @@
             {
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
-              "contract": "Registry-owned active-turn steering command",
-              "contract_status": "fixture_ready",
+              "contract": "Gateway registers /steer as a busy-aware CommandDef and queue-fallback handler using the existing ParseSteerCommand preview helper, without attempting live mid-run injection until the dependent kernel hook row lands",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
                 "gateway"
               ],
-              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately.",
-              "fixture": "internal/gateway/steer_queue_test.go",
+              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately. Planner 2026-04-27T11:18:57Z: the last three attempts stopped at backend stdin/usage-limit before a useful diff, so this row stays human-escalated and blocked behind the backend health bypass row.",
+              "fixture": "internal/gateway/steer_queue_test.go::TestSteerCommandRegistry_*",
               "source_refs": [
                 "../hermes-agent/cli.py@635253b9:busy_input_mode=steer",
                 "../hermes-agent/gateway/run.py@635253b9:running_agent.steer",
@@ -3758,9 +3923,13 @@
                 "Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior.",
                 "The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code.",
                 "The parser row is not present in the worker checkout."
+              ],
+              "blocked_by": [
+                "Backend usage-limit stdin health bypass"
               ],
               "unblocks": [
                 "Mid-run steer injection between tool calls",
@@ -3772,7 +3941,7 @@
                 "TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands.",
                 "Existing gateway command parsing and active-session policy tests remain green."
               ],
-              "note": "Refined 2026-04-27T05:38Z: the parser prerequisite is complete on main, so this row is now unblocked and fixture-ready. It consumes the pure parser and is intentionally queue/fallback only so workers do not mix command registration with kernel tool-loop steering.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: kept the implementation contract small but blocked it behind the backend usage-limit/stdin health bypass because recent attempts produced only infrastructure stdin/usage-limit failures. The parser prerequisite remains complete; after backend health is fixed, a human can clear the needs_human verdict and restore fixture_ready if the row still has no implementation diff.",
               "write_scope": [
                 "internal/gateway/commands.go",
                 "internal/gateway/manager.go",
@@ -3789,23 +3958,34 @@
                 "Gateway command fixtures prove /steer registry exposure, parsed queue fallback, running-agent degraded evidence, and no live mid-run injection."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-27T03:51:02Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:18:53Z",
                 "last_failure": {
-                  "run_id": "20260427T033850Z-190029259",
+                  "run_id": "20260427T061843Z-986679552",
                   "category": "worker_error",
                   "backend": "codexu",
                   "stderr_tail": "Reading additional input from stdin...\n"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:18:53Z",
+                  "after_run_id": "20260427T061843Z-986679552",
+                  "threshold": 3,
+                  "spec_hash": "127f1eca07e07df52b18cf154d00293f98a1bd8c27407855c4a27cd26291160a",
+                  "last_category": "worker_error"
+                }
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-27T05:38:23Z",
-                "last_outcome": "no_attempts_yet"
+                "needs_human": true,
+                "reason": "worker_error/backend stdin wait before diff; re-enable after backend quota/noninteractive execution is healthy",
+                "since": "2026-04-27T11:09:04Z",
+                "reshape_count": 4,
+                "last_reshape": "2026-04-27T11:09:04Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -3823,7 +4003,12 @@
               "status": "planned",
               "note": "TDD: mirror upstream PRs #12334 and #511ed4da — registry-resolved gateway slash commands must execute even while an agent is running for that session, without interrupting the running turn and without queuing discardable command text. Keep non-gateway/unknown commands behind the existing busy-state response so only the safe registry surface bypasses the guard; cover both allowed and denied paths with fixture tests before shipping."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Hermes 635253b9 remains the donor for busy-input /steer behavior. Gormes has the pure parser/preview helper but still needs registry queue fallback, mid-run kernel injection, and gateway-safe active-session bypass. The registry/fallback row is temporarily blocked behind the Gormes-owned backend usage-limit/stdin health bypass because recent autoloop failures were backend-infrastructure exits, not implementation drift."
+          }
         },
         "2.G": {
           "name": "OS-AI Spine: Skills Runtime",
@@ -5486,6 +5671,8 @@
               "source_refs": [
                 "../hermes-agent/run_agent.py@f93d4624:_copy_reasoning_content_for_api",
                 "../hermes-agent/run_agent.py@f93d4624:_needs_deepseek_tool_reasoning",
+                "../hermes-agent/run_agent.py@ee1a07f:_copy_reasoning_content_for_api",
+                "../hermes-agent/tests/run_agent/test_deepseek_reasoning_content_echo.py@ee1a07f",
                 "internal/hermes/http_client.go:openAICompatibleReasoningContent",
                 "internal/hermes/reasoning_content_echo_test.go",
                 "docs/content/upstream-hermes/source-study.md"
@@ -5509,7 +5696,7 @@
                 "An explicit ReasoningContent string on the assistant tool-call message is still preserved verbatim.",
                 "Non-tool assistant turns and non-thinking providers still omit reasoning_content and the storage-only reasoning field from outgoing API payloads."
               ],
-              "note": "Complete: TDD landed DeepSeek/Kimi cross-provider reasoning isolation in `internal/hermes/reasoning_content_echo_test.go` and `internal/hermes/http_client.go`. Replay fixtures now prove provider-native `ReasoningContent` is preserved, but generic storage-only `Message.Reasoning` from a prior provider is not forwarded to DeepSeek/Kimi/Moonshot assistant tool-call continuations; those turns receive `reasoning_content=\"\"` instead. Non-tool assistant turns and non-thinking provider payloads still omit `reasoning_content` and never serialize the storage-only `reasoning` field.",
+              "note": "Complete: TDD landed DeepSeek/Kimi cross-provider reasoning isolation in `internal/hermes/reasoning_content_echo_test.go` and `internal/hermes/http_client.go`. Replay fixtures now prove provider-native `ReasoningContent` is preserved, but generic storage-only `Message.Reasoning` from a prior provider is not forwarded to DeepSeek/Kimi/Moonshot assistant tool-call continuations; those turns receive `reasoning_content=\"\"` instead. Non-tool assistant turns and non-thinking provider payloads still omit `reasoning_content` and never serialize the storage-only `reasoning` field. 2026-04-27 sync: Hermes ee1a07f reasserts the same MiniMax-to-DeepSeek/Kimi leak guard; Gormes already satisfies it through the storage-only reasoning fixtures.",
               "write_scope": [
                 "internal/hermes/http_client.go",
                 "internal/hermes/reasoning_content_echo_test.go",
@@ -5530,8 +5717,8 @@
               },
               "provenance": {
                 "origin_type": "upstream",
-                "upstream_ref": "hermes:f93d4624 run_agent.py",
-                "note": "Hermes changed provider replay ordering to avoid cross-provider reasoning leakage; Gormes should port the behavior as a focused provider-boundary fixture."
+                "upstream_ref": "hermes:ee1a07f run_agent.py",
+                "note": "Hermes changed provider replay ordering to avoid cross-provider reasoning leakage and revalidated it at ee1a07f; Gormes has the focused provider-boundary fixture in place."
               }
             },
             {
@@ -6812,8 +6999,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:52:17Z",
-            "origin_decision": "Hermes 4a2ee6c1 is current after the 2026-04-27 sync. Gormes provider fixtures validate DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, Azure Foundry probing/runtime/status, Codex Responses conversion/repair, and Bedrock request/cache mapping. Hermes c5781d50 adds Azure Foundry GPT-5.x/codex/o-series Responses-only api_mode inference; Gormes tracks that as a small runtime read-model row instead of reopening the probe/status rows. Bedrock remains upstream-led for ConverseStream event decoding and the blocked SigV4/credential seam. Hermes 192e7eb2 provider-rate drift remains tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift remain under 5.O/4.D."
+            "last_upstream_check": "2026-04-27T11:09:04Z",
+            "origin_decision": "Hermes ee1a07f is current after the 2026-04-27 sync. Gormes provider fixtures validate DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, Azure Foundry probing/runtime/status, Codex Responses conversion/repair, and Bedrock request/cache mapping. Hermes ee1a07f reasserts the cross-provider reasoning leak guard for DeepSeek/Kimi; the completed Gormes reasoning_content isolation fixtures already cover storage-only reasoning from prior providers. Hermes c5781d50 adds Azure Foundry GPT-5.x/codex/o-series Responses-only api_mode inference; Gormes tracks that as a small runtime read-model row instead of reopening the probe/status rows. Bedrock remains upstream-led for ConverseStream event decoding and the blocked SigV4/credential seam. Hermes 192e7eb2 provider-rate drift remains tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift remain under 5.O/4.D."
           }
         },
         "4.B": {
@@ -7237,15 +7424,15 @@
               "priority": "P2",
               "status": "planned",
               "contract": "Kernel compression execution signals the ContextEngine when a compression boundary is crossed so cached/replayed context state cannot silently span the pre-compress and post-compress transcript",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression.",
-              "fixture": "internal/kernel/compression_boundary_test.go",
+              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression. Planner 2026-04-27T11:18:57Z: the last three attempts stopped at backend stdin/usage-limit before a useful diff, so this row stays human-escalated and blocked behind the backend health bypass row.",
+              "fixture": "internal/kernel/compression_boundary_test.go::TestKernelCompressionBoundary_*",
               "source_refs": [
                 "../hermes-agent/run_agent.py@e85b7525",
                 "../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525",
@@ -7261,6 +7448,7 @@
                 "internal/kernel/context_engine.go owns the kernel-side context-engine adapter seam; workers should not edit internal/kernel/kernel.go for this row."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice implements summarization, tool-result pruning, manual compression, or context references instead of the boundary callback.",
                 "The slice hides boundary failures or lets a context cache survive across a compression lineage change without observable status evidence.",
                 "The slice edits internal/kernel/kernel.go, internal/hermes/context_compressor_budget.go, transcript storage, or session lineage helpers instead of the context-engine adapter files named in write_scope.",
@@ -7268,7 +7456,8 @@
               ],
               "blocked_by": [
                 "ContextEngine interface + status tool contract",
-                "Aux compression single-prompt threshold reconciliation"
+                "Aux compression single-prompt threshold reconciliation",
+                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "A fake ContextEngine receives exactly one CompressionBoundary notification after a successful compression result is accepted into the kernel transcript lineage.",
@@ -7276,7 +7465,7 @@
                 "The notification includes old_session_id/new_session_id or equivalent lineage evidence so caches can distinguish pre-compress and post-compress context.",
                 "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
               ],
-              "note": "Refined 2026-04-27T05:38Z after a write-scope failure: Hermes e85b7525 added a regression hook so context-engine state sees compression boundaries. Gormes already has a Go ContextEngine boundary and budget math, but no explicit cache/lineage notification row; include internal/kernel/context_engine.go in scope because that file owns the adapter seam workers were reaching for, while keeping kernel.go, transcript, and session lineage out of scope.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: retained the small adapter-only boundary notification scope but blocked execution behind the backend usage-limit/stdin health bypass because the latest attempts produced only infrastructure failures. The prior write-scope repair still stands: internal/kernel/context_engine.go is in scope; kernel.go, transcript, and session lineage remain out of scope.",
               "write_scope": [
                 "internal/hermes/context_engine.go",
                 "internal/hermes/context_engine_test.go",
@@ -7294,18 +7483,34 @@
                 "Fake ContextEngine fixtures prove successful compression emits one boundary notification with lineage evidence, skipped/failed compression does not, and context status exposes degraded evidence."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-27T04:49:49Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:19:46Z",
                 "last_failure": {
-                  "run_id": "20260427T044017Z-075550825",
-                  "category": "report_validation_failed",
+                  "run_id": "20260427T061936Z-770693547",
+                  "category": "worker_error",
                   "backend": "codexu",
                   "stderr_tail": "Reading additional input from stdin...\n"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:19:46Z",
+                  "after_run_id": "20260427T061936Z-770693547",
+                  "threshold": 3,
+                  "spec_hash": "8696861fb436e90806a83a55de2ebeaad6465ded2af18b1d5f321e3fbd1ca81a",
+                  "last_category": "worker_error"
+                }
+              },
+              "planner_verdict": {
+                "needs_human": true,
+                "reason": "worker_error/backend stdin wait before diff; re-enable after backend quota/noninteractive execution is healthy",
+                "since": "2026-04-27T11:09:04Z",
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T11:09:04Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -7316,8 +7521,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:52:17Z",
-            "origin_decision": "Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, superseding the earlier f92006ce/6e561ffa tool-schema headroom rationale while preserving d635e2df provider-cap lookup. Hermes e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation, so this subphase remains upstream-led until the pure content estimator, compression-boundary notification, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer ContextEngine drift supersedes the existing 4.B queue. Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation; compression-boundary notification remains upstream-led but is blocked behind the Gormes-owned backend usage-limit/stdin health bypass until infrastructure failures stop poisoning row health."
           }
         },
         "4.C": {
@@ -7803,6 +8008,28 @@
               "done_signal": [
                 "Title generator fixtures prove bounded prompt construction, candidate cleanup/truncation, empty-history skip, blank-output evidence, and provider-failure evidence with a fake model only."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:26:52Z",
+                "last_failure": {
+                  "run_id": "20260427T062642Z-018452477",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:26:52Z",
+                  "after_run_id": "20260427T062642Z-018452477",
+                  "threshold": 3,
+                  "spec_hash": "4c0c8489ed60a0316e79d9541c33ed9d1b5f25658f3fd6a25961547b11feecaf",
+                  "last_category": "worker_error"
+                }
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-27T04:49:49Z",
@@ -8457,9 +8684,9 @@
             {
               "name": "Provider timeout config fail-closed helper",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Provider timeout lookup handles missing or failed config loading by returning explicit unset evidence, and parses provider request/stale timeout overrides without panicking or applying stale defaults",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -8492,7 +8719,7 @@
                 "TestProviderTimeoutConfig_InvalidValuesFailClosed proves negative, zero when not allowed, non-numeric, and overflow values return timeout_config_invalid evidence.",
                 "No HTTP client, kernel retry, or public config schema is changed by this helper-only slice."
               ],
-              "note": "Hermes 16e243e0/366351b9 made provider timeout helpers return None when load_config fails instead of crashing. Gormes does not yet expose provider-specific request/stale timeout config, so this row first freezes a typed fail-closed helper and evidence shape before any public config wiring.",
+              "note": "Complete (2026-04-27): TDD added internal/hermes/provider_timeout_config.go and provider_timeout_config_test.go. ResolveProviderRequestTimeout and ResolveProviderStaleTimeout use injected loader callbacks plus synthetic provider maps, return timeout_config_unavailable on loader failure, timeout_unset for nil/missing/non-map providers or provider blocks, timeout_config_invalid for negative, zero, non-numeric, and overflow values, and timeout_configured for positive numeric-second or duration-string overrides. Model-level invalid overrides fail closed instead of falling back to provider defaults. The slice does not change internal/config TOML schema, HTTP client construction, kernel retry behavior, or live provider wiring.",
               "write_scope": [
                 "internal/hermes/provider_timeout_config.go",
                 "internal/hermes/provider_timeout_config_test.go",
@@ -8506,6 +8733,11 @@
               "done_signal": [
                 "Provider timeout config fixtures prove load failures, missing providers, malformed values, and valid overrides return explicit evidence without wiring live clients or config schema."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T05:58:48Z",
+                "last_success": "2026-04-27T05:58:48Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:16e243e0 hermes_cli/timeouts.py",
@@ -9947,9 +10179,9 @@
             {
               "name": "Bundled Airtable productivity skill contract",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes can ship the upstream Airtable skill as reviewed SKILL.md content with optional credential discovery, prompt-safe cookbook text, and visible unavailable evidence without requiring Airtable credentials during startup",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "skills",
               "trust_class": [
@@ -9987,7 +10219,7 @@
                 "Present credentials discovered through the existing .env search path make the skill eligible without printing secret values.",
                 "Prompt rendering excludes the Airtable skill when disabled or unavailable and includes it deterministically when enabled and credentials are present."
               ],
-              "note": "Hermes added and then refined a bundled Airtable productivity skill across c997183f/0d4247d9/55e9329e/7e3c8a31. Gormes should port the contract as reviewed local skill content plus credential evidence, not as a live Airtable integration or a parser rewrite.",
+              "note": "Complete: TDD landed reviewed Airtable SKILL.md content plus parser metadata for triggers, exclusions, review state, and any-of credential groups. Fixtures prove missing AIRTABLE_API_KEY/AIRTABLE_PAT keeps the catalog row visible as missing-prerequisite, excludes prompt injection when disabled or unavailable, accepts dotenv-discovered credentials without printing secret values, and adds no live Airtable API/OAuth/sync behavior.",
               "write_scope": [
                 "skills/productivity/airtable/SKILL.md",
                 "internal/skills/airtable_skill_test.go",
@@ -10004,6 +10236,11 @@
               "done_signal": [
                 "Airtable skill fixtures prove SKILL.md metadata/cookbook parsing, credential-availability evidence, disabled/unavailable prompt exclusion, and secret redaction without live Airtable calls."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T05:58:48Z",
+                "last_success": "2026-04-27T05:58:48Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:c997183f..7e3c8a31 skills/productivity/airtable/SKILL.md",
@@ -11215,9 +11452,9 @@
             {
               "name": "File read dedup cache invalidation and wrapper guard",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Native file-read helpers keep dedup status out of returned file content, invalidate read caches on writes/patches, and detect small wrapper calls as guarded reads",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -11254,7 +11491,7 @@
                 "TestFileReadGuard_PatchInvalidatesCache applies a fake patch callback and proves the read cache for that path is invalidated.",
                 "TestFileReadGuard_SmallWrapperDetected covers helper wrappers around read_file so dedup guard status still applies when the read is one call frame removed."
               ],
-              "note": "Hermes a32b325d/977d5f56/ced8f44c tightened file-read dedup and wrapper guards. Gormes should port the guard as a small read-model slice before exposing write-capable file tools.",
+              "note": "Complete: TDD added a Go-native FileReadGuard helper under internal/tools. Fixtures prove duplicate-read dedup evidence and degraded statuses stay outside returned file content, write and patch callbacks invalidate path/workspace-scoped cache entries, and small wrapped read-status text is rejected before write persistence while larger legitimate quoted content is allowed.",
               "write_scope": [
                 "internal/tools/file_read_guard.go",
                 "internal/tools/file_read_guard_test.go",
@@ -11268,6 +11505,11 @@
               "done_signal": [
                 "File read guard fixtures prove dedup evidence is separate from content, writes and patches invalidate path-scoped caches, and small wrapper reads remain guarded."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T05:58:48Z",
+                "last_success": "2026-04-27T05:58:48Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:a32b325d+977d5f56+ced8f44c tools/file_tools.py",
@@ -11361,6 +11603,28 @@
               "done_signal": [
                 "Session search tool fixtures prove same-chat defaults, opt-in user/source widening, deterministic current-lineage-root exclusion in recent mode, and degraded evidence for unavailable/denied widening."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:27:43Z",
+                "last_failure": {
+                  "run_id": "20260427T062735Z-268804397",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:27:43Z",
+                  "after_run_id": "20260427T062735Z-268804397",
+                  "threshold": 3,
+                  "spec_hash": "25de7a35770c82b98efa2a6a400b5f53c91d6e980a4d77fac893a78fbe4516b7",
+                  "last_category": "worker_error"
+                }
+              },
               "planner_verdict": {
                 "reshape_count": 5,
                 "last_reshape": "2026-04-27T05:38:23Z",
@@ -11595,9 +11859,9 @@
             {
               "name": "Cron recurring next-run failure preservation",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cron adds a pure run-completion state helper and executor post-run hook that updates LastRunUnix, LastStatus, and RepeatCompleted after every run while preserving recurring cron/interval jobs as active (Paused=false) when next-run computation is unavailable or returns no future time; one-shot or finite-repeat exhaustion may become terminal, but recurring compute failures must produce typed evidence instead of being confused with user pause/completion",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -11639,7 +11903,7 @@
                 "TestCronRunCompletion_FiniteRepeatExhaustionBecomesTerminal proves Repeat=3 and RepeatCompleted=2 transitions to completed after the third run, while RepeatCompleted=1 remains active.",
                 "TestExecutorRecordAndUpdateJob_UsesRunCompletionState proves success, timeout, and suppressed runs all pass through the helper and persist LastStatus/RepeatCompleted without starting Scheduler.Start."
               ],
-              "note": "Added 2026-04-27 after Hermes 7c63c246 fixed recurring jobs being silently disabled when compute_next_run returned None. Gormes uses robfig/cron instead of Python croniter, but the same operator contract applies: recurring schedules should surface compute-state evidence and remain active unless the user pauses them or finite repeat exhaustion is reached.",
+              "note": "Complete: TDD landed internal/cron/run_completion.go as a pure post-run state helper and wired Executor.recordAndUpdateJob through it. Fixtures prove recurring cron/interval next-run failures remain active with cron_next_run_unavailable evidence, one-shot and finite-repeat exhaustion become terminal distinctly, and executor success/timeout/suppressed paths persist LastStatus and RepeatCompleted without scheduler/provider side effects.",
               "write_scope": [
                 "internal/cron/run_completion.go",
                 "internal/cron/run_completion_test.go",
@@ -11655,6 +11919,11 @@
               "done_signal": [
                 "Cron run-completion fixtures prove recurring next-run failures preserve active jobs with evidence, one-shot/finite-repeat terminal behavior remains distinct, and Executor post-run updates use the helper without scheduler/provider side effects."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T05:58:48Z",
+                "last_success": "2026-04-27T05:58:48Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:7c63c246 cron/jobs.py",
@@ -12174,6 +12443,28 @@
               "done_signal": [
                 "CLI onboarding fixtures prove directory-only OpenClaw residue detection, Gormes-specific cleanup hint text, in-memory seen-state handling, malformed-config tolerance, and no real HOME/config writes."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:23:17Z",
+                "last_failure": {
+                  "run_id": "20260427T062308Z-796738647",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:23:17Z",
+                  "after_run_id": "20260427T062308Z-796738647",
+                  "threshold": 3,
+                  "spec_hash": "8fdbfeee46363e33325e403cca57655ddb48ff3d267798e60aa953d45fa4dea2",
+                  "last_category": "worker_error"
+                }
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:e63929d4 agent/onboarding.py",
@@ -12183,9 +12474,9 @@
             {
               "name": "CLI bracketed-paste wrapper sanitizer",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli exposes StripLeakedBracketedPasteWrappers(text string) string, a pure sanitizer that removes canonical ESC [200~/[201~ wrappers, visible caret-escape wrappers, degraded boundary [200~/[201~ wrappers, and boundary 00~/01~ fragments while preserving non-wrapper substrings inside ordinary text",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -12230,6 +12521,11 @@
               "done_signal": [
                 "Paste sanitizer fixtures prove canonical/caret/degraded wrapper stripping, boundary fragment stripping, normal-text preservation, multiline preservation, and zero TTY/clipboard dependencies."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T05:58:48Z",
+                "last_success": "2026-04-27T05:58:48Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:a0fe73ba cli.py",
@@ -13608,15 +13904,15 @@
               "priority": "P2",
               "status": "planned",
               "contract": "internal/cli exposes a pure model-switch patch helper that updates a custom provider default_model while preserving original credential storage: providers that relied on key_env and had no inline api_key/api_key_ref must not gain an api_key entry, while providers that already had an inline plaintext or `${VAR}` api_key may keep that existing api_key value without writing resolved plaintext",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Model-switch planning returns credential_write_skipped_key_env, credential_ref_preserved, plaintext_preserved, or credential_missing evidence so setup/status surfaces can explain why api_key was not written.",
-              "fixture": "internal/cli/custom_provider_model_switch_test.go",
+              "degraded_mode": "Model-switch planning returns credential_write_skipped_key_env, credential_ref_preserved, plaintext_preserved, or credential_missing evidence so setup/status surfaces can explain why api_key was not written. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "fixture": "internal/cli/custom_provider_model_switch_test.go::TestCustomProviderModelSwitchPatch_*",
               "source_refs": [
                 "../hermes-agent/hermes_cli/main.py@8258f4dc:_model_flow_named_custom",
                 "../hermes-agent/tests/hermes_cli/test_custom_provider_model_switch.py@8258f4dc",
@@ -13630,12 +13926,14 @@
                 "Table tests should construct input provider maps/structs in memory and assert the planned write shape; no process environment, filesystem, or network access is needed."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice changes internal/config, internal/hermes, provider catalog probing, TUI model picker behavior, or command wiring.",
                 "The helper writes an api_key field for a provider whose original config relied only on key_env.",
                 "The helper writes resolved plaintext when the original provider used `${VAR}` or key_env references."
               ],
               "blocked_by": [
-                "Custom provider model-switch credential preservation"
+                "Custom provider model-switch credential preservation",
+                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "TestCustomProviderModelSwitchPatch_KeyEnvDoesNotSynthesizeAPIKey starts with {default_model:'old', key_env:'ACME_KEY'} and proves the patch sets default_model='new', preserves key_env, omits api_key, and returns credential_write_skipped_key_env evidence.",
@@ -13644,7 +13942,7 @@
                 "TestCustomProviderModelSwitchPatch_MissingCredentialStillUpdatesModelWithEvidence proves model changes remain possible while credential_missing evidence is returned for setup/status guidance.",
                 "Existing TestResolveCustomProviderSecret_* fixtures remain green; this row does not redefine resolver semantics."
               ],
-              "note": "Added after Hermes 8258f4dc tightened named custom-provider model switching: key_env-backed providers should not gain a synthesized api_key entry during model changes. Gormes already landed the pure secret resolver; this dependent row freezes the write-shape helper before command/TUI binding.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: preserved the pure patch-helper scope but demoted from fixture_ready to draft and blocked it behind backend usage-limit health repair because current quarantine evidence is infrastructural. Once the backend bypass lands, this can return to fixture_ready without widening beyond internal/cli.",
               "write_scope": [
                 "internal/cli/custom_provider_model_switch.go",
                 "internal/cli/custom_provider_model_switch_test.go",
@@ -13660,6 +13958,28 @@
               "done_signal": [
                 "internal/cli custom-provider model-switch fixtures prove key_env-backed providers update default_model without adding api_key, existing inline references/plaintext are preserved without resolution, and resolver tests still pass."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:20:37Z",
+                "last_failure": {
+                  "run_id": "20260427T062023Z-797610060",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:20:37Z",
+                  "after_run_id": "20260427T062023Z-797610060",
+                  "threshold": 3,
+                  "spec_hash": "020d3e089c6cad11c963f844412638b2e8abb787d62952ddb59e9da1a6770394",
+                  "last_category": "worker_error"
+                }
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:8258f4dc hermes_cli/main.py",
@@ -13797,8 +14117,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T05:26:06Z",
-            "origin_decision": "Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes; and 8258f4dc adds the key_env write-shape guard so model switches do not synthesize api_key for key_env-backed providers. Hermes e63929d4 adds one-time OpenClaw-residue onboarding after migration and a0fe73ba strips leaked bracketed-paste wrappers from CLI buffers; Gormes tracks both as pure internal/cli helper rows before startup or input-loop binding. Gormes has native oneshot/model override and helper rows, but it still lacks typed reasoning-effort propagation, gateway /reasoning session overrides, and command/TUI binding for the custom-provider model-switch write guards, so this CLI/gateway surface remains upstream-led."
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer CLI custom-provider drift supersedes the 8258f4dc key_env write-shape guard. Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes; and 8258f4dc adds the key_env write-shape guard. Gormes has native oneshot/model override and helper rows, but custom-provider key_env write-shape work is demoted to draft and blocked behind backend usage-limit/stdin health repair because current failures are infrastructure-only."
           }
         },
         "5.P": {
@@ -14635,15 +14955,15 @@
               "priority": "P2",
               "status": "planned",
               "contract": "cmd/gormes binds the native TUI /save SessionExportFunc to the canonical persisted transcript reader and writes markdown exports under the Gormes XDG data directory, never under upstream HERMES_HOME or the process working directory",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location.",
-              "fixture": "cmd/gormes/tui_save_export_test.go",
+              "degraded_mode": "TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "fixture": "cmd/gormes/tui_save_export_test.go::TestTUISaveExport_*",
               "source_refs": [
                 "../hermes-agent/tests/cli/test_save_conversation_location.py@5eb6cd82",
                 "../hermes-agent/cli.py@5eb6cd82:save conversation location",
@@ -14661,9 +14981,13 @@
                 "Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice reopens internal/tui slash handler behavior or changes transcript.ExportMarkdown output format.",
                 "The slice writes exports under HERMES_HOME, the repository root, or the current working directory.",
                 "The slice starts a provider, API server, remote TUI gateway, or live session browser."
+              ],
+              "blocked_by": [
+                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "cmd/gormes constructs a SessionExportFunc for the local TUI Model, preferably through a small helper in cmd/gormes/session.go, that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
@@ -14672,7 +14996,7 @@
                 "TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path.",
                 "The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway."
               ],
-              "note": "Refined 2026-04-27T05:38Z: the native TUI /save handler is complete on main, so this row is unblocked and limited to cmd/gormes binding plus XDG output-location fixtures. internal/tui/slash_save.go is now a read-only donor for this slice; do not reopen slash dispatch tests or change transcript markdown formatting.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: the native TUI /save handler remains complete on main, but this cmd/gormes binding is demoted to draft and blocked behind backend usage-limit health repair because current quarantine evidence is infrastructure-only. internal/tui/slash_save.go remains a read-only donor; do not reopen slash dispatch tests or transcript markdown formatting.",
               "write_scope": [
                 "cmd/gormes/main.go",
                 "cmd/gormes/session.go",
@@ -14687,6 +15011,32 @@
               "done_signal": [
                 "cmd/gormes TUI save-export fixtures prove the real SessionExportFunc writes under XDG_DATA_HOME/gormes/sessions/exports, ignores HERMES_HOME for runtime state, relies on the existing TUI partial-file cleanup path, and returns the exported path to /save without internal/tui edits."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:21:30Z",
+                "last_failure": {
+                  "run_id": "20260427T062122Z-385795226",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:21:30Z",
+                  "after_run_id": "20260427T062122Z-385795226",
+                  "threshold": 3,
+                  "spec_hash": "3fba895a259699977ed83d01b1d67e359ce68c87fe6762698faf9615022dec37",
+                  "last_category": "worker_error"
+                }
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T05:33:36Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5eb6cd82 cli.py,tui_gateway/server.py",
@@ -14860,15 +15210,15 @@
               "priority": "P2",
               "status": "planned",
               "contract": "Native Bubble Tea conversation rendering limits each frame to the visible tail of RenderFrame.History plus DraftText/LastError under a caller-provided height budget, emits a stable omitted-history sentinel when earlier turns are hidden, and avoids rebuilding unbounded conversation strings during long sessions",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "If height is too small or width is narrow, the helper still renders the latest visible turn/draft/error and a compact omitted-history sentinel rather than panicking or allocating the full history body.",
-              "fixture": "internal/tui/viewport_history_test.go",
+              "degraded_mode": "If height is too small or width is narrow, the helper still renders the latest visible turn/draft/error and a compact omitted-history sentinel rather than panicking or allocating the full history body. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "fixture": "internal/tui/viewport_history_test.go::TestRenderConversationViewport_*",
               "source_refs": [
                 "../hermes-agent/ui-tui/src/hooks/useVirtualHistory.ts@e63929d4",
                 "../hermes-agent/ui-tui/src/lib/virtualHeights.ts@e63929d4",
@@ -14882,9 +15232,13 @@
                 "The row is a Gormes-native performance guard, not a direct port of Hermes' React/Ink virtualization stack."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice imports React/Ink concepts, starts Node, changes kernel.RenderFrame shape, truncates stored session/transcript history, or edits internal/kernel/internal/transcript persistence.",
                 "The slice changes slash-command, remote TUI SSE, API server, or dashboard behavior in the same diff.",
                 "The slice silently drops DraftText or LastError when history is long."
+              ],
+              "blocked_by": [
+                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "TestRenderConversationViewport_OmitsEarlierHistory builds 120 alternating user/assistant messages and asserts the rendered output contains the latest turns, excludes the earliest turn body, and includes a deterministic omitted-history sentinel with the hidden count.",
@@ -14893,7 +15247,7 @@
                 "TestRenderConversationViewport_RenderedLineBudget asserts the helper returns no more than the requested visible budget plus a small sentinel allowance for wrapped content.",
                 "The implementation stays in internal/tui/view.go plus its test; no kernel/session/transcript files are edited."
               ],
-              "note": "Added after Hermes e63929d4 landed long-session TUI perf work across useVirtualHistory, virtualHeights, streaming markdown, and profiling scripts. Gormes does not have the Ink stack, so the first safe slice is a bounded native render helper over Bubble Tea's existing RenderFrame.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: retained the pure internal/tui viewport-helper contract but demoted to draft and blocked behind backend usage-limit health repair because the quarantine evidence is infrastructure-only. Hermes e63929d4 remains the donor for the invariant; Gormes keeps the implementation native to Bubble Tea.",
               "write_scope": [
                 "internal/tui/view.go",
                 "internal/tui/viewport_history_test.go",
@@ -14907,6 +15261,28 @@
               "done_signal": [
                 "Native TUI viewport fixtures prove long histories render a bounded visible tail with omitted-count sentinel, draft/error preservation, small-size clamps, and no kernel/session persistence changes."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:22:24Z",
+                "last_failure": {
+                  "run_id": "20260427T062214Z-561560764",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:22:24Z",
+                  "after_run_id": "20260427T062214Z-561560764",
+                  "threshold": 3,
+                  "spec_hash": "003ebb07af5d17dbbc405853da03e474c26020f9a6185947d36cc1a2fb1a2470",
+                  "last_category": "worker_error"
+                }
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:e63929d4 ui-tui/src/hooks/useVirtualHistory.ts",
@@ -15295,9 +15671,9 @@
             {
               "name": "API server detailed health snapshot contract",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Native API server defines a pure detailed-health snapshot model that reports provider, response-store, run-event stream, gateway, and cron availability/degradation without binding HTTP routes or cron mutations",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -15332,7 +15708,7 @@
                 "TestDetailedHealthSnapshot_RedactsSecrets proves provider keys, cron script bodies, gateway tokens, and raw request payloads are absent after JSON marshal.",
                 "The helper is pure and does not register routes, start schedulers, or mutate cron/response/run stores."
               ],
-              "note": "Reshaped 2026-04-27 after still-failing outcomes: the old detailed-health row still mixed model design with HTTP route behavior. This first replacement row is pure snapshot construction only; the endpoint row below binds it to HTTP after the shape is fixture-locked.",
+              "note": "Complete: TDD landed internal/apiserver/detailed_health.go with a pure DetailedHealthSnapshot value model plus fixture coverage for ready provider/response_store/run_events/gateway/cron sections, degraded evidence codes, JSON redaction of provider keys/gateway tokens/cron scripts/raw request payloads, and immutable value-only inputs. This replacement row remains snapshot-only; the endpoint row below binds it to HTTP after this shape is fixture-locked.",
               "write_scope": [
                 "internal/apiserver/detailed_health.go",
                 "internal/apiserver/detailed_health_snapshot_test.go",
@@ -15346,6 +15722,11 @@
               "done_signal": [
                 "Detailed-health snapshot fixtures prove section names, degraded evidence, secret redaction, and pure value-model behavior without HTTP routes or cron admin writes."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T05:58:48Z",
+                "last_success": "2026-04-27T05:58:48Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:edc78e25 gateway/platforms/api_server.py",
@@ -15409,6 +15790,28 @@
               "done_signal": [
                 "API server endpoint fixtures prove /health/detailed and /v1/health/detailed route binding, error-envelope compatibility, redaction, and unchanged flat health routes."
               ],
+              "health": {
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:28:35Z",
+                "last_failure": {
+                  "run_id": "20260427T062827Z-805776763",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:28:35Z",
+                  "after_run_id": "20260427T062827Z-805776763",
+                  "threshold": 3,
+                  "spec_hash": "b58d952665841e0c3f9cd60329c89ca1c2368baaa7153eab8786ffaa6e7622bb",
+                  "last_category": "worker_error"
+                }
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:755a2804 gateway/platforms/api_server.py",
@@ -15550,8 +15953,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:32:08Z",
-            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, edc78e25/31d7f195 add Ink selection-copy fixes that Gormes documents as a terminal-native divergence, 2536a36f routes TUI /save through canonical session.save JSON-RPC, and 5eb6cd82 fixes save-location semantics plus session-picker allowed sources. Gormes tracks /save as a native handler plus a now-unblocked XDG file-writer binding row, preserving Gormes XDG runtime state instead of upstream HERMES_HOME. The old API health+cron admin medium row is split into detailed health, cron read-only admin, and cron mutating admin rows so workers do not mix read models with scheduler writes. Hermes 0824ba6a tightens /branch and 9662e321 wires prompt.submit auto-title generation; Gormes tracks those over internal/transcript, session.LineageKindFork, and native TUI helper seams. Hermes e63929d4 adds long-session Ink virtualization and profiling; Gormes now tracks the equivalent first native slice as a bounded Bubble Tea conversation viewport over internal/tui/view.go."
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer API/TUI drift supersedes the existing native Gormes rows. Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes 2536a36f/5eb6cd82 define /save and save-location semantics; Gormes preserves XDG runtime state instead of upstream HERMES_HOME, with the cmd/gormes XDG writer row now blocked behind backend usage-limit/stdin health repair. Hermes e63929d4 adds long-session Ink virtualization and profiling; Gormes tracks the native bounded Bubble Tea viewport row, also blocked until backend infrastructure failures no longer quarantine feature work. Detailed health and cron admin remain split into read-only and mutating rows."
           }
         },
         "5.R": {

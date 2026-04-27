@@ -37,11 +37,11 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 36/74 subphases shipped · 22 in progress · 16 planned
+**Overall:** 35/74 subphases shipped · 23 in progress · 16 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
-| Phase 1 — The Dashboard | ✅ | 3/3 subphases |
+| Phase 1 — The Dashboard | 🔨 | 2/3 subphases |
 | Phase 2 — The Gateway | 🔨 | 15/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
@@ -51,7 +51,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ---
 
-## Phase 1 — The Dashboard ✅
+## Phase 1 — The Dashboard 🔨
 
 *Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary*
 
@@ -65,7 +65,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Offline tool validation
 
-### 1.C — Automation Reliability ✅
+### 1.C — Automation Reliability 🔨
 
 - [x] Orchestrator failure-row stabilization for 4-8 workers
 - [x] Soft-success-nonzero bats coverage
@@ -77,6 +77,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] PR-intake idle backoff
 - [x] Watchdog dead-process vs slow-progress separation
 - [x] Builder-loop self-improvement vs user-feature ratio metric
+- [ ] Backend usage-limit stdin health bypass
 
 ## Phase 2 — The Gateway 🔨
 
@@ -132,7 +133,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway fresh-final eligibility helper
 - [x] Gateway fresh-final send/delete fallback
 - [x] Telegram fresh-final delete and config exposure
-- [ ] Telegram group bot-command mention gate helper
+- [x] Telegram group bot-command mention gate helper
 - [ ] Telegram group mention gate config binding
 - [x] Slack rich-text quotes/lists + link-unfurl ingress
 - [x] Slack thread-parent context + team-scoped cache key
@@ -190,7 +191,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Durable replay and inbox message contract
 - [x] Durable worker execution loop
 - [x] Durable worker abort-slot recovery safety net
-- [ ] Durable worker RSS watchdog policy helper
+- [x] Durable worker RSS watchdog policy helper
 - [ ] Durable worker RSS drain integration
 - [ ] Durable worker RSS doctor/status evidence
 
@@ -446,7 +447,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Retry-After header parsing + HTTPError hint
 - [x] Kernel retry honors Retry-After hint
 - [x] Streaming interrupt retry suppression
-- [ ] Provider timeout config fail-closed helper
+- [x] Provider timeout config fail-closed helper
 - [ ] Prompt-cache capability guard
 - [x] Provider rate guard + budget telemetry
 - [x] Provider rate guard — x-ratelimit header classification
@@ -508,7 +509,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Skill preprocessing + dynamic slash commands
 - [x] [IMPORTANT:] prompt prefix for cron and skill commands
 - [x] Skills list — enabled/disabled status column + --enabled-only filter
-- [ ] Bundled Airtable productivity skill contract
+- [x] Bundled Airtable productivity skill contract
 
 ### 5.G — MCP Integration ✅
 
@@ -553,7 +554,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Atomic checkpoints
 - [x] Checkpoint shadow-repo GC policy
-- [ ] File read dedup cache invalidation and wrapper guard
+- [x] File read dedup cache invalidation and wrapper guard
 
 ### 5.M — Mixture of Agents ⏳
 
@@ -569,7 +570,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Autoloop recent-failure detail excerpts
 - [ ] Cronjob tool API + schedule parser parity
 - [x] Cron schedule parser + repeat state fixtures
-- [ ] Cron recurring next-run failure preservation
+- [x] Cron recurring next-run failure preservation
 - [x] Cron prompt/script safety + pre-run script contract
 - [x] Cronjob tool action envelope over native store
 - [x] Cron context_from output chaining
@@ -583,7 +584,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] CLI banner/output formatting helpers
 - [x] CLI deterministic tip selector
 - [ ] CLI OpenClaw residue onboarding hint
-- [ ] CLI bracketed-paste wrapper sanitizer
+- [x] CLI bracketed-paste wrapper sanitizer
 - [x] CLI webhook URL normalizer
 - [x] CLI dump support-summary helper
 - [x] PTY bridge protocol adapter
@@ -647,7 +648,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway proxy mode forwarding contract
 - [x] Dashboard API client contract
 - [x] Dashboard PTY chat sidecar contract
-- [ ] API server detailed health snapshot contract
+- [x] API server detailed health snapshot contract
 - [ ] API server detailed health endpoint
 - [ ] API server cron admin read-only endpoints
 - [ ] API server cron admin mutating endpoints

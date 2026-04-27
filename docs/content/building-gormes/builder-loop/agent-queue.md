@@ -22,69 +22,28 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. Telegram group bot-command mention gate helper
+## 1. Backend usage-limit stdin health bypass
 
-- Phase: 2 / 2.B.5
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Telegram ingress exposes a pure mention-gate helper that treats `/cmd@botname` bot_command entities as direct address when group require-mention policy is enabled, rejects commands addressed to other bots, and keeps bare group slash commands gated
-- Trust class: gateway, operator, system
-- Ready when: Telegram adapter already normalizes Update.Message into gateway.InboundEvent and commands route through gateway.ParseInboundText., This first slice is helper-only: workers add a pure function over text, []tgbotapi.MessageEntity, expected bot username, and a bool requireMention flag; no live Telegram client, pairing store, gateway manager, config migration, or command execution is needed., Table tests can model bot_command and mention entities directly with go-telegram-bot-api/v5 MessageEntity values.
-- Not ready when: The slice wires group gating into Bot.Run/toInboundEvent production flow, changes allowed_chat_id or first_run_discovery policy, or starts responding to groups before the helper is fixture-backed., The helper treats `/status@other_bot` or bare `/status` as addressed when requireMention is true., The slice changes fresh-final streaming, deleteMessage, session keys, pairing approval, or gateway manager behavior.
-- Degraded mode: Until the helper is bound into Telegram group ingress, Gormes cannot safely enable Hermes-style require_mention command gating for Telegram groups; status should report telegram_group_mention_gate_unavailable instead of silently responding to bare group commands.
-- Fixture: `internal/channels/telegram/group_mention_test.go`
-- Write scope: `internal/channels/telegram/group_mention.go`, `internal/channels/telegram/group_mention_test.go`, `internal/channels/telegram/bot_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/channels/telegram -run '^TestTelegramGroupMentionGate_' -count=1`, `go test ./internal/channels/telegram -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Telegram group mention fixtures prove bot_command suffix matching, other-bot rejection, bare-command gating, mention-entity compatibility, and unchanged existing Telegram command tests without production gateway binding.
-- Acceptance: TestTelegramGroupMentionGate_BotCommandWithMatchingSuffixAllowsCommand builds `/status@gormes_bot` with one bot_command entity covering the whole token and returns addressed=true for expected username `gormes_bot` or `@gormes_bot`., TestTelegramGroupMentionGate_OtherBotSuffixRejected proves `/status@other_bot` with a bot_command entity returns addressed=false when expected username is `gormes_bot`., TestTelegramGroupMentionGate_BareCommandStillGated proves `/status` remains rejected when requireMention is true and accepted when requireMention is false., TestTelegramGroupMentionGate_MentionEntityStillAllowsText proves normal text containing an @gormes_bot mention entity is still accepted., Existing TestBot_ToInboundEvent_Commands and fresh-final delete tests keep passing; no live Telegram token or network call is required.
-- Source refs: ../hermes-agent/gateway/platforms/telegram.py@3ff3dfb5:TelegramAdapter._has_direct_mention, ../hermes-agent/tests/gateway/test_telegram_group_gating.py@3ff3dfb5:test_group_messages_can_require_direct_trigger_via_config, internal/channels/telegram/bot.go, internal/channels/telegram/bot_test.go, github.com/go-telegram-bot-api/telegram-bot-api/v5@v5.5.1:MessageEntity
-- Unblocks: Telegram group mention gate config binding
-- Why now: Unblocks Telegram group mention gate config binding.
-
-## 2. Durable worker RSS watchdog policy helper
-
-- Phase: 2 / 2.E.3
+- Phase: 1 / 1.C
 - Owner: `orchestrator`
 - Size: `small`
 - Status: `planned`
-- Priority: `P3`
-- Contract: Gormes durable worker exposes a pure RSS watchdog policy helper that classifies disabled mode, unavailable RSS reads, threshold exceeded evidence, and stable watchdog restart reset without integrating with the worker loop yet
-- Trust class: operator, system
-- Ready when: Durable worker execution loop and Durable worker abort-slot recovery safety net are validated on main., The GBrain behavior is fully summarized in this row: max_rss_mb=0 disables checks, RSS read errors degrade without cancellation, over-threshold checks request a graceful drain, and watchdog exits after stable runtime reset crash count., The helper can be tested with fake RSS reader, fake clock, and value-only policy structs; no real process RSS, worker goroutine, external supervisor, shell handler, or GBrain TypeScript runtime is required., Workers should not run git show inside the Gormes checkout for GBrain paths; the relative source_refs above point at the synchronized sibling repo only for context.
-- Not ready when: The slice changes DurableWorker.RunOne, doctor/status output, cmd/gormes lifecycle, builder-loop backend watchdogs, live delegate_task behavior, or cron execution semantics., The tests require real RSS measurements, sleeps longer than 100ms, subprocess workers, systemd, Postgres/PGLite, or importing GBrain code., The slice adds process self-termination to the main Gormes process or internal Goncho memory service.
-- Degraded mode: Durable-worker policy reports rss_watchdog_disabled, rss_threshold_exceeded, rss_watchdog_unavailable, or stable_watchdog_restart before runtime drain wiring exists.
-- Fixture: `internal/subagent/durable_worker_rss_watchdog_test.go::TestDurableWorkerRSSWatchdogPolicy`
-- Write scope: `internal/subagent/durable_worker_rss_watchdog.go`, `internal/subagent/durable_worker_rss_watchdog_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/subagent -run 'TestDurableWorkerRSSWatchdog_\|TestDurableWorkerWatchdogRestartPolicy_' -count=1`, `go test ./internal/subagent -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Durable worker RSS policy fixtures prove disabled mode, threshold evidence, read-failure degradation, and stable watchdog restart classification without runtime drain or doctor/status edits.
-- Acceptance: TestDurableWorkerRSSWatchdog_DisabledAtZero proves max_rss_mb=0 records rss_watchdog_disabled and never reads the RSS seam., TestDurableWorkerRSSWatchdog_ThresholdExceeded injects an RSS value over max_rss_mb and returns rss_threshold_exceeded evidence with observed_mb, max_mb, and checked_at from the fake clock., TestDurableWorkerRSSWatchdog_RSSReadFailure returns rss_watchdog_unavailable evidence and does not request a drain., TestDurableWorkerWatchdogRestartPolicy_StableRunReset classifies a watchdog exit after at least five minutes as stable_watchdog_restart and does not increment crash count past one.
-- Source refs: ../gbrain/CHANGELOG.md@c78c3d0:v0.22.2, ../gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts.maxRssMb/getRss/rssCheckInterval, ../gbrain/src/core/minions/worker.ts@c78c3d0:checkMemoryLimit/gracefulShutdown, ../gbrain/src/commands/autopilot.ts@c78c3d0:stable-run reset, ../gbrain/test/minions.test.ts@c78c3d0:MinionWorker --max-rss watchdog, internal/subagent/durable_worker.go, internal/subagent/durable_worker_abort_test.go
-- Unblocks: Durable worker RSS drain integration
-- Why now: Unblocks Durable worker RSS drain integration.
+- Priority: `P1`
+- Contract: Builder-loop treats backend usage-limit/stdin-wait exits that produce no worker diff as backend infrastructure degradation, emits run-level backend evidence, and avoids charging the selected feature row as a worker_error quarantine candidate
+- Trust class: system
+- Ready when: Autoloop audit shows backend_waiting_for_stdin rows whose detail contains `You've hit your usage limit` and no promoted diff., Existing backend failure classification already detects killed, deadline, and stdin-wait exits; this slice only adds the usage-limit/no-diff health bypass around that path., The test can use FakeRunner with a backend Result{Err: errors.New("exit status 1"), Stdout: usage-limit text plus `Reading additional input from stdin...`} and a one-row progress fixture; no real backend, git remote, provider, or worktree promotion is required.
+- Not ready when: The slice changes feature-row contracts, candidate ranking, post-promotion gates, planner prompt generation, or backend command construction., The slice suppresses real row failures that produced a commit, dirty worktree, write-scope violation, validation failure, or no-progress diff., The slice retries forever instead of emitting bounded backend_degraded evidence when no fallback backend remains.
+- Degraded mode: When every configured backend is usage-limited or waiting for stdin, the loop emits backend_degraded/backend_waiting_for_stdin evidence and leaves feature-row health unchanged so the planner sees an infrastructure outage instead of a toxic implementation row.
+- Fixture: `internal/builderloop/run_health_test.go::TestRunOnce_BackendUsageLimitDoesNotQuarantineRow`
+- Write scope: `internal/builderloop/backend_failure.go`, `internal/builderloop/backend_failure_test.go`, `internal/builderloop/run.go`, `internal/builderloop/run_health_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/builderloop -run '^(TestClassifyBackendFailureDetectsUsageLimitStdinExit\|TestRunOnce_BackendUsageLimitDoesNotQuarantineRow\|TestRunOnce_BackendDegradedEventEmittedAfterThreshold)$' -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Builder-loop usage-limit fixtures prove backend stdin/usage-limit outages produce run-level degraded evidence without mutating feature-row health, while ordinary worker_error paths still update row health.
+- Acceptance: TestClassifyBackendFailureDetectsUsageLimitStdinExit proves usage-limit text is classified distinctly from ordinary stdin wait while preserving the original detail tail., TestRunOnce_BackendUsageLimitDoesNotQuarantineRow runs a selected feature row through FakeRunner usage-limit/stdin output and proves the row's health block is not incremented or quarantined., The same run emits a ledger event with backend_waiting_for_stdin or backend_usage_limited detail plus backend_degraded evidence when fallback switching is configured., A separate worker_error fixture with a non-backend row failure still increments row health, so real implementation failures remain visible to quarantine math., Existing TestRunOnce_BackendDegradedEventEmittedAfterThreshold and backend_failure_test.go fixtures remain green.
+- Source refs: internal/builderloop/backend_failure.go:ClassifyBackendFailure, internal/builderloop/backend_failure_test.go, internal/builderloop/run.go:recordWorkerOutcome, internal/builderloop/run_health_test.go:TestRunOnce_BackendDegradedEventEmittedAfterThreshold, internal/builderloop/health_writer.go:RecordFailure, .codex/builder-loop/state/runs.jsonl recent backend_waiting_for_stdin usage-limit entries
+- Unblocks: Steer slash command registry + queue fallback, ContextEngine compression-boundary notification, Custom provider model-switch key_env write guard, Native TUI /save XDG file writer binding, Native TUI bounded conversation viewport
+- Why now: Unblocks Steer slash command registry + queue fallback, ContextEngine compression-boundary notification, Custom provider model-switch key_env write guard, Native TUI /save XDG file writer binding, Native TUI bounded conversation viewport.
 
-## 3. Steer slash command registry + queue fallback
-
-- Phase: 2 / 2.F.5
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Contract: Registry-owned active-turn steering command
-- Trust class: operator, gateway
-- Ready when: Steer slash command parser + preview helper is validated on main., The parser helper is already complete on main, so workers should start from internal/gateway/steer_command.go and add only registry/queue behavior in this row., This slice only registers /steer and queue fallback behavior; the live between-tool-call injection hook remains in the dependent row., Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required.
-- Not ready when: The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior., The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code., The parser row is not present in the worker checkout.
-- Degraded mode: Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately.
-- Fixture: `internal/gateway/steer_queue_test.go`
-- Write scope: `internal/gateway/commands.go`, `internal/gateway/manager.go`, `internal/gateway/steer_command.go`, `internal/gateway/steer_queue_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/gateway -run '^TestSteerCommandRegistry_' -count=1`, `go test ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Gateway command fixtures prove /steer registry exposure, parsed queue fallback, running-agent degraded evidence, and no live mid-run injection.
-- Acceptance: TestSteerCommandRegistry_RegisteredAsBusyAware exposes /steer through the shared registry without changing existing command names., TestSteerCommandRegistry_NoRunningAgentQueuesGuidance queues parsed follow-up guidance and returns the parser preview., TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands., Existing gateway command parsing and active-session policy tests remain green.
-- Source refs: ../hermes-agent/cli.py@635253b9:busy_input_mode=steer, ../hermes-agent/gateway/run.py@635253b9:running_agent.steer, ../hermes-agent/tests/gateway/test_busy_session_ack.py@635253b9, internal/gateway/commands.go, internal/gateway/manager.go, internal/gateway/steer_command.go
-- Unblocks: Mid-run steer injection between tool calls, Gateway-handled slash commands bypass active-session guard
-- Why now: Unblocks Mid-run steer injection between tool calls, Gateway-handled slash commands bypass active-session guard.
-
-## 4. Title prompt and truncation contract
+## 2. Title prompt and truncation contract
 
 - Phase: 4 / 4.F
 - Owner: `provider`
@@ -103,27 +62,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/agent/title_generator.py@4a2ee6c1:generate_title, ../hermes-agent/agent/title_generator.py@4a2ee6c1:maybe_auto_title, ../hermes-agent/tests/agent/test_title_generator.py@4a2ee6c1, internal/tui/auto_title.go, internal/session/, internal/transcript/
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 5. Provider timeout config fail-closed helper
-
-- Phase: 4 / 4.H
-- Owner: `provider`
-- Size: `small`
-- Status: `planned`
-- Priority: `P3`
-- Contract: Provider timeout lookup handles missing or failed config loading by returning explicit unset evidence, and parses provider request/stale timeout overrides without panicking or applying stale defaults
-- Trust class: operator, system
-- Ready when: Classified provider-error taxonomy and Retry-After hint handling are validated, so timeout evidence can reuse provider status vocabulary without changing retry loops., This row is pure lookup/parsing only; workers should not add new public config fields or wire live HTTP client timeouts until the helper behavior is fixture-locked., The helper can use injected loader callbacks and synthetic provider maps; no real config file, network call, or provider client is required.
-- Not ready when: The slice changes internal/config public TOML schema, provider HTTP client construction, or kernel retry behavior in the same change., The helper panics or returns a non-zero timeout when config loading/import fails, when providers is not a map, or when the requested provider block is malformed., The tests depend on wall-clock sleeps or live provider credentials.
-- Degraded mode: Provider status reports timeout_config_unavailable, timeout_config_invalid, or timeout_unset evidence instead of crashing startup or silently applying a stale provider timeout.
-- Fixture: `internal/hermes/provider_timeout_config_test.go`
-- Write scope: `internal/hermes/provider_timeout_config.go`, `internal/hermes/provider_timeout_config_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/hermes -run TestProviderTimeoutConfig -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Provider timeout config fixtures prove load failures, missing providers, malformed values, and valid overrides return explicit evidence without wiring live clients or config schema.
-- Acceptance: TestProviderTimeoutConfig_LoadFailureReturnsUnset injects a loader error and proves request and stale timeout lookup return unset evidence without panic., TestProviderTimeoutConfig_MissingProviderReturnsUnset proves nil providers, missing provider IDs, and non-map provider blocks return timeout_unset., TestProviderTimeoutConfig_ParsesRequestAndStaleTimeouts proves numeric seconds and duration strings resolve to deterministic time.Duration values., TestProviderTimeoutConfig_InvalidValuesFailClosed proves negative, zero when not allowed, non-numeric, and overflow values return timeout_config_invalid evidence., No HTTP client, kernel retry, or public config schema is changed by this helper-only slice.
-- Source refs: ../hermes-agent/hermes_cli/timeouts.py@16e243e0:get_provider_request_timeout, ../hermes-agent/hermes_cli/timeouts.py@16e243e0:get_provider_stale_timeout, ../hermes-agent/hermes_cli/timeouts.py@366351b9, internal/config/config.go:HermesCfg, internal/hermes/http_client.go
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
-
-## 6. Session search
+## 3. Session search
 
 - Phase: 5 / 5.N
 - Owner: `tools`
@@ -142,7 +81,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/tools/session_search_tool.py@dbe50155, ../hermes-agent/tests/tools/test_session_search.py@dbe50155, internal/memory/session_catalog.go, internal/memory/session_lineage_search_test.go, internal/goncho/service.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 7. CLI OpenClaw residue onboarding hint
+## 4. CLI OpenClaw residue onboarding hint
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -163,64 +102,46 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: OpenClaw residue startup banner binding
 - Why now: Unblocks OpenClaw residue startup banner binding.
 
-## 8. CLI bracketed-paste wrapper sanitizer
+## 5. BlueBubbles iMessage bubble formatting parity
 
-- Phase: 5 / 5.O
-- Owner: `tools`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: internal/cli exposes StripLeakedBracketedPasteWrappers(text string) string, a pure sanitizer that removes canonical ESC [200~/[201~ wrappers, visible caret-escape wrappers, degraded boundary [200~/[201~ wrappers, and boundary 00~/01~ fragments while preserving non-wrapper substrings inside ordinary text
-- Trust class: operator, system
-- Ready when: internal/cli already has pure helper/test seams; this slice adds one sanitizer file and does not need Cobra command wiring., Tests can use string literals for canonical escape, caret-escape, bracket-only, fragment-only, and normal-text inputs; no TTY, prompt toolkit, clipboard, or terminal emulator is required.
-- Not ready when: The slice edits cmd/gormes startup, TUI input handling, clipboard/image attachment behavior, file-drop detection, command dispatch, or gateway parsing., The sanitizer deletes non-boundary substrings like build00~tag or literal[200~tag., The tests depend on real terminal bracketed-paste mode or prompt_toolkit behavior.
-- Degraded mode: If a terminal leaks bracketed-paste markers into a CLI buffer, Gormes strips only recognized boundary wrappers before command/path detection; ambiguous inline text is preserved rather than over-sanitized.
-- Fixture: `internal/cli/paste_sanitizer_test.go`
-- Write scope: `internal/cli/paste_sanitizer.go`, `internal/cli/paste_sanitizer_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/cli -run '^TestStripLeakedBracketedPasteWrappers_' -count=1`, `go test ./internal/cli -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Paste sanitizer fixtures prove canonical/caret/degraded wrapper stripping, boundary fragment stripping, normal-text preservation, multiline preservation, and zero TTY/clipboard dependencies.
-- Acceptance: TestStripLeakedBracketedPasteWrappers_CanonicalEscape strips \u001b[200~hello\u001b[201~ to hello., TestStripLeakedBracketedPasteWrappers_CaretEscape strips ^[[200~hello^[[201~ to hello., TestStripLeakedBracketedPasteWrappers_DegradedBracketBoundaries strips [200~hello[201~ at start/whitespace boundaries while preserving literal[200~tag., TestStripLeakedBracketedPasteWrappers_FragmentBoundaries strips 00~hello01~ at start/whitespace boundaries while preserving build00~tag., TestStripLeakedBracketedPasteWrappers_MultilinePreserved keeps embedded newlines and content bytes after wrapper removal.
-- Source refs: ../hermes-agent/cli.py@a0fe73ba:_strip_leaked_bracketed_paste_wrappers, ../hermes-agent/tests/cli/test_cli_bracketed_paste_sanitizer.py@a0fe73ba, internal/cli/command_registry.go, internal/cli/output.go
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
-
-## 9. Native TUI /save XDG file writer binding
-
-- Phase: 5 / 5.Q
+- Phase: 7 / 7.E
 - Owner: `gateway`
 - Size: `small`
 - Status: `planned`
-- Priority: `P2`
-- Contract: cmd/gormes binds the native TUI /save SessionExportFunc to the canonical persisted transcript reader and writes markdown exports under the Gormes XDG data directory, never under upstream HERMES_HOME or the process working directory
-- Trust class: operator, system
-- Ready when: Native TUI /save canonical session export is validated on main and exposes SessionExportFunc on Model options., The prior /save handler write-scope issue is closed; slash_dispatch_test.go was already included in the completed handler row and should not be touched here., cmd/gormes/session.go already proves transcript.ExportMarkdown works against config.MemoryDBPath for the CLI export command., internal/tui/slash_save.go already owns partial-file cleanup and should be treated as read-only in this binding slice., Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence.
-- Not ready when: The slice reopens internal/tui slash handler behavior or changes transcript.ExportMarkdown output format., The slice writes exports under HERMES_HOME, the repository root, or the current working directory., The slice starts a provider, API server, remote TUI gateway, or live session browser.
-- Degraded mode: TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location.
-- Fixture: `cmd/gormes/tui_save_export_test.go`
-- Write scope: `cmd/gormes/main.go`, `cmd/gormes/session.go`, `cmd/gormes/tui_save_export_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./cmd/gormes -run '^TestTUISaveExport_' -count=1`, `go test ./cmd/gormes ./internal/tui ./internal/transcript -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: cmd/gormes TUI save-export fixtures prove the real SessionExportFunc writes under XDG_DATA_HOME/gormes/sessions/exports, ignores HERMES_HOME for runtime state, relies on the existing TUI partial-file cleanup path, and returns the exported path to /save without internal/tui edits.
-- Acceptance: cmd/gormes constructs a SessionExportFunc for the local TUI Model, preferably through a small helper in cmd/gormes/session.go, that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`., runResolvedTUIWithRuntime passes that function through tui.Options{SessionExport: ...} only for the local TUI path; remote TUI startup remains unchanged., TestTUISaveExport_WritesUnderXDGDataHome sets XDG_DATA_HOME and HERMES_HOME to different temp roots, invokes the bound SessionExportFunc, and proves the file lands under the Gormes XDG export directory only., TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path., The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway.
-- Source refs: ../hermes-agent/tests/cli/test_save_conversation_location.py@5eb6cd82, ../hermes-agent/cli.py@5eb6cd82:save conversation location, ../hermes-agent/tui_gateway/server.py@5eb6cd82:session.save, internal/tui/slash_save.go:SessionExportFunc, cmd/gormes/session.go:sessionExportCmd, cmd/gormes/main.go:runResolvedTUIWithRuntime, internal/config/config.go:MemoryDBPath
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
+- Priority: `P3`
+- Contract: BlueBubbles outbound iMessage sends are non-editable, markdown-stripped, paragraph-split bubbles without pagination suffixes
+- Trust class: gateway, system
+- Ready when: The first-pass BlueBubbles adapter already owns Send, markdown stripping, cached GUID resolution, and home-channel fallback in internal/channels/bluebubbles.
+- Not ready when: The slice attempts to add live BlueBubbles HTTP/webhook registration, attachment download, reactions, typing indicators, or edit-message support.
+- Degraded mode: BlueBubbles remains a usable first-pass adapter, but long replies may still arrive as one stripped text send until paragraph splitting and suffix-free chunking are fixture-locked.
+- Fixture: `internal/channels/bluebubbles/bot_test.go`
+- Write scope: `internal/channels/bluebubbles/bot.go`, `internal/channels/bluebubbles/bot_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/channels/bluebubbles -count=1`
+- Done signal: BlueBubbles adapter tests prove paragraph-to-bubble sends, suffix-free chunking, and no edit/placeholder capability.
+- Acceptance: Send splits blank-line-separated paragraphs into separate SendText calls while preserving existing chat GUID resolution and home-channel fallback., Long paragraph chunks omit `(n/m)` pagination suffixes and concatenate back to the stripped original text., Bot does not implement gateway.MessageEditor or gateway.PlaceholderCapable, preserving non-editable iMessage semantics.
+- Source refs: ../hermes-agent/gateway/platforms/bluebubbles.py@f731c2c2, ../hermes-agent/tests/gateway/test_bluebubbles.py@f731c2c2, internal/channels/bluebubbles/bot.go, internal/gateway/channel.go
+- Unblocks: BlueBubbles iMessage session-context prompt guidance
+- Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
 
-## 10. Native TUI bounded conversation viewport
+## 6. Yuanbao protocol envelope + markdown fixtures
 
-- Phase: 5 / 5.Q
-- Owner: `tools`
+- Phase: 7 / 7.E
+- Owner: `gateway`
 - Size: `small`
 - Status: `planned`
-- Priority: `P2`
-- Contract: Native Bubble Tea conversation rendering limits each frame to the visible tail of RenderFrame.History plus DraftText/LastError under a caller-provided height budget, emits a stable omitted-history sentinel when earlier turns are hidden, and avoids rebuilding unbounded conversation strings during long sessions
-- Trust class: operator, system
-- Ready when: internal/tui/view.go currently renders every RenderFrame.History message into one joined string; the worker can add a pure helper and table tests without changing kernel history, persistence, or provider streaming., Synthetic RenderFrame fixtures with 100+ messages are enough; no Bubble Tea program, terminal, Node/Ink runtime, or Hermes profiling script needs to run., The row is a Gormes-native performance guard, not a direct port of Hermes' React/Ink virtualization stack.
-- Not ready when: The slice imports React/Ink concepts, starts Node, changes kernel.RenderFrame shape, truncates stored session/transcript history, or edits internal/kernel/internal/transcript persistence., The slice changes slash-command, remote TUI SSE, API server, or dashboard behavior in the same diff., The slice silently drops DraftText or LastError when history is long.
-- Degraded mode: If height is too small or width is narrow, the helper still renders the latest visible turn/draft/error and a compact omitted-history sentinel rather than panicking or allocating the full history body.
-- Fixture: `internal/tui/viewport_history_test.go`
-- Write scope: `internal/tui/view.go`, `internal/tui/viewport_history_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/tui -run '^TestRenderConversationViewport_' -count=1`, `go test ./internal/tui -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Native TUI viewport fixtures prove long histories render a bounded visible tail with omitted-count sentinel, draft/error preservation, small-size clamps, and no kernel/session persistence changes.
-- Acceptance: TestRenderConversationViewport_OmitsEarlierHistory builds 120 alternating user/assistant messages and asserts the rendered output contains the latest turns, excludes the earliest turn body, and includes a deterministic omitted-history sentinel with the hidden count., TestRenderConversationViewport_AlwaysIncludesDraftAndLastError proves DraftText and LastError survive even when history is clipped., TestRenderConversationViewport_HeightAndWidthClamp proves width<4 and tiny height do not panic and still render a compact latest-message view., TestRenderConversationViewport_RenderedLineBudget asserts the helper returns no more than the requested visible budget plus a small sentinel allowance for wrapped content., The implementation stays in internal/tui/view.go plus its test; no kernel/session/transcript files are edited.
-- Source refs: ../hermes-agent/ui-tui/src/hooks/useVirtualHistory.ts@e63929d4, ../hermes-agent/ui-tui/src/lib/virtualHeights.ts@e63929d4, ../hermes-agent/ui-tui/src/__tests__/virtualHeights.test.ts@e63929d4, ../hermes-agent/scripts/profile-tui.py@e63929d4, internal/tui/view.go:renderConv
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
+- Priority: `P4`
+- Contract: Gormes parses Yuanbao websocket/protobuf-style envelopes and Markdown message fragments into gateway-neutral events using fixture data only
+- Trust class: gateway, system
+- Ready when: The Phase 2 shared gateway event shape and Regional + Device Adapter Backlog are available; this row does not need a live Yuanbao account., Workers can start with captured JSON/proto/markdown testdata under internal/channels/yuanbao/testdata copied or minimized from upstream fixtures., No send loop, login flow, tool registration, media download, or sticker parsing is required for this first slice.
+- Not ready when: The slice opens a websocket, performs login, calls Tencent/Yuanbao endpoints, downloads media, or registers user-visible tools., The slice stores credentials or changes shared gateway session policy., The slice combines protocol parsing with send/reply runtime behavior.
+- Degraded mode: Yuanbao adapter status reports protocol_unavailable or markdown_parse_failed evidence instead of starting a live session with unparsed payloads.
+- Fixture: `internal/channels/yuanbao/proto_test.go`
+- Write scope: `internal/channels/yuanbao/proto.go`, `internal/channels/yuanbao/proto_test.go`, `internal/channels/yuanbao/markdown.go`, `internal/channels/yuanbao/markdown_test.go`, `internal/channels/yuanbao/testdata/`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/channels/yuanbao -run 'TestYuanbao(Proto\|Markdown)' -count=1`, `go test ./internal/channels/yuanbao -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Yuanbao protocol/markdown fixtures prove inbound text event normalization and degraded parse evidence with no live Yuanbao network call.
+- Acceptance: TestYuanbaoProto_DecodesInboundTextFixture loads a captured fixture and returns source, conversation id, message id, author role, and text content., TestYuanbaoMarkdown_RendersCodeAndLinks proves code blocks, links, mentions, and list fragments are normalized into plain prompt-safe text without losing URLs., Malformed/unknown envelope fixtures return typed degraded evidence and do not panic., No test imports a generated protobuf runtime unless a local generated fixture file is checked in under internal/channels/yuanbao.
+- Source refs: ../hermes-agent/gateway/platforms/yuanbao_proto.py@ab687963, ../hermes-agent/gateway/platforms/yuanbao.py@ab687963, ../hermes-agent/tests/test_yuanbao_proto.py@ab687963, ../hermes-agent/tests/test_yuanbao_markdown.py@ab687963, ../hermes-agent/website/docs/user-guide/messaging/yuanbao.md@ab687963
+- Unblocks: Yuanbao media/sticker attachment normalization, Yuanbao gateway runtime + toolset registration
+- Why now: Unblocks Yuanbao media/sticker attachment normalization, Yuanbao gateway runtime + toolset registration.
 
 <!-- PROGRESS:END -->
