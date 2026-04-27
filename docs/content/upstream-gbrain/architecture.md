@@ -230,6 +230,8 @@ Important mechanics:
 - stall detection, wall-clock timeouts, retries, backoff, jitter.
 - parent-child jobs, depth caps, max-children caps.
 - idempotency keys and `maxWaiting` backpressure.
+- RSS watchdog drains for supervised workers, with per-job and periodic checks.
+- stable-run restart accounting so watchdog exits do not look like crash loops.
 - per-job progress JSON.
 - token counters.
 - side-channel inbox with `child_done` messages.
@@ -248,6 +250,18 @@ has goroutine subagents with context cancellation, timeouts, run logs, and tool
 allowlists. The missing class is durable rehydration after process death, plus
 a trust-aware routing rule that keeps privileged deterministic work separate
 from child-agent judgment work.
+
+GBrain `c78c3d0` adds an important follow-up for a future Gormes durable worker
+loop: if a worker can wedge while holding capacity, health must not depend on
+job completion. The portable contract is an injected RSS or capacity watchdog
+that can trigger cooperative drain, abort in-flight handlers, record evidence,
+and let the supervisor treat long healthy watchdog exits as restartable. It is
+not a reason to make the main Gormes process self-terminate or to import
+GBrain's TypeScript worker.
+
+The same release also adds transient Postgres connection retries. That belongs
+to optional remote-database connectors; it is not part of Gormes' SQLite-first
+Goncho memory baseline.
 
 ## Skills Layer
 

@@ -75,6 +75,7 @@ The handler can remain ordinary Go.
 | Code Cathedral II call graph + two-pass retrieval | optional code-context evidence for skill/retrieval explanations | Start with synthetic parent-scope/call-edge fixtures and capped high-fan-out behavior; do not embed GBrain's TypeScript indexer or tree-sitter WASM in the runtime. |
 | Minions SQL queue | subagent manager, cron, audit logs | Add a durable job ledger for long work and child runs. |
 | v0.22.1 worker abort and slot recovery | durable worker loop and builder/autoloop health | Propagate cancellation through every long phase and free claimed worker slots with auditable timeout evidence when a handler ignores cancellation. |
+| v0.22.2 RSS watchdog and stable-run reset | future durable worker loop only | Add opt-in worker RSS/capacity watchdog evidence after a Go durable worker exists; do not self-terminate the main Gormes process or make Goncho memory depend on supervised workers. |
 | v0.22.1 incremental extract + embed-stale filters | learning-loop skill and memory maintenance passes | Carry changed-source IDs through extract/index/embed phases and prove stale-only work avoids whole-corpus scans. |
 | `subagent_messages` and tool ledger | run logs and transcript export | Persist child-agent messages/tool calls enough to resume or replay. |
 | skills resolver and checks | `internal/skills` active/inactive store | Add resolver conformance, routing evals, conflict checks, and promotion evidence. |
@@ -151,6 +152,21 @@ job receives the run context, timeout records aborted/dead evidence, a grace
 timer frees the slot without double-completing the job, and doctor/status names
 the recovery path. Do not build a hidden background worker just to satisfy the
 lesson.
+
+GBrain `c78c3d0` adds the next production lesson: a worker can wedge without
+completing any jobs, so watchdog checks must not only run in per-job cleanup.
+For Gormes, this becomes a blocked row after the durable worker loop exists:
+inject an RSS/capacity reader and fake clock, prove post-job and periodic checks
+can start a graceful drain, abort in-flight handlers, and report stable watchdog
+restarts without incrementing a crash loop. Keep it scoped to a future durable
+worker process or goroutine lane; the main Gormes TUI/API process and the
+Goncho/Honcho-compatible memory service must not gain a blanket RSS
+self-termination policy.
+
+The same GBrain release retries transient Postgres/Supabase startup connection
+errors. Gormes should only reuse that pattern if an optional remote database
+connector is added later. The default SQLite-first runtime does not need a
+database-network retry layer.
 
 ### 3. Strengthen Memory Provenance Before More Recall Magic
 

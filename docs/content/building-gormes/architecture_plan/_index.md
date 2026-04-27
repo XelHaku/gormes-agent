@@ -179,7 +179,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Durable worker supervisor status seam
 - [x] Durable pause/resume intent contract
 - [x] Durable replay and inbox message contract
+- [ ] Durable worker execution loop
 - [ ] Durable worker abort-slot recovery safety net
+- [ ] Durable worker RSS watchdog + graceful drain policy
 
 ### 2.F.1 — Slash Command Registry + Gateway Dispatch ✅
 
@@ -540,7 +542,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Planner audit blank-subphase control-plane bucket
 - [x] Autoloop recent-failure detail excerpts
 - [ ] Cronjob tool API + schedule parser parity
-- [ ] Cron schedule parser + repeat state fixtures
+- [x] Cron schedule parser + repeat state fixtures
 - [ ] Cron prompt/script safety + pre-run script contract
 - [ ] Cronjob tool action envelope over native store
 - [ ] Cron context_from output chaining
