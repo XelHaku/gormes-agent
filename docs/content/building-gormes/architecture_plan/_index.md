@@ -133,7 +133,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway fresh-final send/delete fallback
 - [x] Telegram fresh-final delete and config exposure
 - [x] Telegram group bot-command mention gate helper
-- [ ] Telegram group mention gate config binding
+- [ ] Telegram require-mention config fields
+- [ ] Telegram group require-mention bot binding
 - [x] Slack rich-text quotes/lists + link-unfurl ingress
 - [x] Slack thread-parent context + team-scoped cache key
 - [x] Gateway message deduplicator bounded helper
@@ -471,6 +472,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.B — Sandboxing Backends 🔨
 
 - [ ] Environment interface + file sync contract
+- [ ] Terminal snapshot source stdout suppression guard
 - [ ] Docker
 - [x] Docker backend top-level container reuse semantics
 - [ ] Modal
@@ -533,6 +535,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Dashboard page-scoped plugin slot inventory
 - [ ] Third-party extensions
 - [x] First-party Spotify plugin fixture
+- [ ] Hindsight memory setup blank-input preservation
 
 ### 5.J — Approval / Security Guards 🔨
 
@@ -563,8 +566,10 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Todo
 - [ ] Clarify
-- [ ] Session search
+- [ ] Session search tool schema and argument validation
+- [ ] Session search tool execution wrapper
 - [ ] Debug helpers
+- [ ] Debug share paste sweep scheduler contract
 - [x] Planner audit blank-subphase control-plane bucket
 - [x] Autoloop recent-failure detail excerpts
 - [x] Backend usage-limit stdin health bypass
@@ -583,7 +588,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
 - [x] CLI banner/output formatting helpers
 - [x] CLI deterministic tip selector
-- [ ] CLI OpenClaw residue onboarding hint
+- [ ] CLI OpenClaw residue detection and hint text
+- [ ] CLI onboarding seen-state map helpers
 - [x] CLI bracketed-paste wrapper sanitizer
 - [x] CLI webhook URL normalizer
 - [x] CLI dump support-summary helper
@@ -637,10 +643,12 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] TUI TerminalNativeSelectionHelp constant + help-string fixture
 - [x] Native TUI slash-command dispatch table
 - [x] Native TUI /save canonical session export
-- [ ] Native TUI /save XDG file writer binding
+- [ ] Native TUI /save XDG export helper
+- [ ] Native TUI /save local runtime binding
 - [x] Native TUI /branch session fork + transcript target switch
 - [x] TUI running-agent placeholder surfaces interrupt + queued slash actions
-- [ ] Native TUI bounded conversation viewport
+- [ ] Native TUI conversation viewport tail helper
+- [ ] Native TUI renderConv viewport budget binding
 - [x] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
 - [x] Responses API store + run event stream

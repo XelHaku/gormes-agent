@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T11:44:19Z",
+    "last_updated": "2026-04-27T12:07:47Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1386,7 +1386,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z"
+                "last_reshape": "2026-04-27T11:38:55Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1653,7 +1654,8 @@
                 "The slice changes fresh-final streaming, deleteMessage, session keys, pairing approval, or gateway manager behavior."
               ],
               "unblocks": [
-                "Telegram group mention gate config binding"
+                "Telegram require-mention config fields",
+                "Telegram group require-mention bot binding"
               ],
               "acceptance": [
                 "TestTelegramGroupMentionGate_BotCommandWithMatchingSuffixAllowsCommand builds `/status@gormes_bot` with one bot_command entity covering the whole token and returns addressed=true for expected username `gormes_bot` or `@gormes_bot`.",
@@ -1689,10 +1691,10 @@
               }
             },
             {
-              "name": "Telegram group mention gate config binding",
+              "name": "Telegram require-mention config fields",
               "priority": "P3",
               "status": "planned",
-              "contract": "Telegram runtime can opt into Hermes-style group require-mention policy by using the validated bot-command mention helper to drop unaddressed group text and bare slash commands while leaving DMs, allowed-chat gating, first-run discovery, and fresh-final streaming unchanged",
+              "contract": "internal/config parses Telegram require_mention and bot_username fields with disabled defaults so group mention gating remains opt-in and can be tested without constructing a Telegram bot runtime",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -1701,8 +1703,67 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Telegram status reports telegram_group_mention_gate_disabled, telegram_group_mention_gate_unavailable, or telegram_group_message_unaddressed instead of silently processing unaddressed group traffic.",
-              "fixture": "internal/channels/telegram/group_mention_binding_test.go",
+              "degraded_mode": "When the fields are absent or malformed, Telegram group mention gating remains disabled with config evidence instead of changing DM, allowed-chat, or first-run discovery behavior.",
+              "fixture": "internal/config/config_test.go::TestLoad_TelegramRequireMentionFields",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/telegram.py@3ff3dfb5:TelegramAdapter._should_process_message",
+                "../hermes-agent/tests/gateway/test_telegram_group_gating.py@3ff3dfb5",
+                "internal/config/config.go:TelegramCfg"
+              ],
+              "ready_when": [
+                "Telegram group bot-command mention gate helper is validated on main; config parsing can land independently before runtime binding.",
+                "The worker only touches internal/config and uses temp TOML/string fixtures; no live Telegram token, BotFather username lookup, gateway.Manager, or provider runtime is required.",
+                "Defaults must preserve current behavior: require_mention=false and bot_username empty."
+              ],
+              "not_ready_when": [
+                "The slice edits internal/channels/telegram, starts a bot, changes allowed_chat_id or first_run_discovery, or wires runtime message dropping.",
+                "The config loader enables require_mention by default or requires bot_username for DMs.",
+                "The slice changes gateway pairing approval, channel session-key generation, fresh-final delete behavior, or command registry semantics."
+              ],
+              "unblocks": [
+                "Telegram group require-mention bot binding"
+              ],
+              "acceptance": [
+                "TestLoad_TelegramRequireMentionFields proves require_mention=true and bot_username=\"gormes_bot\" parse into TelegramCfg.",
+                "TestLoad_TelegramRequireMentionDefaults proves missing fields keep require_mention=false and bot_username empty.",
+                "TestLoad_TelegramRequireMentionInvalidType proves malformed require_mention returns config evidence/error without enabling the gate.",
+                "Existing Telegram config tests remain green and no internal/channels/telegram files change."
+              ],
+              "note": "Split from the quarantined Telegram binding row after repeated worker_error/stdin failures. First land only the config vocabulary; the runtime adapter binding is a dependent row with a separate write scope.",
+              "write_scope": [
+                "internal/config/config.go",
+                "internal/config/config_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/config -run TestLoad_TelegramRequireMentionFields -count=1",
+                "go test ./internal/config -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Config fixtures prove Telegram require_mention and bot_username parse with disabled defaults and no Telegram runtime edits."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:3ff3dfb5 gateway/platforms/telegram.py",
+                "note": "Hermes supplies the opt-in group mention policy; Gormes decomposes it into config vocabulary first, then Go adapter binding."
+              }
+            },
+            {
+              "name": "Telegram group require-mention bot binding",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "internal/channels/telegram applies the validated group mention helper to synthetic group updates using parsed require_mention/bot_username settings, dropping unaddressed group text and bare slash commands while preserving DMs, allowed-chat gating, first-run discovery, and fresh-final streaming",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Telegram status reports telegram_group_message_unaddressed or telegram_group_mention_gate_unavailable instead of silently processing unaddressed group traffic.",
+              "fixture": "internal/channels/telegram/group_mention_binding_test.go::TestBot_ToInboundEvent_GroupMentionGate_*",
               "source_refs": [
                 "../hermes-agent/gateway/platforms/telegram.py@3ff3dfb5:TelegramAdapter._should_process_message",
                 "../hermes-agent/tests/gateway/test_telegram_group_gating.py@3ff3dfb5",
@@ -1711,26 +1772,28 @@
                 "internal/config/config.go:TelegramCfg"
               ],
               "ready_when": [
-                "Telegram group bot-command mention gate helper is validated on main; workers can bind config/runtime behavior directly against internal/channels/telegram/group_mention.go.",
-                "The binding can be tested through synthetic tgbotapi.Update values and Config fields only; no live Telegram token, BotFather username lookup, gateway.Manager, pairing store, or provider runtime is required.",
-                "The worker should keep group gating opt-in and leave existing allowed_chat_id / first_run_discovery tests unchanged."
+                "Telegram require-mention config fields and Telegram group bot-command mention gate helper are validated on main.",
+                "The worker can build synthetic tgbotapi.Update values and a Bot/Config fixture; no live getMe call, token, gateway.Manager, pairing store, or provider runtime is required.",
+                "The binding remains opt-in and must leave existing allowed_chat_id, first_run_discovery, fresh-final delete, and command parsing tests unchanged."
               ],
               "not_ready_when": [
-                "The slice changes gateway pairing approval, channel session-key generation, fresh-final deleteMessage behavior, Slack/Discord policy, or command registry semantics.",
-                "The slice requires a live getMe call or network-derived bot username in unit tests.",
+                "The slice edits internal/config parsing, gateway pairing approval, channel session-key generation, Slack/Discord policy, or command registry semantics.",
+                "The unit tests require network-derived bot username or a live Telegram API call.",
                 "The slice drops DMs or explicitly mentioned group commands when require_mention is disabled."
               ],
-              "acceptance": [
-                "TestLoad_TelegramRequireMentionFields proves TelegramCfg parses require_mention and bot_username with safe defaults that preserve current behavior.",
-                "TestBot_ToInboundEvent_GroupBareCommandDroppedWhenRequireMentionEnabled proves a group `/status` command without @botname is dropped when require_mention=true.",
-                "TestBot_ToInboundEvent_GroupBotCommandSuffixAccepted proves `/status@gormes_bot` with a bot_command entity reaches gateway.ParseInboundText when configured bot_username matches.",
-                "TestBot_ToInboundEvent_DMBypassesMentionGate proves private chats still process commands/text without mention.",
-                "Existing Telegram fresh-final delete and command parsing tests keep passing."
+              "blocked_by": [
+                "Telegram group bot-command mention gate helper",
+                "Telegram require-mention config fields"
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z: the mention-helper prerequisite is validated and backend usage-limit failures are now run-level infrastructure evidence, so this config-binding row can run as a focused Telegram adapter slice.",
+              "acceptance": [
+                "TestBot_ToInboundEvent_GroupBareCommandDroppedWhenRequireMentionEnabled proves a group `/status` command without @botname is dropped when require_mention=true.",
+                "TestBot_ToInboundEvent_GroupBotCommandSuffixAccepted proves `/status@gormes_bot` with a bot_command entity reaches gateway.ParseInboundText when bot_username matches.",
+                "TestBot_ToInboundEvent_GroupPlainTextMentionAccepted proves normal group text addressed to @gormes_bot still processes.",
+                "TestBot_ToInboundEvent_DMBypassesMentionGate proves private chats process commands/text without a mention.",
+                "Existing Telegram fresh-final delete, allowed-chat, first-run discovery, and command parsing tests remain green."
+              ],
+              "note": "Dependent half of the quarantined Telegram binding split. It owns only adapter behavior; config parsing is deliberately out of scope.",
               "write_scope": [
-                "internal/config/config.go",
-                "internal/config/config_test.go",
                 "internal/channels/telegram/bot.go",
                 "internal/channels/telegram/bot_test.go",
                 "internal/channels/telegram/group_mention.go",
@@ -1738,44 +1801,17 @@
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/config -run TestLoad_TelegramRequireMentionFields -count=1",
-                "go test ./internal/channels/telegram -run '^TestBot_ToInboundEvent_Group|^TestBot_ToInboundEvent_DMBypassesMentionGate' -count=1",
-                "go test ./internal/config ./internal/channels/telegram -count=1",
+                "go test ./internal/channels/telegram -run '^TestBot_ToInboundEvent_GroupMentionGate_|^TestBot_ToInboundEvent_DMBypassesMentionGate' -count=1",
+                "go test ./internal/channels/telegram -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Config and Telegram adapter fixtures prove opt-in group require-mention policy gates bare group commands, accepts `/cmd@botname` bot_command entities, preserves DM behavior, and leaves existing Telegram streaming/command tests green."
+                "Telegram adapter fixtures prove opt-in group require-mention policy gates unaddressed group traffic, accepts addressed commands/text, preserves DMs, and leaves existing Telegram behavior green."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-27T06:32:03Z",
-                "last_failure": {
-                  "run_id": "20260427T063156Z-200841618",
-                  "category": "worker_error",
-                  "backend": "codexu",
-                  "stderr_tail": "Reading additional input from stdin...\n"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category worker_error",
-                  "since": "2026-04-27T06:32:03Z",
-                  "after_run_id": "20260427T063156Z-200841618",
-                  "threshold": 3,
-                  "spec_hash": "f653811b7ca9ccc6edf34fb0656e85a73fb1c12b1edda770bb5b5c22fe282990",
-                  "last_category": "worker_error"
-                }
-              },
-              "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z"
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:3ff3dfb5 gateway/platforms/telegram.py",
-                "note": "Hermes provides the group require-mention behavior; Gormes adapts it to TOML config and its Go Telegram adapter after the helper fixture lands."
+                "note": "Hermes provides the group require-mention behavior; Gormes binds it after the config vocabulary and pure helper are validated."
               }
             },
             {
@@ -2022,7 +2058,7 @@
                 "system"
               ],
               "degraded_mode": "Gateway status reports dedup_unavailable for missing IDs and duplicate_message for dropped repeats instead of silently replaying duplicate platform events.",
-              "fixture": "internal/gateway/message_deduplicator_manager_test.go",
+              "fixture": "internal/gateway/message_deduplicator_manager_test.go::TestGatewayInboundDedup_*",
               "source_refs": [
                 "../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator",
                 "../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585",
@@ -2031,23 +2067,26 @@
                 "internal/gateway/manager.go"
               ],
               "ready_when": [
-                "Gateway message deduplicator bounded helper is validated on main and exposes duplicate/evicted/disabled evidence.",
+                "Gateway message deduplicator bounded helper is validated on main and exposes duplicate/evicted/disabled evidence; treat internal/gateway/message_deduplicator.go as read-only in this row.",
                 "Shared gateway inbound event normalization is validated and platform adapters already pass stable message IDs where available.",
-                "The worker can use fake gateway.Channel and fake kernel fixtures only; no Telegram, Slack, Discord, or provider SDK is needed."
+                "The worker can use fake gateway.Channel and fake kernel fixtures only; no Telegram, Slack, Discord, provider SDK, or platform adapter edits are needed."
               ],
               "not_ready_when": [
-                "The slice changes channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
-                "The slice stores dedup history on disk or treats empty message IDs as duplicates."
+                "The slice edits internal/gateway/message_deduplicator.go, channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
+                "The slice stores dedup history on disk or treats empty message IDs as duplicates.",
+                "The slice creates platform-specific tests instead of one gateway manager fixture using fake channels/events."
+              ],
+              "blocked_by": [
+                "Gateway message deduplicator bounded helper"
               ],
               "acceptance": [
-                "TestGatewayInbound_DedupDropsRepeatedMessageID submits the same channel/chat/message ID twice and proves the fake kernel receives only the first turn while status evidence records duplicate_message.",
-                "TestGatewayInbound_DedupScopesByChannelChatAndThread proves identical platform message IDs in different chats or threads do not collide.",
-                "TestGatewayInbound_DedupMissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence.",
-                "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green."
+                "TestGatewayInboundDedup_DropsRepeatedMessageID submits the same channel/chat/thread/message ID twice and proves the fake kernel receives only the first turn while status evidence records duplicate_message.",
+                "TestGatewayInboundDedup_ScopesByChannelChatAndThread proves identical platform message IDs in different chats or threads do not collide.",
+                "TestGatewayInboundDedup_MissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence.",
+                "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green without editing message_deduplicator.go."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z: the bounded helper is validated and the backend health bypass is complete, so this row is a manager-wiring fixture only; platform adapters and outbound streaming stay out of scope.",
+              "note": "Refined after a write-scope violation: the bounded MessageDeduplicator helper is complete and now read-only. This row owns only manager/event/fake-test wiring and the manager-level evidence fixture.",
               "write_scope": [
-                "internal/gateway/message_deduplicator.go",
                 "internal/gateway/message_deduplicator_manager_test.go",
                 "internal/gateway/event.go",
                 "internal/gateway/manager.go",
@@ -2055,12 +2094,12 @@
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/gateway -run '^TestGatewayInbound_Dedup' -count=1",
+                "go test ./internal/gateway -run '^TestGatewayInboundDedup_' -count=1",
                 "go test ./internal/gateway -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior."
+                "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior without editing the deduplicator helper."
               ],
               "health": {
                 "attempt_count": 4,
@@ -2077,8 +2116,12 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z"
+                "needs_human": true,
+                "reason": "auto: 3 reshapes without unsticking; last category write_scope_violation",
+                "since": "2026-04-27T12:01:21Z",
+                "reshape_count": 3,
+                "last_reshape": "2026-04-27T12:01:21Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -2089,8 +2132,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T11:44:19Z",
-            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; Gormes tracks it as three dependency-ordered slices. Hermes 3ff3dfb5 fixes Telegram group command-menu gating for `/cmd@botname` bot_command entities; the helper is validated, so the config/runtime binding row is now fixture-ready. Hermes cebf9585 adds bounded MessageDeduplicator eviction; the pure helper is validated, so manager evidence wiring is fixture-ready. Hermes 91512b82/6993e566 adds WhatsApp identifier hardening; the predicate is validated, so the inbound-evidence row is fixture-ready while the completed 2.B.4 adapter runtime remains closed."
+            "last_upstream_check": "2026-04-27T12:07:47Z",
+            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, and message deduplication. The quarantined Telegram group binding is split into config vocabulary and adapter binding. Gateway inbound dedup wiring is narrowed after a write-scope violation so the completed MessageDeduplicator helper is read-only and the row owns only manager/event evidence."
           }
         },
         "2.B.10": {
@@ -2890,7 +2933,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z"
+                "last_reshape": "2026-04-27T11:38:55Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -3876,9 +3920,12 @@
                 ]
               },
               "planner_verdict": {
+                "needs_human": true,
+                "reason": "auto: 6 reshapes without unsticking; last category ",
+                "since": "2026-04-27T12:01:21Z",
                 "reshape_count": 6,
                 "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -7383,9 +7430,12 @@
                 ]
               },
               "planner_verdict": {
+                "needs_human": true,
+                "reason": "auto: 4 reshapes without unsticking; last category ",
+                "since": "2026-04-27T12:01:21Z",
                 "reshape_count": 4,
                 "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -9289,6 +9339,65 @@
               "note": "TDD: port `tools/environments/base.py` and `file_sync.py` into one Go interface with path mapping, upload/download, timeout, and cleanup fixtures before backend-specific code lands."
             },
             {
+              "name": "Terminal snapshot source stdout suppression guard",
+              "priority": "P4",
+              "status": "planned",
+              "contract": "The future Go terminal-environment snapshot wrapper suppresses stdout and stderr while loading persisted shell environment snapshots so macOS bash declare -x output cannot leak environment variables into terminal tool responses",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Terminal status reports environment_snapshot_unavailable or snapshot_source_suppressed evidence rather than returning raw declare -x lines to the model.",
+              "fixture": "internal/tools/environment_snapshot_test.go::TestEnvironmentSnapshotSource_*",
+              "source_refs": [
+                "../hermes-agent/tools/environments/base.py@2e6699b3:BaseEnvironment._wrap_command",
+                "../hermes-agent/tools/terminal_tool.py@2e6699b3",
+                "docs/content/building-gormes/architecture_plan/subsystem-inventory.md:Sandboxing backends"
+              ],
+              "ready_when": [
+                "Environment interface + file sync contract has landed and exposes a shell-wrapper construction seam before backend-specific execution is enabled.",
+                "Tests can use string-built shell wrapper fixtures and fake snapshots; no real shell, macOS bash, Docker, SSH, or sandbox backend is required.",
+                "The row is about terminal environment wrapper construction only, not execute_code or durable worker shell jobs."
+              ],
+              "not_ready_when": [
+                "The slice starts a subprocess, rewrites execute_code, implements Docker/SSH backends, or captures real environment variables in tests.",
+                "The wrapper sources a snapshot with only stderr redirected or returns declare -x lines in output.",
+                "The slice changes file-sync path mapping or sandbox cleanup behavior."
+              ],
+              "blocked_by": [
+                "Environment interface + file sync contract"
+              ],
+              "acceptance": [
+                "TestEnvironmentSnapshotSource_RedirectsStdoutAndStderr proves the generated source command redirects `>/dev/null 2>&1` or equivalent before running user commands.",
+                "TestEnvironmentSnapshotSource_NoSnapshotSkipsSource proves no source command is emitted when snapshot mode is disabled.",
+                "TestEnvironmentSnapshotSource_DoesNotRedactUserCommandOutput proves only snapshot loading is suppressed, not the actual command output.",
+                "No test executes a real shell or inspects the developer environment."
+              ],
+              "note": "Added from Hermes 2e6699b3. Keep draft/blocked until the native environment wrapper exists; this prevents the macOS declare -x leak from being forgotten when sandbox backends start.",
+              "write_scope": [
+                "internal/tools/environment_snapshot.go",
+                "internal/tools/environment_snapshot_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestEnvironmentSnapshotSource_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Environment snapshot wrapper fixtures prove persisted snapshot sourcing suppresses stdout/stderr while preserving real command output."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:2e6699b3 tools/environments/base.py",
+                "note": "Hermes fixed a macOS bash declare-x leak; Gormes should apply the same invariant when terminal environment snapshots exist."
+              }
+            },
+            {
               "name": "Docker",
               "status": "planned",
               "note": "TDD: port Docker execution after the environment interface is green, covering image selection, mount policy, env passthrough allowlists, timeout cleanup, and blocked dangerous mounts."
@@ -9376,8 +9485,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T18:00:00Z",
-            "origin_decision": "Hermes 9be83728 clarified Docker terminal-backend lifecycle: the top-level agent reuses task_id=default across sessions, /new, and /reset, while delegate_task subagents and RL rollouts isolate by their generated task_id. Gormes has only local execute_code today, so Phase 5.B stays upstream-led and now carries a pure container-keying row before live Docker execution."
+            "last_upstream_check": "2026-04-27T12:07:47Z",
+            "origin_decision": "Hermes 2e6699b3 fixed a macOS bash declare-x leak by suppressing stdout/stderr when sourcing terminal environment snapshots. Gormes does not yet have the sandbox environment wrapper, so the invariant is captured as a blocked draft row behind Environment interface + file sync contract. Docker top-level key semantics remain validated; backend-specific execution is still planned."
           }
         },
         "5.C": {
@@ -10938,12 +11047,70 @@
                 "last_attempt": "2026-04-25T10:19:57Z",
                 "last_success": "2026-04-25T10:19:57Z"
               }
+            },
+            {
+              "name": "Hindsight memory setup blank-input preservation",
+              "priority": "P4",
+              "status": "planned",
+              "contract": "Future Gormes Hindsight memory-plugin setup preserves existing mode, endpoint, model, timeout, idle_timeout, and custom config values when the operator presses Enter through prompts, and never overwrites existing API-key references with blank input",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Until the external Hindsight plugin exists, plugin status reports hindsight_memory_plugin_unavailable instead of pretending the internal Goncho service is a Hindsight-compatible provider.",
+              "fixture": "internal/plugins/memory_hindsight_config_test.go::TestHindsightSetupConfigPatch_*",
+              "source_refs": [
+                "../hermes-agent/plugins/memory/hindsight/__init__.py@64a497bf:post_setup",
+                "../hermes-agent/tests/plugins/memory/test_hindsight_provider.py@64a497bf:test_local_embedded_setup_blank_inputs_preserve_existing_config",
+                "docs/content/building-gormes/architecture_plan/subsystem-inventory.md:Memory plugin: Hindsight"
+              ],
+              "ready_when": [
+                "Third-party extensions have a native plugin config-patch seam; do not implement this before the generic plugin setup surface exists.",
+                "Tests can exercise a pure config patch helper with in-memory maps and temp files; no Hindsight cloud/local daemon, uv install, Python plugin import, or Goncho memory change is required.",
+                "This row is external memory-plugin compatibility only; internal Goncho remains the Go-native Honcho-compatible memory implementation."
+              ],
+              "not_ready_when": [
+                "The slice edits internal/goncho, internal/memory, or honcho_* tool names to emulate Hindsight behavior.",
+                "The slice installs hindsight-all, calls a Hindsight API, writes real HOME config, or prompts interactively in tests.",
+                "The slice overwrites existing llm_api_key/key_env/api_url/model/timeout values with blanks."
+              ],
+              "blocked_by": [
+                "Third-party extensions"
+              ],
+              "acceptance": [
+                "TestHindsightSetupConfigPatch_BlankInputsPreserveExistingLocalEmbeddedConfig starts with mode=local_embedded, llm_provider=openai_compatible, llm_base_url, llm_model, timeout=120, idle_timeout=0, and extra vendor keys, then proves blank inputs preserve all values.",
+                "TestHindsightSetupConfigPatch_BlankAPIKeyPreservesReference proves existing API-key references are retained and no empty key is written.",
+                "TestHindsightSetupConfigPatch_ModeDefaultUsesExistingValue proves the selection default follows existing mode when valid and falls back safely when invalid.",
+                "No test imports Hermes Python, calls Hindsight, or changes internal Goncho/Honcho memory behavior."
+              ],
+              "note": "Added from Hermes 64a497bf. This is deliberately blocked behind the external plugin surface so it records upstream drift without distracting current Goncho/Honcho memory work.",
+              "write_scope": [
+                "internal/plugins/memory_hindsight_config.go",
+                "internal/plugins/memory_hindsight_config_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/plugins -run '^TestHindsightSetupConfigPatch_' -count=1",
+                "go test ./internal/plugins -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Hindsight config patch fixtures prove blank setup inputs preserve existing values and credential references without touching Goncho or calling external services."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:64a497bf plugins/memory/hindsight/__init__.py",
+                "note": "Hermes fixed Hindsight setup preservation; Gormes tracks it as future external-plugin compatibility while keeping internal memory under Goncho."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T14:29:29Z",
-            "origin_decision": "Hermes still leads plugin and dashboard-extension contracts. af22421e/cf2fabc4 added page-scoped built-in page slots that Gormes should preserve as inert metadata first, while keeping the Go runtime independent from Hermes React/Vite assets until a native slot runtime is deliberately designed."
+            "last_upstream_check": "2026-04-27T12:07:47Z",
+            "origin_decision": "Hermes still leads plugin and dashboard-extension contracts. af22421e/cf2fabc4 page-scoped built-in slots are validated; 64a497bf adds a Hindsight setup preservation regression, now tracked as a blocked external-memory-plugin config row. Internal Gormes memory remains Goncho with honcho_* compatibility; do not route Hindsight drift into internal/goncho."
           }
         },
         "5.J": {
@@ -11413,9 +11580,10 @@
               "note": "TDD: port `tools/clarify_tool.py` as an interruptible prompt contract that preserves gateway/TUI response routing and times out safely in non-interactive cron turns."
             },
             {
-              "name": "Session search",
+              "name": "Session search tool schema and argument validation",
+              "priority": "P3",
               "status": "planned",
-              "contract": "internal/tools exposes a wrapper-only session_search Tool over existing internal/memory SearchSessions/SearchMessages APIs, preserving same-chat defaults, explicit user/source widening, lineage-root exclusion in recent mode, and Goncho/Honcho-compatible evidence without changing ranking or persistence",
+              "contract": "internal/tools defines a session_search Tool descriptor, JSON schema, timeout, and argument validator for query, scope, sources, mode, limit, and current_session_id without registering the tool globally or reading memory",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -11424,91 +11592,183 @@
                 "child-agent",
                 "system"
               ],
-              "degraded_mode": "Tool result reports session_search_unavailable, source_filter_denied, or lineage_root_excluded evidence instead of widening recall silently.",
-              "fixture": "internal/tools/session_search_tool_test.go::TestSessionSearchTool_*",
+              "degraded_mode": "Invalid input returns session_search_invalid_args evidence instead of widening recall or falling back to global search.",
+              "fixture": "internal/tools/session_search_tool_schema_test.go::TestSessionSearchToolSchema_*",
               "source_refs": [
                 "../hermes-agent/tools/session_search_tool.py@dbe50155",
                 "../hermes-agent/tests/tools/test_session_search.py@dbe50155",
-                "internal/memory/session_catalog.go",
+                "internal/tools/tool.go",
+                "internal/gonchotools/honcho_tools.go:HonchoSearchTool.Schema"
+              ],
+              "ready_when": [
+                "internal/tools.Tool is stable and Honcho-compatible scope/source schema language is validated in internal/gonchotools.",
+                "This slice is descriptor/argument-only: no memory store, SQLite fixture, global registry binding, gateway runtime, or Goncho service construction is required.",
+                "The tool name must be session_search; honcho_* external tool names remain reserved for Goncho/Honcho compatibility."
+              ],
+              "not_ready_when": [
+                "The slice calls internal/memory.SearchSessions/SearchMessages, changes ranking, opens SQLite, or registers the tool in builtin/global toolsets.",
+                "The schema renames public Goncho/Honcho tools or removes same-chat defaults from the later execution row.",
+                "The slice includes todo/debug/clarify tools or cronjob tools."
+              ],
+              "unblocks": [
+                "Session search tool execution wrapper"
+              ],
+              "acceptance": [
+                "TestSessionSearchToolSchema_Descriptor proves Name()==\"session_search\", Description is non-empty, Timeout is deterministic, and Schema exposes query/scope/sources/mode/limit/current_session_id.",
+                "TestSessionSearchToolSchema_DefaultArgs proves omitted scope/sources/mode normalize to same-chat/default mode without memory access.",
+                "TestSessionSearchToolSchema_RejectsUnsafeScope proves unknown scope, unknown mode, negative limit, and non-string sources return session_search_invalid_args evidence.",
+                "TestSessionSearchToolSchema_NotRegisteredGlobally proves the row does not edit internal/tools/builtin.go or register the tool outside the local test registry."
+              ],
+              "note": "Split from the quarantined session_search row after six reshapes and repeated stdin/backend failures. This first row gives workers a no-SQL schema/argument target.",
+              "write_scope": [
+                "internal/tools/session_search_tool.go",
+                "internal/tools/session_search_tool_schema_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestSessionSearchToolSchema_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "session_search descriptor and argument fixtures pass without SQLite, memory ranking, Goncho service construction, or global registry binding."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:dbe50155 tools/session_search_tool.py",
+                "note": "Hermes defines session_search UX and recent-mode semantics; Gormes first locks the Go tool schema before wrapping memory search."
+              }
+            },
+            {
+              "name": "Session search tool execution wrapper",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "internal/tools session_search executes over existing internal/memory SearchSessions/SearchMessages APIs, preserving same-chat defaults, explicit user/source widening, lineage-root exclusion in recent mode, and Goncho/Honcho-compatible evidence without changing ranking or persistence",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Tool result reports session_search_unavailable, source_filter_denied, lineage_root_excluded, or session_search_invalid_args evidence instead of widening recall silently.",
+              "fixture": "internal/tools/session_search_tool_execution_test.go::TestSessionSearchToolExecution_*",
+              "source_refs": [
+                "../hermes-agent/tools/session_search_tool.py@dbe50155",
+                "../hermes-agent/tests/tools/test_session_search.py@dbe50155",
+                "internal/memory/session_catalog.go:SearchSessions",
+                "internal/memory/session_catalog.go:SearchMessages",
                 "internal/memory/session_lineage_search_test.go",
                 "internal/goncho/service.go"
               ],
               "ready_when": [
-                "Source-filtered session/message search core and Lineage-aware source-filtered search hits are validated on main.",
-                "Operator-auditable search evidence is validated on main, so this row is unblocked for the tool wrapper only.",
-                "The tool can use seeded SQLite/session.Metadata fixtures and does not need a live gateway, provider, or Goncho cloud service.",
-                "Existing Goncho/Honcho-compatible scope rules remain the authority for user/source widening.",
-                "Implement against the internal/tools.Tool interface in internal/tools/tool.go; this row creates the tool type and tests, not cmd/gormes registry binding.",
-                "This row must wrap existing internal/memory.SearchSessions/SearchMessages and must not change ranking, lineage construction, default same-chat fences, or Goncho persistence."
+                "Session search tool schema and argument validation is complete.",
+                "Source-filtered session/message search core, Lineage-aware source-filtered search hits, and Operator-auditable search evidence are validated on main.",
+                "The worker uses seeded SQLite/session.Metadata fixtures only; no live gateway, provider, registry binding, or external Goncho/Honcho service is required.",
+                "Existing Goncho/Honcho-compatible scope rules remain the authority for user/source widening."
               ],
               "not_ready_when": [
-                "The slice changes ranking, default same-chat recall fences, or Goncho/Honcho memory persistence instead of wrapping existing search results.",
-                "The slice shells out to Hermes Python or reads ~/.hermes session logs.",
-                "The slice edits internal/memory/session_catalog.go or internal/goncho/service.go; those prerequisites are already validated and should be treated as read-only donor code.",
-                "The slice edits internal/tools/builtin.go, cmd/gormes, gateway runtime registration, or the global toolset manifest; registration is a later row after the wrapper fixtures pass.",
-                "The slice includes todo/debug/clarify tools or cronjob tools in the same change."
+                "The slice changes ranking, default same-chat recall fences, lineage construction, or Goncho/Honcho memory persistence instead of wrapping existing search results.",
+                "The slice shells out to Hermes Python, reads ~/.hermes logs, edits internal/memory/session_catalog.go or internal/goncho/service.go, or registers session_search globally.",
+                "The slice includes todo/debug/clarify tools or cronjob tools."
+              ],
+              "blocked_by": [
+                "Session search tool schema and argument validation",
+                "Source-filtered session/message search core",
+                "Lineage-aware source-filtered search hits",
+                "Operator-auditable search evidence"
               ],
               "acceptance": [
-                "TestSessionSearchTool_SameChatDefault seeds two chats and proves no cross-chat hit appears without explicit scope=user or sources.",
-                "TestSessionSearchTool_UserScopeSourceFilter passes scope=user sources=[telegram] and proves only the allowed source's sessions are returned with source evidence.",
-                "TestSessionSearchTool_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155.",
-                "TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening.",
-                "TestSessionSearchTool_DescriptorAndSchema proves the wrapper satisfies tools.Tool with Name() == \"session_search\", a JSON schema that exposes query/scope/sources/mode/current_session_id, and a deterministic timeout without registering it globally."
+                "TestSessionSearchToolExecution_SameChatDefault seeds two chats and proves no cross-chat hit appears without explicit scope=user or sources.",
+                "TestSessionSearchToolExecution_UserScopeSourceFilter passes scope=user sources=[telegram] and proves only the allowed source sessions return with source evidence.",
+                "TestSessionSearchToolExecution_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155.",
+                "TestSessionSearchToolExecution_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z after backend usage-limit health bypass validation. This is still wrapper-only: implement internal/tools/session_search_tool.go plus tests, consume internal/memory donor APIs as read-only behavior, and leave registry binding/ranking/Goncho persistence to other rows.",
+              "note": "Execution half of the session_search split. Treat internal/memory and internal/goncho as read-only donors; registration remains a later row.",
               "write_scope": [
                 "internal/tools/session_search_tool.go",
-                "internal/tools/session_search_tool_test.go",
+                "internal/tools/session_search_tool_execution_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/tools -run '^TestSessionSearchTool_' -count=1",
+                "go test ./internal/tools -run '^TestSessionSearchToolExecution_' -count=1",
                 "go test ./internal/tools ./internal/memory ./internal/goncho -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Session search tool fixtures prove same-chat defaults, opt-in user/source widening, deterministic current-lineage-root exclusion in recent mode, and degraded evidence for unavailable/denied widening."
+                "Session search execution fixtures prove same-chat defaults, opt-in user/source widening, current-lineage-root exclusion, and degraded evidence while memory ranking/persistence stay unchanged."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-27T06:27:43Z",
-                "last_failure": {
-                  "run_id": "20260427T062735Z-268804397",
-                  "category": "worker_error",
-                  "backend": "codexu",
-                  "stderr_tail": "Reading additional input from stdin...\n"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category worker_error",
-                  "since": "2026-04-27T06:27:43Z",
-                  "after_run_id": "20260427T062735Z-268804397",
-                  "threshold": 3,
-                  "spec_hash": "25de7a35770c82b98efa2a6a400b5f53c91d6e980a4d77fac893a78fbe4516b7",
-                  "last_category": "worker_error"
-                }
-              },
-              "planner_verdict": {
-                "needs_human": true,
-                "reason": "auto: 6 reshapes without unsticking; last category backend_waiting_for_stdin",
-                "since": "2026-04-27T11:38:55Z",
-                "reshape_count": 6,
-                "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "still_failing"
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:dbe50155 tools/session_search_tool.py",
-                "note": "Hermes provides the recent-mode exclusion regression; Gormes maps it onto the Go session catalog and Goncho/Honcho-compatible scope rules."
+                "note": "Hermes provides the recent-mode exclusion regression; Gormes maps it onto Go memory search after the local tool schema is validated."
               }
             },
             {
               "name": "Debug helpers",
               "status": "planned",
               "note": "TDD: port `tools/debug_helpers.py` as read-mostly diagnostic tools with redaction and no hidden writes before exposing them to production agents."
+            },
+            {
+              "name": "Debug share paste sweep scheduler contract",
+              "priority": "P4",
+              "status": "planned",
+              "contract": "Gormes debug-share planning owns a persisted paste-deletion queue and an hourly scheduler hook that sweeps expired paste.rs entries with bounded evidence while retaining opportunistic CLI-only cleanup as a fallback",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "If the scheduler is not running, debug-share status reports paste_sweep_scheduler_unavailable and the CLI fallback can still sweep pending entries on the next debug invocation.",
+              "fixture": "internal/cli/debug_paste_sweep_test.go::TestDebugPasteSweep_*",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/debug.py@90a3e73d:_sweep_expired_pastes",
+                "../hermes-agent/gateway/run.py@90a3e73d:_start_cron_ticker",
+                "docs/content/building-gormes/architecture_plan/subsystem-inventory.md:Debug helpers"
+              ],
+              "ready_when": [
+                "Debug helpers are split into a Go-native diagnostic surface with redaction and no hidden writes.",
+                "A native debug-share pending-paste queue exists or is specified as a pure helper before scheduler wiring begins.",
+                "Tests can use fake clock and fake deleter; no network DELETE, paste.rs upload, gateway process, or live cron daemon is required."
+              ],
+              "not_ready_when": [
+                "The slice uploads to paste.rs/dpaste, creates support archives, changes doctor exit codes, or starts the gateway scheduler.",
+                "The slice deletes non-paste.rs URLs or performs network DELETEs in unit tests.",
+                "The slice mixes debug-share queue persistence with unrelated log snapshot or backup manifest behavior."
+              ],
+              "blocked_by": [
+                "Debug helpers"
+              ],
+              "acceptance": [
+                "TestDebugPasteSweep_ExpiredEntriesDeletedWithFakeClock seeds pending paste.rs entries, advances fake time, and proves expired URLs are passed to the fake deleter once.",
+                "TestDebugPasteSweep_UnexpiredEntriesRemain proves future expire_at rows are retained and counted.",
+                "TestDebugPasteSweep_DeleteFailureRetainsEntryWithEvidence proves a failed fake delete keeps the row and reports paste_delete_failed evidence.",
+                "TestDebugPasteSweep_SchedulerCadence proves the hourly hook calls the sweeper on the configured cadence without starting a real gateway or sleeping."
+              ],
+              "note": "Added from Hermes 90a3e73d. Keep draft/blocked until Debug helpers have a Go-native queue; this captures the upstream retention lesson without adding a live network task to the current hot queue.",
+              "write_scope": [
+                "internal/cli/debug_paste_sweep.go",
+                "internal/cli/debug_paste_sweep_test.go",
+                "internal/cron/debug_paste_sweep.go",
+                "internal/cron/debug_paste_sweep_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run '^TestDebugPasteSweep_' -count=1",
+                "go test ./internal/cron -run '^TestDebugPasteSweep_' -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Debug paste sweep fixtures prove fake-clock deletion, retention on failure, pending-count evidence, and hourly scheduler cadence without network calls."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:90a3e73d hermes_cli/debug.py + gateway/run.py",
+                "note": "Hermes moved paste.rs cleanup from opportunistic debug invocation to the gateway cron ticker; Gormes should adapt the queue/sweeper contract after native debug helpers exist."
+              }
             },
             {
               "name": "Planner audit blank-subphase control-plane bucket",
@@ -11675,8 +11935,8 @@
                 "Steer slash command registry + queue fallback",
                 "ContextEngine compression-boundary notification",
                 "Custom provider model-switch key_env write guard",
-                "Native TUI /save XDG file writer binding",
-                "Native TUI bounded conversation viewport"
+                "Native TUI /save XDG export helper",
+                "Native TUI conversation viewport tail helper"
               ],
               "acceptance": [
                 "TestClassifyBackendFailureDetectsUsageLimitStdinExit proves usage-limit text is classified distinctly from ordinary stdin wait while preserving the original detail tail.",
@@ -12170,8 +12430,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T11:44:19Z",
-            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Hermes 7c63c246 adds recurring-job preservation when next-run computation is unavailable; Gormes maps that to a native run-completion helper over Job/Run state because robfig/cron removes the Python croniter dependency but not the operator contract. Hermes dbe50155 adds deterministic session-search recent-mode exclusion for the current lineage root; Gormes maps that onto the Phase 3 session catalog and Goncho/Honcho-compatible scope rules. Session search is now fixture-ready as a wrapper-only tool over internal/memory.SearchSessions/SearchMessages and explicitly excludes memory catalog, registry binding, and Goncho persistence edits. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, CRON.md mirror, and backend health bypass; cron rows remain split so autoloop workers can advance Phase 5.N without guessing."
+            "last_upstream_check": "2026-04-27T12:07:47Z",
+            "origin_decision": "Hermes 90a3e73d moves paste.rs debug-share deletion from opportunistic-only cleanup to a gateway cron ticker; Gormes now tracks that as a blocked Debug share paste sweep scheduler contract behind the native Debug helpers row. Hermes dbe50155 session-search recent-mode exclusion is split into schema/argument validation first, then the memory execution wrapper over internal/memory and Goncho/Honcho-compatible scope rules. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, CRON.md mirror, and backend health bypass; cron rows remain split so autoloop workers can advance Phase 5.N without guessing."
           }
         },
         "5.O": {
@@ -12331,10 +12591,10 @@
               }
             },
             {
-              "name": "CLI OpenClaw residue onboarding hint",
+              "name": "CLI OpenClaw residue detection and hint text",
               "priority": "P3",
               "status": "planned",
-              "contract": "internal/cli exposes pure OpenClaw-residue onboarding helpers: DetectOpenClawResidue(home string) bool returns true only for an existing ~/.openclaw directory, OpenClawResidueHint(commandName string) string returns a Gormes-specific one-time cleanup hint, and OnboardingSeen/MarkOnboardingSeen operate on an in-memory map shape compatible with config onboarding.seen without reading or writing real config files",
+              "contract": "internal/cli exposes pure DetectOpenClawResidue(home string) bool and OpenClawResidueHint(commandName string) string helpers that detect only an existing ~/.openclaw directory and return Gormes-specific cleanup guidance without reading or writing config files",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -12342,18 +12602,18 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "If HOME cannot be inspected or onboarding config is malformed, the helper reports unseen/false and never blocks CLI startup; command wiring can decide whether to persist the seen flag later.",
-              "fixture": "internal/cli/onboarding_test.go::Test{DetectOpenClawResidue,OpenClawResidueHint,OnboardingSeen,MarkOnboardingSeen}_*",
+              "degraded_mode": "If HOME cannot be inspected, the helper returns false and never blocks CLI startup; startup binding can decide later whether to persist a seen flag.",
+              "fixture": "internal/cli/openclaw_residue_test.go::TestOpenClawResidue*",
               "source_refs": [
-                "../hermes-agent/agent/onboarding.py@e63929d4:OPENCLAW_RESIDUE_FLAG,detect_openclaw_residue,openclaw_residue_hint_cli,is_seen",
+                "../hermes-agent/agent/onboarding.py@e63929d4:detect_openclaw_residue,openclaw_residue_hint_cli",
                 "../hermes-agent/tests/agent/test_onboarding.py@e63929d4:TestOpenClawResidue",
                 "../hermes-agent/cli.py@e63929d4:first-time OpenClaw-residue banner",
                 "internal/cli/tips.go"
               ],
               "ready_when": [
-                "internal/cli already has pure helper files and tests; this slice adds another helper without command registration, config I/O, or startup wiring.",
-                "Use Gormes-facing text (`gormes openclaw cleanup` or the command name injected by tests) rather than copying Hermes' `hermes claw cleanup` string.",
-                "Filesystem checks use a temp HOME provided by tests; no real operator home directory is inspected in unit tests."
+                "internal/cli already has pure helper files and tests; this slice adds a sibling helper without command registration, config I/O, or startup wiring.",
+                "Use Gormes-facing text such as the command name injected by tests; do not copy Hermes `hermes claw cleanup` wording.",
+                "Filesystem checks use a temp HOME provided by tests; no real operator home directory is inspected."
               ],
               "not_ready_when": [
                 "The slice edits cmd/gormes startup, reads/writes config files, renames ~/.openclaw, migrates OpenClaw data, or ports the full optional migration script.",
@@ -12361,59 +12621,93 @@
                 "The helper treats a regular file named .openclaw as residue."
               ],
               "unblocks": [
-                "OpenClaw residue startup banner binding"
+                "CLI onboarding seen-state map helpers"
               ],
               "acceptance": [
                 "TestDetectOpenClawResidue_DirectoryOnly returns true for a temp HOME containing a .openclaw directory and false for missing path or a regular file.",
+                "TestDetectOpenClawResidue_UnreadableHomeReturnsFalse proves stat errors degrade to false without panic.",
                 "TestOpenClawResidueHint_MentionsInjectedCleanupCommand proves the hint contains ~/.openclaw, the injected Gormes cleanup command, and no `hermes claw cleanup` substring.",
-                "TestOnboardingSeen_MalformedConfigUnseen covers missing onboarding, non-map onboarding, non-map seen, false values, and unrelated flags.",
-                "TestMarkOnboardingSeen_InMemoryPreservesOtherFlags sets openclaw_residue_cleanup=true in the provided map without removing existing seen flags.",
-                "No test touches the real user home or writes config.yaml."
+                "No test touches the real user home, config.yaml, or cmd/gormes startup."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z after backend usage-limit health bypass validation. The row remains pure internal/cli helper work over temp HOME and in-memory seen-state only; cmd/gormes startup persistence and cleanup commands stay out of scope.",
+              "note": "Split from the quarantined onboarding row. This first row is filesystem+text only; seen-state map helpers are separate so workers do not mix config-shape logic with HOME probing.",
               "write_scope": [
-                "internal/cli/onboarding.go",
-                "internal/cli/onboarding_test.go",
+                "internal/cli/openclaw_residue.go",
+                "internal/cli/openclaw_residue_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/cli -run '^Test.*OpenClaw|^TestOnboardingSeen|^TestMarkOnboardingSeen' -count=1",
+                "go test ./internal/cli -run '^Test(OpenClawResidue|DetectOpenClawResidue)' -count=1",
                 "go test ./internal/cli -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "CLI onboarding fixtures prove directory-only OpenClaw residue detection, Gormes-specific cleanup hint text, in-memory seen-state handling, malformed-config tolerance, and no real HOME/config writes."
+                "CLI fixtures prove directory-only OpenClaw residue detection and Gormes-specific cleanup hint text without real HOME/config writes."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-27T06:23:17Z",
-                "last_failure": {
-                  "run_id": "20260427T062308Z-796738647",
-                  "category": "worker_error",
-                  "backend": "codexu",
-                  "stderr_tail": "Reading additional input from stdin...\n"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category worker_error",
-                  "since": "2026-04-27T06:23:17Z",
-                  "after_run_id": "20260427T062308Z-796738647",
-                  "threshold": 3,
-                  "spec_hash": "8fdbfeee46363e33325e403cca57655ddb48ff3d267798e60aa953d45fa4dea2",
-                  "last_category": "worker_error"
-                }
-              },
-              "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z"
-              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:e63929d4 agent/onboarding.py",
-                "note": "Hermes defines the OpenClaw-residue first-touch hint; Gormes adapts the helper text and state shape before any command binding."
+                "note": "Hermes defines the OpenClaw-residue first-touch hint; Gormes adapts detection and text before state persistence or startup binding."
+              }
+            },
+            {
+              "name": "CLI onboarding seen-state map helpers",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "internal/cli exposes pure OnboardingSeen and MarkOnboardingSeen helpers over an in-memory map shape compatible with config onboarding.seen without reading or writing real config files",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Malformed onboarding config maps are treated as unseen and never block CLI startup; command wiring can persist the corrected map in a later row.",
+              "fixture": "internal/cli/onboarding_state_test.go::TestOnboardingSeen*",
+              "source_refs": [
+                "../hermes-agent/agent/onboarding.py@e63929d4:OPENCLAW_RESIDUE_FLAG,is_seen,mark_seen",
+                "../hermes-agent/tests/agent/test_onboarding.py@e63929d4:TestOpenClawResidue",
+                "internal/config/config.go:onboarding.seen"
+              ],
+              "ready_when": [
+                "CLI OpenClaw residue detection and hint text is complete or fixture-ready; this row only adds the in-memory seen-state contract.",
+                "Tests build map[string]any fixtures directly and do not read or write config.yaml.",
+                "The helper key remains openclaw_residue_cleanup so later startup wiring can share the same flag."
+              ],
+              "not_ready_when": [
+                "The slice edits cmd/gormes startup, persists config files, inspects HOME, or prints the OpenClaw hint.",
+                "The helper removes unrelated onboarding.seen flags or panics on malformed config shapes.",
+                "The slice migrates OpenClaw data or writes upstream Hermes paths."
+              ],
+              "blocked_by": [
+                "CLI OpenClaw residue detection and hint text"
+              ],
+              "unblocks": [
+                "OpenClaw residue startup banner binding"
+              ],
+              "acceptance": [
+                "TestOnboardingSeen_MalformedConfigUnseen covers missing onboarding, non-map onboarding, non-map seen, false values, and unrelated flags.",
+                "TestOnboardingSeen_OpenClawResidueTrue proves openclaw_residue_cleanup=true is recognized.",
+                "TestMarkOnboardingSeen_InMemoryPreservesOtherFlags sets openclaw_residue_cleanup=true without removing existing seen flags.",
+                "No test reads the real user config or writes config.yaml."
+              ],
+              "note": "Dependent half of the quarantined OpenClaw row. It owns only map-shape helpers; startup banner persistence remains a later row.",
+              "write_scope": [
+                "internal/cli/onboarding_state.go",
+                "internal/cli/onboarding_state_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run '^TestOnboardingSeen|^TestMarkOnboardingSeen' -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "CLI onboarding-state fixtures prove malformed config tolerance, true-flag detection, in-memory mark behavior, and preservation of unrelated seen flags."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:e63929d4 agent/onboarding.py",
+                "note": "Hermes defines the one-time onboarding seen flag; Gormes keeps it as a pure map helper before startup persistence."
               }
             },
             {
@@ -13914,7 +14208,7 @@
               "planner_verdict": {
                 "reshape_count": 2,
                 "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -14053,8 +14347,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T11:44:19Z",
-            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer CLI custom-provider drift supersedes the 8258f4dc key_env write-shape guard. Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes; and 8258f4dc adds the key_env write-shape guard. Gormes has native oneshot/model override helpers, credential preservation, and backend health bypass validated, so the key_env write guard is fixture-ready as a pure internal/cli patch-helper row."
+            "last_upstream_check": "2026-04-27T12:07:47Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer CLI custom-provider drift supersedes the 8258f4dc key_env write-shape guard. Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching; e63929d4 OpenClaw residue onboarding is now split into detection/hint and seen-state helpers so workers avoid mixing HOME probing with config-shape helpers. Gormes has native oneshot/model override helpers, credential preservation, and backend health bypass validated."
           }
         },
         "5.P": {
@@ -14887,10 +15181,10 @@
               }
             },
             {
-              "name": "Native TUI /save XDG file writer binding",
+              "name": "Native TUI /save XDG export helper",
               "priority": "P2",
               "status": "planned",
-              "contract": "cmd/gormes binds the native TUI /save SessionExportFunc to the canonical persisted transcript reader and writes markdown exports under the Gormes XDG data directory, never under upstream HERMES_HOME or the process working directory",
+              "contract": "cmd/gormes exposes a small helper that builds a tui.SessionExportFunc over config.MemoryDBPath and transcript.ExportMarkdown, writing markdown exports under $XDG_DATA_HOME/gormes/sessions/exports and never under HERMES_HOME or the process working directory",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -14898,82 +15192,116 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location. Backend usage-limit/stdin outages are now run-level evidence and should not block this cmd/gormes binding fixture.",
-              "fixture": "cmd/gormes/tui_save_export_test.go::TestTUISaveExport_*",
+              "degraded_mode": "The helper returns store/export/write errors to the TUI save handler so partial-file cleanup can report save failure without falling back to ambiguous paths.",
+              "fixture": "cmd/gormes/tui_save_export_test.go::TestTUISaveExportHelper_*",
               "source_refs": [
                 "../hermes-agent/tests/cli/test_save_conversation_location.py@5eb6cd82",
                 "../hermes-agent/cli.py@5eb6cd82:save conversation location",
                 "../hermes-agent/tui_gateway/server.py@5eb6cd82:session.save",
                 "internal/tui/slash_save.go:SessionExportFunc",
                 "cmd/gormes/session.go:sessionExportCmd",
-                "cmd/gormes/main.go:runResolvedTUIWithRuntime",
                 "internal/config/config.go:MemoryDBPath"
               ],
               "ready_when": [
                 "Native TUI /save canonical session export is validated on main and exposes SessionExportFunc on Model options.",
-                "The prior /save handler write-scope issue is closed; slash_dispatch_test.go was already included in the completed handler row and should not be touched here.",
                 "cmd/gormes/session.go already proves transcript.ExportMarkdown works against config.MemoryDBPath for the CLI export command.",
-                "internal/tui/slash_save.go already owns partial-file cleanup and should be treated as read-only in this binding slice.",
-                "Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence."
+                "This row owns helper construction only; do not edit cmd/gormes/main.go or internal/tui slash handler behavior here.",
+                "Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture must assert that divergence."
               ],
               "not_ready_when": [
-                "The slice reopens internal/tui slash handler behavior or changes transcript.ExportMarkdown output format.",
-                "The slice writes exports under HERMES_HOME, the repository root, or the current working directory.",
+                "The slice changes internal/tui slash handler behavior, transcript.ExportMarkdown output format, or remote TUI startup.",
+                "The slice writes exports under HERMES_HOME, repository root, or current working directory.",
                 "The slice starts a provider, API server, remote TUI gateway, or live session browser."
               ],
-              "acceptance": [
-                "cmd/gormes constructs a SessionExportFunc for the local TUI Model, preferably through a small helper in cmd/gormes/session.go, that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
-                "runResolvedTUIWithRuntime passes that function through tui.Options{SessionExport: ...} only for the local TUI path; remote TUI startup remains unchanged.",
-                "TestTUISaveExport_WritesUnderXDGDataHome sets XDG_DATA_HOME and HERMES_HOME to different temp roots, invokes the bound SessionExportFunc, and proves the file lands under the Gormes XDG export directory only.",
-                "TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path.",
-                "The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway."
+              "blocked_by": [
+                "Native TUI /save canonical session export"
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z after backend health bypass validation. The native TUI /save handler remains complete on main; this row binds cmd/gormes to XDG export storage only and keeps internal/tui slash dispatch plus transcript markdown formatting read-only.",
+              "unblocks": [
+                "Native TUI /save local runtime binding"
+              ],
+              "acceptance": [
+                "A helper in cmd/gormes/session.go constructs a tui.SessionExportFunc that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
+                "TestTUISaveExportHelper_WritesUnderXDGDataHome sets XDG_DATA_HOME and HERMES_HOME to different temp roots and proves the file lands only under the Gormes XDG export directory.",
+                "TestTUISaveExportHelper_CollisionSafeName proves an existing export does not overwrite unrelated data.",
+                "The helper returns the exported path in its result and no test opens a network connection or starts the remote TUI gateway."
+              ],
+              "note": "Split from the quarantined /save binding row. First land the XDG export helper in cmd/gormes/session.go; main.go runtime binding is a dependent row.",
               "write_scope": [
-                "cmd/gormes/main.go",
                 "cmd/gormes/session.go",
                 "cmd/gormes/tui_save_export_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./cmd/gormes -run '^TestTUISaveExport_' -count=1",
-                "go test ./cmd/gormes ./internal/tui ./internal/transcript -count=1",
+                "go test ./cmd/gormes -run '^TestTUISaveExportHelper_' -count=1",
+                "go test ./cmd/gormes ./internal/transcript -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "cmd/gormes TUI save-export fixtures prove the real SessionExportFunc writes under XDG_DATA_HOME/gormes/sessions/exports, ignores HERMES_HOME for runtime state, relies on the existing TUI partial-file cleanup path, and returns the exported path to /save without internal/tui edits."
+                "cmd/gormes export-helper fixtures prove XDG export location, HERMES_HOME isolation, collision-safe names, and transcript.ExportMarkdown integration without main.go/internal/tui edits."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-27T06:21:30Z",
-                "last_failure": {
-                  "run_id": "20260427T062122Z-385795226",
-                  "category": "worker_error",
-                  "backend": "codexu",
-                  "stderr_tail": "Reading additional input from stdin...\n"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category worker_error",
-                  "since": "2026-04-27T06:21:30Z",
-                  "after_run_id": "20260427T062122Z-385795226",
-                  "threshold": 3,
-                  "spec_hash": "3fba895a259699977ed83d01b1d67e359ce68c87fe6762698faf9615022dec37",
-                  "last_category": "worker_error"
-                }
-              },
-              "planner_verdict": {
-                "reshape_count": 3,
-                "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "no_attempts_yet"
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5eb6cd82 cli.py,tui_gateway/server.py",
-                "note": "Hermes contributes the save-location regression; Gormes adapts it to the existing XDG runtime-state policy rather than using upstream HERMES_HOME."
+                "note": "Hermes contributes the save-location regression; Gormes adapts it to the existing XDG runtime-state policy."
+              }
+            },
+            {
+              "name": "Native TUI /save local runtime binding",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "cmd/gormes local native TUI startup passes the validated XDG SessionExportFunc through tui.Options{SessionExport: ...} while remote TUI startup remains unchanged",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Local TUI /save reports `save: store unavailable` or `save: write failed: <err>` through the existing slash handler instead of exposing an unwired handler; remote TUI startup remains unaffected.",
+              "fixture": "cmd/gormes/tui_save_binding_test.go::TestTUISaveBinding_*",
+              "source_refs": [
+                "../hermes-agent/tui_gateway/server.py@5eb6cd82:session.save",
+                "internal/tui/slash_save.go:SessionExportFunc",
+                "cmd/gormes/session.go:sessionExportCmd",
+                "cmd/gormes/main.go:runResolvedTUIWithRuntime"
+              ],
+              "ready_when": [
+                "Native TUI /save XDG export helper is complete and returns a tui.SessionExportFunc.",
+                "The prior /save handler write-scope issue is closed; slash_dispatch_test.go and internal/tui slash cleanup are read-only for this row.",
+                "Tests can exercise runResolvedTUIWithRuntime with injected runtime/options seams; no provider, API server, remote TUI gateway, or live session browser is required."
+              ],
+              "not_ready_when": [
+                "The slice reopens internal/tui slash handler behavior or changes transcript.ExportMarkdown output format.",
+                "The slice starts remote TUI/SSE paths or changes remote gateway behavior.",
+                "The slice writes exports directly in main.go instead of passing the helper-provided SessionExportFunc."
+              ],
+              "blocked_by": [
+                "Native TUI /save XDG export helper"
+              ],
+              "acceptance": [
+                "runResolvedTUIWithRuntime passes tui.Options{SessionExport: helper} for the local TUI path.",
+                "TestTUISaveBinding_LocalModelReceivesSessionExport proves the local model options contain a non-nil SessionExport function backed by the helper.",
+                "TestTUISaveBinding_RemoteTUIUnchanged proves remote TUI startup does not receive or invoke the local SessionExportFunc.",
+                "Existing cmd/gormes session export command tests and internal/tui /save handler tests remain green."
+              ],
+              "note": "Dependent runtime-binding half of the quarantined /save row. It owns cmd/gormes/main.go only after the helper row lands.",
+              "write_scope": [
+                "cmd/gormes/main.go",
+                "cmd/gormes/tui_save_binding_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes -run '^TestTUISaveBinding_' -count=1",
+                "go test ./cmd/gormes ./internal/tui -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "cmd/gormes binding fixtures prove local native TUI receives the XDG SessionExportFunc and remote TUI startup remains unchanged."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:5eb6cd82 tui_gateway/server.py",
+                "note": "Hermes exposes TUI session save; Gormes binds it only for the local native TUI after XDG export behavior is fixture-backed."
               }
             },
             {
@@ -15139,10 +15467,10 @@
               }
             },
             {
-              "name": "Native TUI bounded conversation viewport",
+              "name": "Native TUI conversation viewport tail helper",
               "priority": "P2",
               "status": "planned",
-              "contract": "Native Bubble Tea conversation rendering limits each frame to the visible tail of RenderFrame.History plus DraftText/LastError under a caller-provided height budget, emits a stable omitted-history sentinel when earlier turns are hidden, and avoids rebuilding unbounded conversation strings during long sessions",
+              "contract": "internal/tui exposes a pure conversation viewport helper that clips RenderFrame.History to the visible tail under width/height budgets, emits a deterministic omitted-history sentinel, and always preserves DraftText and LastError inputs",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -15150,8 +15478,8 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "If height is too small or width is narrow, the helper still renders the latest visible turn/draft/error and a compact omitted-history sentinel rather than panicking or allocating the full history body. Backend quota/stdin failures are now run-level degradation and should not block this pure viewport-helper row.",
-              "fixture": "internal/tui/viewport_history_test.go::TestRenderConversationViewport_*",
+              "degraded_mode": "If height is tiny or width is narrow, the helper renders the latest visible turn plus compact draft/error/sentinel evidence instead of panicking or allocating the full history body.",
+              "fixture": "internal/tui/viewport_history_test.go::TestConversationViewportTail_*",
               "source_refs": [
                 "../hermes-agent/ui-tui/src/hooks/useVirtualHistory.ts@e63929d4",
                 "../hermes-agent/ui-tui/src/lib/virtualHeights.ts@e63929d4",
@@ -15162,65 +15490,97 @@
               "ready_when": [
                 "internal/tui/view.go currently renders every RenderFrame.History message into one joined string; the worker can add a pure helper and table tests without changing kernel history, persistence, or provider streaming.",
                 "Synthetic RenderFrame fixtures with 100+ messages are enough; no Bubble Tea program, terminal, Node/Ink runtime, or Hermes profiling script needs to run.",
-                "The row is a Gormes-native performance guard, not a direct port of Hermes' React/Ink virtualization stack."
+                "This row is a Gormes-native performance guard, not a port of Hermes React/Ink virtualization internals."
               ],
               "not_ready_when": [
-                "The slice imports React/Ink concepts, starts Node, changes kernel.RenderFrame shape, truncates stored session/transcript history, or edits internal/kernel/internal/transcript persistence.",
-                "The slice changes slash-command, remote TUI SSE, API server, or dashboard behavior in the same diff.",
-                "The slice silently drops DraftText or LastError when history is long."
+                "The slice imports React/Ink concepts, starts Node, changes kernel.RenderFrame shape, truncates stored session/transcript history, or edits kernel/session/transcript persistence.",
+                "The slice wires renderConv integration, slash-command, remote TUI SSE, API server, or dashboard behavior in the same diff.",
+                "The helper silently drops DraftText or LastError when history is long."
+              ],
+              "unblocks": [
+                "Native TUI renderConv viewport budget binding"
               ],
               "acceptance": [
-                "TestRenderConversationViewport_OmitsEarlierHistory builds 120 alternating user/assistant messages and asserts the rendered output contains the latest turns, excludes the earliest turn body, and includes a deterministic omitted-history sentinel with the hidden count.",
-                "TestRenderConversationViewport_AlwaysIncludesDraftAndLastError proves DraftText and LastError survive even when history is clipped.",
-                "TestRenderConversationViewport_HeightAndWidthClamp proves width<4 and tiny height do not panic and still render a compact latest-message view.",
-                "TestRenderConversationViewport_RenderedLineBudget asserts the helper returns no more than the requested visible budget plus a small sentinel allowance for wrapped content.",
-                "The implementation stays in internal/tui/view.go plus its test; no kernel/session/transcript files are edited."
+                "TestConversationViewportTail_OmitsEarlierHistory builds 120 alternating user/assistant messages and asserts latest turns remain, earliest turn body is excluded, and a deterministic omitted-history sentinel includes the hidden count.",
+                "TestConversationViewportTail_AlwaysIncludesDraftAndLastError proves DraftText and LastError survive when history is clipped.",
+                "TestConversationViewportTail_HeightAndWidthClamp proves width<4 and tiny height do not panic and still render a compact latest-message view.",
+                "TestConversationViewportTail_RenderedLineBudget asserts helper output stays within the requested visible budget plus a small sentinel allowance."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z after backend health bypass validation. Keep the implementation native to internal/tui/view.go plus table tests; no kernel/session/transcript persistence, slash-command, remote TUI, or API server edits belong here.",
+              "note": "Split from the quarantined bounded viewport row. The first slice is a pure helper; renderConv integration is dependent and narrower.",
               "write_scope": [
                 "internal/tui/view.go",
                 "internal/tui/viewport_history_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/tui -run '^TestRenderConversationViewport_' -count=1",
+                "go test ./internal/tui -run '^TestConversationViewportTail_' -count=1",
                 "go test ./internal/tui -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Native TUI viewport fixtures prove long histories render a bounded visible tail with omitted-count sentinel, draft/error preservation, small-size clamps, and no kernel/session persistence changes."
+                "Native TUI viewport helper fixtures prove bounded tail rendering, omitted-count sentinel, draft/error preservation, and small-size clamps without render integration changes."
               ],
-              "health": {
-                "attempt_count": 3,
-                "consecutive_failures": 3,
-                "last_attempt": "2026-04-27T06:22:24Z",
-                "last_failure": {
-                  "run_id": "20260427T062214Z-561560764",
-                  "category": "worker_error",
-                  "backend": "codexu",
-                  "stderr_tail": "Reading additional input from stdin...\n"
-                },
-                "backends_tried": [
-                  "codexu"
-                ],
-                "quarantine": {
-                  "reason": "auto: 3 consecutive failures, last category worker_error",
-                  "since": "2026-04-27T06:22:24Z",
-                  "after_run_id": "20260427T062214Z-561560764",
-                  "threshold": 3,
-                  "spec_hash": "003ebb07af5d17dbbc405853da03e474c26020f9a6185947d36cc1a2fb1a2470",
-                  "last_category": "worker_error"
-                }
-              },
-              "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "no_attempts_yet"
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:e63929d4 ui-tui/src/hooks/useVirtualHistory.ts",
-                "note": "Hermes fixed long-session Ink performance with virtualization; Gormes adapts the invariant to the native Bubble Tea renderer."
+                "note": "Hermes fixed long-session Ink performance with virtualization; Gormes adapts the invariant as a pure Bubble Tea viewport helper first."
+              }
+            },
+            {
+              "name": "Native TUI renderConv viewport budget binding",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "internal/tui renderConv uses the validated conversation viewport helper with the caller-provided frame height/width budget so each Bubble Tea frame renders only the visible conversation tail plus draft/error status",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "renderConv falls back to the helper compact latest-turn output when the terminal is too small instead of rebuilding or returning an unbounded conversation string.",
+              "fixture": "internal/tui/viewport_render_test.go::TestRenderConvViewportBinding_*",
+              "source_refs": [
+                "../hermes-agent/ui-tui/src/hooks/useVirtualHistory.ts@e63929d4",
+                "internal/tui/view.go:renderConv"
+              ],
+              "ready_when": [
+                "Native TUI conversation viewport tail helper is complete and tested.",
+                "The worker only binds renderConv/view rendering to the helper; kernel.RenderFrame, session persistence, transcript storage, remote TUI SSE, and API server behavior are read-only.",
+                "Tests can call renderConv or a package-private wrapper directly without starting a Bubble Tea program."
+              ],
+              "not_ready_when": [
+                "The slice changes kernel.RenderFrame shape, truncates stored history, starts a TUI program, or imports Node/Ink code.",
+                "The slice changes slash-command, remote TUI SSE, API server, dashboard, kernel/session, or transcript files.",
+                "The slice drops DraftText or LastError in the renderConv integration."
+              ],
+              "blocked_by": [
+                "Native TUI conversation viewport tail helper"
+              ],
+              "acceptance": [
+                "TestRenderConvViewportBinding_UsesHeightBudget proves renderConv output for 120 turns contains the latest turns and omitted sentinel but not earliest body text.",
+                "TestRenderConvViewportBinding_DraftAndErrorPreserved proves the render integration preserves DraftText and LastError under clipping.",
+                "TestRenderConvViewportBinding_NoKernelOrTranscriptMutation is covered by write scope and package tests; only internal/tui/view.go plus tests change.",
+                "Existing internal/tui rendering and slash command tests remain green."
+              ],
+              "note": "Dependent binding half of the bounded viewport split. Keep this row to internal/tui view wiring only.",
+              "write_scope": [
+                "internal/tui/view.go",
+                "internal/tui/viewport_render_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tui -run '^TestRenderConvViewportBinding_' -count=1",
+                "go test ./internal/tui -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "renderConv fixtures prove the native TUI frame renderer uses bounded visible-tail output while preserving draft/error status and existing TUI tests."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:e63929d4 ui-tui/src/hooks/useVirtualHistory.ts",
+                "note": "Hermes supplies the long-session rendering invariant; Gormes binds it to Bubble Tea renderConv after the pure helper lands."
               }
             },
             {
@@ -15736,7 +16096,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z"
+                "last_reshape": "2026-04-27T11:38:55Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -15879,8 +16240,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T11:44:19Z",
-            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer API/TUI drift supersedes the existing native Gormes rows. Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes 2536a36f/5eb6cd82 define /save and save-location semantics; Gormes preserves XDG runtime state instead of upstream HERMES_HOME, and the cmd/gormes XDG writer row is fixture-ready after backend health validation. Hermes e63929d4 adds long-session Ink virtualization and profiling; Gormes tracks the native bounded Bubble Tea viewport row as fixture-ready. Detailed health is fixture-ready, and cron admin remains split into read-only then mutating rows."
+            "last_upstream_check": "2026-04-27T12:07:47Z",
+            "origin_decision": "Hermes 755a2804, 5eb6cd82, and e63929d4 remain the donor set for API/TUI health, save-export, and long-history TUI behavior. The quarantined local TUI /save and bounded-viewport rows are now split into helper-first and runtime-binding rows with disjoint acceptance so backend/stdin failures or write-scope collisions do not keep broad rows quarantined. The API server detailed health endpoint remains a small binding row after the snapshot contract."
           }
         },
         "5.R": {

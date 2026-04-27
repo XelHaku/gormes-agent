@@ -42,47 +42,28 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/gateway/whatsapp_identity.py@91512b82:expand_whatsapp_aliases path traversal guard, ../hermes-agent/gateway/whatsapp_identity.py@6993e566:_SAFE_IDENTIFIER_RE ASCII guard, internal/channels/whatsapp/identity.go:NormalizeInboundWithIdentity, internal/channels/whatsapp/testdata/identity_contract.json
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 2. Telegram group mention gate config binding
+## 2. Telegram require-mention config fields
 
 - Phase: 2 / 2.B.5
 - Owner: `gateway`
 - Size: `small`
 - Status: `planned`
 - Priority: `P3`
-- Contract: Telegram runtime can opt into Hermes-style group require-mention policy by using the validated bot-command mention helper to drop unaddressed group text and bare slash commands while leaving DMs, allowed-chat gating, first-run discovery, and fresh-final streaming unchanged
+- Contract: internal/config parses Telegram require_mention and bot_username fields with disabled defaults so group mention gating remains opt-in and can be tested without constructing a Telegram bot runtime
 - Trust class: gateway, operator, system
-- Ready when: Telegram group bot-command mention gate helper is validated on main; workers can bind config/runtime behavior directly against internal/channels/telegram/group_mention.go., The binding can be tested through synthetic tgbotapi.Update values and Config fields only; no live Telegram token, BotFather username lookup, gateway.Manager, pairing store, or provider runtime is required., The worker should keep group gating opt-in and leave existing allowed_chat_id / first_run_discovery tests unchanged.
-- Not ready when: The slice changes gateway pairing approval, channel session-key generation, fresh-final deleteMessage behavior, Slack/Discord policy, or command registry semantics., The slice requires a live getMe call or network-derived bot username in unit tests., The slice drops DMs or explicitly mentioned group commands when require_mention is disabled.
-- Degraded mode: Telegram status reports telegram_group_mention_gate_disabled, telegram_group_mention_gate_unavailable, or telegram_group_message_unaddressed instead of silently processing unaddressed group traffic.
-- Fixture: `internal/channels/telegram/group_mention_binding_test.go`
-- Write scope: `internal/config/config.go`, `internal/config/config_test.go`, `internal/channels/telegram/bot.go`, `internal/channels/telegram/bot_test.go`, `internal/channels/telegram/group_mention.go`, `internal/channels/telegram/group_mention_binding_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/config -run TestLoad_TelegramRequireMentionFields -count=1`, `go test ./internal/channels/telegram -run '^TestBot_ToInboundEvent_Group\|^TestBot_ToInboundEvent_DMBypassesMentionGate' -count=1`, `go test ./internal/config ./internal/channels/telegram -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Config and Telegram adapter fixtures prove opt-in group require-mention policy gates bare group commands, accepts `/cmd@botname` bot_command entities, preserves DM behavior, and leaves existing Telegram streaming/command tests green.
-- Acceptance: TestLoad_TelegramRequireMentionFields proves TelegramCfg parses require_mention and bot_username with safe defaults that preserve current behavior., TestBot_ToInboundEvent_GroupBareCommandDroppedWhenRequireMentionEnabled proves a group `/status` command without @botname is dropped when require_mention=true., TestBot_ToInboundEvent_GroupBotCommandSuffixAccepted proves `/status@gormes_bot` with a bot_command entity reaches gateway.ParseInboundText when configured bot_username matches., TestBot_ToInboundEvent_DMBypassesMentionGate proves private chats still process commands/text without mention., Existing Telegram fresh-final delete and command parsing tests keep passing.
-- Source refs: ../hermes-agent/gateway/platforms/telegram.py@3ff3dfb5:TelegramAdapter._should_process_message, ../hermes-agent/tests/gateway/test_telegram_group_gating.py@3ff3dfb5, internal/channels/telegram/group_mention.go, internal/channels/telegram/bot.go, internal/config/config.go:TelegramCfg
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
+- Ready when: Telegram group bot-command mention gate helper is validated on main; config parsing can land independently before runtime binding., The worker only touches internal/config and uses temp TOML/string fixtures; no live Telegram token, BotFather username lookup, gateway.Manager, or provider runtime is required., Defaults must preserve current behavior: require_mention=false and bot_username empty.
+- Not ready when: The slice edits internal/channels/telegram, starts a bot, changes allowed_chat_id or first_run_discovery, or wires runtime message dropping., The config loader enables require_mention by default or requires bot_username for DMs., The slice changes gateway pairing approval, channel session-key generation, fresh-final delete behavior, or command registry semantics.
+- Degraded mode: When the fields are absent or malformed, Telegram group mention gating remains disabled with config evidence instead of changing DM, allowed-chat, or first-run discovery behavior.
+- Fixture: `internal/config/config_test.go::TestLoad_TelegramRequireMentionFields`
+- Write scope: `internal/config/config.go`, `internal/config/config_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/config -run TestLoad_TelegramRequireMentionFields -count=1`, `go test ./internal/config -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Config fixtures prove Telegram require_mention and bot_username parse with disabled defaults and no Telegram runtime edits.
+- Acceptance: TestLoad_TelegramRequireMentionFields proves require_mention=true and bot_username="gormes_bot" parse into TelegramCfg., TestLoad_TelegramRequireMentionDefaults proves missing fields keep require_mention=false and bot_username empty., TestLoad_TelegramRequireMentionInvalidType proves malformed require_mention returns config evidence/error without enabling the gate., Existing Telegram config tests remain green and no internal/channels/telegram files change.
+- Source refs: ../hermes-agent/gateway/platforms/telegram.py@3ff3dfb5:TelegramAdapter._should_process_message, ../hermes-agent/tests/gateway/test_telegram_group_gating.py@3ff3dfb5, internal/config/config.go:TelegramCfg
+- Unblocks: Telegram group require-mention bot binding
+- Why now: Unblocks Telegram group require-mention bot binding.
 
-## 3. Gateway inbound dedup evidence wiring
-
-- Phase: 2 / 2.B.5
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Gateway manager applies the shared MessageDeduplicator to inbound events with stable message IDs, drops duplicate submissions with visible evidence, and degrades missing message IDs without suppressing the turn
-- Trust class: gateway, system
-- Ready when: Gateway message deduplicator bounded helper is validated on main and exposes duplicate/evicted/disabled evidence., Shared gateway inbound event normalization is validated and platform adapters already pass stable message IDs where available., The worker can use fake gateway.Channel and fake kernel fixtures only; no Telegram, Slack, Discord, or provider SDK is needed.
-- Not ready when: The slice changes channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state., The slice stores dedup history on disk or treats empty message IDs as duplicates.
-- Degraded mode: Gateway status reports dedup_unavailable for missing IDs and duplicate_message for dropped repeats instead of silently replaying duplicate platform events.
-- Fixture: `internal/gateway/message_deduplicator_manager_test.go`
-- Write scope: `internal/gateway/message_deduplicator.go`, `internal/gateway/message_deduplicator_manager_test.go`, `internal/gateway/event.go`, `internal/gateway/manager.go`, `internal/gateway/fake_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/gateway -run '^TestGatewayInbound_Dedup' -count=1`, `go test ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior.
-- Acceptance: TestGatewayInbound_DedupDropsRepeatedMessageID submits the same channel/chat/message ID twice and proves the fake kernel receives only the first turn while status evidence records duplicate_message., TestGatewayInbound_DedupScopesByChannelChatAndThread proves identical platform message IDs in different chats or threads do not collide., TestGatewayInbound_DedupMissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence., Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green.
-- Source refs: ../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator, ../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585, internal/gateway/message_deduplicator.go, internal/gateway/event.go, internal/gateway/manager.go
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
-
-## 4. Durable worker RSS drain integration
+## 3. Durable worker RSS drain integration
 
 - Phase: 2 / 2.E.3
 - Owner: `orchestrator`
@@ -103,7 +84,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Durable worker RSS doctor/status evidence
 - Why now: Unblocks Durable worker RSS doctor/status evidence.
 
-## 5. Steer slash command registry + queue fallback
+## 4. Steer slash command registry + queue fallback
 
 - Phase: 2 / 2.F.5
 - Owner: `gateway`
@@ -123,7 +104,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Mid-run steer injection between tool calls, Gateway-handled slash commands bypass active-session guard
 - Why now: Unblocks Mid-run steer injection between tool calls, Gateway-handled slash commands bypass active-session guard.
 
-## 6. ContextEngine compression-boundary notification
+## 5. ContextEngine compression-boundary notification
 
 - Phase: 4 / 4.B
 - Owner: `provider`
@@ -143,7 +124,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/run_agent.py@e85b7525, ../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525, internal/hermes/context_engine.go, internal/kernel/context_engine.go, internal/kernel/contextengine_test.go, internal/hermes/context_compressor_budget.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 7. Title prompt and truncation contract
+## 6. Title prompt and truncation contract
 
 - Phase: 4 / 4.F
 - Owner: `provider`
@@ -162,47 +143,49 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/agent/title_generator.py@4a2ee6c1:generate_title, ../hermes-agent/agent/title_generator.py@4a2ee6c1:maybe_auto_title, ../hermes-agent/tests/agent/test_title_generator.py@4a2ee6c1, internal/tui/auto_title.go, internal/session/, internal/transcript/
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 8. Session search
+## 7. Session search tool schema and argument validation
 
 - Phase: 5 / 5.N
 - Owner: `tools`
 - Size: `small`
 - Status: `planned`
-- Contract: internal/tools exposes a wrapper-only session_search Tool over existing internal/memory SearchSessions/SearchMessages APIs, preserving same-chat defaults, explicit user/source widening, lineage-root exclusion in recent mode, and Goncho/Honcho-compatible evidence without changing ranking or persistence
+- Priority: `P3`
+- Contract: internal/tools defines a session_search Tool descriptor, JSON schema, timeout, and argument validator for query, scope, sources, mode, limit, and current_session_id without registering the tool globally or reading memory
 - Trust class: operator, child-agent, system
-- Ready when: Source-filtered session/message search core and Lineage-aware source-filtered search hits are validated on main., Operator-auditable search evidence is validated on main, so this row is unblocked for the tool wrapper only., The tool can use seeded SQLite/session.Metadata fixtures and does not need a live gateway, provider, or Goncho cloud service., Existing Goncho/Honcho-compatible scope rules remain the authority for user/source widening., Implement against the internal/tools.Tool interface in internal/tools/tool.go; this row creates the tool type and tests, not cmd/gormes registry binding., This row must wrap existing internal/memory.SearchSessions/SearchMessages and must not change ranking, lineage construction, default same-chat fences, or Goncho persistence.
-- Not ready when: The slice changes ranking, default same-chat recall fences, or Goncho/Honcho memory persistence instead of wrapping existing search results., The slice shells out to Hermes Python or reads ~/.hermes session logs., The slice edits internal/memory/session_catalog.go or internal/goncho/service.go; those prerequisites are already validated and should be treated as read-only donor code., The slice edits internal/tools/builtin.go, cmd/gormes, gateway runtime registration, or the global toolset manifest; registration is a later row after the wrapper fixtures pass., The slice includes todo/debug/clarify tools or cronjob tools in the same change.
-- Degraded mode: Tool result reports session_search_unavailable, source_filter_denied, or lineage_root_excluded evidence instead of widening recall silently.
-- Fixture: `internal/tools/session_search_tool_test.go::TestSessionSearchTool_*`
-- Write scope: `internal/tools/session_search_tool.go`, `internal/tools/session_search_tool_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/tools -run '^TestSessionSearchTool_' -count=1`, `go test ./internal/tools ./internal/memory ./internal/goncho -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Session search tool fixtures prove same-chat defaults, opt-in user/source widening, deterministic current-lineage-root exclusion in recent mode, and degraded evidence for unavailable/denied widening.
-- Acceptance: TestSessionSearchTool_SameChatDefault seeds two chats and proves no cross-chat hit appears without explicit scope=user or sources., TestSessionSearchTool_UserScopeSourceFilter passes scope=user sources=[telegram] and proves only the allowed source's sessions are returned with source evidence., TestSessionSearchTool_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155., TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening., TestSessionSearchTool_DescriptorAndSchema proves the wrapper satisfies tools.Tool with Name() == "session_search", a JSON schema that exposes query/scope/sources/mode/current_session_id, and a deterministic timeout without registering it globally.
-- Source refs: ../hermes-agent/tools/session_search_tool.py@dbe50155, ../hermes-agent/tests/tools/test_session_search.py@dbe50155, internal/memory/session_catalog.go, internal/memory/session_lineage_search_test.go, internal/goncho/service.go
-- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
+- Ready when: internal/tools.Tool is stable and Honcho-compatible scope/source schema language is validated in internal/gonchotools., This slice is descriptor/argument-only: no memory store, SQLite fixture, global registry binding, gateway runtime, or Goncho service construction is required., The tool name must be session_search; honcho_* external tool names remain reserved for Goncho/Honcho compatibility.
+- Not ready when: The slice calls internal/memory.SearchSessions/SearchMessages, changes ranking, opens SQLite, or registers the tool in builtin/global toolsets., The schema renames public Goncho/Honcho tools or removes same-chat defaults from the later execution row., The slice includes todo/debug/clarify tools or cronjob tools.
+- Degraded mode: Invalid input returns session_search_invalid_args evidence instead of widening recall or falling back to global search.
+- Fixture: `internal/tools/session_search_tool_schema_test.go::TestSessionSearchToolSchema_*`
+- Write scope: `internal/tools/session_search_tool.go`, `internal/tools/session_search_tool_schema_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/tools -run '^TestSessionSearchToolSchema_' -count=1`, `go test ./internal/tools -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: session_search descriptor and argument fixtures pass without SQLite, memory ranking, Goncho service construction, or global registry binding.
+- Acceptance: TestSessionSearchToolSchema_Descriptor proves Name()=="session_search", Description is non-empty, Timeout is deterministic, and Schema exposes query/scope/sources/mode/limit/current_session_id., TestSessionSearchToolSchema_DefaultArgs proves omitted scope/sources/mode normalize to same-chat/default mode without memory access., TestSessionSearchToolSchema_RejectsUnsafeScope proves unknown scope, unknown mode, negative limit, and non-string sources return session_search_invalid_args evidence., TestSessionSearchToolSchema_NotRegisteredGlobally proves the row does not edit internal/tools/builtin.go or register the tool outside the local test registry.
+- Source refs: ../hermes-agent/tools/session_search_tool.py@dbe50155, ../hermes-agent/tests/tools/test_session_search.py@dbe50155, internal/tools/tool.go, internal/gonchotools/honcho_tools.go:HonchoSearchTool.Schema
+- Unblocks: Session search tool execution wrapper
+- Why now: Unblocks Session search tool execution wrapper.
 
-## 9. CLI OpenClaw residue onboarding hint
+## 8. CLI OpenClaw residue detection and hint text
 
 - Phase: 5 / 5.O
 - Owner: `tools`
 - Size: `small`
 - Status: `planned`
 - Priority: `P3`
-- Contract: internal/cli exposes pure OpenClaw-residue onboarding helpers: DetectOpenClawResidue(home string) bool returns true only for an existing ~/.openclaw directory, OpenClawResidueHint(commandName string) string returns a Gormes-specific one-time cleanup hint, and OnboardingSeen/MarkOnboardingSeen operate on an in-memory map shape compatible with config onboarding.seen without reading or writing real config files
+- Contract: internal/cli exposes pure DetectOpenClawResidue(home string) bool and OpenClawResidueHint(commandName string) string helpers that detect only an existing ~/.openclaw directory and return Gormes-specific cleanup guidance without reading or writing config files
 - Trust class: operator, system
-- Ready when: internal/cli already has pure helper files and tests; this slice adds another helper without command registration, config I/O, or startup wiring., Use Gormes-facing text (`gormes openclaw cleanup` or the command name injected by tests) rather than copying Hermes' `hermes claw cleanup` string., Filesystem checks use a temp HOME provided by tests; no real operator home directory is inspected in unit tests.
+- Ready when: internal/cli already has pure helper files and tests; this slice adds a sibling helper without command registration, config I/O, or startup wiring., Use Gormes-facing text such as the command name injected by tests; do not copy Hermes `hermes claw cleanup` wording., Filesystem checks use a temp HOME provided by tests; no real operator home directory is inspected.
 - Not ready when: The slice edits cmd/gormes startup, reads/writes config files, renames ~/.openclaw, migrates OpenClaw data, or ports the full optional migration script., The hint text mentions Hermes commands, HERMES_HOME, or writes under upstream Hermes paths., The helper treats a regular file named .openclaw as residue.
-- Degraded mode: If HOME cannot be inspected or onboarding config is malformed, the helper reports unseen/false and never blocks CLI startup; command wiring can decide whether to persist the seen flag later.
-- Fixture: `internal/cli/onboarding_test.go::Test{DetectOpenClawResidue,OpenClawResidueHint,OnboardingSeen,MarkOnboardingSeen}_*`
-- Write scope: `internal/cli/onboarding.go`, `internal/cli/onboarding_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/cli -run '^Test.*OpenClaw\|^TestOnboardingSeen\|^TestMarkOnboardingSeen' -count=1`, `go test ./internal/cli -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: CLI onboarding fixtures prove directory-only OpenClaw residue detection, Gormes-specific cleanup hint text, in-memory seen-state handling, malformed-config tolerance, and no real HOME/config writes.
-- Acceptance: TestDetectOpenClawResidue_DirectoryOnly returns true for a temp HOME containing a .openclaw directory and false for missing path or a regular file., TestOpenClawResidueHint_MentionsInjectedCleanupCommand proves the hint contains ~/.openclaw, the injected Gormes cleanup command, and no `hermes claw cleanup` substring., TestOnboardingSeen_MalformedConfigUnseen covers missing onboarding, non-map onboarding, non-map seen, false values, and unrelated flags., TestMarkOnboardingSeen_InMemoryPreservesOtherFlags sets openclaw_residue_cleanup=true in the provided map without removing existing seen flags., No test touches the real user home or writes config.yaml.
-- Source refs: ../hermes-agent/agent/onboarding.py@e63929d4:OPENCLAW_RESIDUE_FLAG,detect_openclaw_residue,openclaw_residue_hint_cli,is_seen, ../hermes-agent/tests/agent/test_onboarding.py@e63929d4:TestOpenClawResidue, ../hermes-agent/cli.py@e63929d4:first-time OpenClaw-residue banner, internal/cli/tips.go
-- Unblocks: OpenClaw residue startup banner binding
-- Why now: Unblocks OpenClaw residue startup banner binding.
+- Degraded mode: If HOME cannot be inspected, the helper returns false and never blocks CLI startup; startup binding can decide later whether to persist a seen flag.
+- Fixture: `internal/cli/openclaw_residue_test.go::TestOpenClawResidue*`
+- Write scope: `internal/cli/openclaw_residue.go`, `internal/cli/openclaw_residue_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/cli -run '^Test(OpenClawResidue\|DetectOpenClawResidue)' -count=1`, `go test ./internal/cli -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: CLI fixtures prove directory-only OpenClaw residue detection and Gormes-specific cleanup hint text without real HOME/config writes.
+- Acceptance: TestDetectOpenClawResidue_DirectoryOnly returns true for a temp HOME containing a .openclaw directory and false for missing path or a regular file., TestDetectOpenClawResidue_UnreadableHomeReturnsFalse proves stat errors degrade to false without panic., TestOpenClawResidueHint_MentionsInjectedCleanupCommand proves the hint contains ~/.openclaw, the injected Gormes cleanup command, and no `hermes claw cleanup` substring., No test touches the real user home, config.yaml, or cmd/gormes startup.
+- Source refs: ../hermes-agent/agent/onboarding.py@e63929d4:detect_openclaw_residue,openclaw_residue_hint_cli, ../hermes-agent/tests/agent/test_onboarding.py@e63929d4:TestOpenClawResidue, ../hermes-agent/cli.py@e63929d4:first-time OpenClaw-residue banner, internal/cli/tips.go
+- Unblocks: CLI onboarding seen-state map helpers
+- Why now: Unblocks CLI onboarding seen-state map helpers.
 
-## 10. Custom provider model-switch key_env write guard
+## 9. Custom provider model-switch key_env write guard
 
 - Phase: 5 / 5.O
 - Owner: `tools`
@@ -221,5 +204,26 @@ tests, and candidate policy. Keep those control-plane facts in
 - Acceptance: TestCustomProviderModelSwitchPatch_KeyEnvDoesNotSynthesizeAPIKey starts with {default_model:'old', key_env:'ACME_KEY'} and proves the patch sets default_model='new', preserves key_env, omits api_key, and returns credential_write_skipped_key_env evidence., TestCustomProviderModelSwitchPatch_InlineEnvRefPreserved starts with {api_key:'${ACME_KEY}'} and proves the patch keeps api_key='${ACME_KEY}' without resolving or overwriting it., TestCustomProviderModelSwitchPatch_PlaintextPreserved starts with {api_key:'sk-plain'} and proves plaintext is preserved only because it was already present., TestCustomProviderModelSwitchPatch_MissingCredentialStillUpdatesModelWithEvidence proves model changes remain possible while credential_missing evidence is returned for setup/status guidance., Existing TestResolveCustomProviderSecret_* fixtures remain green; this row does not redefine resolver semantics.
 - Source refs: ../hermes-agent/hermes_cli/main.py@8258f4dc:_model_flow_named_custom, ../hermes-agent/tests/hermes_cli/test_custom_provider_model_switch.py@8258f4dc, ../hermes-agent/hermes_cli/main.py@8bbeaea6:_named_custom_provider_map, internal/cli/custom_provider_secret.go, internal/cli/custom_provider_secret_test.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
+
+## 10. Native TUI conversation viewport tail helper
+
+- Phase: 5 / 5.Q
+- Owner: `tools`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: internal/tui exposes a pure conversation viewport helper that clips RenderFrame.History to the visible tail under width/height budgets, emits a deterministic omitted-history sentinel, and always preserves DraftText and LastError inputs
+- Trust class: operator, system
+- Ready when: internal/tui/view.go currently renders every RenderFrame.History message into one joined string; the worker can add a pure helper and table tests without changing kernel history, persistence, or provider streaming., Synthetic RenderFrame fixtures with 100+ messages are enough; no Bubble Tea program, terminal, Node/Ink runtime, or Hermes profiling script needs to run., This row is a Gormes-native performance guard, not a port of Hermes React/Ink virtualization internals.
+- Not ready when: The slice imports React/Ink concepts, starts Node, changes kernel.RenderFrame shape, truncates stored session/transcript history, or edits kernel/session/transcript persistence., The slice wires renderConv integration, slash-command, remote TUI SSE, API server, or dashboard behavior in the same diff., The helper silently drops DraftText or LastError when history is long.
+- Degraded mode: If height is tiny or width is narrow, the helper renders the latest visible turn plus compact draft/error/sentinel evidence instead of panicking or allocating the full history body.
+- Fixture: `internal/tui/viewport_history_test.go::TestConversationViewportTail_*`
+- Write scope: `internal/tui/view.go`, `internal/tui/viewport_history_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/tui -run '^TestConversationViewportTail_' -count=1`, `go test ./internal/tui -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Native TUI viewport helper fixtures prove bounded tail rendering, omitted-count sentinel, draft/error preservation, and small-size clamps without render integration changes.
+- Acceptance: TestConversationViewportTail_OmitsEarlierHistory builds 120 alternating user/assistant messages and asserts latest turns remain, earliest turn body is excluded, and a deterministic omitted-history sentinel includes the hidden count., TestConversationViewportTail_AlwaysIncludesDraftAndLastError proves DraftText and LastError survive when history is clipped., TestConversationViewportTail_HeightAndWidthClamp proves width<4 and tiny height do not panic and still render a compact latest-message view., TestConversationViewportTail_RenderedLineBudget asserts helper output stays within the requested visible budget plus a small sentinel allowance.
+- Source refs: ../hermes-agent/ui-tui/src/hooks/useVirtualHistory.ts@e63929d4, ../hermes-agent/ui-tui/src/lib/virtualHeights.ts@e63929d4, ../hermes-agent/ui-tui/src/__tests__/virtualHeights.test.ts@e63929d4, ../hermes-agent/scripts/profile-tui.py@e63929d4, internal/tui/view.go:renderConv
+- Unblocks: Native TUI renderConv viewport budget binding
+- Why now: Unblocks Native TUI renderConv viewport budget binding.
 
 <!-- PROGRESS:END -->
