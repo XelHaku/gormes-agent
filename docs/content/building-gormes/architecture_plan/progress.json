@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T04:52:17Z",
+    "last_updated": "2026-04-27T05:06:27Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -7034,9 +7034,9 @@
             {
               "name": "Compression protected-tail multimodal length estimator",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Context-compression tail/protect-boundary code uses one pure content-length estimator that counts plain strings by rune length, list/map text blocks by their text field length, bare string list items by their own length, unknown list items by fmt.Sprint length, and image-only blocks as zero text chars; it must never call .get-style assumptions on non-map content and must not mutate message history",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
@@ -7063,9 +7063,6 @@
                 "The implementation treats image_url-only blocks as the number of blocks instead of zero text chars plus caller overhead.",
                 "The tests depend on live multimodal provider requests or Python fixtures rather than synthetic Go values."
               ],
-              "blocked_by": [
-                "Aux compression single-prompt threshold reconciliation"
-              ],
               "unblocks": [
                 "Tool-result pruning + protected head/tail summary",
                 "ContextEngine compression-boundary notification"
@@ -7077,7 +7074,7 @@
                 "TestCompressionContentLength_UnknownListItemFallback converts non-map/non-string list items with fmt.Sprint or equivalent deterministic fallback.",
                 "TestCompressionContentLength_ImageOnlyBlockZeroText proves image-only maps contribute zero text chars before the caller adds per-message overhead."
               ],
-              "note": "Added after Hermes cfc8befe/94346523/bda2dbc2 fixed three related compressor crashes/underestimates around multimodal lists and bare strings. Gormes keeps this as a pure estimator first so future head/tail pruning does not rediscover Python's content-shape assumptions.",
+              "note": "Complete: TDD added internal/hermes/context_compressor_content.go and internal/hermes/context_compressor_content_test.go. The pure compressionContentLength helper counts plain strings by rune length, sums text fields in mixed multimodal blocks, counts bare string list items, falls back to fmt.Sprint for unknown non-map/non-string list items, and treats image-only blocks as zero text chars before any caller overhead. The fixtures are synthetic Go values only and do not invoke the kernel, provider clients, summarizer, transcript storage, or live message-history mutation.",
               "write_scope": [
                 "internal/hermes/context_compressor_content.go",
                 "internal/hermes/context_compressor_content_test.go",
