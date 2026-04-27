@@ -258,8 +258,8 @@ func discordSchemaProperties(actions []string) map[string]any {
 	if hasAnyDiscordAction(actions, "fetch_messages", "search_members") {
 		properties["limit"] = map[string]any{
 			"type":        "integer",
-			"minimum":     1,
-			"maximum":     100,
+			"minimum":     discordLimitMinimum,
+			"maximum":     discordLimitMaximum,
 			"description": "Max results to return.",
 		}
 	}
