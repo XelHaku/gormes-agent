@@ -8467,12 +8467,72 @@
                 "upstream_ref": "hermes:42c076d3 tools/browser_tool.py",
                 "note": "Direct upstream browser behavior drift; Gormes keeps it as a small Go tool-routing helper before native browser runtime work."
               }
+            },
+            {
+              "name": "Browser SSRF quoted-false guard",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Browser and URL safety helpers coerce quoted false-like config values (`\"false\"`, `'false'`, `0`, `no`, `off`) to disabled booleans before private/local URL SSRF guards decide whether cloud navigation is allowed",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Browser safety status reports ssrf_guard_config_invalid or private_url_blocked instead of treating quoted false as truthy and sending private URLs to a cloud/browser provider.",
+              "fixture": "internal/tools/browser_ssrf_guard_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/browser_tool.py@7317d69f",
+                "../hermes-agent/tools/url_safety.py@7317d69f",
+                "../hermes-agent/tests/tools/test_browser_ssrf_local.py@7317d69f",
+                "../hermes-agent/tests/tools/test_url_safety.py@7317d69f",
+                "internal/tools/browser_hybrid_routing.go"
+              ],
+              "ready_when": [
+                "Browser hybrid private-URL local sidecar routing is complete and already classifies private/LAN hosts without DNS or browser startup.",
+                "The worker can add a pure config coercion and guard decision helper under internal/tools; no browser runtime, network, DNS, Chromedp, Rod, Browserbase, Firecrawl, or Camofox dependency is required."
+              ],
+              "not_ready_when": [
+                "The slice starts a browser, performs DNS resolution, follows redirects, or changes cloud/local routing behavior beyond quoted-false coercion.",
+                "The slice weakens private host classification already validated by Browser hybrid private-URL local sidecar routing.",
+                "The slice implements provider bridges or screenshot/navigation actions."
+              ],
+              "blocked_by": [
+                "Browser hybrid private-URL local sidecar routing"
+              ],
+              "acceptance": [
+                "TestBrowserSSRFGuard_CoercesQuotedFalseValues covers `\"false\"`, `'false'`, `0`, `no`, and `off` as disabled while true/yes/on remain enabled.",
+                "TestBrowserSSRFGuard_PrivateURLBlockedWhenCloudWouldReceiveIt proves localhost/RFC1918 URLs return private_url_blocked when cloud routing is enabled and auto-local routing is disabled.",
+                "TestBrowserSSRFGuard_PublicURLAllowed covers a public URL and proves no private_url_blocked evidence is emitted.",
+                "Tests use synthetic strings only and do not start a browser, resolve DNS, or open network sockets."
+              ],
+              "note": "Hermes 7317d69f fixed quoted false handling in browser SSRF guards. Gormes already has private-host routing helpers, so this is a small safety row over config coercion and guard evidence before browser provider bridges become executable.",
+              "write_scope": [
+                "internal/tools/browser_ssrf_guard.go",
+                "internal/tools/browser_ssrf_guard_test.go",
+                "internal/tools/browser_hybrid_routing.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestBrowserSSRFGuard_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Browser SSRF guard fixtures prove quoted false values disable cloud routing guards correctly, private URLs are blocked when they would reach cloud providers, and no browser/network runtime is used."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:7317d69f tools/url_safety.py",
+                "note": "Direct browser security drift from Hermes; Gormes ports it as a pure Go safety helper before browser runtime work."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T18:14:51Z",
-            "origin_decision": "Hermes 42c076d3 added browser cloud/local hybrid routing for private URLs. Gormes still lacks native browser runtime wiring, so Phase 5.C stays upstream-led and now carries a pure route-key helper row before browser provider bridge work."
+            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "origin_decision": "Hermes 42c076d3 added browser cloud/local hybrid routing for private URLs, and 7317d69f tightened quoted-false handling in SSRF guard config. Gormes still lacks native browser runtime wiring, so Phase 5.C stays upstream-led and now carries pure route-key and SSRF-config guard rows before browser provider bridge work."
           }
         },
         "5.D": {
