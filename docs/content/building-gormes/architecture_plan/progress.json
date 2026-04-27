@@ -1692,6 +1692,20 @@
               "done_signal": [
                 "Gateway deduplicator fixtures prove max_size eviction, duplicate rejection, disabled mode, and missing-ID degraded evidence without platform SDKs or disk state."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-27T02:48:03Z",
+                "last_failure": {
+                  "run_id": "20260427T023343Z-745840965",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 gateway/platforms/helpers.py",
