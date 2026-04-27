@@ -23,6 +23,7 @@ const (
 	DurableWorkerRunAbortSignalSent          DurableWorkerRunStatus = "abort_signal_sent"
 	DurableWorkerRunAbortSlotRecovered       DurableWorkerRunStatus = "abort_slot_recovered"
 	DurableWorkerRunAbortRecoveryUnavailable DurableWorkerRunStatus = "abort_recovery_unavailable"
+	DurableWorkerRunRSSHandlerAbortSent      DurableWorkerRunStatus = "rss_handler_abort_sent"
 )
 
 type DurableWorkerProgressFunc func(json.RawMessage) error
@@ -39,6 +40,11 @@ type DurableWorker struct {
 	Timeout    time.Duration
 	AbortGrace time.Duration
 	After      func(time.Duration) <-chan time.Time
+
+	RSSWatchdog DurableWorkerRSSWatchdogPolicy
+	RSSReader   DurableWorkerRSSReader
+	RSSCheck    <-chan time.Time
+	RSSDrain    *DurableWorkerRSSDrain
 }
 
 type DurableWorkerRunResult struct {
@@ -118,27 +124,53 @@ func (w DurableWorker) RunOne(ctx context.Context) (DurableWorkerRunResult, erro
 		return nil
 	}
 	timeout := w.handlerTimeout(job)
-	if timeout <= 0 {
+	if timeout <= 0 && !w.rssWatchdogConfigured() {
 		handlerResult, err := w.Handler(ctx, job, progress)
-		return w.finishHandler(ctx, result, job, workerID, durableWorkerHandlerResult{
+		result, err = w.finishHandler(ctx, result, job, workerID, durableWorkerHandlerResult{
 			result: handlerResult,
 			err:    err,
 		})
+		if err != nil {
+			return result, err
+		}
+		return w.checkPostJobRSSDrain(ctx, result, job, workerID)
 	}
 
 	handlerCtx, cancelHandler := context.WithCancel(ctx)
 	defer cancelHandler()
 	handlerDone := make(chan durableWorkerHandlerResult, 1)
+	rssRegistration := w.registerRSSHandler(job, workerID)
+	defer rssRegistration.Unregister()
 	go func() {
 		handlerResult, err := w.Handler(handlerCtx, job, progress)
 		handlerDone <- durableWorkerHandlerResult{result: handlerResult, err: err}
 	}()
 
-	select {
-	case handlerResult := <-handlerDone:
-		return w.finishHandler(ctx, result, job, workerID, handlerResult)
-	case <-w.after(timeout):
-		return w.abortTimedOutHandler(ctx, result, job, workerID, cancelHandler, handlerDone)
+	var timeoutC <-chan time.Time
+	if timeout > 0 {
+		timeoutC = w.after(timeout)
+	}
+	for {
+		select {
+		case handlerResult := <-handlerDone:
+			rssRegistration.Unregister()
+			result, err := w.finishHandler(ctx, result, job, workerID, handlerResult)
+			if err != nil {
+				return result, err
+			}
+			return w.checkPostJobRSSDrain(ctx, result, job, workerID)
+		case <-timeoutC:
+			return w.abortTimedOutHandler(ctx, result, job, workerID, cancelHandler, handlerDone)
+		case <-w.rssCheck():
+			if err := w.checkPeriodicRSSDrain(ctx, job, workerID); err != nil {
+				result.Status = DurableWorkerRunClaimUnavailable
+				result.ErrorText = err.Error()
+				result.FinishedAt = w.now()
+				return result, err
+			}
+		case <-rssRegistration.Abort:
+			return w.abortRSSDrainedHandler(ctx, result, job, workerID, cancelHandler, handlerDone)
+		}
 	}
 }
 
@@ -178,11 +210,19 @@ func (w DurableWorker) finishHandler(ctx context.Context, result DurableWorkerRu
 }
 
 func (w DurableWorker) abortTimedOutHandler(ctx context.Context, result DurableWorkerRunResult, job DurableJob, workerID string, cancelHandler context.CancelFunc, handlerDone <-chan durableWorkerHandlerResult) (DurableWorkerRunResult, error) {
+	return w.abortHandler(ctx, result, job, workerID, cancelHandler, handlerDone, string(DurableWorkerRunAbortSignalSent), DurableWorkerRunAbortSignalSent, "handler_ignored_abort")
+}
+
+func (w DurableWorker) abortRSSDrainedHandler(ctx context.Context, result DurableWorkerRunResult, job DurableJob, workerID string, cancelHandler context.CancelFunc, handlerDone <-chan durableWorkerHandlerResult) (DurableWorkerRunResult, error) {
+	return w.abortHandler(ctx, result, job, workerID, cancelHandler, handlerDone, string(DurableWorkerRunRSSHandlerAbortSent), DurableWorkerRunRSSHandlerAbortSent, "rss_handler_ignored_abort")
+}
+
+func (w DurableWorker) abortHandler(ctx context.Context, result DurableWorkerRunResult, job DurableJob, workerID string, cancelHandler context.CancelFunc, handlerDone <-chan durableWorkerHandlerResult, reason string, successStatus DurableWorkerRunStatus, ignoredReason string) (DurableWorkerRunResult, error) {
 	cancelHandler()
 	event := DurableWorkerAbortEvent{
 		JobID:     job.ID,
 		WorkerID:  workerID,
-		Reason:    string(DurableWorkerRunAbortSignalSent),
+		Reason:    reason,
 		CreatedAt: w.now(),
 	}
 	if err := w.Ledger.RecordWorkerAbortSignal(ctx, event); err != nil {
@@ -218,15 +258,15 @@ func (w DurableWorker) abortTimedOutHandler(ctx context.Context, result DurableW
 			result.FinishedAt = w.now()
 			return result, nil
 		}
-		result.Status = DurableWorkerRunAbortSignalSent
-		result.ErrorText = string(DurableWorkerRunAbortSignalSent)
+		result.Status = successStatus
+		result.ErrorText = reason
 		result.FinishedAt = w.now()
 		return result, nil
 	case <-w.after(w.abortGrace()):
 		_, ok, err := w.Ledger.RecoverWorkerAbortSlot(ctx, DurableWorkerAbortEvent{
 			JobID:     job.ID,
 			WorkerID:  workerID,
-			Reason:    "handler_ignored_abort",
+			Reason:    ignoredReason,
 			CreatedAt: w.now(),
 		})
 		if err != nil {
@@ -255,10 +295,81 @@ func (w DurableWorker) abortTimedOutHandler(ctx context.Context, result DurableW
 			return result, nil
 		}
 		result.Status = DurableWorkerRunAbortSlotRecovered
-		result.ErrorText = "handler_ignored_abort"
+		result.ErrorText = ignoredReason
 		result.FinishedAt = w.now()
 		return result, nil
 	}
+}
+
+func (w DurableWorker) checkPostJobRSSDrain(ctx context.Context, result DurableWorkerRunResult, job DurableJob, workerID string) (DurableWorkerRunResult, error) {
+	if result.Status != DurableWorkerRunCompleted || !w.rssWatchdogConfigured() {
+		return result, nil
+	}
+	if err := w.checkRSSDrain(ctx, job, workerID); err != nil {
+		result.Status = DurableWorkerRunClaimUnavailable
+		result.ErrorText = err.Error()
+		result.FinishedAt = w.now()
+		return result, err
+	}
+	return result, nil
+}
+
+func (w DurableWorker) checkPeriodicRSSDrain(ctx context.Context, job DurableJob, workerID string) error {
+	if !w.rssWatchdogConfigured() {
+		return nil
+	}
+	return w.checkRSSDrain(ctx, job, workerID)
+}
+
+func (w DurableWorker) checkRSSDrain(ctx context.Context, job DurableJob, workerID string) error {
+	decision := w.RSSWatchdog.Check(w.RSSReader, w.now)
+	if decision.Reason == "" {
+		return nil
+	}
+	if decision.Reason == DurableWorkerRSSWatchdogUnavailable {
+		return w.Ledger.RecordWorkerRSSWatchdogEvent(ctx, DurableWorkerRSSWatchdogEvent{
+			JobID:     job.ID,
+			WorkerID:  workerID,
+			Reason:    DurableWorkerRSSWatchdogUnavailable,
+			Evidence:  decision.Evidence,
+			CreatedAt: w.now(),
+		})
+	}
+	if !decision.RequestDrain {
+		return nil
+	}
+	if !w.rssDrain().Start(DurableWorkerRSSDrainStarted, decision.Evidence) {
+		return nil
+	}
+	return w.Ledger.RecordWorkerRSSWatchdogEvent(ctx, DurableWorkerRSSWatchdogEvent{
+		JobID:     job.ID,
+		WorkerID:  workerID,
+		Reason:    DurableWorkerRSSDrainStarted,
+		Evidence:  decision.Evidence,
+		CreatedAt: w.now(),
+	})
+}
+
+func (w DurableWorker) registerRSSHandler(job DurableJob, workerID string) durableWorkerRSSDrainRegistration {
+	if !w.rssWatchdogConfigured() {
+		return durableWorkerRSSDrainRegistration{}
+	}
+	return w.rssDrain().Register(job.ID, workerID)
+}
+
+func (w DurableWorker) rssDrain() *DurableWorkerRSSDrain {
+	return w.RSSDrain
+}
+
+func (w DurableWorker) rssCheck() <-chan time.Time {
+	if !w.rssWatchdogConfigured() {
+		return nil
+	}
+	return w.RSSCheck
+}
+
+func (w DurableWorker) rssWatchdogConfigured() bool {
+	return w.RSSWatchdog.MaxRSSMB > 0 && w.RSSReader != nil && w.RSSDrain != nil
 }
 
 func (w DurableWorker) lease() time.Duration {

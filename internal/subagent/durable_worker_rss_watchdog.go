@@ -1,6 +1,13 @@
 package subagent
 
-import "time"
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+	"sync"
+	"time"
+)
 
 // DurableWorkerRSSWatchdogReason is the machine-readable policy vocabulary
 // emitted before the RSS watchdog is wired into the durable worker loop.
@@ -10,6 +17,7 @@ const (
 	DurableWorkerRSSWatchdogDisabled    DurableWorkerRSSWatchdogReason = "rss_watchdog_disabled"
 	DurableWorkerRSSThresholdExceeded   DurableWorkerRSSWatchdogReason = "rss_threshold_exceeded"
 	DurableWorkerRSSWatchdogUnavailable DurableWorkerRSSWatchdogReason = "rss_watchdog_unavailable"
+	DurableWorkerRSSDrainStarted        DurableWorkerRSSWatchdogReason = "rss_drain_started"
 )
 
 const durableWorkerBytesPerMiB = 1024 * 1024
@@ -50,6 +58,15 @@ type DurableWorkerRSSWatchdogEvidence struct {
 	ErrorText  string                         `json:"error,omitempty"`
 }
 
+// DurableWorkerRSSWatchdogEvent is an auditable RSS watchdog observation.
+type DurableWorkerRSSWatchdogEvent struct {
+	JobID     string
+	WorkerID  string
+	Reason    DurableWorkerRSSWatchdogReason
+	Evidence  DurableWorkerRSSWatchdogEvidence
+	CreatedAt time.Time
+}
+
 // DurableWorkerWatchdogRestartPolicy classifies supervised watchdog exits.
 type DurableWorkerWatchdogRestartPolicy struct {
 	StableRunAfter time.Duration
@@ -76,6 +93,16 @@ func (p DurableWorkerRSSWatchdogPolicy) Check(readRSS DurableWorkerRSSReader, no
 			Reason: DurableWorkerRSSWatchdogDisabled,
 			Evidence: DurableWorkerRSSWatchdogEvidence{
 				Reason: DurableWorkerRSSWatchdogDisabled,
+			},
+		}
+	}
+	if readRSS == nil {
+		return DurableWorkerRSSWatchdogDecision{
+			Reason: DurableWorkerRSSWatchdogUnavailable,
+			Evidence: DurableWorkerRSSWatchdogEvidence{
+				Reason:    DurableWorkerRSSWatchdogUnavailable,
+				CheckedAt: durableWorkerRSSNow(now),
+				ErrorText: "rss reader is nil",
 			},
 		}
 	}
@@ -140,4 +167,132 @@ func (p DurableWorkerWatchdogRestartPolicy) stableRunAfter() time.Duration {
 		return p.StableRunAfter
 	}
 	return defaultDurableWorkerWatchdogStableRunAfter
+}
+
+// DurableWorkerRSSDrain coordinates graceful RSS drains across concurrent
+// DurableWorker.RunOne calls that share the same worker process.
+type DurableWorkerRSSDrain struct {
+	mu       sync.Mutex
+	active   map[string]chan durableWorkerRSSDrainAbort
+	draining bool
+	abort    durableWorkerRSSDrainAbort
+}
+
+type durableWorkerRSSDrainAbort struct {
+	Reason   DurableWorkerRSSWatchdogReason
+	Evidence DurableWorkerRSSWatchdogEvidence
+}
+
+type durableWorkerRSSDrainRegistration struct {
+	Abort      <-chan durableWorkerRSSDrainAbort
+	unregister func()
+}
+
+func NewDurableWorkerRSSDrain() *DurableWorkerRSSDrain {
+	return &DurableWorkerRSSDrain{}
+}
+
+func (d *DurableWorkerRSSDrain) Register(jobID, workerID string) durableWorkerRSSDrainRegistration {
+	if d == nil {
+		return durableWorkerRSSDrainRegistration{}
+	}
+	ch := make(chan durableWorkerRSSDrainAbort, 1)
+	key := durableWorkerRSSDrainKey(jobID, workerID)
+
+	d.mu.Lock()
+	if d.active == nil {
+		d.active = make(map[string]chan durableWorkerRSSDrainAbort)
+	}
+	d.active[key] = ch
+	if d.draining {
+		ch <- d.abort
+	}
+	d.mu.Unlock()
+
+	return durableWorkerRSSDrainRegistration{
+		Abort: ch,
+		unregister: func() {
+			d.mu.Lock()
+			delete(d.active, key)
+			d.mu.Unlock()
+		},
+	}
+}
+
+func (r durableWorkerRSSDrainRegistration) Unregister() {
+	if r.unregister != nil {
+		r.unregister()
+	}
+}
+
+func (d *DurableWorkerRSSDrain) Start(reason DurableWorkerRSSWatchdogReason, evidence DurableWorkerRSSWatchdogEvidence) bool {
+	if d == nil {
+		return false
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.draining {
+		return false
+	}
+	d.draining = true
+	d.abort = durableWorkerRSSDrainAbort{
+		Reason:   reason,
+		Evidence: evidence,
+	}
+	for _, ch := range d.active {
+		select {
+		case ch <- d.abort:
+		default:
+		}
+	}
+	return true
+}
+
+func durableWorkerRSSDrainKey(jobID, workerID string) string {
+	return strings.TrimSpace(workerID) + "\x00" + strings.TrimSpace(jobID)
+}
+
+func (l *DurableLedger) RecordWorkerRSSWatchdogEvent(ctx context.Context, event DurableWorkerRSSWatchdogEvent) error {
+	if l == nil || l.db == nil {
+		return errors.New("subagent: durable ledger is nil")
+	}
+	workerID := strings.TrimSpace(event.WorkerID)
+	if workerID == "" {
+		return errors.New("subagent: durable worker id is empty")
+	}
+	reason := event.Reason
+	if reason == "" {
+		reason = event.Evidence.Reason
+	}
+	if reason == "" {
+		return errors.New("subagent: durable worker RSS watchdog reason is empty")
+	}
+	createdAt := event.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = durableTime(durableNow())
+	}
+	evidence := event.Evidence
+	if evidence.Reason == "" {
+		evidence.Reason = reason
+	}
+	if evidence.CheckedAt.IsZero() {
+		evidence.CheckedAt = createdAt.UTC()
+	}
+	payload := map[string]any{
+		"type":      string(reason),
+		"job_id":    strings.TrimSpace(event.JobID),
+		"worker_id": workerID,
+		"reason":    string(reason),
+		"evidence":  evidence,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = l.db.ExecContext(ctx, `
+		INSERT INTO durable_worker_events
+			(type, worker_id, reason, payload_json, created_at)
+		VALUES (?, ?, ?, ?, ?)`,
+		string(reason), workerID, string(reason), string(raw), createdAt.UTC().UnixNano())
+	return err
 }
