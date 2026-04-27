@@ -1375,18 +1375,26 @@
                 "Inbound safety fixtures prove unsafe WhatsApp sender/chat/alias values are rejected with whatsapp_identifier_unsafe evidence while safe identity contracts stay green."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-27T06:25:05Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:31:12Z",
                 "last_failure": {
-                  "run_id": "20260427T062456Z-788554096",
+                  "run_id": "20260427T063105Z-875657968",
                   "category": "worker_error",
                   "backend": "codexu",
                   "stderr_tail": "Reading additional input from stdin...\n"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:31:12Z",
+                  "after_run_id": "20260427T063105Z-875657968",
+                  "threshold": 3,
+                  "spec_hash": "0d3ac470a9cc359e82c25f20d1aa490645920a6f5d9964a3d3b5c258f3bfd732",
+                  "last_category": "worker_error"
+                }
               },
               "provenance": {
                 "origin_type": "hybrid",
