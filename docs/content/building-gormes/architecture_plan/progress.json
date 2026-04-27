@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T12:07:47Z",
+    "last_updated": "2026-04-27T12:29:11Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1324,7 +1324,7 @@
               "name": "WhatsApp unsafe identifier inbound evidence",
               "priority": "P2",
               "status": "planned",
-              "contract": "WhatsApp inbound normalization uses the validated safety predicate to drop unsafe raw sender/chat/reply IDs with explicit whatsapp_identifier_unsafe evidence before Event.ChatID, Event.UserID, Reply.ChatID, alias graph entries, or outbound pairing targets are created",
+              "contract": "WhatsApp inbound normalization in internal/channels/whatsapp/inbound.go uses the validated safety predicate from identity.go to drop unsafe raw sender/chat/reply IDs with explicit whatsapp_identifier_unsafe evidence before Event.ChatID, Event.UserID, Reply.ChatID, alias graph entries, or outbound pairing targets are created",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -1338,17 +1338,18 @@
               "source_refs": [
                 "../hermes-agent/gateway/whatsapp_identity.py@91512b82:expand_whatsapp_aliases path traversal guard",
                 "../hermes-agent/gateway/whatsapp_identity.py@6993e566:_SAFE_IDENTIFIER_RE ASCII guard",
-                "internal/channels/whatsapp/identity.go:NormalizeInboundWithIdentity",
+                "internal/channels/whatsapp/inbound.go:NormalizeInboundWithIdentity",
+                "internal/channels/whatsapp/identity.go:NormalizeSafeWhatsAppIdentifier",
                 "internal/channels/whatsapp/testdata/identity_contract.json"
               ],
               "ready_when": [
-                "WhatsApp identifier safety predicate is validated on main; workers can start from internal/channels/whatsapp/identity.go without rediscovering the helper.",
-                "The worker should reuse the helper and extend inbound fixtures only; no platform runtime, bridge process, native WhatsApp client, or gateway manager dispatch is needed.",
+                "WhatsApp identifier safety predicate is validated on main; workers should reuse NormalizeSafeWhatsAppIdentifier from identity.go and wire only NormalizeInboundWithIdentity in inbound.go.",
+                "The worker should extend inbound fixtures only; no platform runtime, bridge process, native WhatsApp client, send/reconnect path, or gateway manager dispatch is needed.",
                 "Safe identity_contract.json fixtures must remain unchanged unless the test adds a separate unsafe fixture file."
               ],
               "not_ready_when": [
                 "The slice rewrites safe identity fixtures, changes send/reconnect behavior, or accepts unsafe IDs after stripping dangerous characters.",
-                "The slice opens live WhatsApp clients, writes Hermes lid-mapping files, or changes non-WhatsApp gateway session-key behavior."
+                "The slice opens live WhatsApp clients, writes Hermes lid-mapping files, edits internal/channels/whatsapp/send.go, or changes non-WhatsApp gateway session-key behavior."
               ],
               "acceptance": [
                 "TestNormalizeInboundWithIdentity_UnsafeRawSenderRejected proves unsafe sender/user IDs return whatsapp_identifier_unsafe evidence and leave Event.UserID empty.",
@@ -1356,8 +1357,9 @@
                 "TestNormalizeInboundWithIdentity_UnsafeAliasEndpointRejected proves alias graph expansion skips unsafe endpoints while preserving safe aliases.",
                 "Existing identity_contract.json fixtures still pass unchanged for safe bridge/native DM and group cases."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z: the WhatsApp identifier safety predicate is validated and the backend usage-limit health bypass is complete, so this dependent inbound-evidence fixture is ready for one focused worker. Keep the slice inside WhatsApp identity normalization and do not reopen live platform/runtime behavior.",
+              "note": "Refined 2026-04-27T12:29:11Z after write-scope drift: NormalizeInboundWithIdentity lives in internal/channels/whatsapp/inbound.go, while identity.go owns the validated safety helper. Keep the worker inside those two files plus the new inbound safety fixture; do not reopen live platform/runtime behavior.",
               "write_scope": [
+                "internal/channels/whatsapp/inbound.go",
                 "internal/channels/whatsapp/identity.go",
                 "internal/channels/whatsapp/identity_inbound_safety_test.go",
                 "internal/channels/whatsapp/identity_test.go",
@@ -2138,8 +2140,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T12:07:47Z",
-            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, and message deduplication. The quarantined Telegram group binding is split into config vocabulary and adapter binding. Gateway inbound dedup wiring is narrowed after a write-scope violation so the completed MessageDeduplicator helper is read-only and the row owns only manager/event evidence."
+            "last_upstream_check": "2026-04-27T12:29:11Z",
+            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, and message deduplication. The Telegram group binding is split into config vocabulary and adapter binding. WhatsApp unsafe inbound evidence now points at inbound.go for NormalizeInboundWithIdentity and identity.go for the helper so workers do not repeat the prior write-scope violation. Gateway inbound dedup remains human-escalated after repeated write-scope/report-validation failures; the completed MessageDeduplicator helper is read-only until that contract is split or manually cleared."
           }
         },
         "2.B.10": {
@@ -16059,7 +16061,7 @@
               "name": "API server detailed health endpoint",
               "priority": "P2",
               "status": "planned",
-              "contract": "Native API server binds the validated detailed-health snapshot to an authenticated GET /health/detailed and /v1/health/detailed route while preserving existing /health and /v1/health behavior",
+              "contract": "Native API server binds the validated detailed-health snapshot to unauthenticated GET /health/detailed and /v1/health/detailed routes while preserving existing /health and /v1/health behavior",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -16068,21 +16070,21 @@
                 "gateway",
                 "system"
               ],
-              "degraded_mode": "HTTP detailed health returns per-section degraded evidence through stable JSON while flat /health remains backward-compatible.",
+              "degraded_mode": "HTTP detailed health returns per-section degraded evidence through stable JSON without requiring an API key, while flat /health remains backward-compatible.",
               "fixture": "internal/apiserver/detailed_health_endpoint_test.go",
               "source_refs": [
-                "../hermes-agent/gateway/platforms/api_server.py@755a2804",
+                "../hermes-agent/gateway/platforms/api_server.py@ee1a07f9:_handle_health_detailed no authentication required",
                 "internal/apiserver/detailed_health.go",
                 "internal/apiserver/server.go:routes,handleHealth",
                 "internal/apiserver/chat_completions_test.go:health fixtures"
               ],
               "ready_when": [
-                "API server detailed health snapshot contract is validated on main; this row only binds the snapshot to authenticated HTTP routes.",
+                "API server detailed health snapshot contract is validated on main; this row only binds the snapshot to GET HTTP routes and intentionally follows Hermes' unauthenticated /health/detailed behavior.",
                 "The slice can use httptest against Server.Handler with fake snapshot inputs; no provider, live gateway, scheduler goroutine, or cron mutation endpoint is required.",
                 "Existing /health and /v1/health fixtures remain byte-compatible except for explicitly allowed internal refactoring."
               ],
               "not_ready_when": [
-                "The slice creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, changes OpenAI-style error envelopes, or weakens API auth/body-size checks.",
+                "The slice creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, adds auth requirements to health routes, changes OpenAI-style error envelopes, or weakens auth/body-size checks on non-health routes.",
                 "The slice changes dashboard client behavior or imports Hermes Python."
               ],
               "unblocks": [
@@ -16090,11 +16092,12 @@
               ],
               "acceptance": [
                 "TestAPIServerDetailedHealthEndpoint_OK GETs /health/detailed and /v1/health/detailed and decodes provider, response_store, run_events, gateway, and cron sections.",
+                "TestAPIServerDetailedHealthEndpoint_NoAuthRequired configures APIKey=\"sk-test\" and proves both detailed health routes return 200 without Authorization or X-API-Key headers.",
                 "TestAPIServerDetailedHealthEndpoint_MethodNotAllowed reuses the shared OpenAI-style method-not-allowed error envelope.",
                 "TestAPIServerDetailedHealthEndpoint_RedactsSecrets proves the HTTP response body omits provider keys, cron script bodies, gateway tokens, and raw request payloads.",
                 "Existing /health and /v1/health tests continue to report status/platform/responses/runs as before."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z: the detailed-health snapshot prerequisite and backend health bypass are validated, so workers should bind only GET /health/detailed and /v1/health/detailed while preserving flat /health behavior.",
+              "note": "Refined 2026-04-27T12:29:11Z after upstream check: Hermes documents /health/detailed as unauthenticated cross-container probing. Workers should bind only GET /health/detailed and /v1/health/detailed, prove no-auth behavior even when APIKey is configured, and preserve flat /health behavior.",
               "write_scope": [
                 "internal/apiserver/detailed_health.go",
                 "internal/apiserver/detailed_health_endpoint_test.go",
@@ -16107,7 +16110,7 @@
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "API server endpoint fixtures prove /health/detailed and /v1/health/detailed route binding, error-envelope compatibility, redaction, and unchanged flat health routes."
+                "API server endpoint fixtures prove /health/detailed and /v1/health/detailed route binding, unauthenticated health access, error-envelope compatibility, redaction, and unchanged flat health routes."
               ],
               "health": {
                 "attempt_count": 3,
