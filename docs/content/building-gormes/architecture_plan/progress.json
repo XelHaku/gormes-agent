@@ -10995,9 +10995,9 @@
             {
               "name": "Checkpoint shadow-repo GC policy",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Native checkpoint manager prunes orphan and stale shadow repositories at startup using a deterministic policy before any write-capable file tools depend on rollback state",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -11033,7 +11033,7 @@
                 "TestCheckpointManagerDryRunReportsCandidates returns the same orphan/stale candidates without deleting them.",
                 "Status evidence names counts and paths relative to the checkpoint root, with no absolute home-directory leakage."
               ],
-              "note": "Hermes 478444c2 added startup pruning for orphan and stale checkpoint shadow repos. Gormes has only an umbrella checkpoint row, so this creates the first landable Go checkpoint-manager slice before broader file write/patch ports.",
+              "note": "Complete: TDD landed a Go-native checkpoint manager startup GC contract under `internal/tools` with Gormes-owned XDG checkpoint roots, `GORMES_WORKDIR` shadow markers, orphan/stale pruning, dry-run candidate reporting, fake-clock TTL fixtures, and redacted status evidence before write/patch/restore tools are exposed.",
               "write_scope": [
                 "internal/tools/checkpoint_manager.go",
                 "internal/tools/checkpoint_manager_test.go",
