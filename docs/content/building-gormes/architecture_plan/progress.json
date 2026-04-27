@@ -3803,8 +3803,8 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-27T05:38:23Z",
+                "reshape_count": 3,
+                "last_reshape": "2026-04-27T05:33:36Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -7306,6 +7306,10 @@
                 "backends_tried": [
                   "codexu"
                 ]
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T05:33:36Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -14687,6 +14691,10 @@
               "done_signal": [
                 "cmd/gormes TUI save-export fixtures prove the real SessionExportFunc writes under XDG_DATA_HOME/gormes/sessions/exports, ignores HERMES_HOME for runtime state, relies on the existing TUI partial-file cleanup path, and returns the exported path to /save without internal/tui edits."
               ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T05:33:36Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:5eb6cd82 cli.py,tui_gateway/server.py",
