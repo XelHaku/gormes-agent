@@ -7250,17 +7250,20 @@
                 "../hermes-agent/run_agent.py@e85b7525",
                 "../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525",
                 "internal/hermes/context_engine.go",
+                "internal/kernel/context_engine.go",
                 "internal/kernel/contextengine_test.go",
                 "internal/hermes/context_compressor_budget.go"
               ],
               "ready_when": [
                 "ContextEngine interface + status tool contract is validated on main.",
                 "Compression token-budget and single-prompt threshold fixtures are validated, so this slice only adds boundary notification semantics and does not invent compression budgeting.",
-                "A fake ContextEngine can record boundary notifications without calling a live provider or mutating real transcript storage."
+                "A fake ContextEngine can record boundary notifications without calling a live provider or mutating real transcript storage.",
+                "internal/kernel/context_engine.go owns the kernel-side context-engine adapter seam; workers should not edit internal/kernel/kernel.go for this row."
               ],
               "not_ready_when": [
                 "The slice implements summarization, tool-result pruning, manual compression, or context references instead of the boundary callback.",
                 "The slice hides boundary failures or lets a context cache survive across a compression lineage change without observable status evidence.",
+                "The slice edits internal/kernel/kernel.go, internal/hermes/context_compressor_budget.go, transcript storage, or session lineage helpers instead of the context-engine adapter files named in write_scope.",
                 "The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern."
               ],
               "blocked_by": [
@@ -7273,10 +7276,11 @@
                 "The notification includes old_session_id/new_session_id or equivalent lineage evidence so caches can distinguish pre-compress and post-compress context.",
                 "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
               ],
-              "note": "Hermes e85b7525 added a regression hook so context-engine state sees compression boundaries. Gormes already has a Go ContextEngine boundary and budget math, but no explicit cache/lineage notification row, so this keeps the drift as a small fake-engine fixture before broader pruning/manual-compression work.",
+              "note": "Refined 2026-04-27T05:38Z after a write-scope failure: Hermes e85b7525 added a regression hook so context-engine state sees compression boundaries. Gormes already has a Go ContextEngine boundary and budget math, but no explicit cache/lineage notification row; include internal/kernel/context_engine.go in scope because that file owns the adapter seam workers were reaching for, while keeping kernel.go, transcript, and session lineage out of scope.",
               "write_scope": [
                 "internal/hermes/context_engine.go",
                 "internal/hermes/context_engine_test.go",
+                "internal/kernel/context_engine.go",
                 "internal/kernel/contextengine_test.go",
                 "internal/kernel/compression_boundary_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"

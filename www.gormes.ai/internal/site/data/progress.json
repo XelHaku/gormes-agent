@@ -3734,7 +3734,7 @@
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
               "contract": "Registry-owned active-turn steering command",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -3753,6 +3753,7 @@
               ],
               "ready_when": [
                 "Steer slash command parser + preview helper is validated on main.",
+                "The parser helper is already complete on main, so workers should start from internal/gateway/steer_command.go and add only registry/queue behavior in this row.",
                 "This slice only registers /steer and queue fallback behavior; the live between-tool-call injection hook remains in the dependent row.",
                 "Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required."
               ],
@@ -3760,9 +3761,6 @@
                 "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior.",
                 "The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code.",
                 "The parser row is not present in the worker checkout."
-              ],
-              "blocked_by": [
-                "Steer slash command parser + preview helper"
               ],
               "unblocks": [
                 "Mid-run steer injection between tool calls",
@@ -3774,7 +3772,7 @@
                 "TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands.",
                 "Existing gateway command parsing and active-session policy tests remain green."
               ],
-              "note": "Second steer slice. It consumes the pure parser and is intentionally queue/fallback only so workers do not mix command registration with kernel tool-loop steering.",
+              "note": "Refined 2026-04-27T05:38Z: the parser prerequisite is complete on main, so this row is now unblocked and fixture-ready. It consumes the pure parser and is intentionally queue/fallback only so workers do not mix command registration with kernel tool-loop steering.",
               "write_scope": [
                 "internal/gateway/commands.go",
                 "internal/gateway/manager.go",
@@ -3805,8 +3803,8 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T04:18:56Z",
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T05:38:23Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -7252,17 +7250,20 @@
                 "../hermes-agent/run_agent.py@e85b7525",
                 "../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525",
                 "internal/hermes/context_engine.go",
+                "internal/kernel/context_engine.go",
                 "internal/kernel/contextengine_test.go",
                 "internal/hermes/context_compressor_budget.go"
               ],
               "ready_when": [
                 "ContextEngine interface + status tool contract is validated on main.",
                 "Compression token-budget and single-prompt threshold fixtures are validated, so this slice only adds boundary notification semantics and does not invent compression budgeting.",
-                "A fake ContextEngine can record boundary notifications without calling a live provider or mutating real transcript storage."
+                "A fake ContextEngine can record boundary notifications without calling a live provider or mutating real transcript storage.",
+                "internal/kernel/context_engine.go owns the kernel-side context-engine adapter seam; workers should not edit internal/kernel/kernel.go for this row."
               ],
               "not_ready_when": [
                 "The slice implements summarization, tool-result pruning, manual compression, or context references instead of the boundary callback.",
                 "The slice hides boundary failures or lets a context cache survive across a compression lineage change without observable status evidence.",
+                "The slice edits internal/kernel/kernel.go, internal/hermes/context_compressor_budget.go, transcript storage, or session lineage helpers instead of the context-engine adapter files named in write_scope.",
                 "The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern."
               ],
               "blocked_by": [
@@ -7275,10 +7276,11 @@
                 "The notification includes old_session_id/new_session_id or equivalent lineage evidence so caches can distinguish pre-compress and post-compress context.",
                 "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
               ],
-              "note": "Hermes e85b7525 added a regression hook so context-engine state sees compression boundaries. Gormes already has a Go ContextEngine boundary and budget math, but no explicit cache/lineage notification row, so this keeps the drift as a small fake-engine fixture before broader pruning/manual-compression work.",
+              "note": "Refined 2026-04-27T05:38Z after a write-scope failure: Hermes e85b7525 added a regression hook so context-engine state sees compression boundaries. Gormes already has a Go ContextEngine boundary and budget math, but no explicit cache/lineage notification row; include internal/kernel/context_engine.go in scope because that file owns the adapter seam workers were reaching for, while keeping kernel.go, transcript, and session lineage out of scope.",
               "write_scope": [
                 "internal/hermes/context_engine.go",
                 "internal/hermes/context_engine_test.go",
+                "internal/kernel/context_engine.go",
                 "internal/kernel/contextengine_test.go",
                 "internal/kernel/compression_boundary_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -7803,7 +7805,8 @@
               ],
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T04:49:49Z"
+                "last_reshape": "2026-04-27T04:49:49Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -7929,7 +7932,8 @@
               ],
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T04:49:49Z"
+                "last_reshape": "2026-04-27T04:49:49Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -11326,21 +11330,24 @@
                 "Operator-auditable search evidence is validated on main, so this row is unblocked for the tool wrapper only.",
                 "The tool can use seeded SQLite/session.Metadata fixtures and does not need a live gateway, provider, or Goncho cloud service.",
                 "Existing Goncho/Honcho-compatible scope rules remain the authority for user/source widening.",
+                "Implement against the internal/tools.Tool interface in internal/tools/tool.go; this row creates the tool type and tests, not cmd/gormes registry binding.",
                 "This row must wrap existing internal/memory.SearchSessions/SearchMessages and must not change ranking, lineage construction, default same-chat fences, or Goncho persistence."
               ],
               "not_ready_when": [
                 "The slice changes ranking, default same-chat recall fences, or Goncho/Honcho memory persistence instead of wrapping existing search results.",
                 "The slice shells out to Hermes Python or reads ~/.hermes session logs.",
                 "The slice edits internal/memory/session_catalog.go or internal/goncho/service.go; those prerequisites are already validated and should be treated as read-only donor code.",
+                "The slice edits internal/tools/builtin.go, cmd/gormes, gateway runtime registration, or the global toolset manifest; registration is a later row after the wrapper fixtures pass.",
                 "The slice includes todo/debug/clarify tools or cronjob tools in the same change."
               ],
               "acceptance": [
                 "TestSessionSearchTool_SameChatDefault seeds two chats and proves no cross-chat hit appears without explicit scope=user or sources.",
                 "TestSessionSearchTool_UserScopeSourceFilter passes scope=user sources=[telegram] and proves only the allowed source's sessions are returned with source evidence.",
                 "TestSessionSearchTool_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155.",
-                "TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening."
+                "TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening.",
+                "TestSessionSearchTool_DescriptorAndSchema proves the wrapper satisfies tools.Tool with Name() == \"session_search\", a JSON schema that exposes query/scope/sources/mode/current_session_id, and a deterministic timeout without registering it globally."
               ],
-              "note": "Reshaped 2026-04-27 after still-failing outcomes: the Phase 3 lineage/search/evidence prerequisites are complete, so this row is now a strict wrapper-only tool slice. Removed internal/memory from write_scope because workers should consume SearchSessions/SearchMessages as stable donor APIs, not reopen catalog semantics.",
+              "note": "Refined 2026-04-27T05:38Z after no-attempts-yet feedback: the Phase 3 lineage/search/evidence prerequisites are complete, so this row is a strict wrapper-only tools.Tool slice. Removed internal/memory from write_scope earlier and now explicitly excludes registry binding so workers consume SearchSessions/SearchMessages as stable donor APIs instead of reopening catalog or Goncho semantics.",
               "write_scope": [
                 "internal/tools/session_search_tool.go",
                 "internal/tools/session_search_tool_test.go",
@@ -11355,11 +11362,8 @@
                 "Session search tool fixtures prove same-chat defaults, opt-in user/source widening, deterministic current-lineage-root exclusion in recent mode, and degraded evidence for unavailable/denied widening."
               ],
               "planner_verdict": {
-                "needs_human": true,
-                "reason": "auto: 4 reshapes without unsticking; last category ",
-                "since": "2026-04-27T04:18:56Z",
-                "reshape_count": 4,
-                "last_reshape": "2026-04-27T04:18:56Z",
+                "reshape_count": 5,
+                "last_reshape": "2026-04-27T05:38:23Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
@@ -14646,12 +14650,14 @@
                 "../hermes-agent/tui_gateway/server.py@5eb6cd82:session.save",
                 "internal/tui/slash_save.go:SessionExportFunc",
                 "cmd/gormes/session.go:sessionExportCmd",
+                "cmd/gormes/main.go:runResolvedTUIWithRuntime",
                 "internal/config/config.go:MemoryDBPath"
               ],
               "ready_when": [
                 "Native TUI /save canonical session export is validated on main and exposes SessionExportFunc on Model options.",
                 "The prior /save handler write-scope issue is closed; slash_dispatch_test.go was already included in the completed handler row and should not be touched here.",
                 "cmd/gormes/session.go already proves transcript.ExportMarkdown works against config.MemoryDBPath for the CLI export command.",
+                "internal/tui/slash_save.go already owns partial-file cleanup and should be treated as read-only in this binding slice.",
                 "Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence."
               ],
               "not_ready_when": [
@@ -14660,16 +14666,17 @@
                 "The slice starts a provider, API server, remote TUI gateway, or live session browser."
               ],
               "acceptance": [
-                "cmd/gormes constructs a SessionExportFunc for the local TUI Model that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
+                "cmd/gormes constructs a SessionExportFunc for the local TUI Model, preferably through a small helper in cmd/gormes/session.go, that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
+                "runResolvedTUIWithRuntime passes that function through tui.Options{SessionExport: ...} only for the local TUI path; remote TUI startup remains unchanged.",
                 "TestTUISaveExport_WritesUnderXDGDataHome sets XDG_DATA_HOME and HERMES_HOME to different temp roots, invokes the bound SessionExportFunc, and proves the file lands under the Gormes XDG export directory only.",
                 "TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path.",
                 "The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway."
               ],
-              "note": "Refined 2026-04-27: the native TUI /save handler is complete on main, so this row is unblocked and limited to cmd/gormes binding plus XDG output-location fixtures. Do not reopen slash dispatch tests or change transcript markdown formatting.",
+              "note": "Refined 2026-04-27T05:38Z: the native TUI /save handler is complete on main, so this row is unblocked and limited to cmd/gormes binding plus XDG output-location fixtures. internal/tui/slash_save.go is now a read-only donor for this slice; do not reopen slash dispatch tests or change transcript markdown formatting.",
               "write_scope": [
                 "cmd/gormes/main.go",
+                "cmd/gormes/session.go",
                 "cmd/gormes/tui_save_export_test.go",
-                "internal/tui/slash_save.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
@@ -14678,7 +14685,7 @@
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "cmd/gormes TUI save-export fixtures prove the real SessionExportFunc writes under XDG_DATA_HOME/gormes/sessions/exports, ignores HERMES_HOME for runtime state, cleans partial files, and returns the exported path to /save."
+                "cmd/gormes TUI save-export fixtures prove the real SessionExportFunc writes under XDG_DATA_HOME/gormes/sessions/exports, ignores HERMES_HOME for runtime state, relies on the existing TUI partial-file cleanup path, and returns the exported path to /save without internal/tui edits."
               ],
               "provenance": {
                 "origin_type": "hybrid",
@@ -15845,8 +15852,8 @@
                 "SKILL.md metadata fixtures prove invalid, disabled, or unreviewed drafts stay out of prompt injection."
               ],
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T03:51:02Z",
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T05:21:34Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {
