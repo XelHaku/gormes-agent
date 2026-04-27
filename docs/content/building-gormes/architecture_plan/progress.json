@@ -7368,18 +7368,26 @@
                 "Fake ContextEngine fixtures prove successful compression emits one boundary notification with lineage evidence, skipped/failed compression does not, and context status exposes degraded evidence."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-27T06:04:03Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:19:46Z",
                 "last_failure": {
-                  "run_id": "20260427T060354Z-317886926",
+                  "run_id": "20260427T061936Z-770693547",
                   "category": "worker_error",
                   "backend": "codexu",
                   "stderr_tail": "Reading additional input from stdin...\n"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:19:46Z",
+                  "after_run_id": "20260427T061936Z-770693547",
+                  "threshold": 3,
+                  "spec_hash": "8696861fb436e90806a83a55de2ebeaad6465ded2af18b1d5f321e3fbd1ca81a",
+                  "last_category": "worker_error"
+                }
               },
               "planner_verdict": {
                 "reshape_count": 1,
