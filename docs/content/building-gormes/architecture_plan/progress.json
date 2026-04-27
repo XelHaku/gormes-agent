@@ -3400,7 +3400,7 @@
             {
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
-              "contract": "Registry-owned active-turn steering command",
+              "contract": "Registry-owned /steer command accepts operator/gateway text during a busy turn, validates/truncates preview text, and queues visible guidance when no running-agent steer hook is available",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -3409,41 +3409,55 @@
                 "gateway"
               ],
               "degraded_mode": "Gateway returns visible usage, busy, or queued status instead of dropping steer text when the command cannot run immediately.",
-              "fixture": "internal/gateway active-turn command registry fixtures",
+              "fixture": "internal/gateway/steer_command_test.go",
               "source_refs": [
-                "docs/content/upstream-hermes/source-study.md",
-                "docs/content/building-gormes/upstream-lessons.md"
+                "../hermes-agent/cli.py@635253b9:busy_input_mode=steer",
+                "../hermes-agent/gateway/run.py@635253b9:running_agent.steer",
+                "../hermes-agent/hermes_cli/commands.py@635253b9:/busy steer",
+                "../hermes-agent/tests/gateway/test_busy_session_ack.py@635253b9",
+                "internal/gateway/commands.go",
+                "internal/gateway/manager.go"
               ],
               "ready_when": [
-                "2.E.2 is complete and the shared CommandDef registry is stable for gateway commands."
+                "Concurrent-tool cancellation (2.E.2) and the shared CommandDef registry are complete on main.",
+                "This slice only registers /steer and queue fallback behavior; the live between-tool-call injection hook remains in the dependent row.",
+                "Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required."
               ],
               "not_ready_when": [
-                "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior."
-              ],
-              "blocked_by": [
-                "2.E.2"
+                "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior.",
+                "The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code.",
+                "The slice accepts empty/image-bearing steer payloads instead of returning usage/fallback evidence."
               ],
               "unblocks": [
                 "Mid-run steer injection between tool calls",
                 "Gateway-handled slash commands bypass active-session guard"
               ],
               "acceptance": [
-                "The shared CommandDef registry exposes /steer with argument validation and preview truncation.",
-                "No-running-agent paths queue follow-up guidance instead of dropping it.",
-                "Running-agent paths do not inject mid-run guidance until the next slice owns that hook."
+                "TestSteerCommandRegistry_ValidatesArgs exposes /steer with missing-argument usage text and rejects image-bearing payloads.",
+                "TestSteerCommandRegistry_PreviewTruncation returns deterministic preview text for long guidance.",
+                "TestSteerCommandRegistry_NoRunningAgentQueuesGuidance queues follow-up guidance instead of dropping it.",
+                "TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands."
               ],
-              "note": "TDD: port upstream PR #12116 `/steer` ingress (see `gateway/run.py` steer handler) as a CommandDef on the shared registry with queue-fallback when no agent is running, explicit missing-argument usage text, and deterministic preview truncation. Keep the mid-run inject hook unimplemented until the next 2.F.5 slice lands.",
+              "note": "Refined 2026-04-27 against Hermes 635253b9. This is only the registry/fallback slice for /steer; the upstream busy_input_mode=steer runtime injection remains blocked behind the next row so workers do not mix command parsing with kernel tool-loop steering.",
               "write_scope": [
-                "internal/gateway/",
-                "internal/channels/",
+                "internal/gateway/commands.go",
+                "internal/gateway/manager.go",
+                "internal/gateway/steer_command_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/gateway ./internal/channels/... -count=1"
+                "go test ./internal/gateway -run '^TestSteerCommandRegistry_' -count=1",
+                "go test ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "The shared command registry exposes /steer and no-agent paths return visible queued guidance."
-              ]
+                "Gateway command fixtures prove /steer argument validation, preview truncation, queued fallback, and no live mid-run injection."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:635253b9 gateway/run.py",
+                "note": "Hermes defines busy-input steer behavior; Gormes splits command registration/fallback from the later native kernel injection hook."
+              }
             },
             {
               "name": "Mid-run steer injection between tool calls",
