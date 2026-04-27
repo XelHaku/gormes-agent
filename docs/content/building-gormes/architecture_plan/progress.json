@@ -4003,7 +4003,12 @@
               "status": "planned",
               "note": "TDD: mirror upstream PRs #12334 and #511ed4da — registry-resolved gateway slash commands must execute even while an agent is running for that session, without interrupting the running turn and without queuing discardable command text. Keep non-gateway/unknown commands behind the existing busy-state response so only the safe registry surface bypasses the guard; cover both allowed and denied paths with fixture tests before shipping."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Hermes 635253b9 remains the donor for busy-input /steer behavior. Gormes has the pure parser/preview helper but still needs registry queue fallback, mid-run kernel injection, and gateway-safe active-session bypass. The registry/fallback row is temporarily blocked behind the Gormes-owned backend usage-limit/stdin health bypass because recent autoloop failures were backend-infrastructure exits, not implementation drift."
+          }
         },
         "2.G": {
           "name": "OS-AI Spine: Skills Runtime",
