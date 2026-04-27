@@ -6025,9 +6025,9 @@
                 "Azure Foundry fixtures prove Responses-only family inference, target-model precedence, non-OpenAI preservation, anthropic_messages guard, and zero live Azure dependency."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-27T05:09:57Z",
-                "last_success": "2026-04-27T05:09:57Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T05:21:31Z",
+                "last_success": "2026-04-27T05:21:31Z"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -7088,6 +7088,11 @@
               "done_signal": [
                 "Compression content-length fixtures prove plain strings, multimodal text blocks, bare strings in lists, unknown list-item fallback, and image-only zero-text handling without provider or kernel side effects."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T05:21:31Z",
+                "last_success": "2026-04-27T05:21:31Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:cfc8befe+94346523+bda2dbc2 agent/context_compressor.py",
@@ -8883,9 +8888,9 @@
                 "Discord limit fixtures prove string, JSON-number, invalid, too-small, and too-large limit inputs normalize with stable evidence and no live Discord API calls."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-27T05:07:41Z",
-                "last_success": "2026-04-27T05:07:41Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T05:21:31Z",
+                "last_success": "2026-04-27T05:21:31Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -9280,6 +9285,11 @@
               "done_signal": [
                 "Browser SSRF guard fixtures prove quoted false values disable cloud routing guards correctly, private URLs are blocked when they would reach cloud providers, and no browser/network runtime is used."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T05:21:31Z",
+                "last_success": "2026-04-27T05:21:31Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:7317d69f tools/url_safety.py",
@@ -9535,6 +9545,11 @@
               "done_signal": [
                 "URL candidate fixtures prove frontmatter-name, URL-slug, missing-name evidence, unsafe-name rejection, source/trust metadata, and no network/filesystem imports."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T05:21:31Z",
+                "last_success": "2026-04-27T05:21:31Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:e63929d4 tools/skills_hub.py UrlSource.fetch",
@@ -10414,9 +10429,9 @@
                 "MCP/cron fixtures prove cancelled stdio PIDs become orphaned, cron tick cleanup reaps only orphans after join, shutdown can include active PIDs, and no real subprocess is spawned."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-27T05:11:40Z",
-                "last_success": "2026-04-27T05:11:40Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T05:21:31Z",
+                "last_success": "2026-04-27T05:21:31Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -10896,6 +10911,11 @@
               "done_signal": [
                 "Hook consent parser fixtures prove quoted false-like strings and non-bool scalars cannot auto-accept executable hooks, while explicit CLI/env truthy values still work."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T05:21:31Z",
+                "last_success": "2026-04-27T05:21:31Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:e19854d8 agent/shell_hooks.py",
@@ -11047,6 +11067,11 @@
               "done_signal": [
                 "Checkpoint manager fixtures prove startup orphan/stale shadow cleanup, dry-run reporting, fake-clock TTL behavior, and redacted status evidence under t.TempDir only."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T05:21:31Z",
+                "last_success": "2026-04-27T05:21:31Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:478444c2 tools/checkpoint_manager.py",
