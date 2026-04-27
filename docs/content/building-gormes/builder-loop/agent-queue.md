@@ -22,28 +22,7 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. Backend usage-limit stdin health bypass
-
-- Phase: 1 / 1.C
-- Owner: `orchestrator`
-- Size: `small`
-- Status: `planned`
-- Priority: `P1`
-- Contract: Builder-loop treats backend usage-limit/stdin-wait exits that produce no worker diff as backend infrastructure degradation, emits run-level backend evidence, and avoids charging the selected feature row as a worker_error quarantine candidate
-- Trust class: system
-- Ready when: Autoloop audit shows backend_waiting_for_stdin rows whose detail contains `You've hit your usage limit` and no promoted diff., Existing backend failure classification already detects killed, deadline, and stdin-wait exits; this slice only adds the usage-limit/no-diff health bypass around that path., The test can use FakeRunner with a backend Result{Err: errors.New("exit status 1"), Stdout: usage-limit text plus `Reading additional input from stdin...`} and a one-row progress fixture; no real backend, git remote, provider, or worktree promotion is required.
-- Not ready when: The slice changes feature-row contracts, candidate ranking, post-promotion gates, planner prompt generation, or backend command construction., The slice suppresses real row failures that produced a commit, dirty worktree, write-scope violation, validation failure, or no-progress diff., The slice retries forever instead of emitting bounded backend_degraded evidence when no fallback backend remains.
-- Degraded mode: When every configured backend is usage-limited or waiting for stdin, the loop emits backend_degraded/backend_waiting_for_stdin evidence and leaves feature-row health unchanged so the planner sees an infrastructure outage instead of a toxic implementation row.
-- Fixture: `internal/builderloop/run_health_test.go::TestRunOnce_BackendUsageLimitDoesNotQuarantineRow`
-- Write scope: `internal/builderloop/backend_failure.go`, `internal/builderloop/backend_failure_test.go`, `internal/builderloop/run.go`, `internal/builderloop/run_health_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/builderloop -run '^(TestClassifyBackendFailureDetectsUsageLimitStdinExit\|TestRunOnce_BackendUsageLimitDoesNotQuarantineRow\|TestRunOnce_BackendDegradedEventEmittedAfterThreshold)$' -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Builder-loop usage-limit fixtures prove backend stdin/usage-limit outages produce run-level degraded evidence without mutating feature-row health, while ordinary worker_error paths still update row health.
-- Acceptance: TestClassifyBackendFailureDetectsUsageLimitStdinExit proves usage-limit text is classified distinctly from ordinary stdin wait while preserving the original detail tail., TestRunOnce_BackendUsageLimitDoesNotQuarantineRow runs a selected feature row through FakeRunner usage-limit/stdin output and proves the row's health block is not incremented or quarantined., The same run emits a ledger event with backend_waiting_for_stdin or backend_usage_limited detail plus backend_degraded evidence when fallback switching is configured., A separate worker_error fixture with a non-backend row failure still increments row health, so real implementation failures remain visible to quarantine math., Existing TestRunOnce_BackendDegradedEventEmittedAfterThreshold and backend_failure_test.go fixtures remain green.
-- Source refs: internal/builderloop/backend_failure.go:ClassifyBackendFailure, internal/builderloop/backend_failure_test.go, internal/builderloop/run.go:recordWorkerOutcome, internal/builderloop/run_health_test.go:TestRunOnce_BackendDegradedEventEmittedAfterThreshold, internal/builderloop/health_writer.go:RecordFailure, .codex/builder-loop/state/runs.jsonl recent backend_waiting_for_stdin usage-limit entries
-- Unblocks: Steer slash command registry + queue fallback, ContextEngine compression-boundary notification, Custom provider model-switch key_env write guard, Native TUI /save XDG file writer binding, Native TUI bounded conversation viewport
-- Why now: Unblocks Steer slash command registry + queue fallback, ContextEngine compression-boundary notification, Custom provider model-switch key_env write guard, Native TUI /save XDG file writer binding, Native TUI bounded conversation viewport.
-
-## 2. Title prompt and truncation contract
+## 1. Title prompt and truncation contract
 
 - Phase: 4 / 4.F
 - Owner: `provider`
@@ -62,7 +41,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/agent/title_generator.py@4a2ee6c1:generate_title, ../hermes-agent/agent/title_generator.py@4a2ee6c1:maybe_auto_title, ../hermes-agent/tests/agent/test_title_generator.py@4a2ee6c1, internal/tui/auto_title.go, internal/session/, internal/transcript/
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 3. Session search
+## 2. Session search
 
 - Phase: 5 / 5.N
 - Owner: `tools`
@@ -80,6 +59,27 @@ tests, and candidate policy. Keep those control-plane facts in
 - Acceptance: TestSessionSearchTool_SameChatDefault seeds two chats and proves no cross-chat hit appears without explicit scope=user or sources., TestSessionSearchTool_UserScopeSourceFilter passes scope=user sources=[telegram] and proves only the allowed source's sessions are returned with source evidence., TestSessionSearchTool_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155., TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening., TestSessionSearchTool_DescriptorAndSchema proves the wrapper satisfies tools.Tool with Name() == "session_search", a JSON schema that exposes query/scope/sources/mode/current_session_id, and a deterministic timeout without registering it globally.
 - Source refs: ../hermes-agent/tools/session_search_tool.py@dbe50155, ../hermes-agent/tests/tools/test_session_search.py@dbe50155, internal/memory/session_catalog.go, internal/memory/session_lineage_search_test.go, internal/goncho/service.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
+
+## 3. Backend usage-limit stdin health bypass
+
+- Phase: 5 / 5.N
+- Owner: `orchestrator`
+- Size: `small`
+- Status: `planned`
+- Priority: `P1`
+- Contract: Builder-loop treats backend usage-limit/stdin-wait exits that produce no worker diff as backend infrastructure degradation, emits run-level backend evidence, and avoids charging the selected feature row as a worker_error quarantine candidate
+- Trust class: system
+- Ready when: Autoloop audit shows backend_waiting_for_stdin rows whose detail contains `You've hit your usage limit` and no promoted diff., Existing backend failure classification already detects killed, deadline, and stdin-wait exits; this slice only adds the usage-limit/no-diff health bypass around that path., The test can use FakeRunner with a backend Result{Err: errors.New("exit status 1"), Stdout: usage-limit text plus `Reading additional input from stdin...`} and a one-row progress fixture; no real backend, git remote, provider, or worktree promotion is required.
+- Not ready when: The slice changes feature-row contracts, candidate ranking, post-promotion gates, planner prompt generation, or backend command construction., The slice suppresses real row failures that produced a commit, dirty worktree, write-scope violation, validation failure, or no-progress diff., The slice retries forever instead of emitting bounded backend_degraded evidence when no fallback backend remains.
+- Degraded mode: When every configured backend is usage-limited or waiting for stdin, the loop emits backend_degraded/backend_waiting_for_stdin evidence and leaves feature-row health unchanged so the planner sees an infrastructure outage instead of a toxic implementation row.
+- Fixture: `internal/builderloop/run_health_test.go::TestRunOnce_BackendUsageLimitDoesNotQuarantineRow`
+- Write scope: `internal/builderloop/backend_failure.go`, `internal/builderloop/backend_failure_test.go`, `internal/builderloop/run.go`, `internal/builderloop/run_health_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/builderloop -run '^(TestClassifyBackendFailureDetectsUsageLimitStdinExit\|TestRunOnce_BackendUsageLimitDoesNotQuarantineRow\|TestRunOnce_BackendDegradedEventEmittedAfterThreshold)$' -count=1`, `go test ./internal/builderloop -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Builder-loop usage-limit fixtures prove backend stdin/usage-limit outages produce run-level degraded evidence without mutating feature-row health, while ordinary worker_error paths still update row health.
+- Acceptance: TestClassifyBackendFailureDetectsUsageLimitStdinExit proves usage-limit text is classified distinctly from ordinary stdin wait while preserving the original detail tail., TestRunOnce_BackendUsageLimitDoesNotQuarantineRow runs a selected feature row through FakeRunner usage-limit/stdin output and proves the row's health block is not incremented or quarantined., The same run emits a ledger event with backend_waiting_for_stdin or backend_usage_limited detail plus backend_degraded evidence when fallback switching is configured., A separate worker_error fixture with a non-backend row failure still increments row health, so real implementation failures remain visible to quarantine math., Existing TestRunOnce_BackendDegradedEventEmittedAfterThreshold and backend_failure_test.go fixtures remain green.
+- Source refs: internal/builderloop/backend_failure.go:ClassifyBackendFailure, internal/builderloop/backend_failure_test.go, internal/builderloop/run.go:recordWorkerOutcome, internal/builderloop/run_health_test.go:TestRunOnce_BackendDegradedEventEmittedAfterThreshold, internal/builderloop/health_writer.go:RecordFailure, .codex/builder-loop/state/runs.jsonl recent backend_waiting_for_stdin usage-limit entries
+- Unblocks: Steer slash command registry + queue fallback, ContextEngine compression-boundary notification, Custom provider model-switch key_env write guard, Native TUI /save XDG file writer binding, Native TUI bounded conversation viewport
+- Why now: Unblocks Steer slash command registry + queue fallback, ContextEngine compression-boundary notification, Custom provider model-switch key_env write guard, Native TUI /save XDG file writer binding, Native TUI bounded conversation viewport.
 
 ## 4. CLI OpenClaw residue onboarding hint
 

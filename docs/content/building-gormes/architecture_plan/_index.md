@@ -37,11 +37,11 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 35/74 subphases shipped · 23 in progress · 16 planned
+**Overall:** 36/74 subphases shipped · 22 in progress · 16 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
-| Phase 1 — The Dashboard | 🔨 | 2/3 subphases |
+| Phase 1 — The Dashboard | ✅ | 3/3 subphases |
 | Phase 2 — The Gateway | 🔨 | 15/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
@@ -51,7 +51,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ---
 
-## Phase 1 — The Dashboard 🔨
+## Phase 1 — The Dashboard ✅
 
 *Tactical bridge: Go TUI over Python's api_server HTTP+SSE boundary*
 
@@ -65,7 +65,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Offline tool validation
 
-### 1.C — Automation Reliability 🔨
+### 1.C — Automation Reliability ✅
 
 - [x] Orchestrator failure-row stabilization for 4-8 workers
 - [x] Soft-success-nonzero bats coverage
@@ -77,7 +77,6 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] PR-intake idle backoff
 - [x] Watchdog dead-process vs slow-progress separation
 - [x] Builder-loop self-improvement vs user-feature ratio metric
-- [ ] Backend usage-limit stdin health bypass
 
 ## Phase 2 — The Gateway 🔨
 
@@ -568,6 +567,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Debug helpers
 - [x] Planner audit blank-subphase control-plane bucket
 - [x] Autoloop recent-failure detail excerpts
+- [ ] Backend usage-limit stdin health bypass
 - [ ] Cronjob tool API + schedule parser parity
 - [x] Cron schedule parser + repeat state fixtures
 - [x] Cron recurring next-run failure preservation
