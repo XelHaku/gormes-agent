@@ -2020,7 +2020,7 @@
                 "The slice stores dedup history on disk or wires the helper into inbound dispatch; manager wiring is the dependent row."
               ],
               "unblocks": [
-                "Gateway inbound dedup evidence wiring"
+                "Gateway inbound dedup key helper"
               ],
               "acceptance": [
                 "TestMessageDeduplicator_MaxSizeEvictsOldest adds max_size+1 distinct IDs and proves the first ID is no longer considered duplicate while the newest IDs remain tracked.",
@@ -2054,10 +2054,72 @@
               }
             },
             {
-              "name": "Gateway inbound dedup evidence wiring",
+              "name": "Gateway inbound dedup key helper",
               "priority": "P2",
               "status": "planned",
-              "contract": "Gateway manager applies the shared MessageDeduplicator to inbound events with stable message IDs, drops duplicate submissions with visible evidence, and degrades missing message IDs without suppressing the turn",
+              "contract": "Gateway exposes a pure helper that derives a dedup tracking key from InboundEvent.Platform, ChatID, ThreadID, and MessageID, returning explicit missing-ID evidence without dropping or submitting events",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Gateway status can distinguish dedup_unavailable_missing_message_id from duplicate_message before manager dispatch is wired.",
+              "fixture": "internal/gateway/inbound_dedup_key_test.go::TestInboundDedupKey_*",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator",
+                "../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585",
+                "internal/gateway/message_deduplicator.go",
+                "internal/gateway/event.go:InboundEvent.MessageID"
+              ],
+              "ready_when": [
+                "Gateway message deduplicator bounded helper is validated on main and exposes duplicate/evicted/disabled evidence.",
+                "InboundEvent already carries MessageID, Platform, ChatID, and ThreadID; this row only derives a deterministic key and missing-ID evidence.",
+                "Tests use InboundEvent literals only; no Manager, fake channel, kernel, Telegram, Slack, Discord, provider SDK, or platform adapter is needed."
+              ],
+              "not_ready_when": [
+                "The slice edits internal/gateway/message_deduplicator.go, internal/gateway/manager.go, fake gateway fixtures, channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
+                "The helper treats empty MessageID as a duplicate instead of returning missing-ID degraded evidence.",
+                "The helper stores dedup history or calls MessageDeduplicator.Track; manager binding is the dependent row."
+              ],
+              "blocked_by": [
+                "Gateway message deduplicator bounded helper"
+              ],
+              "unblocks": [
+                "Gateway inbound dedup manager binding"
+              ],
+              "acceptance": [
+                "TestInboundDedupKey_ScopesByPlatformChatThreadMessageID proves identical MessageID values in different platforms, chats, or threads produce different keys.",
+                "TestInboundDedupKey_StableForSameEvent proves repeated calls over the same event produce the exact same key.",
+                "TestInboundDedupKey_MissingMessageIDDegrades proves empty MessageID returns dedup_unavailable_missing_message_id evidence and no key.",
+                "Existing MessageDeduplicator helper tests remain green without editing message_deduplicator.go."
+              ],
+              "note": "Split 2026-04-27T12:56:05Z after repeated manager-row write-scope/report-validation failures. This first row is helper-only and drops the stale failed health/verdict block by replacing the contract with a new spec hash.",
+              "write_scope": [
+                "internal/gateway/inbound_dedup_key.go",
+                "internal/gateway/inbound_dedup_key_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run '^TestInboundDedupKey_' -count=1",
+                "go test ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Gateway helper fixtures prove deterministic scoped dedup keys and missing-ID degraded evidence without manager wiring or deduplicator-helper edits."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:cebf9585 tests/gateway/test_message_deduplicator.py",
+                "note": "Hermes applies deduplication inside platform helpers; Gormes first derives a shared Go event key before manager-level dispatch suppression."
+              }
+            },
+            {
+              "name": "Gateway inbound dedup manager binding",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Gateway manager applies MessageDeduplicator through the validated inbound dedup key helper, drops repeated inbound submissions with duplicate_message evidence, and lets missing-ID events continue with dedup_unavailable evidence",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -2070,33 +2132,33 @@
               "source_refs": [
                 "../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator",
                 "../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585",
+                "internal/gateway/inbound_dedup_key.go",
                 "internal/gateway/message_deduplicator.go",
-                "internal/gateway/event.go",
                 "internal/gateway/manager.go"
               ],
               "ready_when": [
-                "Gateway message deduplicator bounded helper is validated on main and exposes duplicate/evicted/disabled evidence; treat internal/gateway/message_deduplicator.go as read-only in this row.",
-                "Shared gateway inbound event normalization is validated and platform adapters already pass stable message IDs where available.",
-                "The worker can use fake gateway.Channel and fake kernel fixtures only; no Telegram, Slack, Discord, provider SDK, or platform adapter edits are needed."
+                "Gateway inbound dedup key helper and Gateway message deduplicator bounded helper are validated on main; treat both helper files as read-only in this row.",
+                "The worker can use fake gateway.Channel and fake kernel fixtures only; no Telegram, Slack, Discord, provider SDK, or platform adapter edits are needed.",
+                "ManagerConfig can add the minimum in-memory dedup field or dependency injection needed for tests; no disk store or global cache is required."
               ],
               "not_ready_when": [
-                "The slice edits internal/gateway/message_deduplicator.go, channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
+                "The slice edits internal/gateway/inbound_dedup_key.go, internal/gateway/message_deduplicator.go, channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
                 "The slice stores dedup history on disk or treats empty message IDs as duplicates.",
                 "The slice creates platform-specific tests instead of one gateway manager fixture using fake channels/events."
               ],
               "blocked_by": [
+                "Gateway inbound dedup key helper",
                 "Gateway message deduplicator bounded helper"
               ],
               "acceptance": [
                 "TestGatewayInboundDedup_DropsRepeatedMessageID submits the same channel/chat/thread/message ID twice and proves the fake kernel receives only the first turn while status evidence records duplicate_message.",
                 "TestGatewayInboundDedup_ScopesByChannelChatAndThread proves identical platform message IDs in different chats or threads do not collide.",
                 "TestGatewayInboundDedup_MissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence.",
-                "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green without editing message_deduplicator.go."
+                "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green without editing helper files."
               ],
-              "note": "Refined after a write-scope violation: the bounded MessageDeduplicator helper is complete and now read-only. This row owns only manager/event/fake-test wiring and the manager-level evidence fixture.",
+              "note": "Dependent manager-binding half of the split. It owns only Manager/fake-test wiring after the key helper lands, so workers no longer need to edit the completed deduplicator helper or infer the key shape.",
               "write_scope": [
                 "internal/gateway/message_deduplicator_manager_test.go",
-                "internal/gateway/event.go",
                 "internal/gateway/manager.go",
                 "internal/gateway/fake_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -2107,41 +2169,19 @@
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior without editing the deduplicator helper."
+                "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior without editing dedup helper files."
               ],
-              "health": {
-                "attempt_count": 4,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-27T12:01:21Z",
-                "last_failure": {
-                  "run_id": "20260427T115009Z-170800409",
-                  "category": "report_validation_failed",
-                  "backend": "codexu",
-                  "stderr_tail": "Reading additional input from stdin...\n"
-                },
-                "backends_tried": [
-                  "codexu"
-                ]
-              },
-              "planner_verdict": {
-                "needs_human": true,
-                "reason": "auto: 3 reshapes without unsticking; last category write_scope_violation",
-                "since": "2026-04-27T12:01:21Z",
-                "reshape_count": 3,
-                "last_reshape": "2026-04-27T12:01:21Z",
-                "last_outcome": "still_failing"
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 tests/gateway/test_message_deduplicator.py",
-                "note": "Hermes applies deduplication inside platform helpers; Gormes wires the shared Go helper at the gateway manager boundary after the helper contract is fixture-backed."
+                "note": "Hermes applies deduplication inside platform helpers; Gormes wires the shared Go helper at the gateway manager boundary after the key helper is fixture-backed."
               }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T12:29:11Z",
-            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, and message deduplication. The Telegram group binding is split into config vocabulary and adapter binding. WhatsApp unsafe inbound evidence now points at inbound.go for NormalizeInboundWithIdentity and identity.go for the helper so workers do not repeat the prior write-scope violation. Gateway inbound dedup remains human-escalated after repeated write-scope/report-validation failures; the completed MessageDeduplicator helper is read-only until that contract is split or manually cleared."
+            "last_upstream_check": "2026-04-27T12:56:05Z",
+            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, and message deduplication. Telegram group command-suffix behavior from 3ff3dfb5 is split into helper, config, and adapter-binding rows; the helper/config slices are complete and the adapter binding remains fixture-ready. WhatsApp unsafe inbound evidence points at inbound.go for NormalizeInboundWithIdentity and identity.go for the helper so workers do not repeat the prior write-scope violation. Gateway inbound dedup was split into a helper-only key row and a dependent manager-binding row after repeated write-scope/report-validation failures."
           }
         },
         "2.B.10": {
