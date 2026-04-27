@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/TrebuchetDynamics/gormes-agent/internal/hermes"
 	"github.com/TrebuchetDynamics/gormes-agent/internal/kernel"
 )
 
@@ -120,6 +121,99 @@ func renderConv(f kernel.RenderFrame, width int) string {
 		return muted.Render("(start typing below to begin)")
 	}
 	return strings.Join(lines, "\n\n")
+}
+
+func conversationViewportTail(f kernel.RenderFrame, width, height int) string {
+	if width < 4 {
+		width = 4
+	}
+	if height < 1 {
+		height = 1
+	}
+	wrap := lipgloss.NewStyle().Width(width - 4)
+	compact := width < 8 || height < 3
+	forced := conversationForcedBlocks(f, wrap, compact)
+	maxLines := height + 1 + len(forced)
+
+	var visible []string
+	for i := len(f.History) - 1; i >= 0; i-- {
+		msg := f.History[i]
+		block := conversationMessageBlock(msg, wrap, compact)
+		omitted := i
+		candidate := append([]string{block}, visible...)
+		if omitted > 0 {
+			candidate = append([]string{omittedHistorySentinel(omitted)}, candidate...)
+		}
+		candidate = append(candidate, forced...)
+		if renderedLineCount(strings.Join(candidate, "\n\n")) > maxLines && len(visible) > 0 {
+			break
+		}
+		visible = append([]string{block}, visible...)
+	}
+
+	omitted := len(f.History) - len(visible)
+	lines := make([]string, 0, len(visible)+1)
+	if omitted > 0 {
+		lines = append(lines, omittedHistorySentinel(omitted))
+	}
+	lines = append(lines, visible...)
+	lines = append(lines, forced...)
+	if len(lines) == 0 {
+		return muted.Render("(start typing below to begin)")
+	}
+	return strings.Join(lines, "\n\n")
+}
+
+func conversationForcedBlocks(f kernel.RenderFrame, wrap lipgloss.Style, compact bool) []string {
+	var blocks []string
+	if f.DraftText != "" {
+		blocks = append(blocks, conversationDraftBlock(f.DraftText, wrap, compact))
+	}
+	if f.LastError != "" {
+		blocks = append(blocks, conversationErrorBlock(f.LastError, compact))
+	}
+	return blocks
+}
+
+func conversationMessageBlock(msg hermes.Message, wrap lipgloss.Style, compact bool) string {
+	content := msg.Content
+	if compact {
+		content = compactViewportText(content)
+	} else {
+		content = wrap.Render(content)
+	}
+	return roleTag(msg.Role) + " " + content
+}
+
+func conversationDraftBlock(draft string, wrap lipgloss.Style, compact bool) string {
+	if compact {
+		draft = compactViewportText(draft)
+	} else {
+		draft = wrap.Render(draft)
+	}
+	return botStyle.Render("gormes:") + " " + draft
+}
+
+func conversationErrorBlock(lastError string, compact bool) string {
+	if compact {
+		lastError = compactViewportText(lastError)
+	}
+	return errStyle.Render("err:") + " " + lastError
+}
+
+func compactViewportText(s string) string {
+	return truncateEllipsis(strings.Join(strings.Fields(s), " "), 48)
+}
+
+func omittedHistorySentinel(count int) string {
+	return muted.Render(fmt.Sprintf("... %d earlier history messages omitted ...", count))
+}
+
+func renderedLineCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	return strings.Count(s, "\n") + 1
 }
 
 // renderSidebar renders the Telemetry + Soul Monitor pane.

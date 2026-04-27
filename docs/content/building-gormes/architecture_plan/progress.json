@@ -15476,9 +15476,9 @@
             {
               "name": "Native TUI conversation viewport tail helper",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tui exposes a pure conversation viewport helper that clips RenderFrame.History to the visible tail under width/height budgets, emits a deterministic omitted-history sentinel, and always preserves DraftText and LastError inputs",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -15513,7 +15513,7 @@
                 "TestConversationViewportTail_HeightAndWidthClamp proves width<4 and tiny height do not panic and still render a compact latest-message view.",
                 "TestConversationViewportTail_RenderedLineBudget asserts helper output stays within the requested visible budget plus a small sentinel allowance."
               ],
-              "note": "Split from the quarantined bounded viewport row. The first slice is a pure helper; renderConv integration is dependent and narrower.",
+              "note": "Complete: TDD added internal/tui/viewport_history_test.go and a pure conversationViewportTail helper in internal/tui/view.go. Fixtures cover 120-message tail clipping with a deterministic omitted-count sentinel, draft/error preservation under clipping, tiny height/narrow width compact latest-turn rendering, and rendered line budget without renderConv integration or kernel/session history changes.",
               "write_scope": [
                 "internal/tui/view.go",
                 "internal/tui/viewport_history_test.go",
