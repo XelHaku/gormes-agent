@@ -1146,7 +1146,7 @@
               "priority": "P3",
               "status": "planned",
               "contract": "Gateway session-context prompts tell the agent when the origin is BlueBubbles/iMessage and ask for short, blank-line-separated message bubbles",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1250,9 +1250,9 @@
             {
               "name": "Gateway fresh-final eligibility helper",
               "priority": "P0",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway coalescer exposes a deterministic fresh-final eligibility decision for stale editable previews without changing send/edit behavior yet",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1291,14 +1291,14 @@
                 "Focused tests use a fake now function and do not sleep.",
                 "Existing coalescer edit/finalize behavior remains unchanged because this row does not add the fresh send path."
               ],
-              "note": "Split 2026-04-27 from the broader fresh-final row after autoloop hit worker_error. This first slice ports only Hermes b16f9d43 _should_send_fresh_final as fake-clock Go coalescer state so the send/delete behavior can land as a separate worker-sized slice.",
+              "note": "Complete: TDD landed fake-clock coalescer state for preview creation time plus the deterministic shouldSendFreshFinal helper. The helper rejects disabled thresholds, non-final updates, missing preview IDs, missing creation time, and young previews, and enables stale final previews; the send/delete behavior landed in the paired fallback row.",
               "write_scope": [
                 "internal/gateway/coalesce.go",
                 "internal/gateway/coalesce_fresh_final_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/gateway -run 'TestFreshFinalEligibility|TestCoalescer' -count=1",
+                "go test ./internal/gateway -run 'TestCoalescerFreshFinal|TestCoalescer' -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
@@ -1313,9 +1313,9 @@
             {
               "name": "Gateway fresh-final send/delete fallback",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway streaming finalization can replace an eligible old editable preview with a fresh final message, best-effort delete the old preview when supported, and fall back to the legacy final edit when fresh send fails",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1360,7 +1360,7 @@
                 "Non-final intermediate edits never trigger a fresh final.",
                 "Existing manager outbound tests for non-editable channels and editable streaming remain green."
               ],
-              "note": "Split 2026-04-27 from the broader fresh-final row after autoloop hit worker_error. This second gateway slice ports Hermes b16f9d43 _try_fresh_final over the shared Go coalescer while still leaving Telegram operator config and SDK deleteMessage wiring to the blocked follow-up.",
+              "note": "TDD landed: shared gateway coalescer now supports threshold-gated fresh final sends with injected time, adopts the fresh message id, best-effort deletes stale previews through optional MessageDeleter, and falls back to EditMessageFinal when disabled, too young, unsupported, or fresh send fails. Telegram config/defaults and SDK deleteMessage wiring remain in the dependent row.",
               "write_scope": [
                 "internal/gateway/channel.go",
                 "internal/gateway/coalesce.go",
@@ -1371,7 +1371,7 @@
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/gateway -run 'TestCoalescerFreshFinalSendFallback' -count=1",
+                "go test ./internal/gateway -run 'TestCoalescerFreshFinal' -count=1",
                 "go test ./internal/gateway -run 'TestManager_Outbound|TestGatewayStreamConsumer|TestCoalescer' -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],

@@ -34,6 +34,12 @@ type FinalizingMessageEditor interface {
 	EditMessageFinal(ctx context.Context, chatID, msgID, text string, finalize bool) error
 }
 
+// MessageDeleter is implemented by channels that can remove an existing
+// message after a replacement has been delivered.
+type MessageDeleter interface {
+	DeleteMessage(ctx context.Context, chatID, msgID string) error
+}
+
 // PlaceholderCapable is implemented by channels that can create a message
 // placeholder for subsequent streaming edits.
 type PlaceholderCapable interface {

@@ -51,15 +51,16 @@ type activeTurnSnapshot struct {
 
 // ManagerConfig drives the shared gateway manager.
 type ManagerConfig struct {
-	AllowedChats   map[string]string
-	AllowDiscovery map[string]bool
-	CoalesceMs     int
-	SessionMap     session.Map
-	Hooks          *Hooks
-	RuntimeStatus  RuntimeStatusWriter
-	Restart        RestartConfig
-	SessionExpiry  SessionExpiryConfig
-	Now            func() time.Time
+	AllowedChats    map[string]string
+	AllowDiscovery  map[string]bool
+	CoalesceMs      int
+	FreshFinalAfter time.Duration
+	SessionMap      session.Map
+	Hooks           *Hooks
+	RuntimeStatus   RuntimeStatusWriter
+	Restart         RestartConfig
+	SessionExpiry   SessionExpiryConfig
+	Now             func() time.Time
 	// PersistReasoningGlobal is invoked by /reasoning ... --global to persist
 	// the requested effort beyond the calling session. A nil callback or one
 	// that returns an error causes the command to fall back to a session-only
@@ -151,6 +152,50 @@ func (h hookedPlaceholderEditor) SendPlaceholder(ctx context.Context, chatID str
 	return msgID, nil
 }
 
+func (h hookedPlaceholderEditor) Send(ctx context.Context, chatID, text string) (string, error) {
+	sender, ok := h.base.(coalescerMessageSender)
+	if !ok {
+		return "", errors.New("gateway: channel does not support fresh final send")
+	}
+
+	h.manager.fireHook(ctx, HookEvent{
+		Point:    HookBeforeSend,
+		Platform: h.platform,
+		ChatID:   chatID,
+		Text:     text,
+	})
+
+	msgID, err := sender.Send(ctx, chatID, text)
+	if err != nil {
+		h.manager.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+			Platform:      h.platform,
+			PlatformState: PlatformStateFailed,
+			ErrorMessage:  err.Error(),
+		})
+		h.manager.fireHook(ctx, HookEvent{
+			Point:    HookOnError,
+			Platform: h.platform,
+			ChatID:   chatID,
+			Text:     text,
+			Err:      err,
+		})
+		return "", err
+	}
+
+	h.manager.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+		Platform:      h.platform,
+		PlatformState: PlatformStateRunning,
+	})
+	h.manager.fireHook(ctx, HookEvent{
+		Point:    HookAfterSend,
+		Platform: h.platform,
+		ChatID:   chatID,
+		MsgID:    msgID,
+		Text:     text,
+	})
+	return msgID, nil
+}
+
 func (h hookedPlaceholderEditor) EditMessage(ctx context.Context, chatID, msgID, text string) error {
 	return h.base.EditMessage(ctx, chatID, msgID, text)
 }
@@ -160,6 +205,13 @@ func (h hookedPlaceholderEditor) EditMessageFinal(ctx context.Context, chatID, m
 		return finalizer.EditMessageFinal(ctx, chatID, msgID, text, finalize)
 	}
 	return h.base.EditMessage(ctx, chatID, msgID, text)
+}
+
+func (h hookedPlaceholderEditor) DeleteMessage(ctx context.Context, chatID, msgID string) error {
+	if deleter, ok := h.base.(MessageDeleter); ok {
+		return deleter.DeleteMessage(ctx, chatID, msgID)
+	}
+	return nil
 }
 
 // ErrDuplicateChannel is returned when two registered channels share a name.
@@ -597,7 +649,10 @@ func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **
 				base:     pe,
 				manager:  m,
 				platform: platform,
-			}, time.Duration(m.cfg.CoalesceMs)*time.Millisecond, chatID)
+			}, time.Duration(m.cfg.CoalesceMs)*time.Millisecond, chatID,
+				coalescerFreshFinalAfter(m.cfg.FreshFinalAfter),
+				coalescerNow(m.now),
+			)
 			*co = nc
 			go nc.run(cCtx)
 			nc.flushImmediate(ctx, "⏳")

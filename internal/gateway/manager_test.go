@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -377,6 +378,64 @@ func TestManager_Outbound_StreamsToPinnedChannel(t *testing.T) {
 	waitFor(t, 500*time.Millisecond, func() bool {
 		return len(tg.sentSnapshot()) >= 1 && len(tg.editsSnapshot()) >= 1
 	})
+}
+
+func TestManager_Outbound_FreshFinalAfterSendsFreshFinal(t *testing.T) {
+	tg := &freshFinalFakeChannel{fakeChannel: newFakeChannel("telegram")}
+	frames := make(chan kernel.RenderFrame, 8)
+	fk := &fakeKernel{}
+	now := time.Date(2026, 4, 27, 1, 0, 0, 0, time.UTC)
+
+	m := NewManagerWithSubmitter(ManagerConfig{
+		AllowedChats:    map[string]string{"telegram": "42"},
+		CoalesceMs:      10,
+		FreshFinalAfter: time.Minute,
+		Now:             func() time.Time { return now },
+	}, fk, slog.Default())
+	m.setRenderChan(frames)
+	_ = m.Register(tg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = m.Run(ctx) }()
+
+	tg.pushInbound(InboundEvent{
+		Platform: "telegram", ChatID: "42", MsgID: "m1",
+		Kind: EventSubmit, Text: "hi",
+	})
+	waitFor(t, 200*time.Millisecond, func() bool {
+		return len(fk.submitsSnapshot()) == 1
+	})
+
+	frames <- kernel.RenderFrame{Phase: kernel.PhaseStreaming, DraftText: "partial"}
+	waitFor(t, 500*time.Millisecond, func() bool {
+		return len(tg.sentSnapshot()) >= 1 && len(tg.editsSnapshot()) >= 1
+	})
+	oldID := tg.sentSnapshot()[0].MsgID
+
+	now = now.Add(time.Minute)
+	frames <- kernel.RenderFrame{
+		Phase: kernel.PhaseIdle,
+		History: []hermes.Message{
+			{Role: "user", Content: "hi"},
+			{Role: "assistant", Content: "done"},
+		},
+	}
+
+	waitFor(t, 500*time.Millisecond, func() bool {
+		return len(tg.sentSnapshot()) >= 2
+	})
+	sent := tg.sentSnapshot()
+	if sent[1].Text != "done" {
+		t.Fatalf("fresh final text = %q, want %q; sent=%#v", sent[1].Text, "done", sent)
+	}
+	edits := tg.editsSnapshot()
+	if len(edits) != 1 {
+		t.Fatalf("EditMessageFinal calls = %d, want only initial preview edit; edits=%#v", len(edits), edits)
+	}
+	if got, want := tg.deletesSnapshot(), []fakeDelete{{ChatID: "42", MsgID: oldID}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("DeleteMessage calls = %#v, want %#v", got, want)
+	}
 }
 
 func TestManager_Outbound_NonEditableChannelUsesPlainSendForInterimAndFinal(t *testing.T) {
