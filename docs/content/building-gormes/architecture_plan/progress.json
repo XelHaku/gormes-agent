@@ -1323,9 +1323,9 @@
             {
               "name": "WhatsApp unsafe sender/chat inbound evidence",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "WhatsApp inbound normalization in internal/channels/whatsapp/inbound.go uses the validated NormalizeSafeWhatsAppIdentifier helper to reject unsafe raw sender, chat, and reply target identifiers before Event.UserID, Event.ChatID, Reply.ChatID, or outbound pairing targets are created",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1360,7 +1360,7 @@
                 "TestNormalizeInboundWithIdentity_UnsafeReplyTargetRejected proves unsafe reply targets are dropped with evidence while safe sender/chat IDs still normalize.",
                 "Existing identity_contract.json fixtures still pass unchanged for safe bridge/native DM and group cases."
               ],
-              "note": "Split 2026-04-27T13:21:48Z from the broader unsafe inbound row after repeated report/write-scope failures. This first slice is raw sender/chat/reply evidence only; alias graph expansion is the dependent row.",
+              "note": "Complete: TDD landed inbound safety fixtures for unsafe raw sender, chat, and reply target IDs. NormalizeInboundWithIdentity now validates raw sender/chat/reply peer identifiers with NormalizeSafeWhatsAppIdentifier before creating Event.UserID, Event.ChatID, Reply.ChatID, or outbound pairing targets, returning unresolved_identity with whatsapp_identifier_unsafe evidence while preserving existing safe identity_contract.json behavior. Alias graph endpoint filtering remains the dependent row.",
               "write_scope": [
                 "internal/channels/whatsapp/inbound.go",
                 "internal/channels/whatsapp/identity_inbound_safety_test.go",
@@ -1374,6 +1374,11 @@
               "done_signal": [
                 "Inbound safety fixtures prove unsafe sender, chat, and reply identifiers are rejected with whatsapp_identifier_unsafe evidence while safe identity contracts remain green."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T13:43:23Z",
+                "last_success": "2026-04-27T13:43:23Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:91512b82+6993e566 gateway/whatsapp_identity.py",
