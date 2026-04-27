@@ -7611,6 +7611,20 @@
               "done_signal": [
                 "Image-budget fixtures prove image_url/input_image/image parts add a flat 1600-token charge in budget accounting while the existing text-only length estimator stays unchanged."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-27T14:32:15Z",
+                "last_failure": {
+                  "run_id": "20260427T143213Z-573333984",
+                  "category": "worker_error",
+                  "backend": "opencode",
+                  "stderr_tail": "                   share the session                                    [boolean]\n  -m, --model                         model to use in the format of provider/model          [string]\n      --agent                         agent to use                                          [string]\n      --format                        format: default (formatted) or json (raw JSON events)\n                                          [string] [choices: \"default\", \"json\"] [default: \"default\"]\n  -f, --file                          file(s) to attach to message                           [array]\n      --title                         title for the session (uses truncated prompt if no value\n                                      provided)                                             [string]\n      --attach                        attach to a running opencode server (e.g.,\n                                      http://localhost:4096)                                [string]\n  -p, --password                      basic auth password (defaults to OPENCODE_SERVER_PASSWORD)\n                                                                                            [string]\n      --dir                           directory to run in, path on remote server if attaching\n                                                                                            [string]\n      --port                          port for the local server (defaults to random port if no value\n                                      provided)                                             [number]\n      --variant                       model variant (provider-specific reasoning effort, e.g., high,\n                                      max, minimal)                                         [string]\n      --thinking                      show thinking blocks                [boolean] [default: false]\n      --dangerously-skip-permissions  auto-approve permissions that are not explicitly denied\n                                      (dangerous!)                        [boolean] [default: false]"
+                },
+                "backends_tried": [
+                  "opencode"
+                ]
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:ec671c41 agent/context_compressor.py",
