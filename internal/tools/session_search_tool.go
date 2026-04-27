@@ -3,10 +3,15 @@ package tools
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/TrebuchetDynamics/gormes-agent/internal/memory"
+	"github.com/TrebuchetDynamics/gormes-agent/internal/session"
 )
 
 const (
@@ -14,9 +19,33 @@ const (
 	sessionSearchMaxLimit     = 5
 )
 
-// SessionSearchTool exposes the model-facing session_search descriptor. This
-// slice intentionally validates arguments only; execution is wired separately.
-type SessionSearchTool struct{}
+// SessionSearchDirectory exposes the canonical session metadata needed to bind
+// session_search execution to the current chat before any recall widening.
+type SessionSearchDirectory interface {
+	GetMetadata(ctx context.Context, sessionID string) (session.Metadata, bool, error)
+	ListMetadataByUserID(ctx context.Context, userID string) ([]session.Metadata, error)
+}
+
+// SessionSearchToolConfig wires the execution wrapper without registering it
+// globally.
+type SessionSearchToolConfig struct {
+	DB       *sql.DB
+	Sessions SessionSearchDirectory
+}
+
+// SessionSearchTool exposes the model-facing session_search descriptor and,
+// when configured, executes against the local memory/session catalog.
+type SessionSearchTool struct {
+	db       *sql.DB
+	sessions SessionSearchDirectory
+}
+
+func NewSessionSearchTool(config SessionSearchToolConfig) *SessionSearchTool {
+	return &SessionSearchTool{
+		db:       config.DB,
+		sessions: config.Sessions,
+	}
+}
 
 // SessionSearchArgs is the normalized argument shape for session_search.
 type SessionSearchArgs struct {
@@ -30,15 +59,40 @@ type SessionSearchArgs struct {
 
 // SessionSearchEvidence is degraded-mode evidence returned for invalid input.
 type SessionSearchEvidence struct {
-	Status string `json:"status"`
-	Field  string `json:"field,omitempty"`
-	Reason string `json:"reason"`
+	Status    string `json:"status"`
+	Field     string `json:"field,omitempty"`
+	Reason    string `json:"reason"`
+	SessionID string `json:"session_id,omitempty"`
 }
 
 type sessionSearchResult struct {
-	Success  bool                    `json:"success"`
-	Args     *SessionSearchArgs      `json:"args,omitempty"`
-	Evidence []SessionSearchEvidence `json:"evidence,omitempty"`
+	Success       bool                            `json:"success"`
+	Args          *SessionSearchArgs              `json:"args,omitempty"`
+	Mode          string                          `json:"mode,omitempty"`
+	Query         string                          `json:"query,omitempty"`
+	Count         int                             `json:"count"`
+	Results       []SessionSearchHit              `json:"results,omitempty"`
+	Evidence      []SessionSearchEvidence         `json:"evidence,omitempty"`
+	ScopeEvidence *memory.CrossChatRecallEvidence `json:"scope_evidence,omitempty"`
+}
+
+// SessionSearchHit is one model-facing hit from local session search.
+type SessionSearchHit struct {
+	SessionID      string                `json:"session_id"`
+	ChatID         string                `json:"chat_id,omitempty"`
+	Source         string                `json:"source,omitempty"`
+	OriginSource   string                `json:"origin_source,omitempty"`
+	Role           string                `json:"role,omitempty"`
+	Content        string                `json:"content,omitempty"`
+	LatestTurnUnix int64                 `json:"latest_turn_unix,omitempty"`
+	Lineage        *SessionSearchLineage `json:"lineage,omitempty"`
+}
+
+type SessionSearchLineage struct {
+	ParentSessionID string   `json:"parent_session_id,omitempty"`
+	LineageKind     string   `json:"lineage_kind,omitempty"`
+	ChildSessionIDs []string `json:"child_session_ids,omitempty"`
+	Status          string   `json:"status"`
 }
 
 func (*SessionSearchTool) Name() string { return "session_search" }
@@ -53,7 +107,7 @@ func (*SessionSearchTool) Schema() json.RawMessage {
 
 func (*SessionSearchTool) Timeout() time.Duration { return 5 * time.Second }
 
-func (*SessionSearchTool) Execute(_ context.Context, args json.RawMessage) (json.RawMessage, error) {
+func (t *SessionSearchTool) Execute(ctx context.Context, args json.RawMessage) (json.RawMessage, error) {
 	normalized, evidence := ValidateSessionSearchArgs(args)
 	if evidence != nil {
 		return json.Marshal(sessionSearchResult{
@@ -62,14 +116,294 @@ func (*SessionSearchTool) Execute(_ context.Context, args json.RawMessage) (json
 		})
 	}
 
+	if t.db == nil || t.sessions == nil {
+		return json.Marshal(sessionSearchResult{
+			Success: false,
+			Args:    &normalized,
+			Evidence: []SessionSearchEvidence{{
+				Status: "session_search_unavailable",
+				Reason: "session_search execution requires a SQLite memory store and session directory",
+			}},
+		})
+	}
+
+	current, ok, err := t.sessions.GetMetadata(ctx, normalized.CurrentSessionID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok || strings.TrimSpace(current.UserID) == "" {
+		return json.Marshal(sessionSearchResult{
+			Success: false,
+			Args:    &normalized,
+			Evidence: []SessionSearchEvidence{{
+				Status:    "session_search_unavailable",
+				SessionID: normalized.CurrentSessionID,
+				Reason:    "current session metadata is unavailable; session_search cannot prove same-chat scope",
+			}},
+		})
+	}
+
+	metas, err := t.sessions.ListMetadataByUserID(ctx, current.UserID)
+	if err != nil {
+		return nil, err
+	}
+	mode := sessionSearchMode(normalized)
+	if normalized.Scope == "user" {
+		filter := memory.SearchFilter{
+			UserID:           current.UserID,
+			Sources:          normalized.Sources,
+			Query:            normalized.Query,
+			CurrentSessionID: normalized.CurrentSessionID,
+			CurrentChatKey:   sessionSearchChatKey(current),
+		}
+		evidence := memory.ExplainCrossChatRecall(metas, filter)
+		if evidence.Decision != memory.CrossChatDecisionAllowed {
+			return json.Marshal(sessionSearchResult{
+				Success:       false,
+				Args:          &normalized,
+				Mode:          mode,
+				Evidence:      []SessionSearchEvidence{sourceFilterDeniedEvidence(evidence.Reason)},
+				ScopeEvidence: &evidence,
+			})
+		}
+		return t.executeSessionSearch(ctx, normalized, mode, metas, filter, &evidence, normalized.Limit)
+	}
+
+	filter := memory.SearchFilter{
+		UserID:           current.UserID,
+		Sources:          normalized.Sources,
+		SessionIDs:       sameChatSessionIDs(metas, current),
+		Query:            normalized.Query,
+		CurrentSessionID: normalized.CurrentSessionID,
+	}
+	if !sameChatSourceFilterAllowed(normalized.Sources, current) {
+		return json.Marshal(sessionSearchResult{
+			Success: false,
+			Args:    &normalized,
+			Mode:    mode,
+			Evidence: []SessionSearchEvidence{sourceFilterDeniedEvidence(
+				"same-chat source filter does not include the current chat source; use scope=user with valid binding to widen recall",
+			)},
+		})
+	}
+	return t.executeSessionSearch(ctx, normalized, mode, metas, filter, nil, normalized.Limit)
+}
+
+func (t *SessionSearchTool) executeSessionSearch(ctx context.Context, args SessionSearchArgs, mode string, metas []session.Metadata, filter memory.SearchFilter, scopeEvidence *memory.CrossChatRecallEvidence, limit int) (json.RawMessage, error) {
+	if mode == "recent" {
+		searchLimit := limit + sessionSearchMaxLimit
+		sessions, err := memory.SearchSessions(ctx, t.db, metas, filter, searchLimit)
+		if err != nil {
+			return nil, err
+		}
+		results := make([]SessionSearchHit, 0, len(sessions))
+		for _, hit := range sessions {
+			results = append(results, sessionSearchHitFromSession(hit))
+		}
+		var evidence []SessionSearchEvidence
+		var lineageEvidence *SessionSearchEvidence
+		results, lineageEvidence = excludeCurrentLineageFromRecent(results, metas, args.CurrentSessionID)
+		if lineageEvidence != nil {
+			evidence = append(evidence, *lineageEvidence)
+		}
+		if len(results) > limit {
+			results = results[:limit]
+		}
+		return json.Marshal(sessionSearchResult{
+			Success:       true,
+			Args:          &args,
+			Mode:          mode,
+			Count:         len(results),
+			Results:       results,
+			Evidence:      evidence,
+			ScopeEvidence: scopeEvidence,
+		})
+	}
+
+	messages, err := memory.SearchMessages(ctx, t.db, metas, filter, limit)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]SessionSearchHit, 0, len(messages))
+	for _, hit := range messages {
+		results = append(results, sessionSearchHitFromMessage(hit))
+	}
 	return json.Marshal(sessionSearchResult{
-		Success: false,
-		Args:    &normalized,
-		Evidence: []SessionSearchEvidence{{
-			Status: "session_search_unavailable",
-			Reason: "session_search execution wrapper is not registered in this descriptor-only slice",
-		}},
+		Success:       true,
+		Args:          &args,
+		Mode:          mode,
+		Query:         args.Query,
+		Count:         len(results),
+		Results:       results,
+		ScopeEvidence: scopeEvidence,
 	})
+}
+
+func sourceFilterDeniedEvidence(reason string) SessionSearchEvidence {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "source-filtered user-scope widening was denied"
+	}
+	return SessionSearchEvidence{
+		Status: "source_filter_denied",
+		Reason: reason,
+	}
+}
+
+func excludeCurrentLineageFromRecent(results []SessionSearchHit, metas []session.Metadata, currentSessionID string) ([]SessionSearchHit, *SessionSearchEvidence) {
+	currentRoot, ok := sessionSearchLineageRoot(metas, currentSessionID)
+	if !ok || currentRoot == "" {
+		return results, nil
+	}
+	out := make([]SessionSearchHit, 0, len(results))
+	excluded := false
+	for _, result := range results {
+		if result.SessionID == strings.TrimSpace(currentSessionID) || result.SessionID == currentRoot {
+			excluded = true
+			continue
+		}
+		if resultRoot, ok := sessionSearchLineageRoot(metas, result.SessionID); ok && resultRoot == currentRoot {
+			excluded = true
+			continue
+		}
+		out = append(out, result)
+	}
+	if !excluded {
+		return out, nil
+	}
+	return out, &SessionSearchEvidence{
+		Status:    "lineage_root_excluded",
+		SessionID: currentRoot,
+		Reason:    "recent mode excluded the current session lineage root",
+	}
+}
+
+func sessionSearchLineageRoot(metas []session.Metadata, sessionID string) (string, bool) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return "", false
+	}
+	byID := make(map[string]session.Metadata, len(metas))
+	for _, meta := range metas {
+		meta.SessionID = strings.TrimSpace(meta.SessionID)
+		if meta.SessionID != "" {
+			byID[meta.SessionID] = meta
+		}
+	}
+	if _, ok := byID[sessionID]; !ok {
+		return sessionID, false
+	}
+	root := sessionID
+	seen := map[string]struct{}{}
+	for {
+		if _, ok := seen[root]; ok {
+			return root, true
+		}
+		seen[root] = struct{}{}
+		meta := byID[root]
+		parent := strings.TrimSpace(meta.ParentSessionID)
+		if parent == "" {
+			return root, true
+		}
+		if _, ok := byID[parent]; !ok {
+			return parent, true
+		}
+		root = parent
+	}
+}
+
+func sessionSearchMode(args SessionSearchArgs) string {
+	switch args.Mode {
+	case "recent":
+		return "recent"
+	case "search":
+		return "search"
+	default:
+		if strings.TrimSpace(args.Query) == "" {
+			return "recent"
+		}
+		return "search"
+	}
+}
+
+func sameChatSessionIDs(metas []session.Metadata, current session.Metadata) []string {
+	currentKey := sessionSearchChatKey(current)
+	if currentKey == "" {
+		return []string{strings.TrimSpace(current.SessionID)}
+	}
+	out := make([]string, 0, len(metas))
+	for _, meta := range metas {
+		if sessionSearchChatKey(meta) != currentKey {
+			continue
+		}
+		sessionID := strings.TrimSpace(meta.SessionID)
+		if sessionID == "" || slices.Contains(out, sessionID) {
+			continue
+		}
+		out = append(out, sessionID)
+	}
+	if len(out) == 0 {
+		return []string{strings.TrimSpace(current.SessionID)}
+	}
+	return out
+}
+
+func sameChatSourceFilterAllowed(sources []string, current session.Metadata) bool {
+	if len(sources) == 0 {
+		return true
+	}
+	return slices.Contains(sources, normalizeSessionSearchLabel(current.Source))
+}
+
+func sessionSearchChatKey(meta session.Metadata) string {
+	source := normalizeSessionSearchLabel(meta.Source)
+	chatID := strings.TrimSpace(meta.ChatID)
+	if source == "" || chatID == "" {
+		return ""
+	}
+	return source + ":" + chatID
+}
+
+func sessionSearchHitFromMessage(hit memory.MessageSearchHit) SessionSearchHit {
+	return SessionSearchHit{
+		SessionID:    hit.SessionID,
+		ChatID:       hit.ChatID,
+		Source:       hit.Source,
+		OriginSource: hit.Source,
+		Role:         hit.Role,
+		Content:      hit.Content,
+		Lineage:      sessionSearchLineageFromMemory(hit.Lineage),
+	}
+}
+
+func sessionSearchHitFromSession(hit memory.SessionSearchHit) SessionSearchHit {
+	return SessionSearchHit{
+		SessionID:      hit.SessionID,
+		ChatID:         hit.ChatID,
+		Source:         hit.Source,
+		OriginSource:   hit.Source,
+		LatestTurnUnix: hit.LatestTurnUnix,
+		Lineage:        sessionSearchLineageFromMemory(hit.Lineage),
+	}
+}
+
+func sessionSearchLineageFromMemory(lineage memory.SearchLineage) *SessionSearchLineage {
+	if strings.TrimSpace(lineage.Status) == "" &&
+		strings.TrimSpace(lineage.ParentSessionID) == "" &&
+		strings.TrimSpace(lineage.LineageKind) == "" &&
+		len(lineage.ChildSessionIDs) == 0 {
+		return nil
+	}
+	status := strings.TrimSpace(lineage.Status)
+	if status == "" {
+		status = memory.SearchLineageStatusUnavailable
+	}
+	return &SessionSearchLineage{
+		ParentSessionID: strings.TrimSpace(lineage.ParentSessionID),
+		LineageKind:     strings.TrimSpace(lineage.LineageKind),
+		ChildSessionIDs: append([]string(nil), lineage.ChildSessionIDs...),
+		Status:          status,
+	}
 }
 
 // ValidateSessionSearchArgs normalizes safe defaults and rejects arguments that

@@ -11829,9 +11829,9 @@
             {
               "name": "Session search tool execution wrapper",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools session_search executes over existing internal/memory SearchSessions/SearchMessages APIs, preserving same-chat defaults, explicit user/source widening, lineage-root exclusion in recent mode, and Goncho/Honcho-compatible evidence without changing ranking or persistence",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -11872,7 +11872,7 @@
                 "TestSessionSearchToolExecution_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155.",
                 "TestSessionSearchToolExecution_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening."
               ],
-              "note": "Execution half of the session_search split. Treat internal/memory and internal/goncho as read-only donors; registration remains a later row.",
+              "note": "TDD landed: internal/tools/session_search now has an opt-in execution wrapper over seeded SQLite plus session.Metadata, preserving same-chat defaults, scope=user source-filtered widening with memory.CrossChatRecallEvidence, recent-mode current-lineage-root exclusion evidence, and fail-closed degraded evidence for unavailable bindings or denied source widening. Registration remains a later row.",
               "write_scope": [
                 "internal/tools/session_search_tool.go",
                 "internal/tools/session_search_tool_execution_test.go",
@@ -11886,6 +11886,11 @@
               "done_signal": [
                 "Session search execution fixtures prove same-chat defaults, opt-in user/source widening, current-lineage-root exclusion, and degraded evidence while memory ranking/persistence stay unchanged."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T13:13:59Z",
+                "last_success": "2026-04-27T13:13:59Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:dbe50155 tools/session_search_tool.py",
