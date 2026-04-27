@@ -296,7 +296,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return RunSummary{}, fmt.Errorf("planner: snapshot runtime sources: %w", err)
 	}
 
-	argv, err := plannerBackendCommand(cfg.Backend, cfg.Mode, rawReportPath)
+	argv, err := plannerBackendCommand(cfg.Backend, cfg.Mode, rawReportPath, cfg.RepoRoot)
 	if err != nil {
 		return RunSummary{}, err
 	}
@@ -777,7 +777,7 @@ func runPlannerGitRepairAgent(ctx context.Context, cfg Config, runner cmdrunner.
 	})
 
 	rawReportPath := filepath.Join(cfg.RunRoot, "git_repair_report.raw.md")
-	argv, err := plannerBackendCommand(cfg.Backend, cfg.Mode, rawReportPath)
+	argv, err := plannerBackendCommand(cfg.Backend, cfg.Mode, rawReportPath, cfg.RepoRoot)
 	if err != nil {
 		return err
 	}
@@ -968,7 +968,7 @@ func truncatePlannerDetail(value string) string {
 	return value[:maxDetail] + " ... [truncated]"
 }
 
-func plannerBackendCommand(backend, mode, rawReportPath string) ([]string, error) {
+func plannerBackendCommand(backend, mode, rawReportPath, repoRoot string) ([]string, error) {
 	if backend == "" {
 		backend = "codexu"
 	}
@@ -978,7 +978,7 @@ func plannerBackendCommand(backend, mode, rawReportPath string) ([]string, error
 		return nil, fmt.Errorf("invalid BACKEND %q: expected codexu or claudeu", backend)
 	}
 
-	argv, err := builderloop.BuildBackendCommand(backend, mode)
+	argv, err := builderloop.BuildBackendCommandWithRepoRoot(backend, mode, repoRoot)
 	if err != nil {
 		return nil, err
 	}

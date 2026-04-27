@@ -1,6 +1,10 @@
 package builderloop
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
 
 // workerOutcome is the loop's internal classification of a worker's exit.
 // IsBackendErrorFlag is true ONLY when the worker produced no commit AND
@@ -90,6 +94,10 @@ func indexOfString(xs []string, s string) int {
 }
 
 func BuildBackendCommand(backend, mode string) ([]string, error) {
+	return BuildBackendCommandWithRepoRoot(backend, mode, "")
+}
+
+func BuildBackendCommandWithRepoRoot(backend, mode, repoRoot string) ([]string, error) {
 	if backend == "" {
 		backend = "codexu"
 	}
@@ -102,16 +110,39 @@ func BuildBackendCommand(backend, mode string) ([]string, error) {
 		return nil, err
 	}
 
+	backendBinary := backend
 	switch backend {
 	case "codexu":
 		return []string{"codexu", "exec", "--json", "--ephemeral", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", sandbox}, nil
 	case "claudeu":
-		return []string{"claudeu", "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", sandbox}, nil
+		if shim := resolveClaudeuShim(repoRoot); shim != "" {
+			backendBinary = shim
+		}
+		return []string{backendBinary, "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", sandbox}, nil
 	case "opencode":
-		return []string{"opencode", "run", "--no-interactive"}, nil
+		return []string{"opencode", "run"}, nil
 	default:
 		return nil, fmt.Errorf("invalid BACKEND %q: expected codexu, claudeu, or opencode", backend)
 	}
+}
+
+func resolveClaudeuShim(repoRoot string) string {
+	if repoRoot == "" {
+		return ""
+	}
+	candidate := filepath.Join(repoRoot, "scripts", "orchestrator", "claudeu")
+	info, err := os.Stat(candidate)
+	if err != nil || info.IsDir() {
+		return ""
+	}
+	if info.Mode()&0o111 == 0 {
+		return ""
+	}
+	abs, err := filepath.Abs(candidate)
+	if err != nil {
+		return candidate
+	}
+	return abs
 }
 
 func sandboxForMode(mode string) (string, error) {

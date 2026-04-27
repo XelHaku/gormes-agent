@@ -334,7 +334,7 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return PushMainIfConfigured(ctx, opts.Config, runner, runID, "run_completed")
 	}
 
-	argv, err := BuildBackendCommand(opts.Config.Backend, opts.Config.Mode)
+	argv, err := BuildBackendCommandWithRepoRoot(opts.Config.Backend, opts.Config.Mode, opts.Config.RepoRoot)
 	if err != nil {
 		return RunSummary{}, err
 	}
@@ -659,7 +659,7 @@ func runPrePromotionRepair(ctx context.Context, cfg Config, runner Runner, runID
 		return err
 	}
 
-	argv, err := BuildBackendCommand(cfg.Backend, cfg.Mode)
+	argv, err := BuildBackendCommandWithRepoRoot(cfg.Backend, cfg.Mode, cfg.RepoRoot)
 	if err != nil {
 		ledgerErr := appendRunLedgerEvent(cfg, LedgerEvent{
 			TS:     time.Now().UTC(),
@@ -1000,7 +1000,7 @@ func runPostPromotionRepair(ctx context.Context, cfg Config, runner Runner, runI
 		return err
 	}
 
-	argv, err := BuildBackendCommand(cfg.Backend, cfg.Mode)
+	argv, err := BuildBackendCommandWithRepoRoot(cfg.Backend, cfg.Mode, cfg.RepoRoot)
 	if err != nil {
 		ledgerErr := appendRunLedgerEvent(cfg, LedgerEvent{
 			TS:     time.Now().UTC(),
