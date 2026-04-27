@@ -15183,9 +15183,9 @@
             {
               "name": "Native TUI /save XDG export helper",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "cmd/gormes exposes a small helper that builds a tui.SessionExportFunc over config.MemoryDBPath and transcript.ExportMarkdown, writing markdown exports under $XDG_DATA_HOME/gormes/sessions/exports and never under HERMES_HOME or the process working directory",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
