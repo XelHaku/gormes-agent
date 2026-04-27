@@ -1749,6 +1749,20 @@
               "done_signal": [
                 "Config and Telegram adapter fixtures prove opt-in group require-mention policy gates bare group commands, accepts `/cmd@botname` bot_command entities, preserves DM behavior, and leaves existing Telegram streaming/command tests green."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-27T06:17:28Z",
+                "last_failure": {
+                  "run_id": "20260427T061720Z-353489698",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:3ff3dfb5 gateway/platforms/telegram.py",
