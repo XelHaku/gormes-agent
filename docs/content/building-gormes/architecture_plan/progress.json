@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T12:56:05Z",
+    "last_updated": "2026-04-27T13:21:48Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1321,10 +1321,10 @@
               }
             },
             {
-              "name": "WhatsApp unsafe identifier inbound evidence",
+              "name": "WhatsApp unsafe sender/chat inbound evidence",
               "priority": "P2",
               "status": "planned",
-              "contract": "WhatsApp inbound normalization in internal/channels/whatsapp/inbound.go uses the validated safety predicate from identity.go to drop unsafe raw sender/chat/reply IDs with explicit whatsapp_identifier_unsafe evidence before Event.ChatID, Event.UserID, Reply.ChatID, alias graph entries, or outbound pairing targets are created",
+              "contract": "WhatsApp inbound normalization in internal/channels/whatsapp/inbound.go uses the validated NormalizeSafeWhatsAppIdentifier helper to reject unsafe raw sender, chat, and reply target identifiers before Event.UserID, Event.ChatID, Reply.ChatID, or outbound pairing targets are created",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -1333,69 +1333,111 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Unsafe inbound WhatsApp IDs produce unresolved/degraded event evidence instead of a session key, reply target, or pairing target.",
-              "fixture": "internal/channels/whatsapp/identity_inbound_safety_test.go",
+              "degraded_mode": "Unsafe inbound WhatsApp sender/chat/reply IDs produce whatsapp_identifier_unsafe evidence and an unresolved event shape instead of a session key or pairing target.",
+              "fixture": "internal/channels/whatsapp/identity_inbound_safety_test.go::TestNormalizeInboundWithIdentity_UnsafeRawIDs",
               "source_refs": [
                 "../hermes-agent/gateway/whatsapp_identity.py@91512b82:expand_whatsapp_aliases path traversal guard",
                 "../hermes-agent/gateway/whatsapp_identity.py@6993e566:_SAFE_IDENTIFIER_RE ASCII guard",
                 "internal/channels/whatsapp/inbound.go:NormalizeInboundWithIdentity",
-                "internal/channels/whatsapp/identity.go:NormalizeSafeWhatsAppIdentifier",
-                "internal/channels/whatsapp/testdata/identity_contract.json"
+                "internal/channels/whatsapp/identity.go:NormalizeSafeWhatsAppIdentifier"
               ],
               "ready_when": [
-                "WhatsApp identifier safety predicate is validated on main; workers should reuse NormalizeSafeWhatsAppIdentifier from identity.go and wire only NormalizeInboundWithIdentity in inbound.go.",
-                "The worker should extend inbound fixtures only; no platform runtime, bridge process, native WhatsApp client, send/reconnect path, or gateway manager dispatch is needed.",
-                "Safe identity_contract.json fixtures must remain unchanged unless the test adds a separate unsafe fixture file."
+                "WhatsApp identifier safety predicate is validated on main; identity.go is a read-only dependency for this slice.",
+                "The worker edits only inbound.go and a new inbound safety fixture; no platform runtime, bridge process, native WhatsApp client, send/reconnect path, or gateway manager dispatch is needed.",
+                "Safe identity_contract.json fixtures must remain unchanged."
               ],
               "not_ready_when": [
-                "The slice rewrites safe identity fixtures, changes send/reconnect behavior, or accepts unsafe IDs after stripping dangerous characters.",
-                "The slice opens live WhatsApp clients, writes Hermes lid-mapping files, edits internal/channels/whatsapp/send.go, or changes non-WhatsApp gateway session-key behavior."
+                "The slice edits identity.go, identity_test.go, send.go, reconnect code, gateway manager code, or live WhatsApp client setup.",
+                "The slice accepts unsafe IDs after stripping dangerous characters instead of returning whatsapp_identifier_unsafe evidence.",
+                "The slice rewrites the existing identity_contract.json safe-case fixture."
+              ],
+              "unblocks": [
+                "WhatsApp unsafe alias endpoint inbound evidence"
               ],
               "acceptance": [
                 "TestNormalizeInboundWithIdentity_UnsafeRawSenderRejected proves unsafe sender/user IDs return whatsapp_identifier_unsafe evidence and leave Event.UserID empty.",
                 "TestNormalizeInboundWithIdentity_UnsafeChatRejected proves unsafe chat IDs do not produce Event.ChatID, Reply.ChatID, or an outbound pairing target.",
-                "TestNormalizeInboundWithIdentity_UnsafeAliasEndpointRejected proves alias graph expansion skips unsafe endpoints while preserving safe aliases.",
+                "TestNormalizeInboundWithIdentity_UnsafeReplyTargetRejected proves unsafe reply targets are dropped with evidence while safe sender/chat IDs still normalize.",
                 "Existing identity_contract.json fixtures still pass unchanged for safe bridge/native DM and group cases."
               ],
-              "note": "Refined 2026-04-27T12:29:11Z after write-scope drift: NormalizeInboundWithIdentity lives in internal/channels/whatsapp/inbound.go, while identity.go owns the validated safety helper. Keep the worker inside those two files plus the new inbound safety fixture; do not reopen live platform/runtime behavior.",
+              "note": "Split 2026-04-27T13:21:48Z from the broader unsafe inbound row after repeated report/write-scope failures. This first slice is raw sender/chat/reply evidence only; alias graph expansion is the dependent row.",
               "write_scope": [
                 "internal/channels/whatsapp/inbound.go",
-                "internal/channels/whatsapp/identity.go",
                 "internal/channels/whatsapp/identity_inbound_safety_test.go",
-                "internal/channels/whatsapp/identity_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/channels/whatsapp -run '^TestNormalizeInboundWithIdentity_Unsafe|^TestWhatsAppIdentifierSafetyPredicate_' -count=1",
+                "go test ./internal/channels/whatsapp -run '^TestNormalizeInboundWithIdentity_UnsafeRaw|^TestNormalizeInboundWithIdentity_UnsafeChat|^TestNormalizeInboundWithIdentity_UnsafeReply' -count=1",
                 "go test ./internal/channels/whatsapp -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Inbound safety fixtures prove unsafe WhatsApp sender/chat/alias values are rejected with whatsapp_identifier_unsafe evidence while safe identity contracts stay green."
+                "Inbound safety fixtures prove unsafe sender, chat, and reply identifiers are rejected with whatsapp_identifier_unsafe evidence while safe identity contracts remain green."
               ],
-              "health": {
-                "attempt_count": 4,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-27T12:26:26Z",
-                "last_failure": {
-                  "run_id": "20260427T121643Z-500449251",
-                  "category": "report_validation_failed",
-                  "backend": "codexu",
-                  "stderr_tail": "Reading additional input from stdin...\n"
-                },
-                "backends_tried": [
-                  "codexu"
-                ]
-              },
-              "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "still_failing"
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:91512b82+6993e566 gateway/whatsapp_identity.py",
-                "note": "Hermes applies the guard to lid-mapping inputs; Gormes applies it at the adapter event boundary while preserving the internal Go identity graph."
+                "note": "Hermes applies identifier guards to lid-mapping inputs; Gormes applies them at the adapter event boundary while preserving the internal Go identity graph."
+              }
+            },
+            {
+              "name": "WhatsApp unsafe alias endpoint inbound evidence",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "WhatsApp inbound alias graph expansion skips unsafe alias endpoints with explicit whatsapp_identifier_unsafe evidence after raw sender/chat safety is fixture-backed",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Unsafe alias endpoints are ignored with whatsapp_identifier_unsafe evidence instead of being added to alias graph entries or outbound pairing targets.",
+              "fixture": "internal/channels/whatsapp/identity_inbound_safety_test.go::TestNormalizeInboundWithIdentity_UnsafeAliasEndpointRejected",
+              "source_refs": [
+                "../hermes-agent/gateway/whatsapp_identity.py@91512b82:expand_whatsapp_aliases path traversal guard",
+                "../hermes-agent/gateway/whatsapp_identity.py@6993e566:_SAFE_IDENTIFIER_RE ASCII guard",
+                "internal/channels/whatsapp/inbound.go:NormalizeInboundWithIdentity",
+                "internal/channels/whatsapp/identity.go:NormalizeSafeWhatsAppIdentifier"
+              ],
+              "ready_when": [
+                "WhatsApp unsafe sender/chat inbound evidence is complete on main.",
+                "The worker extends only the inbound safety fixture around alias endpoints; identity.go and existing identity_contract.json safe cases are read-only.",
+                "No bridge/native runtime, send/reconnect path, gateway manager dispatch, or Hermes lid-mapping file is needed."
+              ],
+              "not_ready_when": [
+                "The raw sender/chat inbound safety row is not complete in the worker checkout.",
+                "The slice edits identity.go, send/reconnect code, gateway session-key behavior, or platform runtime setup.",
+                "The alias graph accepts unsafe values after normalization or stripping instead of returning evidence."
+              ],
+              "blocked_by": [
+                "WhatsApp unsafe sender/chat inbound evidence"
+              ],
+              "acceptance": [
+                "TestNormalizeInboundWithIdentity_UnsafeAliasEndpointRejected proves unsafe alias endpoints are skipped with whatsapp_identifier_unsafe evidence.",
+                "Safe alias endpoints still expand exactly as covered by existing identity fixtures.",
+                "No outbound pairing target is created from an unsafe alias endpoint.",
+                "The full internal/channels/whatsapp package test suite remains green."
+              ],
+              "note": "Second half of the unsafe inbound split. It depends on raw sender/chat evidence so workers do not need to solve raw event rejection and alias graph filtering in one attempt.",
+              "write_scope": [
+                "internal/channels/whatsapp/inbound.go",
+                "internal/channels/whatsapp/identity_inbound_safety_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/channels/whatsapp -run '^TestNormalizeInboundWithIdentity_UnsafeAliasEndpointRejected$' -count=1",
+                "go test ./internal/channels/whatsapp -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Alias endpoint fixtures prove unsafe alias graph inputs are skipped with whatsapp_identifier_unsafe evidence while safe aliases and outbound target derivation stay unchanged."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:91512b82+6993e566 gateway/whatsapp_identity.py",
+                "note": "Hermes applies identifier guards to lid-mapping inputs; Gormes applies them at the adapter event boundary while preserving the internal Go identity graph."
               }
             },
             {
@@ -2124,7 +2166,7 @@
               "name": "Gateway inbound dedup manager binding",
               "priority": "P2",
               "status": "planned",
-              "contract": "Gateway manager applies MessageDeduplicator through the validated inbound dedup key helper, drops repeated inbound submissions with duplicate_message evidence, and lets missing-ID events continue with dedup_unavailable evidence",
+              "contract": "Gateway manager owns one in-memory MessageDeduplicator instance, derives tracking keys through the validated InboundDedupKey helper, drops repeated inbound submissions with duplicate_message evidence, and lets missing-ID events continue with dedup_unavailable_missing_message_id evidence",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -2137,17 +2179,19 @@
               "source_refs": [
                 "../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator",
                 "../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585",
-                "internal/gateway/inbound_dedup_key.go",
-                "internal/gateway/message_deduplicator.go",
-                "internal/gateway/manager.go"
+                "internal/gateway/inbound_dedup_key.go:InboundDedupKey",
+                "internal/gateway/inbound_dedup_key_test.go",
+                "internal/gateway/message_deduplicator.go:MessageDeduplicator",
+                "internal/gateway/message_deduplicator_test.go",
+                "internal/gateway/manager.go:submitEvent"
               ],
               "ready_when": [
-                "Gateway inbound dedup key helper and Gateway message deduplicator bounded helper are validated on main; treat both helper files as read-only in this row.",
+                "Gateway inbound dedup key helper and Gateway message deduplicator bounded helper are validated on main; treat inbound_dedup_key.go and message_deduplicator.go as read-only in this row.",
                 "The worker can use fake gateway.Channel and fake kernel fixtures only; no Telegram, Slack, Discord, provider SDK, or platform adapter edits are needed.",
-                "ManagerConfig can add the minimum in-memory dedup field or dependency injection needed for tests; no disk store or global cache is required."
+                "ManagerConfig can add only the minimum in-memory dedup field or dependency injection needed for tests; no disk store, package-global cache, event schema change, or platform-specific state is required."
               ],
               "not_ready_when": [
-                "The slice edits internal/gateway/inbound_dedup_key.go, internal/gateway/message_deduplicator.go, channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
+                "The slice edits internal/gateway/inbound_dedup_key.go, internal/gateway/message_deduplicator.go, internal/gateway/event.go, channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
                 "The slice stores dedup history on disk or treats empty message IDs as duplicates.",
                 "The slice creates platform-specific tests instead of one gateway manager fixture using fake channels/events."
               ],
@@ -2158,10 +2202,10 @@
               "acceptance": [
                 "TestGatewayInboundDedup_DropsRepeatedMessageID submits the same channel/chat/thread/message ID twice and proves the fake kernel receives only the first turn while status evidence records duplicate_message.",
                 "TestGatewayInboundDedup_ScopesByChannelChatAndThread proves identical platform message IDs in different chats or threads do not collide.",
-                "TestGatewayInboundDedup_MissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence.",
+                "TestGatewayInboundDedup_MissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable_missing_message_id evidence.",
                 "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green without editing helper files."
               ],
-              "note": "Dependent manager-binding half of the split. It owns only Manager/fake-test wiring after the key helper lands, so workers no longer need to edit the completed deduplicator helper or infer the key shape.",
+              "note": "Refined 2026-04-27T13:21:48Z after the helper row landed and the prior worker attempted out-of-scope helper/event edits. This row owns only Manager/fake-test wiring; event.go, inbound_dedup_key.go, and message_deduplicator.go are read-only.",
               "write_scope": [
                 "internal/gateway/message_deduplicator_manager_test.go",
                 "internal/gateway/manager.go",
@@ -2174,8 +2218,12 @@
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior without editing dedup helper files."
+                "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior without editing event or dedup helper files."
               ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T13:21:48Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 tests/gateway/test_message_deduplicator.py",
@@ -2186,7 +2234,7 @@
           "drift_state": {
             "status": "porting",
             "last_upstream_check": "2026-04-27T12:56:05Z",
-            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, and message deduplication. Telegram group command-suffix behavior from 3ff3dfb5 is split into helper, config, and adapter-binding rows; the helper/config slices are complete and the adapter binding remains fixture-ready. WhatsApp unsafe inbound evidence points at inbound.go for NormalizeInboundWithIdentity and identity.go for the helper so workers do not repeat the prior write-scope violation. Gateway inbound dedup was split into a helper-only key row and a dependent manager-binding row after repeated write-scope/report-validation failures."
+            "origin_decision": "Hermes session/delivery drift remains upstream-led for Telegram require-mention, WhatsApp unsafe identifiers, and message deduplication. Telegram group command-suffix behavior from 3ff3dfb5 is split into helper, config, and adapter-binding rows; the helper/config slices are complete and the adapter binding remains fixture-ready. WhatsApp unsafe inbound evidence is now split into raw sender/chat/reply rejection first and alias-endpoint filtering second, both scoped to inbound.go plus a new safety fixture with identity.go read-only. Gateway inbound dedup now has the helper-only key row validated and a manager-binding row with event/helper files explicitly read-only after the last write-scope violation."
           }
         },
         "2.B.10": {
@@ -3911,14 +3959,14 @@
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
               "contract": "Registry-owned active-turn steering command",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
                 "gateway"
               ],
-              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately. Backend usage-limit/stdin outages are now handled by the validated run-level health bypass, so feature workers should not re-block this row on quota noise.",
+              "degraded_mode": "Needs human review: gateway should continue returning the parser-level steer_usage/steer_payload_unsupported evidence and should not advertise queued /steer support until the Manager queue hook is selected.",
               "fixture": "internal/gateway/steer_queue_test.go::TestSteerCommandRegistry_*",
               "source_refs": [
                 "../hermes-agent/cli.py@635253b9:busy_input_mode=steer",
@@ -3930,14 +3978,18 @@
               ],
               "ready_when": [
                 "Steer slash command parser + preview helper is validated on main.",
-                "The parser helper is already complete on main, so workers should start from internal/gateway/steer_command.go and add only registry/queue behavior in this row.",
-                "This slice only registers /steer and queue fallback behavior; the live between-tool-call injection hook remains in the dependent row.",
-                "Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required."
+                "Human review identifies whether /steer should reuse queueFollowUpIfActive, a separate steer guidance queue, or the existing CommandActiveTurnPolicyDrain path.",
+                "After review, the worker must keep the parser helper read-only and add only registry/queue fallback behavior; live between-tool-call injection remains a dependent row.",
+                "Tests must use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required."
               ],
               "not_ready_when": [
+                "No human-reviewed decision exists for the Manager queue hook or status evidence names.",
                 "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior.",
                 "The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code.",
                 "The parser row is not present in the worker checkout."
+              ],
+              "blocked_by": [
+                "Human review: steer queue manager hook"
               ],
               "unblocks": [
                 "Mid-run steer injection between tool calls",
@@ -3949,7 +4001,7 @@
                 "TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands.",
                 "Existing gateway command parsing and active-session policy tests remain green."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z after Backend usage-limit stdin health bypass validated on main. The parser prerequisite remains complete; this row is now a fixture-ready registry/queue fallback slice and still excludes live mid-run injection.",
+              "note": "Marked draft 2026-04-27T13:21:48Z after repeated worker_error attempts with no landed diff. The remaining ambiguity is not upstream behavior; it is the Gormes Manager hook choice for queueing guidance without colliding with regular follow-up prompts.",
               "write_scope": [
                 "internal/gateway/commands.go",
                 "internal/gateway/manager.go",
@@ -3982,8 +4034,8 @@
                 "needs_human": true,
                 "reason": "auto: 6 reshapes without unsticking; last category ",
                 "since": "2026-04-27T12:01:21Z",
-                "reshape_count": 6,
-                "last_reshape": "2026-04-27T11:38:55Z",
+                "reshape_count": 7,
+                "last_reshape": "2026-04-27T13:21:48Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -4569,8 +4621,8 @@
           ],
           "drift_state": {
             "status": "converged",
-            "last_upstream_check": "2026-04-26T21:50:06Z",
-            "origin_decision": "Honcho e659b6b remains the synchronized donor for SillyTavern integration guidance. The 2026-04-26 check found docs/install-label drift but no new core cross-chat schema requirement beyond Gormes' validated host-integration, persona/group mapping, scope/source schema, deny-path, and operator-evidence fixtures. Internal implementation remains Goncho; external compatibility keeps honcho_* naming."
+            "last_upstream_check": "2026-04-27T13:21:48Z",
+            "origin_decision": "Honcho e659b6b remains the synchronized donor for SillyTavern and host-integration guidance. The 2026-04-27 check found no new core cross-chat schema requirement beyond Gormes' validated host-integration, persona/group mapping, scope/source schema, deny-path, and operator-evidence fixtures. Internal implementation remains Goncho; external compatibility keeps honcho_* naming."
           }
         },
         "3.E.8": {
@@ -5497,8 +5549,8 @@
           ],
           "drift_state": {
             "status": "converged",
-            "last_upstream_check": "2026-04-26T21:50:06Z",
-            "origin_decision": "Honcho e659b6b remains the synchronized memory donor for core memory docs. The 2026-04-26 check found docs-only SillyTavern/opencode guidance drift and no new Goncho runtime contract beyond the validated host integration, SillyTavern mapping, filter grammar, streaming chat persistence, configuration namespace, and Go-native dream scheduler intent. Honcho MCP self-hosted HONCHO_API_URL drift stays under Phase 5.G MCP config/env resolution rather than reopening internal Goncho memory. Keep the implementation named Goncho while preserving honcho_* public tool compatibility."
+            "last_upstream_check": "2026-04-27T13:21:48Z",
+            "origin_decision": "Honcho e659b6b remains the synchronized memory donor for core memory docs. The 2026-04-27 check found no new Goncho runtime contract beyond the validated host integration, SillyTavern mapping, filter grammar, streaming chat persistence, configuration namespace, queue status, file import, summary budget, and Go-native dream scheduler intent. Honcho MCP self-hosted HONCHO_API_URL drift stays under Phase 5.G MCP config/env resolution rather than reopening internal Goncho memory. Keep the implementation named Goncho while preserving honcho_* public tool compatibility."
           }
         }
       }
@@ -7379,7 +7431,7 @@
               ],
               "unblocks": [
                 "Tool-result pruning + protected head/tail summary",
-                "ContextEngine compression-boundary notification"
+                "ContextEngine compression-boundary callback vocabulary"
               ],
               "acceptance": [
                 "TestCompressionContentLength_PlainString counts a 500-character string as 500 chars and preserves existing budget math expectations.",
@@ -7419,10 +7471,10 @@
               "note": "TDD: port `manual_compression_feedback.py` and `context_references.py` as separate read/write contracts so user-visible compression feedback and reference handles are testable without a provider call."
             },
             {
-              "name": "ContextEngine compression-boundary notification",
+              "name": "ContextEngine compression-boundary callback vocabulary",
               "priority": "P2",
               "status": "planned",
-              "contract": "Kernel compression execution signals the ContextEngine when a compression boundary is crossed so cached/replayed context state cannot silently span the pre-compress and post-compress transcript",
+              "contract": "internal/hermes defines a compression-boundary callback vocabulary on ContextEngine with stable lineage evidence and status fields, without binding kernel compression execution yet",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
@@ -7430,27 +7482,91 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression. Backend quota/stdin outages are now run-level degradation and should not block this adapter-only row.",
+              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence until kernel compression execution binds the callback.",
+              "fixture": "internal/hermes/context_engine_boundary_test.go::TestContextEngineCompressionBoundaryVocabulary",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@e85b7525",
+                "../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525",
+                "internal/hermes/context_engine.go:ContextEngine",
+                "internal/hermes/context_engine_test.go"
+              ],
+              "ready_when": [
+                "ContextEngine interface + status tool contract is validated on main.",
+                "Compression token-budget and single-prompt threshold fixtures are validated, so this slice only adds callback vocabulary and status evidence.",
+                "The worker edits only internal/hermes context-engine files; no kernel, transcript storage, summarizer, or Goncho/Honcho memory behavior is in scope."
+              ],
+              "not_ready_when": [
+                "The slice edits internal/kernel/kernel.go, creates internal/kernel/context_engine.go, implements summarization, mutates transcript history, or binds live compression execution.",
+                "The slice hides boundary failures or lets status imply a boundary callback ran before the kernel binding row is complete.",
+                "The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern."
+              ],
+              "unblocks": [
+                "ContextEngine compression-boundary notification"
+              ],
+              "acceptance": [
+                "A new CompressionBoundary value carries old_session_id, new_session_id, reason, and compressed_at or equivalent stable lineage evidence.",
+                "DisabledContextEngine or an in-package fake can record one boundary callback and expose last boundary evidence through Status without contacting a provider.",
+                "Status reports compression_boundary_unavailable or last_boundary_missing when no boundary has been recorded.",
+                "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
+              ],
+              "note": "Added 2026-04-27T13:21:48Z after repeated worker_error attempts exposed a bad source reference: internal/kernel/context_engine.go does not exist. This row is hermes package vocabulary only; kernel binding stays in the existing dependent row.",
+              "write_scope": [
+                "internal/hermes/context_engine.go",
+                "internal/hermes/context_engine_test.go",
+                "internal/hermes/context_engine_boundary_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'Test.*ContextEngine.*Boundary|TestDisabledContextEngine_StatusToolFixture' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Hermes package fixtures prove boundary vocabulary, status evidence, unavailable/missing degraded modes, and no kernel or memory side effects."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:e85b7525 run_agent.py",
+                "note": "Hermes provides the compression-boundary regression; Gormes first fixture-locks the Go ContextEngine callback vocabulary without changing internal Goncho memory naming."
+              }
+            },
+            {
+              "name": "Kernel compression-boundary callback binding",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Kernel compression execution calls the validated ContextEngine boundary callback exactly once after a successful compression result is accepted into transcript lineage",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Until kernel compression execution is wired, context status keeps reporting last_boundary_missing instead of implying context-engine caches were reset.",
               "fixture": "internal/kernel/compression_boundary_test.go::TestKernelCompressionBoundary_*",
               "source_refs": [
                 "../hermes-agent/run_agent.py@e85b7525",
                 "../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525",
                 "internal/hermes/context_engine.go",
-                "internal/kernel/context_engine.go",
+                "internal/kernel/kernel.go:updateContextEngineUsage",
                 "internal/kernel/contextengine_test.go",
                 "internal/hermes/context_compressor_budget.go"
               ],
               "ready_when": [
-                "ContextEngine interface + status tool contract is validated on main.",
-                "Compression token-budget and single-prompt threshold fixtures are validated, so this slice only adds boundary notification semantics and does not invent compression budgeting.",
-                "A fake ContextEngine can record boundary notifications without calling a live provider or mutating real transcript storage.",
-                "internal/kernel/context_engine.go owns the kernel-side context-engine adapter seam; workers should not edit internal/kernel/kernel.go for this row."
+                "ContextEngine compression-boundary callback vocabulary is complete on main.",
+                "The worker identifies the existing kernel compression execution point; if no explicit compression execution path exists in the checkout, keep this row blocked and do not create fake wiring.",
+                "A fake ContextEngine can record boundary notifications without calling a live provider or mutating real transcript storage."
               ],
               "not_ready_when": [
+                "Context compression remains an umbrella-only placeholder or no explicit kernel compression execution path exists.",
                 "The slice implements summarization, tool-result pruning, manual compression, or context references instead of the boundary callback.",
                 "The slice hides boundary failures or lets a context cache survive across a compression lineage change without observable status evidence.",
-                "The slice edits internal/kernel/kernel.go, internal/hermes/context_compressor_budget.go, transcript storage, or session lineage helpers instead of the context-engine adapter files named in write_scope.",
+                "The slice edits internal/hermes/context_engine.go, internal/hermes/context_compressor_budget.go, transcript storage, or session lineage helpers instead of the kernel binding files named in write_scope.",
                 "The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern."
+              ],
+              "blocked_by": [
+                "ContextEngine compression-boundary callback vocabulary",
+                "Context compression"
               ],
               "acceptance": [
                 "A fake ContextEngine receives exactly one CompressionBoundary notification after a successful compression result is accepted into the kernel transcript lineage.",
@@ -7458,11 +7574,9 @@
                 "The notification includes old_session_id/new_session_id or equivalent lineage evidence so caches can distinguish pre-compress and post-compress context.",
                 "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z: context-engine status, auxiliary compression threshold reconciliation, and backend health bypass are validated. Workers should implement only the ContextEngine boundary notification adapter files named in write_scope; kernel.go, transcript storage, and Goncho memory semantics remain out of scope.",
+              "note": "Refined 2026-04-27T13:21:48Z after repeated worker_error attempts exposed a bad source reference: internal/kernel/context_engine.go does not exist. This dependent binding row stays draft/blocked until the callback vocabulary and a real kernel compression execution point are present.",
               "write_scope": [
-                "internal/hermes/context_engine.go",
-                "internal/hermes/context_engine_test.go",
-                "internal/kernel/context_engine.go",
+                "internal/kernel/kernel.go",
                 "internal/kernel/contextengine_test.go",
                 "internal/kernel/compression_boundary_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -7499,14 +7613,14 @@
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:e85b7525 run_agent.py",
-                "note": "Hermes provides the compression-boundary regression; Gormes maps it onto the Go ContextEngine and kernel lineage contracts without changing internal Goncho memory naming."
+                "note": "Hermes provides the compression-boundary regression; Gormes binds it to kernel lineage only after the Go callback vocabulary and compression execution path are fixture-backed."
               }
             }
           ],
           "drift_state": {
             "status": "porting",
             "last_upstream_check": "2026-04-27T11:44:19Z",
-            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer ContextEngine drift supersedes the existing 4.B queue. Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, single-prompt budget reconciliation, and backend health bypass validated, so compression-boundary notification is fixture-ready as an adapter-only row."
+            "origin_decision": "Hermes 8ed599dc is current after sync; no newer ContextEngine drift supersedes the existing 4.B queue. Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation validated. The compression-boundary row is split: a hermes-package callback vocabulary row is fixture-ready, while kernel binding stays draft/blocked because internal/kernel/context_engine.go does not exist and context compression remains umbrella-only."
           }
         },
         "4.C": {
@@ -8076,7 +8190,7 @@
               "planner_verdict": {
                 "reshape_count": 2,
                 "last_reshape": "2026-04-27T11:38:55Z",
-                "last_outcome": "still_failing"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -14359,7 +14473,7 @@
               "name": "Custom provider model-switch key_env write guard",
               "priority": "P2",
               "status": "planned",
-              "contract": "internal/cli exposes a pure model-switch patch helper that updates a custom provider default_model while preserving original credential storage: providers that relied on key_env and had no inline api_key/api_key_ref must not gain an api_key entry, while providers that already had an inline plaintext or `${VAR}` api_key may keep that existing api_key value without writing resolved plaintext",
+              "contract": "internal/cli exposes a pure model-switch patch helper that accepts an in-memory custom provider ref plus a target model and returns the config patch/evidence for default_model changes while preserving original credential storage: providers that relied on key_env and had no inline api_key/api_key_ref must not gain an api_key entry, while providers that already had inline plaintext or `${VAR}` api_key may keep that existing value without writing resolved plaintext",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -14373,16 +14487,16 @@
                 "../hermes-agent/hermes_cli/main.py@8258f4dc:_model_flow_named_custom",
                 "../hermes-agent/tests/hermes_cli/test_custom_provider_model_switch.py@8258f4dc",
                 "../hermes-agent/hermes_cli/main.py@8bbeaea6:_named_custom_provider_map",
-                "internal/cli/custom_provider_secret.go",
+                "internal/cli/custom_provider_secret.go:CustomProviderRef,ResolveCustomProviderSecret",
                 "internal/cli/custom_provider_secret_test.go"
               ],
               "ready_when": [
                 "Custom provider model-switch credential preservation is validated on main and provides the resolver vocabulary for env-template, plaintext, key_env, unset, and missing credentials.",
-                "This slice only adds a pure patch/model-switch helper under internal/cli; no config reader, /model command handler, TUI picker, fake /v1/models server, provider routing, or cmd/gormes wiring is required.",
+                "This slice only adds a pure patch/model-switch helper under internal/cli/custom_provider_model_switch.go; no config reader, /model command handler, TUI picker, fake /v1/models server, provider routing, or cmd/gormes wiring is required.",
                 "Table tests should construct input provider maps/structs in memory and assert the planned write shape; no process environment, filesystem, or network access is needed."
               ],
               "not_ready_when": [
-                "The slice changes internal/config, internal/hermes, provider catalog probing, TUI model picker behavior, or command wiring.",
+                "The slice changes internal/config, internal/hermes, provider catalog probing, TUI model picker behavior, command wiring, or the existing custom_provider_secret resolver semantics.",
                 "The helper writes an api_key field for a provider whose original config relied only on key_env.",
                 "The helper writes resolved plaintext when the original provider used `${VAR}` or key_env references."
               ],
@@ -14393,12 +14507,10 @@
                 "TestCustomProviderModelSwitchPatch_MissingCredentialStillUpdatesModelWithEvidence proves model changes remain possible while credential_missing evidence is returned for setup/status guidance.",
                 "Existing TestResolveCustomProviderSecret_* fixtures remain green; this row does not redefine resolver semantics."
               ],
-              "note": "Re-enabled 2026-04-27T11:44:19Z: credential resolver vocabulary and backend health bypass are validated. Keep the slice limited to internal/cli custom-provider model-switch patch helpers; no config reader, command wiring, provider probing, TUI picker, or plaintext resolution.",
+              "note": "Refined 2026-04-27T13:21:48Z: credential resolver vocabulary is a read-only dependency. Keep the slice limited to a new internal/cli custom-provider model-switch patch helper and its tests; no config reader, command wiring, provider probing, TUI picker, plaintext resolution, or custom_provider_secret edits.",
               "write_scope": [
                 "internal/cli/custom_provider_model_switch.go",
                 "internal/cli/custom_provider_model_switch_test.go",
-                "internal/cli/custom_provider_secret.go",
-                "internal/cli/custom_provider_secret_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
@@ -14423,8 +14535,11 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-27T11:38:55Z",
+                "needs_human": true,
+                "reason": "auto: 3 reshapes without unsticking; last category ",
+                "since": "2026-04-27T13:21:48Z",
+                "reshape_count": 3,
+                "last_reshape": "2026-04-27T13:21:48Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -16263,7 +16378,7 @@
               "name": "API server detailed health endpoint",
               "priority": "P2",
               "status": "planned",
-              "contract": "Native API server binds the validated detailed-health snapshot to unauthenticated GET /health/detailed and /v1/health/detailed routes while preserving existing /health and /v1/health behavior",
+              "contract": "Native API server binds the validated DetailedHealthSnapshot value model to unauthenticated GET /health/detailed and /v1/health/detailed routes while preserving existing flat /health and /v1/health behavior",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -16276,17 +16391,18 @@
               "fixture": "internal/apiserver/detailed_health_endpoint_test.go",
               "source_refs": [
                 "../hermes-agent/gateway/platforms/api_server.py@ee1a07f9:_handle_health_detailed no authentication required",
-                "internal/apiserver/detailed_health.go",
-                "internal/apiserver/server.go:routes,handleHealth",
+                "internal/apiserver/detailed_health.go:DetailedHealthSnapshot",
+                "internal/apiserver/server.go:NewServer,handleHealth",
                 "internal/apiserver/chat_completions_test.go:health fixtures"
               ],
               "ready_when": [
-                "API server detailed health snapshot contract is validated on main; this row only binds the snapshot to GET HTTP routes and intentionally follows Hermes' unauthenticated /health/detailed behavior.",
-                "The slice can use httptest against Server.Handler with fake snapshot inputs; no provider, live gateway, scheduler goroutine, or cron mutation endpoint is required.",
+                "API server detailed health snapshot contract is validated on main; detailed_health.go is a read-only dependency for this row.",
+                "This row only binds GET /health/detailed and GET /v1/health/detailed routes and intentionally follows Hermes' unauthenticated /health/detailed behavior.",
+                "The slice can use httptest against Server.Handler with fake snapshot inputs; no provider, live gateway, scheduler goroutine, cron admin endpoint, or cron mutation endpoint is required.",
                 "Existing /health and /v1/health fixtures remain byte-compatible except for explicitly allowed internal refactoring."
               ],
               "not_ready_when": [
-                "The slice creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, adds auth requirements to health routes, changes OpenAI-style error envelopes, or weakens auth/body-size checks on non-health routes.",
+                "The slice edits detailed_health.go, creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, adds auth requirements to health routes, changes OpenAI-style error envelopes, or weakens auth/body-size checks on non-health routes.",
                 "The slice changes dashboard client behavior or imports Hermes Python."
               ],
               "unblocks": [
@@ -16299,9 +16415,8 @@
                 "TestAPIServerDetailedHealthEndpoint_RedactsSecrets proves the HTTP response body omits provider keys, cron script bodies, gateway tokens, and raw request payloads.",
                 "Existing /health and /v1/health tests continue to report status/platform/responses/runs as before."
               ],
-              "note": "Refined 2026-04-27T12:29:11Z after upstream check: Hermes documents /health/detailed as unauthenticated cross-container probing. Workers should bind only GET /health/detailed and /v1/health/detailed, prove no-auth behavior even when APIKey is configured, and preserve flat /health behavior.",
+              "note": "Refined 2026-04-27T13:21:48Z after worker_error attempts: the snapshot row is complete and read-only. Workers should bind only GET /health/detailed and /v1/health/detailed in server.go plus endpoint tests, prove no-auth behavior even when APIKey is configured, and preserve flat /health behavior.",
               "write_scope": [
-                "internal/apiserver/detailed_health.go",
                 "internal/apiserver/detailed_health_endpoint_test.go",
                 "internal/apiserver/server.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -16328,8 +16443,8 @@
                 ]
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:38:55Z",
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T13:21:48Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -17054,8 +17169,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T23:11:47Z",
-            "origin_decision": "GBrain f718c59/172b55b/e2961c0 lead the retrieval lessons for hybrid scoring, Code Cathedral II evidence, source-swamp resistance, and delta-bounded maintenance. Gormes should adapt these as small SQLite/skills evidence contracts with visible degraded modes, not import GBrain's TypeScript chunker, PGLite/Postgres search runtime, or SQL ranking builders."
+            "last_upstream_check": "2026-04-27T13:21:48Z",
+            "origin_decision": "GBrain f718c59/172b55b/e2961c0 still lead the retrieval lessons for hybrid scoring, Code Cathedral II evidence, source-swamp resistance, and delta-bounded maintenance; the synced 891c28b frontmatter-guard release affects 6.C validation rather than changing 6.D retrieval shape. Gormes should adapt these as small SQLite/skills evidence contracts with visible degraded modes, not import GBrain's TypeScript chunker, PGLite/Postgres search runtime, or SQL ranking builders."
           }
         },
         "6.E": {

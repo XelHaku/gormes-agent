@@ -37,12 +37,12 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 36/74 subphases shipped · 22 in progress · 16 planned
+**Overall:** 37/74 subphases shipped · 22 in progress · 15 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
 | Phase 1 — The Dashboard | ✅ | 3/3 subphases |
-| Phase 2 — The Gateway | 🔨 | 15/20 subphases |
+| Phase 2 — The Gateway | 🔨 | 16/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
 | Phase 5 — The Final Purge | 🔨 | 2/18 subphases |
@@ -128,17 +128,19 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway stream consumer for agent-event fan-out
 - [x] Non-editable gateway progress/commentary send fallback
 - [x] WhatsApp identifier safety predicate
-- [ ] WhatsApp unsafe identifier inbound evidence
+- [ ] WhatsApp unsafe sender/chat inbound evidence
+- [ ] WhatsApp unsafe alias endpoint inbound evidence
 - [x] Gateway fresh-final eligibility helper
 - [x] Gateway fresh-final send/delete fallback
 - [x] Telegram fresh-final delete and config exposure
 - [x] Telegram group bot-command mention gate helper
-- [ ] Telegram require-mention config fields
+- [x] Telegram require-mention config fields
 - [ ] Telegram group require-mention bot binding
 - [x] Slack rich-text quotes/lists + link-unfurl ingress
 - [x] Slack thread-parent context + team-scoped cache key
 - [x] Gateway message deduplicator bounded helper
-- [ ] Gateway inbound dedup evidence wiring
+- [x] Gateway inbound dedup key helper
+- [ ] Gateway inbound dedup manager binding
 
 ### 2.B.10 — WeChat Adapter ✅
 
@@ -183,7 +185,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [x] Interrupt propagation to concurrent-tool workers
 
-### 2.E.3 — OS-AI Spine: Durable Job Resilience 🔨
+### 2.E.3 — OS-AI Spine: Durable Job Resilience ✅
 
 - [x] Durable job backpressure + timeout audit
 - [x] Durable worker supervisor status seam
@@ -192,8 +194,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Durable worker execution loop
 - [x] Durable worker abort-slot recovery safety net
 - [x] Durable worker RSS watchdog policy helper
-- [ ] Durable worker RSS drain integration
-- [ ] Durable worker RSS doctor/status evidence
+- [x] Durable worker RSS drain integration
+- [x] Durable worker RSS doctor/status evidence
 
 ### 2.F.1 — Slash Command Registry + Gateway Dispatch ✅
 
@@ -398,7 +400,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Aux compression single-prompt threshold reconciliation
 - [x] Compression protected-tail multimodal length estimator
 - [ ] Manual compression feedback + context references
-- [ ] ContextEngine compression-boundary notification
+- [ ] ContextEngine compression-boundary callback vocabulary
+- [ ] Kernel compression-boundary callback binding
 
 ### 4.C — Native Prompt Builder 🔨
 
@@ -407,6 +410,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Model-specific role and tool-use guidance
 - [ ] Toolset-aware skills prompt snapshot
 - [ ] Memory and session-search guidance assembly
+- [x] Gormes self-help skill/docs prompt guidance
 - [x] [SYSTEM:→[IMPORTANT: meta-instruction prefix rename for Azure content filter compatibility
 
 ### 4.D — Smart Model Routing 🔨
@@ -423,10 +427,10 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Trajectory writer + redaction gates
 - [ ] Self-monitoring telemetry
 
-### 4.F — Title Generation ⏳
+### 4.F — Title Generation 🔨
 
-- [ ] Title prompt and truncation contract
-- [ ] Title auxiliary failure visibility
+- [x] Title prompt and truncation contract
+- [x] Title auxiliary failure visibility
 - [ ] Auto-naming sessions
 
 ### 4.G — Credentials + OAuth ⏳
@@ -557,6 +561,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Atomic checkpoints
 - [x] Checkpoint shadow-repo GC policy
 - [x] File read dedup cache invalidation and wrapper guard
+- [x] File read repeated-stub BLOCKED escalation
 
 ### 5.M — Mixture of Agents ⏳
 
@@ -566,8 +571,8 @@ machine-readable queue for developing the full `gormes-agent`.
 
 - [ ] Todo
 - [ ] Clarify
-- [ ] Session search tool schema and argument validation
-- [ ] Session search tool execution wrapper
+- [x] Session search tool schema and argument validation
+- [x] Session search tool execution wrapper
 - [ ] Debug helpers
 - [ ] Debug share paste sweep scheduler contract
 - [x] Planner audit blank-subphase control-plane bucket
@@ -588,8 +593,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
 - [x] CLI banner/output formatting helpers
 - [x] CLI deterministic tip selector
-- [ ] CLI OpenClaw residue detection and hint text
-- [ ] CLI onboarding seen-state map helpers
+- [x] CLI OpenClaw residue detection and hint text
+- [x] CLI onboarding seen-state map helpers
 - [x] CLI bracketed-paste wrapper sanitizer
 - [x] CLI webhook URL normalizer
 - [x] CLI dump support-summary helper
@@ -643,11 +648,11 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] TUI TerminalNativeSelectionHelp constant + help-string fixture
 - [x] Native TUI slash-command dispatch table
 - [x] Native TUI /save canonical session export
-- [ ] Native TUI /save XDG export helper
-- [ ] Native TUI /save local runtime binding
+- [x] Native TUI /save XDG export helper
+- [x] Native TUI /save local runtime binding
 - [x] Native TUI /branch session fork + transcript target switch
 - [x] TUI running-agent placeholder surfaces interrupt + queued slash actions
-- [ ] Native TUI conversation viewport tail helper
+- [x] Native TUI conversation viewport tail helper
 - [ ] Native TUI renderConv viewport budget binding
 - [x] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
