@@ -31,7 +31,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Priority: `P3`
 - Contract: Gormes durable worker exposes a pure RSS watchdog policy helper that classifies disabled mode, unavailable RSS reads, threshold exceeded evidence, and stable watchdog restart reset without integrating with the worker loop yet
 - Trust class: operator, system
-- Ready when: Durable worker execution loop and Durable worker abort-slot recovery safety net are validated on main., The worker should read sibling GBrain files through the absolute /home/xel/git/sages-openclaw/workspace-mineru/gbrain path above, not by running git show in the Gormes checkout., The helper can be tested with fake RSS reader, fake clock, and value-only policy structs; no real process RSS, worker goroutine, external supervisor, shell handler, or GBrain TypeScript runtime is required.
+- Ready when: Durable worker execution loop and Durable worker abort-slot recovery safety net are validated on main., The GBrain behavior is fully summarized in this row: max_rss_mb=0 disables checks, RSS read errors degrade without cancellation, over-threshold checks request a graceful drain, and watchdog exits after stable runtime reset crash count., The helper can be tested with fake RSS reader, fake clock, and value-only policy structs; no real process RSS, worker goroutine, external supervisor, shell handler, or GBrain TypeScript runtime is required., Workers should not run git show inside the Gormes checkout for GBrain paths; the relative source_refs above point at the synchronized sibling repo only for context.
 - Not ready when: The slice changes DurableWorker.RunOne, doctor/status output, cmd/gormes lifecycle, builder-loop backend watchdogs, live delegate_task behavior, or cron execution semantics., The tests require real RSS measurements, sleeps longer than 100ms, subprocess workers, systemd, Postgres/PGLite, or importing GBrain code., The slice adds process self-termination to the main Gormes process or internal Goncho memory service.
 - Degraded mode: Durable-worker policy reports rss_watchdog_disabled, rss_threshold_exceeded, rss_watchdog_unavailable, or stable_watchdog_restart before runtime drain wiring exists.
 - Fixture: `internal/subagent/durable_worker_rss_watchdog_test.go::TestDurableWorkerRSSWatchdogPolicy`
@@ -39,29 +39,29 @@ tests, and candidate policy. Keep those control-plane facts in
 - Test commands: `go test ./internal/subagent -run 'TestDurableWorkerRSSWatchdog_\|TestDurableWorkerWatchdogRestartPolicy_' -count=1`, `go test ./internal/subagent -count=1`, `go run ./cmd/builder-loop progress validate`
 - Done signal: Durable worker RSS policy fixtures prove disabled mode, threshold evidence, read-failure degradation, and stable watchdog restart classification without runtime drain or doctor/status edits.
 - Acceptance: TestDurableWorkerRSSWatchdog_DisabledAtZero proves max_rss_mb=0 records rss_watchdog_disabled and never reads the RSS seam., TestDurableWorkerRSSWatchdog_ThresholdExceeded injects an RSS value over max_rss_mb and returns rss_threshold_exceeded evidence with observed_mb, max_mb, and checked_at from the fake clock., TestDurableWorkerRSSWatchdog_RSSReadFailure returns rss_watchdog_unavailable evidence and does not request a drain., TestDurableWorkerWatchdogRestartPolicy_StableRunReset classifies a watchdog exit after at least five minutes as stable_watchdog_restart and does not increment crash count past one.
-- Source refs: ../gbrain/CHANGELOG.md@c78c3d0:v0.22.2, /home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts.maxRssMb/getRss/rssCheckInterval, /home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/core/minions/worker.ts@c78c3d0:checkMemoryLimit, /home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/commands/autopilot.ts@c78c3d0:stable-run reset, /home/xel/git/sages-openclaw/workspace-mineru/gbrain/test/minions.test.ts@c78c3d0:--max-rss watchdog, ../gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts.maxRssMb/getRss/rssCheckInterval, ../gbrain/src/core/minions/worker.ts@c78c3d0:checkMemoryLimit/gracefulShutdown, ../gbrain/src/commands/autopilot.ts@c78c3d0:stable-run reset, ../gbrain/test/minions.test.ts@c78c3d0:MinionWorker --max-rss watchdog, internal/subagent/durable_worker.go, internal/subagent/durable_worker_abort_test.go
+- Source refs: ../gbrain/CHANGELOG.md@c78c3d0:v0.22.2, ../gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts.maxRssMb/getRss/rssCheckInterval, ../gbrain/src/core/minions/worker.ts@c78c3d0:checkMemoryLimit/gracefulShutdown, ../gbrain/src/commands/autopilot.ts@c78c3d0:stable-run reset, ../gbrain/test/minions.test.ts@c78c3d0:MinionWorker --max-rss watchdog, internal/subagent/durable_worker.go, internal/subagent/durable_worker_abort_test.go
 - Unblocks: Durable worker RSS drain integration
 - Why now: Unblocks Durable worker RSS drain integration.
 
-## 2. Steer slash command registry + queue fallback
+## 2. Steer slash command parser + preview helper
 
 - Phase: 2 / 2.F.5
 - Owner: `gateway`
 - Size: `small`
 - Status: `planned`
-- Contract: Registry-owned active-turn steering command
+- Contract: Gateway exposes a pure /steer parser and preview helper that validates non-empty text guidance, rejects image-bearing or attachment-bearing payloads, and returns deterministic preview/evidence strings without touching active sessions
 - Trust class: operator, gateway
-- Ready when: Concurrent-tool cancellation (2.E.2) and the shared CommandDef registry are complete on main., This slice only registers /steer and queue fallback behavior; the live between-tool-call injection hook remains in the dependent row., Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required.
-- Not ready when: The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior., The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code., The slice accepts empty/image-bearing steer payloads instead of returning usage/fallback evidence.
-- Degraded mode: Gateway returns visible usage, busy, or queued status instead of dropping steer text when the command cannot run immediately.
-- Fixture: `internal/gateway/steer_command_test.go`
-- Write scope: `internal/gateway/commands.go`, `internal/gateway/manager.go`, `internal/gateway/steer_command_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/gateway -run '^TestSteerCommandRegistry_' -count=1`, `go test ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Gateway command fixtures prove /steer argument validation, preview truncation, queued fallback, and no live mid-run injection.
-- Acceptance: TestSteerCommandRegistry_ValidatesArgs exposes /steer with missing-argument usage text and rejects image-bearing payloads., TestSteerCommandRegistry_PreviewTruncation returns deterministic preview text for long guidance., TestSteerCommandRegistry_NoRunningAgentQueuesGuidance queues follow-up guidance instead of dropping it., TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands.
-- Source refs: ../hermes-agent/cli.py@635253b9:busy_input_mode=steer, ../hermes-agent/gateway/run.py@635253b9:running_agent.steer, ../hermes-agent/hermes_cli/commands.py@635253b9:/busy steer, ../hermes-agent/tests/gateway/test_busy_session_ack.py@635253b9, internal/gateway/commands.go, internal/gateway/manager.go
-- Unblocks: Mid-run steer injection between tool calls, Gateway-handled slash commands bypass active-session guard
-- Why now: Unblocks Mid-run steer injection between tool calls, Gateway-handled slash commands bypass active-session guard.
+- Ready when: Concurrent-tool cancellation (2.E.2) and the shared CommandDef registry are complete on main., This slice is pure parser/preview behavior only; no manager state, running-agent hook, TUI keybinding, or platform adapter is touched., Tests use table inputs for raw slash text and synthetic payload metadata; no provider, active tool loop, Slack, Telegram, or session store is required.
+- Not ready when: The slice queues guidance, injects mid-run prompts, changes active-session policy, or persists /busy configuration., The slice accepts empty/image-bearing steer payloads instead of returning usage/fallback evidence.
+- Degraded mode: Invalid steer input returns steer_usage or steer_payload_unsupported evidence before gateway dispatch can queue or inject it.
+- Fixture: `internal/gateway/steer_command_test.go::TestParseSteerCommand`
+- Write scope: `internal/gateway/steer_command.go`, `internal/gateway/steer_command_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/gateway -run '^TestParseSteerCommand_\|^TestSteerPreview_' -count=1`, `go test ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Gateway steer parser fixtures prove usage errors, unsupported payload evidence, text trimming, deterministic preview truncation, and no active-session side effects.
+- Acceptance: TestParseSteerCommand_MissingArgs returns steer_usage evidence and no guidance., TestParseSteerCommand_RejectsImageBearingPayload returns steer_payload_unsupported evidence for image/attachment metadata., TestParseSteerCommand_TrimsText preserves internal whitespace but trims leading/trailing spaces., TestSteerPreview_TruncatesLongGuidance returns a deterministic preview that does not exceed 80 runes and marks truncation.
+- Source refs: ../hermes-agent/cli.py@635253b9:busy_input_mode=steer, ../hermes-agent/gateway/run.py@635253b9:running_agent.steer, ../hermes-agent/hermes_cli/commands.py@635253b9:/busy steer, ../hermes-agent/tests/gateway/test_busy_session_ack.py@635253b9, internal/gateway/commands.go
+- Unblocks: Steer slash command registry + queue fallback
+- Why now: Unblocks Steer slash command registry + queue fallback.
 
 ## 3. Provider timeout config fail-closed helper
 
@@ -103,7 +103,28 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/tools/browser_tool.py@7317d69f, ../hermes-agent/tools/url_safety.py@7317d69f, ../hermes-agent/tests/tools/test_browser_ssrf_local.py@7317d69f, ../hermes-agent/tests/tools/test_url_safety.py@7317d69f, internal/tools/browser_hybrid_routing.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 5. MCP stdio orphan cleanup after cron ticks
+## 5. Skills hub direct URL candidate parser
+
+- Phase: 5 / 5.F
+- Owner: `skills`
+- Size: `small`
+- Status: `planned`
+- Priority: `P2`
+- Contract: internal/skills exposes a pure ParseURLSkillCandidate(rawURL string, skillMD []byte) (URLSkillCandidate, error) helper that mirrors Hermes UrlSource.fetch metadata without network or store writes: HTTPS SKILL.md URLs only, source=url, trust=community, files={SKILL.md}, resolved name from valid frontmatter or URL slug, awaiting_name evidence when neither produces a safe install name, and no path traversal in name/category candidates
+- Trust class: operator, system
+- Ready when: internal/skills/parser.go already extracts SKILL.md name/description/body and enforces size limits., The row is pure parsing and validation: tests inject raw SKILL.md bytes and URLs; no HTTP client, CLI command, quarantine directory, scan policy, or active store mutation belongs in this slice., Use Gormes naming in retry hints (`gormes skills install ... --name <your-name>`), while source_refs stay pinned to Hermes behavior.
+- Not ready when: The slice downloads from the network, writes files under active/candidates/.hub, shells out, or changes skill selection/preprocessing., The slice accepts sentinel names such as skill, readme, index, unnamed-skill, absolute paths, drive letters, nested paths, or `..` segments as installable names., The slice implements interactive prompting or cobra command wiring; those belong to the dependent install-binding row.
+- Degraded mode: The helper returns evidence values url_skill_invalid_url, url_skill_missing_name, url_skill_invalid_name, or url_skill_invalid_frontmatter; callers can render actionable retry guidance without writing to the active skill store.
+- Fixture: `internal/skills/url_candidate_test.go`
+- Write scope: `internal/skills/url_candidate.go`, `internal/skills/url_candidate_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/skills -run '^TestURLSkillCandidate_' -count=1`, `go test ./internal/skills -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: URL candidate fixtures prove frontmatter-name, URL-slug, missing-name evidence, unsafe-name rejection, source/trust metadata, and no network/filesystem imports.
+- Acceptance: TestURLSkillCandidate_FromFrontmatter resolves `name: sharethis-chat` to Name=sharethis-chat, AwaitingName=false, Source=url, Trust=community, and Files contains exactly SKILL.md., TestURLSkillCandidate_FromURLSlug resolves `https://example.com/tools/review-bot/SKILL.md` to Name=review-bot when frontmatter name is missing., TestURLSkillCandidate_MissingNameEvidence returns AwaitingName=true plus url_skill_missing_name for `https://example.com/SKILL.md` with no valid frontmatter name., TestURLSkillCandidate_RejectsUnsafeNames rejects sentinel, nested, absolute, drive-letter, and traversal names before any path is returned., The helper imports neither net/http nor internal/cli and performs no filesystem writes.
+- Source refs: ../hermes-agent/tools/skills_hub.py@e63929d4:UrlSource.fetch,_validate_skill_name, ../hermes-agent/hermes_cli/skills_hub.py@e63929d4:_is_valid_installed_skill_name, ../hermes-agent/tests/hermes_cli/test_skills_hub.py@e63929d4:test_url_install_actionable_error_on_non_interactive_with_no_name, internal/skills/parser.go, internal/skills/types.go
+- Unblocks: Skills hub direct URL install name/category guard
+- Why now: Unblocks Skills hub direct URL install name/category guard.
+
+## 6. MCP stdio orphan cleanup after cron ticks
 
 - Phase: 5 / 5.G
 - Owner: `tools`
@@ -123,7 +144,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/tools/mcp_tool.py@930494d6:_orphan_stdio_pids, ../hermes-agent/cron/scheduler.py@930494d6:tick cleanup, ../hermes-agent/tests/tools/test_mcp_stability.py@930494d6, internal/tools/mcp_stdio.go, internal/cron/scheduler.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 6. Checkpoint shadow-repo GC policy
+## 7. Checkpoint shadow-repo GC policy
 
 - Phase: 5 / 5.L
 - Owner: `tools`
@@ -144,7 +165,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: File read dedup cache invalidation and wrapper guard
 - Why now: Unblocks File read dedup cache invalidation and wrapper guard.
 
-## 7. Session search
+## 8. Session search
 
 - Phase: 5 / 5.N
 - Owner: `tools`
@@ -152,18 +173,39 @@ tests, and candidate policy. Keep those control-plane facts in
 - Status: `planned`
 - Contract: Native session_search tool uses the Phase 3 session catalog with same-chat defaults, opt-in user/source filters, and deterministic recent-mode exclusion of the current lineage root
 - Trust class: operator, child-agent, system
-- Ready when: Source-filtered session/message search core and Lineage-aware source-filtered search hits are validated on main., Operator-auditable search evidence is validated on main, so this row is unblocked for the tool wrapper only., The tool can use seeded SQLite/session.Metadata fixtures and does not need a live gateway, provider, or Goncho cloud service., Existing Goncho/Honcho-compatible scope rules remain the authority for user/source widening.
-- Not ready when: The slice changes ranking, default same-chat recall fences, or Goncho/Honcho memory persistence instead of wrapping existing search results., The slice shells out to Hermes Python or reads ~/.hermes session logs., The slice includes todo/debug/clarify tools or cronjob tools in the same change.
+- Ready when: Source-filtered session/message search core and Lineage-aware source-filtered search hits are validated on main., Operator-auditable search evidence is validated on main, so this row is unblocked for the tool wrapper only., The tool can use seeded SQLite/session.Metadata fixtures and does not need a live gateway, provider, or Goncho cloud service., Existing Goncho/Honcho-compatible scope rules remain the authority for user/source widening., This row must wrap existing internal/memory.SearchSessions/SearchMessages and must not change ranking, lineage construction, default same-chat fences, or Goncho persistence.
+- Not ready when: The slice changes ranking, default same-chat recall fences, or Goncho/Honcho memory persistence instead of wrapping existing search results., The slice shells out to Hermes Python or reads ~/.hermes session logs., The slice edits internal/memory/session_catalog.go or internal/goncho/service.go; those prerequisites are already validated and should be treated as read-only donor code., The slice includes todo/debug/clarify tools or cronjob tools in the same change.
 - Degraded mode: Tool result reports session_search_unavailable, source_filter_denied, or lineage_root_excluded evidence instead of widening recall silently.
 - Fixture: `internal/tools/session_search_tool_test.go`
-- Write scope: `internal/tools/session_search_tool.go`, `internal/tools/session_search_tool_test.go`, `internal/memory/session_catalog.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Write scope: `internal/tools/session_search_tool.go`, `internal/tools/session_search_tool_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
 - Test commands: `go test ./internal/tools -run '^TestSessionSearchTool_' -count=1`, `go test ./internal/tools ./internal/memory ./internal/goncho -count=1`, `go run ./cmd/builder-loop progress validate`
 - Done signal: Session search tool fixtures prove same-chat defaults, opt-in user/source widening, deterministic current-lineage-root exclusion in recent mode, and degraded evidence for unavailable/denied widening.
 - Acceptance: TestSessionSearchTool_SameChatDefault seeds two chats and proves no cross-chat hit appears without explicit scope=user or sources., TestSessionSearchTool_UserScopeSourceFilter passes scope=user sources=[telegram] and proves only the allowed source's sessions are returned with source evidence., TestSessionSearchTool_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155., TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening.
 - Source refs: ../hermes-agent/tools/session_search_tool.py@dbe50155, ../hermes-agent/tests/tools/test_session_search.py@dbe50155, internal/memory/session_catalog.go, internal/memory/session_lineage_search_test.go, internal/goncho/service.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
-## 8. Native TUI /save XDG file writer binding
+## 9. CLI OpenClaw residue onboarding hint
+
+- Phase: 5 / 5.O
+- Owner: `tools`
+- Size: `small`
+- Status: `planned`
+- Priority: `P3`
+- Contract: internal/cli exposes pure OpenClaw-residue onboarding helpers: DetectOpenClawResidue(home string) bool returns true only for an existing ~/.openclaw directory, OpenClawResidueHint(commandName string) string returns a Gormes-specific one-time cleanup hint, and OnboardingSeen/MarkOnboardingSeen operate on an in-memory map shape compatible with config onboarding.seen without reading or writing real config files
+- Trust class: operator, system
+- Ready when: internal/cli already has pure helper files and tests; this slice adds another helper without command registration, config I/O, or startup wiring., Use Gormes-facing text (`gormes openclaw cleanup` or the command name injected by tests) rather than copying Hermes' `hermes claw cleanup` string., Filesystem checks use a temp HOME provided by tests; no real operator home directory is inspected in unit tests.
+- Not ready when: The slice edits cmd/gormes startup, reads/writes config files, renames ~/.openclaw, migrates OpenClaw data, or ports the full optional migration script., The hint text mentions Hermes commands, HERMES_HOME, or writes under upstream Hermes paths., The helper treats a regular file named .openclaw as residue.
+- Degraded mode: If HOME cannot be inspected or onboarding config is malformed, the helper reports unseen/false and never blocks CLI startup; command wiring can decide whether to persist the seen flag later.
+- Fixture: `internal/cli/onboarding_test.go`
+- Write scope: `internal/cli/onboarding.go`, `internal/cli/onboarding_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/cli -run '^Test.*OpenClaw\|^TestOnboardingSeen\|^TestMarkOnboardingSeen' -count=1`, `go test ./internal/cli -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: CLI onboarding fixtures prove directory-only OpenClaw residue detection, Gormes-specific cleanup hint text, in-memory seen-state handling, malformed-config tolerance, and no real HOME/config writes.
+- Acceptance: TestDetectOpenClawResidue_DirectoryOnly returns true for a temp HOME containing a .openclaw directory and false for missing path or a regular file., TestOpenClawResidueHint_MentionsInjectedCleanupCommand proves the hint contains ~/.openclaw, the injected Gormes cleanup command, and no `hermes claw cleanup` substring., TestOnboardingSeen_MalformedConfigUnseen covers missing onboarding, non-map onboarding, non-map seen, false values, and unrelated flags., TestMarkOnboardingSeen_InMemoryPreservesOtherFlags sets openclaw_residue_cleanup=true in the provided map without removing existing seen flags., No test touches the real user home or writes config.yaml.
+- Source refs: ../hermes-agent/agent/onboarding.py@e63929d4:OPENCLAW_RESIDUE_FLAG,detect_openclaw_residue,openclaw_residue_hint_cli,is_seen, ../hermes-agent/tests/agent/test_onboarding.py@e63929d4:TestOpenClawResidue, ../hermes-agent/cli.py@e63929d4:first-time OpenClaw-residue banner, internal/cli/tips.go
+- Unblocks: OpenClaw residue startup banner binding
+- Why now: Unblocks OpenClaw residue startup banner binding.
+
+## 10. Native TUI /save XDG file writer binding
 
 - Phase: 5 / 5.Q
 - Owner: `gateway`
@@ -182,47 +224,5 @@ tests, and candidate policy. Keep those control-plane facts in
 - Acceptance: cmd/gormes constructs a SessionExportFunc for the local TUI Model that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`., TestTUISaveExport_WritesUnderXDGDataHome sets XDG_DATA_HOME and HERMES_HOME to different temp roots, invokes the bound SessionExportFunc, and proves the file lands under the Gormes XDG export directory only., TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path., The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway.
 - Source refs: ../hermes-agent/tests/cli/test_save_conversation_location.py@5eb6cd82, ../hermes-agent/cli.py@5eb6cd82:save conversation location, ../hermes-agent/tui_gateway/server.py@5eb6cd82:session.save, internal/tui/slash_save.go:SessionExportFunc, cmd/gormes/session.go:sessionExportCmd, internal/config/config.go:MemoryDBPath
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
-
-## 9. API server detailed health read-model
-
-- Phase: 5 / 5.Q
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Native API server exposes a detailed health read-model that reports provider, response-store, run-event stream, gateway, and cron availability/degradation without leaking secrets or adding cron mutations
-- Trust class: operator, gateway, system
-- Ready when: OpenAI-compatible chat-completions API server, Responses API store + run event stream, and Gateway proxy mode forwarding contract are validated on main., Cronjob tool action envelope over native store, Cron context_from output chaining, and Cron multi-target delivery + media/live-adapter fallback are validated on main, so cron health can be read without defining admin writes., Tests can inject fake provider/gateway/cron/read-store health snapshots; no provider, live gateway, scheduler goroutine, or cron mutation endpoint is required.
-- Not ready when: The slice creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, changes OpenAI-style error envelopes, or weakens API auth/body-size checks., The slice imports Hermes Python, starts the remote TUI gateway, or changes dashboard client behavior., Health output includes plaintext tokens, provider API keys, cron script bodies, or raw request payloads.
-- Degraded mode: HTTP health reports cron_unavailable, response_store_disabled, run_events_unavailable, gateway_unavailable, or provider_unconfigured evidence instead of returning a flat OK/failed bit.
-- Fixture: `internal/apiserver/detailed_health_test.go`
-- Write scope: `internal/apiserver/`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/apiserver -run '^TestAPIServerDetailedHealth_' -count=1`, `go test ./internal/apiserver -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: API server fixtures prove detailed health sections, degraded evidence, secret redaction, and existing auth/error-envelope behavior without cron admin writes.
-- Acceptance: TestAPIServerDetailedHealth_AllSystemsReady returns provider, response_store, run_events, gateway, and cron sections with status=ready and stable JSON field names., TestAPIServerDetailedHealth_DegradedEvidence seeds disabled response store, missing cron store, and unavailable gateway status and proves each appears as separate degraded evidence., TestAPIServerDetailedHealth_RedactsSecrets proves provider keys, cron script bodies, and gateway tokens are absent from the response body., Auth failure, request-size, and method-not-allowed behavior match the existing API server error-envelope fixtures.
-- Source refs: ../hermes-agent/gateway/platforms/api_server.py@755a2804, internal/apiserver/, internal/cron/, internal/gateway/status.go
-- Unblocks: API server cron admin read-only endpoints
-- Why now: Unblocks API server cron admin read-only endpoints.
-
-## 10. BlueBubbles iMessage bubble formatting parity
-
-- Phase: 7 / 7.E
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P3`
-- Contract: BlueBubbles outbound iMessage sends are non-editable, markdown-stripped, paragraph-split bubbles without pagination suffixes
-- Trust class: gateway, system
-- Ready when: The first-pass BlueBubbles adapter already owns Send, markdown stripping, cached GUID resolution, and home-channel fallback in internal/channels/bluebubbles.
-- Not ready when: The slice attempts to add live BlueBubbles HTTP/webhook registration, attachment download, reactions, typing indicators, or edit-message support.
-- Degraded mode: BlueBubbles remains a usable first-pass adapter, but long replies may still arrive as one stripped text send until paragraph splitting and suffix-free chunking are fixture-locked.
-- Fixture: `internal/channels/bluebubbles/bot_test.go`
-- Write scope: `internal/channels/bluebubbles/bot.go`, `internal/channels/bluebubbles/bot_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/channels/bluebubbles -count=1`
-- Done signal: BlueBubbles adapter tests prove paragraph-to-bubble sends, suffix-free chunking, and no edit/placeholder capability.
-- Acceptance: Send splits blank-line-separated paragraphs into separate SendText calls while preserving existing chat GUID resolution and home-channel fallback., Long paragraph chunks omit `(n/m)` pagination suffixes and concatenate back to the stripped original text., Bot does not implement gateway.MessageEditor or gateway.PlaceholderCapable, preserving non-editable iMessage semantics.
-- Source refs: ../hermes-agent/gateway/platforms/bluebubbles.py@f731c2c2, ../hermes-agent/tests/gateway/test_bluebubbles.py@f731c2c2, internal/channels/bluebubbles/bot.go, internal/gateway/channel.go
-- Unblocks: BlueBubbles iMessage session-context prompt guidance
-- Why now: Unblocks BlueBubbles iMessage session-context prompt guidance.
 
 <!-- PROGRESS:END -->

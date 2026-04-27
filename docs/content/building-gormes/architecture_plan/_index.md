@@ -127,7 +127,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 - [x] Non-editable gateway progress/commentary send fallback
-- [ ] WhatsApp ASCII identifier guard
+- [ ] WhatsApp identifier safety predicate
+- [ ] WhatsApp unsafe identifier inbound evidence
 - [x] Gateway fresh-final eligibility helper
 - [x] Gateway fresh-final send/delete fallback
 - [x] Telegram fresh-final delete and config exposure
@@ -230,6 +231,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ### 2.F.5 — Gateway Mid-Run Steering + Active-Turn Policy ⏳
 
+- [ ] Steer slash command parser + preview helper
 - [ ] Steer slash command registry + queue fallback
 - [ ] Mid-run steer injection between tool calls
 - [ ] Gateway-handled slash commands bypass active-session guard
@@ -496,6 +498,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Skills hub search result types + in-memory registry provider
 - [x] Skills hub search read-model function over registry providers
 - [ ] Skill registries
+- [ ] Skills hub direct URL candidate parser
+- [ ] Skills hub direct URL install name/category guard
 - [x] Skill preprocessing + dynamic slash commands
 - [x] [IMPORTANT:] prompt prefix for cron and skill commands
 - [x] Skills list — enabled/disabled status column + --enabled-only filter
@@ -572,6 +576,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Deterministic helper-file ports (banner/output/tips/webhook/dump)
 - [x] CLI banner/output formatting helpers
 - [x] CLI deterministic tip selector
+- [ ] CLI OpenClaw residue onboarding hint
 - [x] CLI webhook URL normalizer
 - [x] CLI dump support-summary helper
 - [x] PTY bridge protocol adapter
@@ -626,6 +631,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Native TUI /save XDG file writer binding
 - [x] Native TUI /branch session fork + transcript target switch
 - [x] TUI running-agent placeholder surfaces interrupt + queued slash actions
+- [ ] Native TUI bounded conversation viewport
 - [x] SSE streaming to Bubble Tea TUI
 - [x] OpenAI-compatible chat-completions API server
 - [x] Responses API store + run event stream
@@ -633,7 +639,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway proxy mode forwarding contract
 - [x] Dashboard API client contract
 - [x] Dashboard PTY chat sidecar contract
-- [ ] API server detailed health read-model
+- [ ] API server detailed health snapshot contract
+- [ ] API server detailed health endpoint
 - [ ] API server cron admin read-only endpoints
 - [ ] API server cron admin mutating endpoints
 
