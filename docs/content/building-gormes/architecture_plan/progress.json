@@ -2829,11 +2829,11 @@
                 "Durable worker fixtures prove post-job and injected periodic RSS drains cancel handlers through the existing abort path, preserve read-failure degradation, and avoid real RSS/sleeps/supervisors."
               ],
               "health": {
-                "attempt_count": 1,
-                "consecutive_failures": 1,
-                "last_attempt": "2026-04-27T06:11:11Z",
+                "attempt_count": 2,
+                "consecutive_failures": 2,
+                "last_attempt": "2026-04-27T06:14:44Z",
                 "last_failure": {
-                  "run_id": "20260427T061100Z-443674386",
+                  "run_id": "20260427T061436Z-528517144",
                   "category": "worker_error",
                   "backend": "codexu",
                   "stderr_tail": "Reading additional input from stdin...\n"
