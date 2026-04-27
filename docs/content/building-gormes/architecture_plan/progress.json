@@ -7528,6 +7528,63 @@
               "note": "TDD: assemble memory guidance, session-search guidance, available tool-name gates, and environment/platform hints without changing existing Phase 3 GONCHO recall semantics."
             },
             {
+              "name": "Gormes self-help skill/docs prompt guidance",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Native prompt assembly exposes a pure guidance block that tells the model, when the user asks about configuring, setting up, troubleshooting, or using Gormes itself, to consult Gormes-owned docs/skills before answering; the block must say Gormes/Gormes Agent, must not mention Hermes Agent as the product, and must be gated so unrelated user prompts do not receive extra self-help text.",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "system",
+                "operator"
+              ],
+              "degraded_mode": "If a future Gormes self-help skill is unavailable, prompt assembly still points to the local Hugo docs surface and emits self-help-unavailable evidence instead of silently falling back to Hermes Agent wording.",
+              "fixture": "internal/hermes/self_help_guidance_test.go::TestGormesSelfHelpGuidance*",
+              "source_refs": [
+                "../hermes-agent/agent/prompt_builder.py@920ebd83:HERMES_AGENT_HELP_GUIDANCE",
+                "../hermes-agent/run_agent.py@920ebd83",
+                "docs/hugo.toml",
+                "docs/content/_index.md",
+                "docs/content/building-gormes/_index.md"
+              ],
+              "ready_when": [
+                "Native prompt-builder slices can add one pure helper or constant without replacing the full Python prompt bridge.",
+                "The test fixture can assert string content and gating decisions only; no model call, provider adapter, or live docs fetch is required.",
+                "The public docs base URL remains https://docs.gormes.ai/ in docs/hugo.toml."
+              ],
+              "not_ready_when": [
+                "The slice copies Hermes Agent product wording, skill name, docs URL, or support instructions verbatim.",
+                "The slice changes provider role selection, context-file discovery, tool schema formatting, memory recall, or session-search guidance.",
+                "The slice requires a live skill install or network access to pass tests."
+              ],
+              "acceptance": [
+                "TestGormesSelfHelpGuidanceMentionsGormesDocs asserts the guidance mentions Gormes/Gormes Agent and docs.gormes.ai.",
+                "TestGormesSelfHelpGuidanceDoesNotMentionHermesAgent asserts the rendered block contains no Hermes Agent product guidance.",
+                "TestGormesSelfHelpGuidanceGateMatchesSetupQuestions covers configure/setup/troubleshoot/use questions and a negative unrelated prompt.",
+                "The helper returns deterministic text suitable for prompt snapshots and does not inspect the user's filesystem."
+              ],
+              "note": "Hermes 920ebd83 points its agent at Hermes Agent skill/docs for self-help. Gormes needs the same UX pattern, but with Gormes-owned docs and future skill naming so prompt drift does not route users back to upstream Python documentation.",
+              "write_scope": [
+                "internal/hermes/self_help_guidance.go",
+                "internal/hermes/self_help_guidance_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run '^TestGormesSelfHelpGuidance' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Self-help guidance fixtures prove Gormes docs/product wording, absence of Hermes Agent wording, deterministic gating, and no provider/model/runtime side effects."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:920ebd83 agent/prompt_builder.py",
+                "note": "Upstream added the self-help prompt pattern; Gormes owns the docs URL, product wording, and future skill naming."
+              }
+            },
+            {
               "name": "[SYSTEM:→[IMPORTANT: meta-instruction prefix rename for Azure content filter compatibility",
               "priority": "P1",
               "status": "complete",
@@ -7594,7 +7651,12 @@
                 "note": "Direct port of the upstream Azure-content-filter compatibility rename. Gormes uses [SYSTEM: in two narrow spots; this slice closes the drift and unblocks Azure OpenAI traffic without touching prompt body content."
               }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T12:56:05Z",
+            "origin_decision": "Hermes 920ebd83 adds product self-help guidance into prompt assembly. Gormes still has native prompt-builder slices in flight, so the drift is tracked as a pure Gormes self-help docs/skill guidance row before the broader system+memory+tools assembly is executed. Existing Azure [SYSTEM: to [IMPORTANT:] drift remains complete."
+          }
         },
         "4.D": {
           "name": "Smart Model Routing",
