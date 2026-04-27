@@ -213,6 +213,81 @@ func TestCheckDurableLedgerReportsRestartIntentAuditEvidence(t *testing.T) {
 	}
 }
 
+func TestCheckDurableLedgerReportsAbortRecoveryEvidence(t *testing.T) {
+	ctx := context.Background()
+	ms, err := memory.OpenSqlite(filepath.Join(t.TempDir(), "ledger.db"), 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer ms.Close(ctx)
+	ledger, err := subagent.NewDurableLedger(ms.DB())
+	if err != nil {
+		t.Fatalf("NewDurableLedger: %v", err)
+	}
+	now := time.Now().UTC()
+	if err := ledger.RecordSupervisorStatus(ctx, subagent.DurableSupervisorReport{
+		Available:  true,
+		ReportedAt: now,
+	}); err != nil {
+		t.Fatalf("RecordSupervisorStatus: %v", err)
+	}
+	if err := ledger.RecordWorkerHeartbeat(ctx, subagent.DurableWorkerHeartbeat{
+		WorkerID:    "worker-a",
+		HeartbeatAt: now,
+	}); err != nil {
+		t.Fatalf("RecordWorkerHeartbeat: %v", err)
+	}
+	if _, err := ledger.Submit(ctx, subagent.DurableJobSubmission{ID: "cron:ignored", Kind: subagent.WorkKindCronJob}); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	if _, ok, err := ledger.ClaimJob(ctx, "cron:ignored", subagent.DurableClaim{
+		WorkerID:  "worker-a",
+		LockUntil: now.Add(time.Minute),
+		TimeoutAt: now.Add(-time.Second),
+	}); err != nil || !ok {
+		t.Fatalf("ClaimJob ok=%v err=%v, want true nil", ok, err)
+	}
+	if _, ok, err := ledger.RecoverWorkerAbortSlot(ctx, subagent.DurableWorkerAbortEvent{
+		JobID:     "cron:ignored",
+		WorkerID:  "worker-a",
+		Reason:    "handler_ignored_abort",
+		CreatedAt: now.Add(time.Second),
+	}); err != nil || !ok {
+		t.Fatalf("RecoverWorkerAbortSlot ok=%v err=%v, want true nil", ok, err)
+	}
+	if err := ledger.RecordWorkerAbortRecoveryUnavailable(ctx, subagent.DurableWorkerAbortEvent{
+		JobID:     "cron:unavailable",
+		WorkerID:  "worker-a",
+		Reason:    "ledger update denied",
+		CreatedAt: now.Add(2 * time.Second),
+	}); err != nil {
+		t.Fatalf("RecordWorkerAbortRecoveryUnavailable: %v", err)
+	}
+
+	result := CheckDurableLedger(ctx, ledger, "")
+
+	if result.Status != StatusWarn {
+		t.Fatalf("Status = %v, want WARN for abort recovery evidence: %+v", result.Status, result)
+	}
+	for _, want := range []string{"handler_ignored_abort=1", "abort_recovery_unavailable=1"} {
+		if !strings.Contains(result.Summary, want) {
+			t.Fatalf("Summary = %q, want %q", result.Summary, want)
+		}
+	}
+	item := findDoctorItem(result.Items, "abort_recovery")
+	if item.Name == "" {
+		t.Fatalf("Items = %+v, want abort_recovery item", result.Items)
+	}
+	if item.Status != StatusWarn {
+		t.Fatalf("abort_recovery status = %v, want WARN", item.Status)
+	}
+	for _, want := range []string{"handler_ignored_abort=1", "abort_recovery_unavailable=1"} {
+		if !strings.Contains(item.Note, want) {
+			t.Fatalf("abort_recovery note = %q, want %q", item.Note, want)
+		}
+	}
+}
+
 func findDoctorItem(items []ItemInfo, name string) ItemInfo {
 	for _, item := range items {
 		if item.Name == name {

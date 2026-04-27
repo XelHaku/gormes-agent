@@ -200,6 +200,25 @@ type DurableWorkerRestartStatus struct {
 	AuditEvents  int
 }
 
+type DurableWorkerAbortEvent struct {
+	JobID     string
+	WorkerID  string
+	Reason    string
+	CreatedAt time.Time
+}
+
+type DurableWorkerAbortRecoveryStatus struct {
+	AbortSignalSent          int
+	AbortSlotRecovered       int
+	HandlerIgnoredAbort      int
+	AbortRecoveryUnavailable int
+	LastEvent                string
+	LastJobID                string
+	LastWorkerID             string
+	LastReason               string
+	LastEventAt              time.Time
+}
+
 type DurableWorkerStatus struct {
 	Liveness             DurableWorkerLiveness
 	WorkerID             string
@@ -210,6 +229,7 @@ type DurableWorkerStatus struct {
 	SupervisorReason     string
 	SupervisorReportedAt time.Time
 	RestartIntent        DurableWorkerRestartStatus
+	AbortRecovery        DurableWorkerAbortRecoveryStatus
 }
 
 type DurableLedgerStatus struct {
@@ -1018,6 +1038,28 @@ func (l *DurableLedger) RecordWorkerRestartIntent(ctx context.Context, intent Du
 	return nil
 }
 
+func (l *DurableLedger) RecordWorkerAbortSignal(ctx context.Context, event DurableWorkerAbortEvent) error {
+	if l == nil || l.db == nil {
+		return errors.New("subagent: durable ledger is nil")
+	}
+	return durableInsertWorkerAbortEvent(ctx, l.db, string(DurableWorkerRunAbortSignalSent), event)
+}
+
+func (l *DurableLedger) RecordWorkerAbortRecoveryUnavailable(ctx context.Context, event DurableWorkerAbortEvent) error {
+	if l == nil || l.db == nil {
+		return errors.New("subagent: durable ledger is nil")
+	}
+	return durableInsertWorkerAbortEvent(ctx, l.db, string(DurableWorkerRunAbortRecoveryUnavailable), event)
+}
+
+func (l *DurableLedger) AbortWorkerJob(ctx context.Context, event DurableWorkerAbortEvent) (DurableJob, bool, error) {
+	return l.abortWorkerJob(ctx, event, false)
+}
+
+func (l *DurableLedger) RecoverWorkerAbortSlot(ctx context.Context, event DurableWorkerAbortEvent) (DurableJob, bool, error) {
+	return l.abortWorkerJob(ctx, event, true)
+}
+
 func (l *DurableLedger) Status(ctx context.Context) (DurableLedgerStatus, error) {
 	if l == nil || l.db == nil {
 		return DurableLedgerStatus{}, errors.New("subagent: durable ledger is nil")
@@ -1175,6 +1217,51 @@ func (l *DurableLedger) populateDurableWorkerStatus(ctx context.Context, st *Dur
 		worker.RestartIntent.RequestedAt = durableTime(requestedAt)
 	}
 
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM durable_worker_events
+		WHERE type = ?`, string(DurableWorkerRunAbortSignalSent)).Scan(&worker.AbortRecovery.AbortSignalSent)
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM durable_worker_events
+		WHERE type = ?`, string(DurableWorkerRunAbortSlotRecovered)).Scan(&worker.AbortRecovery.AbortSlotRecovered)
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM durable_worker_events
+		WHERE type = 'handler_ignored_abort'`).Scan(&worker.AbortRecovery.HandlerIgnoredAbort)
+	_ = l.db.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM durable_worker_events
+		WHERE type = ?`, string(DurableWorkerRunAbortRecoveryUnavailable)).Scan(&worker.AbortRecovery.AbortRecoveryUnavailable)
+
+	var abortEventType, abortWorkerID, abortReason, abortPayload string
+	var abortCreatedAt int64
+	err = l.db.QueryRowContext(ctx, `
+		SELECT type, worker_id, reason, payload_json, created_at
+		FROM durable_worker_events
+		WHERE type IN (?, ?, 'handler_ignored_abort', ?)
+		ORDER BY id DESC
+		LIMIT 1`,
+		string(DurableWorkerRunAbortSignalSent),
+		string(DurableWorkerRunAbortSlotRecovered),
+		string(DurableWorkerRunAbortRecoveryUnavailable),
+	).Scan(&abortEventType, &abortWorkerID, &abortReason, &abortPayload, &abortCreatedAt)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("subagent: durable worker abort recovery status: %w", err)
+	}
+	if err == nil {
+		worker.AbortRecovery.LastEvent = abortEventType
+		worker.AbortRecovery.LastWorkerID = abortWorkerID
+		worker.AbortRecovery.LastReason = abortReason
+		worker.AbortRecovery.LastEventAt = durableTime(abortCreatedAt)
+		var payload struct {
+			JobID string `json:"job_id"`
+		}
+		if json.Unmarshal([]byte(abortPayload), &payload) == nil {
+			worker.AbortRecovery.LastJobID = payload.JobID
+		}
+	}
+
 	st.Worker = worker
 	return nil
 }
@@ -1229,8 +1316,88 @@ func (l *DurableLedger) terminal(ctx context.Context, id, workerID string, statu
 	return job, true, nil
 }
 
+func (l *DurableLedger) abortWorkerJob(ctx context.Context, event DurableWorkerAbortEvent, handlerIgnored bool) (DurableJob, bool, error) {
+	if l == nil || l.db == nil {
+		return DurableJob{}, false, errors.New("subagent: durable ledger is nil")
+	}
+	event.JobID = strings.TrimSpace(event.JobID)
+	if event.JobID == "" {
+		return DurableJob{}, false, errors.New("subagent: durable abort job id is empty")
+	}
+	event.WorkerID = strings.TrimSpace(event.WorkerID)
+	if event.WorkerID == "" {
+		return DurableJob{}, false, errors.New("subagent: durable worker id is empty")
+	}
+	if event.CreatedAt.IsZero() {
+		event.CreatedAt = durableTime(durableNow())
+	}
+	if strings.TrimSpace(event.Reason) == "" {
+		event.Reason = string(DurableWorkerRunAbortSignalSent)
+		if handlerIgnored {
+			event.Reason = "handler_ignored_abort"
+		}
+	}
+	eventAt := event.CreatedAt.UTC().UnixNano()
+	reason := durableWorkerAbortReason(event)
+
+	tx, err := l.db.BeginTx(ctx, nil)
+	if err != nil {
+		return DurableJob{}, false, err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE durable_jobs
+		SET status = ?, cancel_requested = 1, cancel_reason = ?, error_text = ?,
+		    lock_owner = '', lock_until = NULL, finished_at = COALESCE(finished_at, ?),
+		    updated_at = ?
+		WHERE id = ? AND status = ? AND lock_owner = ?`,
+		DurableJobCancelled, reason, reason, eventAt, eventAt,
+		event.JobID, DurableJobActive, event.WorkerID)
+	if err != nil {
+		return DurableJob{}, false, err
+	}
+	ok, err := durableRowsAffected(res)
+	if err != nil || !ok {
+		return DurableJob{}, ok, err
+	}
+	job, err := durableGet(ctx, tx, event.JobID)
+	if err != nil {
+		return DurableJob{}, false, err
+	}
+	if job.ParentID != "" {
+		if err := durableInsertChildEvent(ctx, tx, job, DurableChildCancelled, reason); err != nil {
+			return DurableJob{}, false, err
+		}
+		if err := durableResolveParent(ctx, tx, job.ParentID); err != nil {
+			return DurableJob{}, false, err
+		}
+	}
+	if handlerIgnored {
+		if err := durableInsertWorkerAbortEvent(ctx, tx, "handler_ignored_abort", event); err != nil {
+			return DurableJob{}, false, err
+		}
+		if err := durableInsertWorkerAbortEvent(ctx, tx, string(DurableWorkerRunAbortSlotRecovered), DurableWorkerAbortEvent{
+			JobID:     event.JobID,
+			WorkerID:  event.WorkerID,
+			Reason:    string(DurableWorkerRunAbortSlotRecovered),
+			CreatedAt: event.CreatedAt,
+		}); err != nil {
+			return DurableJob{}, false, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return DurableJob{}, false, err
+	}
+	return job, true, nil
+}
+
 type durableQuerier interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+type durableExecer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
 type durableScanner interface {
@@ -1373,6 +1540,53 @@ func durableInsertBackpressureEvent(ctx context.Context, tx *sql.Tx, id string, 
 		VALUES (?, 'backpressure_denied', ?, ?, ?)`,
 		id, kind, string(raw), durableNow())
 	return err
+}
+
+func durableInsertWorkerAbortEvent(ctx context.Context, q durableExecer, eventType string, event DurableWorkerAbortEvent) error {
+	eventType = strings.TrimSpace(eventType)
+	if eventType == "" {
+		return errors.New("subagent: durable worker abort event type is empty")
+	}
+	workerID := strings.TrimSpace(event.WorkerID)
+	if workerID == "" {
+		return errors.New("subagent: durable worker id is empty")
+	}
+	jobID := strings.TrimSpace(event.JobID)
+	if jobID == "" {
+		return errors.New("subagent: durable abort job id is empty")
+	}
+	createdAt := event.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = durableTime(durableNow())
+	}
+	reason := strings.TrimSpace(event.Reason)
+	payload := map[string]any{
+		"type":      eventType,
+		"job_id":    jobID,
+		"worker_id": workerID,
+		"reason":    reason,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = q.ExecContext(ctx, `
+		INSERT INTO durable_worker_events
+			(type, worker_id, reason, payload_json, created_at)
+		VALUES (?, ?, ?, ?, ?)`,
+		eventType, workerID, reason, string(raw), createdAt.UTC().UnixNano())
+	return err
+}
+
+func durableWorkerAbortReason(event DurableWorkerAbortEvent) string {
+	reason := strings.TrimSpace(event.Reason)
+	if reason == "" {
+		reason = string(DurableWorkerRunAbortSignalSent)
+	}
+	if !strings.Contains(reason, string(DurableWorkerRunAbortSignalSent)) {
+		reason = string(DurableWorkerRunAbortSignalSent) + ": " + reason
+	}
+	return reason
 }
 
 func (l *DurableLedger) recordProtectedSubmitDenied(ctx context.Context, trust TrustClass, sub DurableJobSubmission) error {

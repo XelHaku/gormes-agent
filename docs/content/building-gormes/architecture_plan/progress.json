@@ -2236,9 +2236,9 @@
             {
               "name": "Durable worker abort-slot recovery safety net",
               "priority": "P2",
-              "status": "planned",
-              "contract": "When Gormes grows a real durable worker execution loop, timed-out jobs propagate cancellation into the handler and a bounded grace timer frees the worker slot with auditable recovery evidence if the handler ignores cancellation",
-              "contract_status": "draft",
+              "status": "complete",
+              "contract": "Gormes durable worker execution loop propagates timed-out jobs into handler cancellation and uses a bounded grace timer to free the worker slot with auditable recovery evidence if the handler ignores cancellation",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -2267,16 +2267,13 @@
                 "The slice changes live delegate_task behavior, cron execution semantics, or builder-loop backend execution.",
                 "The tests require real timeouts longer than 100ms, external processes, Postgres/PGLite, or GBrain TypeScript imports."
               ],
-              "blocked_by": [
-                "Durable worker execution loop"
-              ],
               "acceptance": [
                 "TestDurableWorker_TimeoutPropagatesCancel seeds a claimed job with a short timeout, runs a fake handler that observes ctx.Done, and asserts the ledger records aborted/dead evidence plus abort_signal_sent status.",
                 "TestDurableWorker_IgnoredAbortReleasesSlot runs a fake handler that blocks after ctx cancellation; after the injected grace clock fires, worker capacity is released, abort_slot_recovered is recorded once, and the handler cannot later double-complete the job.",
                 "TestDurableWorker_ClaimsNextJobAfterRecovery proves a second waiting job can be claimed after recovery from the ignored-abort handler.",
                 "Doctor/status fixtures expose handler_ignored_abort and abort_recovery_unavailable without requiring operators to inspect raw ledger rows."
               ],
-              "note": "GBrain e2961c0 fixed a production Minions wedge where a timed-out autopilot cycle ignored AbortSignal and kept the worker at capacity. Gormes already has timeout audit and supervisor status, but no real durable worker execution loop yet; keep this row blocked until that loop exists so workers do not invent a daemon just to port the safety net.",
+              "note": "Complete: TDD landed internal/subagent/durable_worker_abort_test.go over the Go-native DurableWorker.RunOne seam. Timed-out runs now cancel the handler context, record abort_signal_sent audit evidence, terminally cancel the durable job with lock release, and, when a handler ignores cancellation, use an injected bounded grace timer to record handler_ignored_abort plus one-shot abort_slot_recovered evidence before returning capacity. Late handler returns cannot double-complete recovered jobs, a follow-up waiting job can be claimed after recovery, and doctor/status now exposes abort recovery counts including abort_recovery_unavailable.",
               "write_scope": [
                 "internal/subagent/durable_worker.go",
                 "internal/subagent/durable_worker_abort_test.go",
@@ -2292,6 +2289,11 @@
               "done_signal": [
                 "Durable worker fixtures prove timeout cancellation reaches handlers, ignored handlers free capacity through a one-shot grace recovery, the next job can claim, and doctor/status expose abort recovery evidence."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T01:00:12Z",
+                "last_success": "2026-04-27T01:00:12Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:e2961c0 src/core/minions/worker.ts",

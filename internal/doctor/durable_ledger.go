@@ -47,12 +47,18 @@ func CheckDurableLedger(ctx context.Context, ledger *subagent.DurableLedger, run
 	replayDegraded := status.ReplayUnavailable > 0
 	inboxDegraded := status.InboxUnread > 0
 	protectedSubmitDegraded := status.ProtectedSubmitDenied > 0
+	abortRecoveryDegraded := status.Worker.AbortRecovery.AbortSignalSent > 0 ||
+		status.Worker.AbortRecovery.AbortSlotRecovered > 0 ||
+		status.Worker.AbortRecovery.HandlerIgnoredAbort > 0 ||
+		status.Worker.AbortRecovery.AbortRecoveryUnavailable > 0
 	if status.QueueFull || status.TimedOut > 0 || status.StaleWaiting > 0 ||
 		workerDegraded || supervisorDegraded || restartIntent || lifecycleDegraded ||
-		replayDegraded || inboxDegraded || protectedSubmitDegraded {
+		replayDegraded || inboxDegraded || protectedSubmitDegraded || abortRecoveryDegraded {
 		result.Status = StatusWarn
 		if status.QueueFull {
 			prefix = "queue full; restart/replay available"
+		} else if abortRecoveryDegraded {
+			prefix = "durable worker abort recovery evidence; restart/replay available"
 		} else if workerDegraded || supervisorDegraded {
 			prefix = "durable worker degraded; restart/replay available"
 		} else if restartIntent {
@@ -76,12 +82,16 @@ func CheckDurableLedger(ctx context.Context, ledger *subagent.DurableLedger, run
 		restartReason = "none"
 	}
 	result.Summary = fmt.Sprintf(
-		"%s (%d total, %d waiting, %d claimed, %d stalled, %d timeout-at, %d timed-out, %d stale waiting, %d backpressure-denied, %d replay-unavailable, %d inbox-unread, %d protected-submit-denied, %d paused, %d resume-pending, %d lifecycle-unsupported, worker=%s, supervisor=%s, restart_intent=%d reason=%s)",
+		"%s (%d total, %d waiting, %d claimed, %d stalled, %d timeout-at, %d timed-out, %d stale waiting, %d backpressure-denied, %d replay-unavailable, %d inbox-unread, %d protected-submit-denied, %d paused, %d resume-pending, %d lifecycle-unsupported, worker=%s, supervisor=%s, restart_intent=%d reason=%s, abort_signal_sent=%d abort_slot_recovered=%d handler_ignored_abort=%d abort_recovery_unavailable=%d)",
 		prefix, status.Total, status.Waiting, status.Claimed, status.Stalled,
 		status.TimeoutScheduled, status.TimedOut, status.StaleWaiting, status.BackpressureDenied,
 		status.ReplayUnavailable, status.InboxUnread, status.ProtectedSubmitDenied,
 		status.Paused, status.ResumePending, status.LifecycleControlUnsupported,
 		status.Worker.Liveness, supervisorNote, status.Worker.RestartIntent.AuditEvents, restartReason,
+		status.Worker.AbortRecovery.AbortSignalSent,
+		status.Worker.AbortRecovery.AbortSlotRecovered,
+		status.Worker.AbortRecovery.HandlerIgnoredAbort,
+		status.Worker.AbortRecovery.AbortRecoveryUnavailable,
 	)
 	queueStatus := StatusPass
 	if status.QueueFull || status.TimedOut > 0 || status.StaleWaiting > 0 {
@@ -102,6 +112,10 @@ func CheckDurableLedger(ctx context.Context, ledger *subagent.DurableLedger, run
 	restartStatus := StatusPass
 	if restartIntent {
 		restartStatus = StatusWarn
+	}
+	abortRecoveryStatus := StatusPass
+	if abortRecoveryDegraded {
+		abortRecoveryStatus = StatusWarn
 	}
 	lifecycleStatus := StatusPass
 	if lifecycleDegraded {
@@ -157,6 +171,18 @@ func CheckDurableLedger(ctx context.Context, ledger *subagent.DurableLedger, run
 			restartReason,
 			status.Worker.RestartIntent.AuditEvents,
 			formatDurableTime(status.Worker.RestartIntent.RequestedAt),
+		)},
+		{Name: "abort_recovery", Status: abortRecoveryStatus, Note: fmt.Sprintf(
+			"abort_signal_sent=%d abort_slot_recovered=%d handler_ignored_abort=%d abort_recovery_unavailable=%d last_event=%s job_id=%s worker_id=%s reason=%s at=%s",
+			status.Worker.AbortRecovery.AbortSignalSent,
+			status.Worker.AbortRecovery.AbortSlotRecovered,
+			status.Worker.AbortRecovery.HandlerIgnoredAbort,
+			status.Worker.AbortRecovery.AbortRecoveryUnavailable,
+			status.Worker.AbortRecovery.LastEvent,
+			status.Worker.AbortRecovery.LastJobID,
+			status.Worker.AbortRecovery.LastWorkerID,
+			status.Worker.AbortRecovery.LastReason,
+			formatDurableTime(status.Worker.AbortRecovery.LastEventAt),
 		)},
 	}
 	return result
