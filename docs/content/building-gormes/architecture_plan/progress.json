@@ -11587,9 +11587,9 @@
             {
               "name": "Session search tool schema and argument validation",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/tools defines a session_search Tool descriptor, JSON schema, timeout, and argument validator for query, scope, sources, mode, limit, and current_session_id without registering the tool globally or reading memory",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -11624,7 +11624,7 @@
                 "TestSessionSearchToolSchema_RejectsUnsafeScope proves unknown scope, unknown mode, negative limit, and non-string sources return session_search_invalid_args evidence.",
                 "TestSessionSearchToolSchema_NotRegisteredGlobally proves the row does not edit internal/tools/builtin.go or register the tool outside the local test registry."
               ],
-              "note": "Split from the quarantined session_search row after six reshapes and repeated stdin/backend failures. This first row gives workers a no-SQL schema/argument target.",
+              "note": "TDD landed: internal/tools now defines a descriptor-only session_search Tool plus argument validation for query, scope, sources, mode, limit, and current_session_id. The validator defaults omitted scope/sources/mode to same-chat, empty allowlist, and default mode; unsafe scope, mode, negative limit, or non-string sources return session_search_invalid_args evidence. The tool remains unregistered globally and does not call memory, SQLite, Goncho, or the gateway runtime.",
               "write_scope": [
                 "internal/tools/session_search_tool.go",
                 "internal/tools/session_search_tool_schema_test.go",
