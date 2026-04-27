@@ -7521,8 +7521,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:52:17Z",
-            "origin_decision": "Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, superseding the earlier f92006ce/6e561ffa tool-schema headroom rationale while preserving d635e2df provider-cap lookup. Hermes e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation, so this subphase remains upstream-led until the pure content estimator, compression-boundary notification, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer ContextEngine drift supersedes the existing 4.B queue. Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation; compression-boundary notification remains upstream-led but is blocked behind the Gormes-owned backend usage-limit/stdin health bypass until infrastructure failures stop poisoning row health."
           }
         },
         "4.C": {
@@ -14117,8 +14117,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T05:26:06Z",
-            "origin_decision": "Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes; and 8258f4dc adds the key_env write-shape guard so model switches do not synthesize api_key for key_env-backed providers. Hermes e63929d4 adds one-time OpenClaw-residue onboarding after migration and a0fe73ba strips leaked bracketed-paste wrappers from CLI buffers; Gormes tracks both as pure internal/cli helper rows before startup or input-loop binding. Gormes has native oneshot/model override and helper rows, but it still lacks typed reasoning-effort propagation, gateway /reasoning session overrides, and command/TUI binding for the custom-provider model-switch write guards, so this CLI/gateway surface remains upstream-led."
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer CLI custom-provider drift supersedes the 8258f4dc key_env write-shape guard. Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes; and 8258f4dc adds the key_env write-shape guard. Gormes has native oneshot/model override and helper rows, but custom-provider key_env write-shape work is demoted to draft and blocked behind backend usage-limit/stdin health repair because current failures are infrastructure-only."
           }
         },
         "5.P": {
@@ -15953,8 +15953,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:32:08Z",
-            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, edc78e25/31d7f195 add Ink selection-copy fixes that Gormes documents as a terminal-native divergence, 2536a36f routes TUI /save through canonical session.save JSON-RPC, and 5eb6cd82 fixes save-location semantics plus session-picker allowed sources. Gormes tracks /save as a native handler plus a now-unblocked XDG file-writer binding row, preserving Gormes XDG runtime state instead of upstream HERMES_HOME. The old API health+cron admin medium row is split into detailed health, cron read-only admin, and cron mutating admin rows so workers do not mix read models with scheduler writes. Hermes 0824ba6a tightens /branch and 9662e321 wires prompt.submit auto-title generation; Gormes tracks those over internal/transcript, session.LineageKindFork, and native TUI helper seams. Hermes e63929d4 adds long-session Ink virtualization and profiling; Gormes now tracks the equivalent first native slice as a bounded Bubble Tea conversation viewport over internal/tui/view.go."
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer API/TUI drift supersedes the existing native Gormes rows. Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes 2536a36f/5eb6cd82 define /save and save-location semantics; Gormes preserves XDG runtime state instead of upstream HERMES_HOME, with the cmd/gormes XDG writer row now blocked behind backend usage-limit/stdin health repair. Hermes e63929d4 adds long-session Ink virtualization and profiling; Gormes tracks the native bounded Bubble Tea viewport row, also blocked until backend infrastructure failures no longer quarantine feature work. Detailed health and cron admin remain split into read-only and mutating rows."
           }
         },
         "5.R": {
