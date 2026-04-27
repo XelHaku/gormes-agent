@@ -13,10 +13,40 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `3ff3dfb5`
+- Upstream commit: `ee1a07f9`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `81ad5c42`
+- Gormes commit: `a8a62302`
 - Date: 2026-04-27
+
+## 2026-04-27 (Hermes ee1a07f9, GBrain 891c28b) Drift Check
+
+The synchronized Hermes head is now `ee1a07f9`, GBrain is `891c28b`, and
+Honcho remains `e659b6b`. The Gormes memory direction is unchanged: internal
+implementation stays `goncho`, while public compatibility surfaces keep
+`honcho_*` names and Honcho v3 data-shape expectations where hosts require
+them.
+
+Material deltas in this window are already represented by focused rows:
+
+- Hermes `ee1a07f9` blocks cross-provider reasoning-content leakage to
+  DeepSeek/Kimi-family providers. Gormes already carries validated Phase 4.A
+  reasoning-isolation and sanitization rows, so no new provider row is needed.
+- Hermes updated the Hindsight memory plugin and provider docs. Gormes keeps
+  Goncho as the in-binary memory baseline and should not port a second memory
+  provider until the Honcho-compatible Goncho surface is complete.
+- GBrain `891c28b` adds the frontmatter-guard release. Gormes tracks the useful
+  contract as Phase 6.C `SKILL.md frontmatter validation guard`, not as a
+  TypeScript CLI import.
+- Honcho `e659b6b` adds SillyTavern integration docs. Gormes already validated
+  SillyTavern persona/group-chat mapping fixtures while preserving internal
+  `goncho` naming.
+
+Autoloop health changed the planning priority more than upstream did. The
+backend usage-limit/stdin health bypass is validated, so rows previously
+blocked only because worker attempts hit quota/stdin infrastructure were
+re-enabled as fixture-ready slices. Their `health` blocks remain preserved; the
+spec changes intentionally make those quarantines stale so the builder loop can
+clear them on the next selection.
 
 ## 2026-04-27 (Hermes 3ff3dfb5) Drift Check
 
@@ -238,7 +268,7 @@ planner cycle:
   new row.
 
 For the autoloop the immediate priority is to keep hot rows split and
-metadata-ready; the current planner pass found no active quarantine blocks in
+metadata-ready; that planner pass found no active quarantine blocks in
 `progress.json`, but recent failure categories still point to over-broad
 contracts and status-field mistakes.
 Nothing on this drift list is load-bearing for the next several builder

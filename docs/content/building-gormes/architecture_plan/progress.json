@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T05:46:49Z",
+    "last_updated": "2026-04-27T11:44:19Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1325,7 +1325,7 @@
               "priority": "P2",
               "status": "planned",
               "contract": "WhatsApp inbound normalization uses the validated safety predicate to drop unsafe raw sender/chat/reply IDs with explicit whatsapp_identifier_unsafe evidence before Event.ChatID, Event.UserID, Reply.ChatID, alias graph entries, or outbound pairing targets are created",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1342,7 +1342,7 @@
                 "internal/channels/whatsapp/testdata/identity_contract.json"
               ],
               "ready_when": [
-                "WhatsApp identifier safety predicate is validated on main.",
+                "WhatsApp identifier safety predicate is validated on main; workers can start from internal/channels/whatsapp/identity.go without rediscovering the helper.",
                 "The worker should reuse the helper and extend inbound fixtures only; no platform runtime, bridge process, native WhatsApp client, or gateway manager dispatch is needed.",
                 "Safe identity_contract.json fixtures must remain unchanged unless the test adds a separate unsafe fixture file."
               ],
@@ -1350,16 +1350,13 @@
                 "The slice rewrites safe identity fixtures, changes send/reconnect behavior, or accepts unsafe IDs after stripping dangerous characters.",
                 "The slice opens live WhatsApp clients, writes Hermes lid-mapping files, or changes non-WhatsApp gateway session-key behavior."
               ],
-              "blocked_by": [
-                "WhatsApp identifier safety predicate"
-              ],
               "acceptance": [
                 "TestNormalizeInboundWithIdentity_UnsafeRawSenderRejected proves unsafe sender/user IDs return whatsapp_identifier_unsafe evidence and leave Event.UserID empty.",
                 "TestNormalizeInboundWithIdentity_UnsafeChatRejected proves unsafe chat IDs do not produce Event.ChatID, Reply.ChatID, or an outbound pairing target.",
                 "TestNormalizeInboundWithIdentity_UnsafeAliasEndpointRejected proves alias graph expansion skips unsafe endpoints while preserving safe aliases.",
                 "Existing identity_contract.json fixtures still pass unchanged for safe bridge/native DM and group cases."
               ],
-              "note": "Second WhatsApp hardening slice. It is blocked behind the pure predicate so workers do not mix safety vocabulary with inbound event/pairing behavior.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z: the WhatsApp identifier safety predicate is validated and the backend usage-limit health bypass is complete, so this dependent inbound-evidence fixture is ready for one focused worker. Keep the slice inside WhatsApp identity normalization and do not reopen live platform/runtime behavior.",
               "write_scope": [
                 "internal/channels/whatsapp/identity.go",
                 "internal/channels/whatsapp/identity_inbound_safety_test.go",
@@ -1395,6 +1392,10 @@
                   "spec_hash": "0d3ac470a9cc359e82c25f20d1aa490645920a6f5d9964a3d3b5c258f3bfd732",
                   "last_category": "worker_error"
                 }
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T11:38:55Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1701,7 +1702,7 @@
               "priority": "P3",
               "status": "planned",
               "contract": "Telegram runtime can opt into Hermes-style group require-mention policy by using the validated bot-command mention helper to drop unaddressed group text and bare slash commands while leaving DMs, allowed-chat gating, first-run discovery, and fresh-final streaming unchanged",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1719,7 +1720,7 @@
                 "internal/config/config.go:TelegramCfg"
               ],
               "ready_when": [
-                "Telegram group bot-command mention gate helper is validated on main.",
+                "Telegram group bot-command mention gate helper is validated on main; workers can bind config/runtime behavior directly against internal/channels/telegram/group_mention.go.",
                 "The binding can be tested through synthetic tgbotapi.Update values and Config fields only; no live Telegram token, BotFather username lookup, gateway.Manager, pairing store, or provider runtime is required.",
                 "The worker should keep group gating opt-in and leave existing allowed_chat_id / first_run_discovery tests unchanged."
               ],
@@ -1728,9 +1729,6 @@
                 "The slice requires a live getMe call or network-derived bot username in unit tests.",
                 "The slice drops DMs or explicitly mentioned group commands when require_mention is disabled."
               ],
-              "blocked_by": [
-                "Telegram group bot-command mention gate helper"
-              ],
               "acceptance": [
                 "TestLoad_TelegramRequireMentionFields proves TelegramCfg parses require_mention and bot_username with safe defaults that preserve current behavior.",
                 "TestBot_ToInboundEvent_GroupBareCommandDroppedWhenRequireMentionEnabled proves a group `/status` command without @botname is dropped when require_mention=true.",
@@ -1738,7 +1736,7 @@
                 "TestBot_ToInboundEvent_DMBypassesMentionGate proves private chats still process commands/text without mention.",
                 "Existing Telegram fresh-final delete and command parsing tests keep passing."
               ],
-              "note": "Dependent runtime binding for the helper row. It stays lower priority and blocked so the first worker can land only the pure entity-classification contract from Hermes 3ff3dfb5.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z: the mention-helper prerequisite is validated and backend usage-limit failures are now run-level infrastructure evidence, so this config-binding row can run as a focused Telegram adapter slice.",
               "write_scope": [
                 "internal/config/config.go",
                 "internal/config/config_test.go",
@@ -1778,6 +1776,10 @@
                   "spec_hash": "f653811b7ca9ccc6edf34fb0656e85a73fb1c12b1edda770bb5b5c22fe282990",
                   "last_category": "worker_error"
                 }
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T11:38:55Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -2021,7 +2023,7 @@
               "priority": "P2",
               "status": "planned",
               "contract": "Gateway manager applies the shared MessageDeduplicator to inbound events with stable message IDs, drops duplicate submissions with visible evidence, and degrades missing message IDs without suppressing the turn",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -2038,17 +2040,13 @@
                 "internal/gateway/manager.go"
               ],
               "ready_when": [
-                "Gateway message deduplicator bounded helper is complete and exposes duplicate/evicted/disabled evidence.",
+                "Gateway message deduplicator bounded helper is validated on main and exposes duplicate/evicted/disabled evidence.",
                 "Shared gateway inbound event normalization is validated and platform adapters already pass stable message IDs where available.",
                 "The worker can use fake gateway.Channel and fake kernel fixtures only; no Telegram, Slack, Discord, or provider SDK is needed."
               ],
               "not_ready_when": [
                 "The slice changes channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
-                "The slice stores dedup history on disk or treats empty message IDs as duplicates.",
-                "The helper row is not complete in the worker checkout."
-              ],
-              "blocked_by": [
-                "Gateway message deduplicator bounded helper"
+                "The slice stores dedup history on disk or treats empty message IDs as duplicates."
               ],
               "acceptance": [
                 "TestGatewayInbound_DedupDropsRepeatedMessageID submits the same channel/chat/message ID twice and proves the fake kernel receives only the first turn while status evidence records duplicate_message.",
@@ -2056,7 +2054,7 @@
                 "TestGatewayInbound_DedupMissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence.",
                 "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green."
               ],
-              "note": "Second half of the 2026-04-27 deduplicator split. This row may touch manager/event tests after the helper lands, but it must not reopen platform adapters or change outbound streaming behavior.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z: the bounded helper is validated and the backend health bypass is complete, so this row is a manager-wiring fixture only; platform adapters and outbound streaming stay out of scope.",
               "write_scope": [
                 "internal/gateway/message_deduplicator.go",
                 "internal/gateway/message_deduplicator_manager_test.go",
@@ -2095,6 +2093,10 @@
                   "last_category": "worker_error"
                 }
               },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T11:38:55Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 tests/gateway/test_message_deduplicator.py",
@@ -2104,8 +2106,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T05:26:06Z",
-            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; after a worker_error on the broader row, Gormes tracks it as three dependency-ordered slices. Hermes 3ff3dfb5 fixes Telegram group command-menu gating for `/cmd@botname` bot_command entities; Gormes splits it into a helper-first row and a blocked config/runtime binding row. Hermes cebf9585 adds bounded MessageDeduplicator eviction; after a status-field validation failure, Gormes now splits that work into a pure shared helper and a dependent manager wiring row so platform adapters stay thin. Hermes 91512b82/6993e566 adds WhatsApp identifier hardening; after write-scope failures, Gormes now splits that work into a pure identifier safety predicate and a dependent inbound-evidence row so the completed 2.B.4 adapter runtime remains closed."
+            "last_upstream_check": "2026-04-27T11:44:19Z",
+            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; Gormes tracks it as three dependency-ordered slices. Hermes 3ff3dfb5 fixes Telegram group command-menu gating for `/cmd@botname` bot_command entities; the helper is validated, so the config/runtime binding row is now fixture-ready. Hermes cebf9585 adds bounded MessageDeduplicator eviction; the pure helper is validated, so manager evidence wiring is fixture-ready. Hermes 91512b82/6993e566 adds WhatsApp identifier hardening; the predicate is validated, so the inbound-evidence row is fixture-ready while the completed 2.B.4 adapter runtime remains closed."
           }
         },
         "2.B.10": {
@@ -2840,7 +2842,7 @@
               "priority": "P3",
               "status": "planned",
               "contract": "DurableWorker integrates the validated RSS watchdog policy after job completion and on an injected periodic check, starts graceful drain, cancels in-flight handlers through existing abort-slot recovery, and records watchdog drain evidence",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -2857,17 +2859,13 @@
                 "internal/subagent/durable_worker_rss_watchdog.go"
               ],
               "ready_when": [
-                "Durable worker RSS watchdog policy helper is complete and exposes threshold/read-failure evidence.",
+                "Durable worker RSS watchdog policy helper is validated on main and exposes threshold/read-failure evidence.",
                 "Durable worker abort-slot recovery safety net is complete, so handler cancellation and slot release already have ledger evidence.",
                 "The worker can inject a fake RSS reader and fake ticker/channel; no real periodic sleep, process RSS, subprocess, or supervisor is required."
               ],
               "not_ready_when": [
                 "The slice changes doctor/status rendering, cmd/gormes lifecycle, builder-loop backend watchdogs, live delegate_task behavior, cron execution semantics, or main-process termination.",
-                "The slice reimplements abort-slot recovery instead of reusing the existing cancellation/grace path.",
-                "The helper row is not complete in the worker checkout."
-              ],
-              "blocked_by": [
-                "Durable worker RSS watchdog policy helper"
+                "The slice reimplements abort-slot recovery instead of reusing the existing cancellation/grace path."
               ],
               "unblocks": [
                 "Durable worker RSS doctor/status evidence"
@@ -2878,7 +2876,7 @@
                 "TestDurableWorkerRSSDrain_ReadFailureDoesNotCancel proves rss_watchdog_unavailable evidence does not cancel handlers.",
                 "Existing DurableWorker abort-slot recovery tests remain green without sleeps longer than 100ms."
               ],
-              "note": "Second row in the 2026-04-27 RSS split. It may touch DurableWorker runtime integration only after the policy helper lands, and it deliberately leaves doctor/status rendering to the final row.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z: the RSS policy helper and abort-slot recovery prerequisites are validated, so workers should wire only DurableWorker drain/cancel evidence with fake RSS and fake ticker fixtures.",
               "write_scope": [
                 "internal/subagent/durable_worker.go",
                 "internal/subagent/durable_worker_rss_watchdog.go",
@@ -2915,6 +2913,10 @@
                   "spec_hash": "79254370ab00c6cbde7e15ac4084f8aed91a8444c7051d5d01670e05a7aa9963",
                   "last_category": "worker_error"
                 }
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T11:38:55Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -2985,7 +2987,7 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "last_upstream_check": "2026-04-27T11:44:19Z",
             "origin_decision": "GBrain 11abb24 unified the jobs lane into minion-orchestrator, e2961c0 added abort propagation plus force-eviction for wedged workers, and c78c3d0 added RSS watchdog drains, stable-run restart reset, cold-start DB connect retry, and autopilot maxWaiting=1. Gormes has Go-native durable routing, ledger, backpressure, supervisor status, pause/resume, replay, inbox, protected-submit denial, a fake-handler DurableWorker loop, and abort-slot recovery validated over SQLite. Existing max_waiting evidence covers the queue-pileup lesson; the RSS lesson is now split into policy helper, drain integration, and doctor/status evidence so workers do not mix upstream lookup, runtime cancellation, and operator rendering in one slice. The Postgres/Supabase connect-retry lesson does not apply to the default SQLite-first runtime or internal Goncho memory unless a future optional remote database connector is introduced."
           }
         },
@@ -3832,14 +3834,14 @@
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
               "contract": "Registry-owned active-turn steering command",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
                 "gateway"
               ],
-              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately. Planner 2026-04-27T11:18:57Z: the last three attempts stopped at backend stdin/usage-limit before a useful diff, so this row stays human-escalated and blocked behind the backend health bypass row.",
+              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately. Backend usage-limit/stdin outages are now handled by the validated run-level health bypass, so feature workers should not re-block this row on quota noise.",
               "fixture": "internal/gateway/steer_queue_test.go::TestSteerCommandRegistry_*",
               "source_refs": [
                 "../hermes-agent/cli.py@635253b9:busy_input_mode=steer",
@@ -3856,13 +3858,9 @@
                 "Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required."
               ],
               "not_ready_when": [
-                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior.",
                 "The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code.",
                 "The parser row is not present in the worker checkout."
-              ],
-              "blocked_by": [
-                "Backend usage-limit stdin health bypass"
               ],
               "unblocks": [
                 "Mid-run steer injection between tool calls",
@@ -3874,7 +3872,7 @@
                 "TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands.",
                 "Existing gateway command parsing and active-session policy tests remain green."
               ],
-              "note": "Reshaped 2026-04-27T11:18:57Z: kept the implementation contract small but blocked it behind the backend usage-limit/stdin health bypass because recent attempts produced only infrastructure stdin/usage-limit failures. The parser prerequisite remains complete; after backend health is fixed, a human can clear the needs_human verdict and restore fixture_ready if the row still has no implementation diff.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z after Backend usage-limit stdin health bypass validated on main. The parser prerequisite remains complete; this row is now a fixture-ready registry/queue fallback slice and still excludes live mid-run injection.",
               "write_scope": [
                 "internal/gateway/commands.go",
                 "internal/gateway/manager.go",
@@ -3913,12 +3911,9 @@
                 }
               },
               "planner_verdict": {
-                "needs_human": true,
-                "reason": "worker_error/backend stdin wait before diff; re-enable after backend quota/noninteractive execution is healthy",
-                "since": "2026-04-27T11:09:04Z",
-                "reshape_count": 5,
-                "last_reshape": "2026-04-27T11:18:57Z",
-                "last_outcome": "still_failing"
+                "reshape_count": 6,
+                "last_reshape": "2026-04-27T11:38:55Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -3939,8 +3934,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T11:18:57Z",
-            "origin_decision": "Hermes 635253b9 remains the donor for busy-input /steer behavior. Gormes has the pure parser/preview helper but still needs registry queue fallback, mid-run kernel injection, and gateway-safe active-session bypass. The registry/fallback row is temporarily blocked behind the Gormes-owned backend usage-limit/stdin health bypass because recent autoloop failures were backend-infrastructure exits, not implementation drift."
+            "last_upstream_check": "2026-04-27T11:44:19Z",
+            "origin_decision": "Hermes 635253b9 remains the donor for busy-input /steer behavior. Gormes has the pure parser/preview helper, and the backend usage-limit/stdin health bypass is validated, so the registry/queue fallback row is fixture-ready again. Mid-run kernel injection and gateway-safe active-session bypass remain separate dependent rows."
           }
         },
         "2.G": {
@@ -7357,14 +7352,14 @@
               "priority": "P2",
               "status": "planned",
               "contract": "Kernel compression execution signals the ContextEngine when a compression boundary is crossed so cached/replayed context state cannot silently span the pre-compress and post-compress transcript",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression. Planner 2026-04-27T11:18:57Z: the last three attempts stopped at backend stdin/usage-limit before a useful diff, so this row stays human-escalated and blocked behind the backend health bypass row.",
+              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression. Backend quota/stdin outages are now run-level degradation and should not block this adapter-only row.",
               "fixture": "internal/kernel/compression_boundary_test.go::TestKernelCompressionBoundary_*",
               "source_refs": [
                 "../hermes-agent/run_agent.py@e85b7525",
@@ -7381,16 +7376,10 @@
                 "internal/kernel/context_engine.go owns the kernel-side context-engine adapter seam; workers should not edit internal/kernel/kernel.go for this row."
               ],
               "not_ready_when": [
-                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice implements summarization, tool-result pruning, manual compression, or context references instead of the boundary callback.",
                 "The slice hides boundary failures or lets a context cache survive across a compression lineage change without observable status evidence.",
                 "The slice edits internal/kernel/kernel.go, internal/hermes/context_compressor_budget.go, transcript storage, or session lineage helpers instead of the context-engine adapter files named in write_scope.",
                 "The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern."
-              ],
-              "blocked_by": [
-                "ContextEngine interface + status tool contract",
-                "Aux compression single-prompt threshold reconciliation",
-                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "A fake ContextEngine receives exactly one CompressionBoundary notification after a successful compression result is accepted into the kernel transcript lineage.",
@@ -7398,7 +7387,7 @@
                 "The notification includes old_session_id/new_session_id or equivalent lineage evidence so caches can distinguish pre-compress and post-compress context.",
                 "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
               ],
-              "note": "Reshaped 2026-04-27T11:18:57Z: retained the small adapter-only boundary notification scope but blocked execution behind the backend usage-limit/stdin health bypass because the latest attempts produced only infrastructure failures. The prior write-scope repair still stands: internal/kernel/context_engine.go is in scope; kernel.go, transcript, and session lineage remain out of scope.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z: context-engine status, auxiliary compression threshold reconciliation, and backend health bypass are validated. Workers should implement only the ContextEngine boundary notification adapter files named in write_scope; kernel.go, transcript storage, and Goncho memory semantics remain out of scope.",
               "write_scope": [
                 "internal/hermes/context_engine.go",
                 "internal/hermes/context_engine_test.go",
@@ -7438,12 +7427,9 @@
                 }
               },
               "planner_verdict": {
-                "needs_human": true,
-                "reason": "worker_error/backend stdin wait before diff; re-enable after backend quota/noninteractive execution is healthy",
-                "since": "2026-04-27T11:09:04Z",
-                "reshape_count": 3,
-                "last_reshape": "2026-04-27T11:18:57Z",
-                "last_outcome": "still_failing"
+                "reshape_count": 4,
+                "last_reshape": "2026-04-27T11:38:55Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -7454,8 +7440,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T11:18:57Z",
-            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer ContextEngine drift supersedes the existing 4.B queue. Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation; compression-boundary notification remains upstream-led but is blocked behind the Gormes-owned backend usage-limit/stdin health bypass until infrastructure failures stop poisoning row health."
+            "last_upstream_check": "2026-04-27T11:44:19Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer ContextEngine drift supersedes the existing 4.B queue. Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, single-prompt budget reconciliation, and backend health bypass validated, so compression-boundary notification is fixture-ready as an adapter-only row."
           }
         },
         "4.C": {
@@ -7902,7 +7888,7 @@
                 "system"
               ],
               "degraded_mode": "Title status reports auto_title_skipped, title_provider_failed, or title_blank_result evidence instead of silently leaving NULL titles with no operator-visible cause.",
-              "fixture": "internal/hermes/title_generator_test.go",
+              "fixture": "internal/hermes/title_generator_test.go::TestTitle*",
               "source_refs": [
                 "../hermes-agent/agent/title_generator.py@4a2ee6c1:generate_title",
                 "../hermes-agent/agent/title_generator.py@4a2ee6c1:maybe_auto_title",
@@ -7927,7 +7913,7 @@
                 "TestTitleGenerator_BlankModelOutput returns title_blank_result evidence without writing metadata.",
                 "TestTitleGenerator_ProviderFailureReturnsTypedEvidence proves the fake model error is returned as nonfatal title_provider_failed evidence."
               ],
-              "note": "Refined 2026-04-27 after Hermes 4a2ee6c1 made title-generation failures visible through the auxiliary failure channel. This first Gormes row owns only the pure prompt/model-result boundary; persistence and callback routing are separate rows.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z: recent quarantine evidence was backend stdin/usage-limit noise, and the backend health bypass is complete. This remains a pure title prompt/model-result helper with fake model tests only; no session persistence, TUI submit, or Goncho memory source belongs in this row.",
               "write_scope": [
                 "internal/hermes/title_generator.go",
                 "internal/hermes/title_generator_test.go",
@@ -7964,8 +7950,8 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T04:49:49Z",
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T11:38:55Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -8104,7 +8090,7 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:52:17Z",
+            "last_upstream_check": "2026-04-27T11:44:19Z",
             "origin_decision": "Hermes 4a2ee6c1 makes title-generation failures visible through _emit_auxiliary_failure after provider errors were previously swallowed. Gormes has a native TUI auto-title eligibility helper but no title prompt/model boundary, no auxiliary failure routing, and no session title persistence, so this subphase remains upstream-led and is split into prompt/failure/persistence rows."
           }
         },
@@ -11482,7 +11468,7 @@
             {
               "name": "Session search",
               "status": "planned",
-              "contract": "Native session_search tool uses the Phase 3 session catalog with same-chat defaults, opt-in user/source filters, and deterministic recent-mode exclusion of the current lineage root",
+              "contract": "internal/tools exposes a wrapper-only session_search Tool over existing internal/memory SearchSessions/SearchMessages APIs, preserving same-chat defaults, explicit user/source widening, lineage-root exclusion in recent mode, and Goncho/Honcho-compatible evidence without changing ranking or persistence",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
@@ -11492,7 +11478,7 @@
                 "system"
               ],
               "degraded_mode": "Tool result reports session_search_unavailable, source_filter_denied, or lineage_root_excluded evidence instead of widening recall silently.",
-              "fixture": "internal/tools/session_search_tool_test.go",
+              "fixture": "internal/tools/session_search_tool_test.go::TestSessionSearchTool_*",
               "source_refs": [
                 "../hermes-agent/tools/session_search_tool.py@dbe50155",
                 "../hermes-agent/tests/tools/test_session_search.py@dbe50155",
@@ -11522,7 +11508,7 @@
                 "TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening.",
                 "TestSessionSearchTool_DescriptorAndSchema proves the wrapper satisfies tools.Tool with Name() == \"session_search\", a JSON schema that exposes query/scope/sources/mode/current_session_id, and a deterministic timeout without registering it globally."
               ],
-              "note": "Refined 2026-04-27T05:38Z after no-attempts-yet feedback: the Phase 3 lineage/search/evidence prerequisites are complete, so this row is a strict wrapper-only tools.Tool slice. Removed internal/memory from write_scope earlier and now explicitly excludes registry binding so workers consume SearchSessions/SearchMessages as stable donor APIs instead of reopening catalog or Goncho semantics.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z after backend usage-limit health bypass validation. This is still wrapper-only: implement internal/tools/session_search_tool.go plus tests, consume internal/memory donor APIs as read-only behavior, and leave registry binding/ranking/Goncho persistence to other rows.",
               "write_scope": [
                 "internal/tools/session_search_tool.go",
                 "internal/tools/session_search_tool_test.go",
@@ -11560,10 +11546,10 @@
               },
               "planner_verdict": {
                 "needs_human": true,
-                "reason": "auto: 5 reshapes without unsticking; last category backend_waiting_for_stdin",
-                "since": "2026-04-27T11:18:57Z",
-                "reshape_count": 5,
-                "last_reshape": "2026-04-27T05:38:23Z",
+                "reason": "auto: 6 reshapes without unsticking; last category backend_waiting_for_stdin",
+                "since": "2026-04-27T11:38:55Z",
+                "reshape_count": 6,
+                "last_reshape": "2026-04-27T11:38:55Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -12237,8 +12223,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:52:17Z",
-            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Hermes 7c63c246 adds recurring-job preservation when next-run computation is unavailable; Gormes maps that to a native run-completion helper over Job/Run state because robfig/cron removes the Python croniter dependency but not the operator contract. Hermes dbe50155 adds a deterministic session-search recent-mode exclusion for the current lineage root; Gormes maps that onto the Phase 3 session catalog and Goncho/Honcho-compatible scope rules in the refined Session search row. After still-failing attempts, Session search is narrowed to a wrapper-only tool over internal/memory.SearchSessions/SearchMessages and explicitly excludes memory catalog or Goncho persistence edits. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, and CRON.md mirror; the cron umbrella is split into parser/repeat, run-completion preservation, safety, action-envelope, context_from, and delivery-plan rows so autoloop workers can advance Phase 5.N without guessing."
+            "last_upstream_check": "2026-04-27T11:44:19Z",
+            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Hermes 7c63c246 adds recurring-job preservation when next-run computation is unavailable; Gormes maps that to a native run-completion helper over Job/Run state because robfig/cron removes the Python croniter dependency but not the operator contract. Hermes dbe50155 adds deterministic session-search recent-mode exclusion for the current lineage root; Gormes maps that onto the Phase 3 session catalog and Goncho/Honcho-compatible scope rules. Session search is now fixture-ready as a wrapper-only tool over internal/memory.SearchSessions/SearchMessages and explicitly excludes memory catalog, registry binding, and Goncho persistence edits. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, CRON.md mirror, and backend health bypass; cron rows remain split so autoloop workers can advance Phase 5.N without guessing."
           }
         },
         "5.O": {
@@ -12410,7 +12396,7 @@
                 "system"
               ],
               "degraded_mode": "If HOME cannot be inspected or onboarding config is malformed, the helper reports unseen/false and never blocks CLI startup; command wiring can decide whether to persist the seen flag later.",
-              "fixture": "internal/cli/onboarding_test.go",
+              "fixture": "internal/cli/onboarding_test.go::Test{DetectOpenClawResidue,OpenClawResidueHint,OnboardingSeen,MarkOnboardingSeen}_*",
               "source_refs": [
                 "../hermes-agent/agent/onboarding.py@e63929d4:OPENCLAW_RESIDUE_FLAG,detect_openclaw_residue,openclaw_residue_hint_cli,is_seen",
                 "../hermes-agent/tests/agent/test_onboarding.py@e63929d4:TestOpenClawResidue",
@@ -12437,7 +12423,7 @@
                 "TestMarkOnboardingSeen_InMemoryPreservesOtherFlags sets openclaw_residue_cleanup=true in the provided map without removing existing seen flags.",
                 "No test touches the real user home or writes config.yaml."
               ],
-              "note": "Added 2026-04-27 after Hermes e63929d4 introduced a one-time OpenClaw residue banner. Gormes tracks only the pure helper seam first because startup persistence and any cleanup command need separate command-surface decisions.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z after backend usage-limit health bypass validation. The row remains pure internal/cli helper work over temp HOME and in-memory seen-state only; cmd/gormes startup persistence and cleanup commands stay out of scope.",
               "write_scope": [
                 "internal/cli/onboarding.go",
                 "internal/cli/onboarding_test.go",
@@ -12472,6 +12458,10 @@
                   "spec_hash": "8fdbfeee46363e33325e403cca57655ddb48ff3d267798e60aa953d45fa4dea2",
                   "last_category": "worker_error"
                 }
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T11:38:55Z"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -13912,14 +13902,14 @@
               "priority": "P2",
               "status": "planned",
               "contract": "internal/cli exposes a pure model-switch patch helper that updates a custom provider default_model while preserving original credential storage: providers that relied on key_env and had no inline api_key/api_key_ref must not gain an api_key entry, while providers that already had an inline plaintext or `${VAR}` api_key may keep that existing api_key value without writing resolved plaintext",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Model-switch planning returns credential_write_skipped_key_env, credential_ref_preserved, plaintext_preserved, or credential_missing evidence so setup/status surfaces can explain why api_key was not written. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "degraded_mode": "Model-switch planning returns credential_write_skipped_key_env, credential_ref_preserved, plaintext_preserved, or credential_missing evidence so setup/status surfaces can explain why api_key was not written. The credential-preservation prerequisite and backend health bypass are now validated, so this row should run as a pure internal/cli patch-helper fixture.",
               "fixture": "internal/cli/custom_provider_model_switch_test.go::TestCustomProviderModelSwitchPatch_*",
               "source_refs": [
                 "../hermes-agent/hermes_cli/main.py@8258f4dc:_model_flow_named_custom",
@@ -13934,14 +13924,9 @@
                 "Table tests should construct input provider maps/structs in memory and assert the planned write shape; no process environment, filesystem, or network access is needed."
               ],
               "not_ready_when": [
-                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice changes internal/config, internal/hermes, provider catalog probing, TUI model picker behavior, or command wiring.",
                 "The helper writes an api_key field for a provider whose original config relied only on key_env.",
                 "The helper writes resolved plaintext when the original provider used `${VAR}` or key_env references."
-              ],
-              "blocked_by": [
-                "Custom provider model-switch credential preservation",
-                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "TestCustomProviderModelSwitchPatch_KeyEnvDoesNotSynthesizeAPIKey starts with {default_model:'old', key_env:'ACME_KEY'} and proves the patch sets default_model='new', preserves key_env, omits api_key, and returns credential_write_skipped_key_env evidence.",
@@ -13950,7 +13935,7 @@
                 "TestCustomProviderModelSwitchPatch_MissingCredentialStillUpdatesModelWithEvidence proves model changes remain possible while credential_missing evidence is returned for setup/status guidance.",
                 "Existing TestResolveCustomProviderSecret_* fixtures remain green; this row does not redefine resolver semantics."
               ],
-              "note": "Reshaped 2026-04-27T11:18:57Z: preserved the pure patch-helper scope but demoted from fixture_ready to draft and blocked it behind backend usage-limit health repair because current quarantine evidence is infrastructural. Once the backend bypass lands, this can return to fixture_ready without widening beyond internal/cli.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z: credential resolver vocabulary and backend health bypass are validated. Keep the slice limited to internal/cli custom-provider model-switch patch helpers; no config reader, command wiring, provider probing, TUI picker, or plaintext resolution.",
               "write_scope": [
                 "internal/cli/custom_provider_model_switch.go",
                 "internal/cli/custom_provider_model_switch_test.go",
@@ -13989,8 +13974,9 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:18:57Z"
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T11:38:55Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -14129,8 +14115,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T11:18:57Z",
-            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer CLI custom-provider drift supersedes the 8258f4dc key_env write-shape guard. Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes; and 8258f4dc adds the key_env write-shape guard. Gormes has native oneshot/model override and helper rows, but custom-provider key_env write-shape work is demoted to draft and blocked behind backend usage-limit/stdin health repair because current failures are infrastructure-only."
+            "last_upstream_check": "2026-04-27T11:44:19Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer CLI custom-provider drift supersedes the 8258f4dc key_env write-shape guard. Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes; and 8258f4dc adds the key_env write-shape guard. Gormes has native oneshot/model override helpers, credential preservation, and backend health bypass validated, so the key_env write guard is fixture-ready as a pure internal/cli patch-helper row."
           }
         },
         "5.P": {
@@ -14967,14 +14953,14 @@
               "priority": "P2",
               "status": "planned",
               "contract": "cmd/gormes binds the native TUI /save SessionExportFunc to the canonical persisted transcript reader and writes markdown exports under the Gormes XDG data directory, never under upstream HERMES_HOME or the process working directory",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "degraded_mode": "TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location. Backend usage-limit/stdin outages are now run-level evidence and should not block this cmd/gormes binding fixture.",
               "fixture": "cmd/gormes/tui_save_export_test.go::TestTUISaveExport_*",
               "source_refs": [
                 "../hermes-agent/tests/cli/test_save_conversation_location.py@5eb6cd82",
@@ -14993,13 +14979,9 @@
                 "Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence."
               ],
               "not_ready_when": [
-                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice reopens internal/tui slash handler behavior or changes transcript.ExportMarkdown output format.",
                 "The slice writes exports under HERMES_HOME, the repository root, or the current working directory.",
                 "The slice starts a provider, API server, remote TUI gateway, or live session browser."
-              ],
-              "blocked_by": [
-                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "cmd/gormes constructs a SessionExportFunc for the local TUI Model, preferably through a small helper in cmd/gormes/session.go, that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
@@ -15008,7 +14990,7 @@
                 "TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path.",
                 "The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway."
               ],
-              "note": "Reshaped 2026-04-27T11:18:57Z: the native TUI /save handler remains complete on main, but this cmd/gormes binding is demoted to draft and blocked behind backend usage-limit health repair because current quarantine evidence is infrastructure-only. internal/tui/slash_save.go remains a read-only donor; do not reopen slash dispatch tests or transcript markdown formatting.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z after backend health bypass validation. The native TUI /save handler remains complete on main; this row binds cmd/gormes to XDG export storage only and keeps internal/tui slash dispatch plus transcript markdown formatting read-only.",
               "write_scope": [
                 "cmd/gormes/main.go",
                 "cmd/gormes/session.go",
@@ -15046,9 +15028,9 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-27T11:18:57Z",
-                "last_outcome": "still_failing"
+                "reshape_count": 3,
+                "last_reshape": "2026-04-27T11:38:55Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -15223,14 +15205,14 @@
               "priority": "P2",
               "status": "planned",
               "contract": "Native Bubble Tea conversation rendering limits each frame to the visible tail of RenderFrame.History plus DraftText/LastError under a caller-provided height budget, emits a stable omitted-history sentinel when earlier turns are hidden, and avoids rebuilding unbounded conversation strings during long sessions",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "If height is too small or width is narrow, the helper still renders the latest visible turn/draft/error and a compact omitted-history sentinel rather than panicking or allocating the full history body. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "degraded_mode": "If height is too small or width is narrow, the helper still renders the latest visible turn/draft/error and a compact omitted-history sentinel rather than panicking or allocating the full history body. Backend quota/stdin failures are now run-level degradation and should not block this pure viewport-helper row.",
               "fixture": "internal/tui/viewport_history_test.go::TestRenderConversationViewport_*",
               "source_refs": [
                 "../hermes-agent/ui-tui/src/hooks/useVirtualHistory.ts@e63929d4",
@@ -15245,13 +15227,9 @@
                 "The row is a Gormes-native performance guard, not a direct port of Hermes' React/Ink virtualization stack."
               ],
               "not_ready_when": [
-                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice imports React/Ink concepts, starts Node, changes kernel.RenderFrame shape, truncates stored session/transcript history, or edits internal/kernel/internal/transcript persistence.",
                 "The slice changes slash-command, remote TUI SSE, API server, or dashboard behavior in the same diff.",
                 "The slice silently drops DraftText or LastError when history is long."
-              ],
-              "blocked_by": [
-                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "TestRenderConversationViewport_OmitsEarlierHistory builds 120 alternating user/assistant messages and asserts the rendered output contains the latest turns, excludes the earliest turn body, and includes a deterministic omitted-history sentinel with the hidden count.",
@@ -15260,7 +15238,7 @@
                 "TestRenderConversationViewport_RenderedLineBudget asserts the helper returns no more than the requested visible budget plus a small sentinel allowance for wrapped content.",
                 "The implementation stays in internal/tui/view.go plus its test; no kernel/session/transcript files are edited."
               ],
-              "note": "Reshaped 2026-04-27T11:18:57Z: retained the pure internal/tui viewport-helper contract but demoted to draft and blocked behind backend usage-limit health repair because the quarantine evidence is infrastructure-only. Hermes e63929d4 remains the donor for the invariant; Gormes keeps the implementation native to Bubble Tea.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z after backend health bypass validation. Keep the implementation native to internal/tui/view.go plus table tests; no kernel/session/transcript persistence, slash-command, remote TUI, or API server edits belong here.",
               "write_scope": [
                 "internal/tui/view.go",
                 "internal/tui/viewport_history_test.go",
@@ -15297,8 +15275,9 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T11:18:57Z"
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T11:38:55Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -15755,7 +15734,7 @@
               "priority": "P2",
               "status": "planned",
               "contract": "Native API server binds the validated detailed-health snapshot to an authenticated GET /health/detailed and /v1/health/detailed route while preserving existing /health and /v1/health behavior",
-              "contract_status": "draft",
+              "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -15772,16 +15751,13 @@
                 "internal/apiserver/chat_completions_test.go:health fixtures"
               ],
               "ready_when": [
-                "API server detailed health snapshot contract is validated on main.",
+                "API server detailed health snapshot contract is validated on main; this row only binds the snapshot to authenticated HTTP routes.",
                 "The slice can use httptest against Server.Handler with fake snapshot inputs; no provider, live gateway, scheduler goroutine, or cron mutation endpoint is required.",
                 "Existing /health and /v1/health fixtures remain byte-compatible except for explicitly allowed internal refactoring."
               ],
               "not_ready_when": [
                 "The slice creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, changes OpenAI-style error envelopes, or weakens API auth/body-size checks.",
                 "The slice changes dashboard client behavior or imports Hermes Python."
-              ],
-              "blocked_by": [
-                "API server detailed health snapshot contract"
               ],
               "unblocks": [
                 "API server cron admin read-only endpoints"
@@ -15792,7 +15768,7 @@
                 "TestAPIServerDetailedHealthEndpoint_RedactsSecrets proves the HTTP response body omits provider keys, cron script bodies, gateway tokens, and raw request payloads.",
                 "Existing /health and /v1/health tests continue to report status/platform/responses/runs as before."
               ],
-              "note": "Second half of the detailed-health split. It only binds the snapshot to HTTP routes and keeps cron admin endpoint work blocked behind this endpoint.",
+              "note": "Re-enabled 2026-04-27T11:44:19Z: the detailed-health snapshot prerequisite and backend health bypass are validated, so workers should bind only GET /health/detailed and /v1/health/detailed while preserving flat /health behavior.",
               "write_scope": [
                 "internal/apiserver/detailed_health.go",
                 "internal/apiserver/detailed_health_endpoint_test.go",
@@ -15828,6 +15804,10 @@
                   "spec_hash": "b58d952665841e0c3f9cd60329c89ca1c2368baaa7153eab8786ffaa6e7622bb",
                   "last_category": "worker_error"
                 }
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T11:38:55Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -15970,8 +15950,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T11:18:57Z",
-            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer API/TUI drift supersedes the existing native Gormes rows. Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes 2536a36f/5eb6cd82 define /save and save-location semantics; Gormes preserves XDG runtime state instead of upstream HERMES_HOME, with the cmd/gormes XDG writer row now blocked behind backend usage-limit/stdin health repair. Hermes e63929d4 adds long-session Ink virtualization and profiling; Gormes tracks the native bounded Bubble Tea viewport row, also blocked until backend infrastructure failures no longer quarantine feature work. Detailed health and cron admin remain split into read-only and mutating rows."
+            "last_upstream_check": "2026-04-27T11:44:19Z",
+            "origin_decision": "Hermes ee1a07f9 is current after sync; no newer API/TUI drift supersedes the existing native Gormes rows. Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes 2536a36f/5eb6cd82 define /save and save-location semantics; Gormes preserves XDG runtime state instead of upstream HERMES_HOME, and the cmd/gormes XDG writer row is fixture-ready after backend health validation. Hermes e63929d4 adds long-session Ink virtualization and profiling; Gormes tracks the native bounded Bubble Tea viewport row as fixture-ready. Detailed health is fixture-ready, and cron admin remains split into read-only then mutating rows."
           }
         },
         "5.R": {

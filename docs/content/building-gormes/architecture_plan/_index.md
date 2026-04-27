@@ -567,7 +567,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Debug helpers
 - [x] Planner audit blank-subphase control-plane bucket
 - [x] Autoloop recent-failure detail excerpts
-- [ ] Backend usage-limit stdin health bypass
+- [x] Backend usage-limit stdin health bypass
 - [ ] Cronjob tool API + schedule parser parity
 - [x] Cron schedule parser + repeat state fixtures
 - [x] Cron recurring next-run failure preservation
