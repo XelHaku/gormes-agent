@@ -2058,18 +2058,26 @@
                 "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior."
               ],
               "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-27T06:24:09Z",
+                "attempt_count": 3,
+                "consecutive_failures": 3,
+                "last_attempt": "2026-04-27T06:30:21Z",
                 "last_failure": {
-                  "run_id": "20260427T062400Z-726779940",
+                  "run_id": "20260427T063013Z-132521214",
                   "category": "worker_error",
                   "backend": "codexu",
                   "stderr_tail": "Reading additional input from stdin...\n"
                 },
                 "backends_tried": [
                   "codexu"
-                ]
+                ],
+                "quarantine": {
+                  "reason": "auto: 3 consecutive failures, last category worker_error",
+                  "since": "2026-04-27T06:30:21Z",
+                  "after_run_id": "20260427T063013Z-132521214",
+                  "threshold": 3,
+                  "spec_hash": "19fe2dfc314b1dd10ccddd7e4250f5ff4cc9489f31f52b60177fcaec4639b8d3",
+                  "last_category": "worker_error"
+                }
               },
               "provenance": {
                 "origin_type": "hybrid",
