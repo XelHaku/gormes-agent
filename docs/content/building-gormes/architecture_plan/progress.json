@@ -3916,8 +3916,8 @@
                 "needs_human": true,
                 "reason": "worker_error/backend stdin wait before diff; re-enable after backend quota/noninteractive execution is healthy",
                 "since": "2026-04-27T11:09:04Z",
-                "reshape_count": 4,
-                "last_reshape": "2026-04-27T11:09:04Z",
+                "reshape_count": 5,
+                "last_reshape": "2026-04-27T11:18:57Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -7441,8 +7441,8 @@
                 "needs_human": true,
                 "reason": "worker_error/backend stdin wait before diff; re-enable after backend quota/noninteractive execution is healthy",
                 "since": "2026-04-27T11:09:04Z",
-                "reshape_count": 2,
-                "last_reshape": "2026-04-27T11:09:04Z",
+                "reshape_count": 3,
+                "last_reshape": "2026-04-27T11:18:57Z",
                 "last_outcome": "still_failing"
               },
               "provenance": {
@@ -7966,7 +7966,7 @@
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-27T04:49:49Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -11559,9 +11559,12 @@
                 }
               },
               "planner_verdict": {
+                "needs_human": true,
+                "reason": "auto: 5 reshapes without unsticking; last category backend_waiting_for_stdin",
+                "since": "2026-04-27T11:18:57Z",
                 "reshape_count": 5,
                 "last_reshape": "2026-04-27T05:38:23Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -13980,6 +13983,10 @@
                   "last_category": "worker_error"
                 }
               },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T11:18:57Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:8258f4dc hermes_cli/main.py",
@@ -15034,8 +15041,9 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T05:33:36Z"
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T11:18:57Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -15282,6 +15290,10 @@
                   "spec_hash": "003ebb07af5d17dbbc405853da03e474c26020f9a6185947d36cc1a2fb1a2470",
                   "last_category": "worker_error"
                 }
+              },
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T11:18:57Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
