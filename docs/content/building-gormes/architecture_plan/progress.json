@@ -12197,9 +12197,9 @@
             {
               "name": "CLI bracketed-paste wrapper sanitizer",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli exposes StripLeakedBracketedPasteWrappers(text string) string, a pure sanitizer that removes canonical ESC [200~/[201~ wrappers, visible caret-escape wrappers, degraded boundary [200~/[201~ wrappers, and boundary 00~/01~ fragments while preserving non-wrapper substrings inside ordinary text",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
