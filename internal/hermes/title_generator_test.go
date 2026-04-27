@@ -192,3 +192,147 @@ func TestTitleGenerator_ProviderFailureReturnsTypedEvidence(t *testing.T) {
 		t.Fatalf("Err = %v; want wrapping provider error %v", result.Err, providerErr)
 	}
 }
+
+func TestTitleFailureCallback_FiresOnProviderError(t *testing.T) {
+	t.Parallel()
+
+	providerErr := errors.New("openrouter 402: credits exhausted")
+	var captured []TitleEvidence
+	result := GenerateTitle(context.Background(), TitleRequest{
+		History: []TitleMessage{
+			{Role: "user", Content: "name this failed provider turn"},
+			{Role: "assistant", Content: "the foreground answer already completed"},
+		},
+		FailureCallback: func(ctx context.Context, evidence TitleEvidence) error {
+			captured = append(captured, evidence)
+			return nil
+		},
+	}, func(ctx context.Context, req TitleModelRequest) (string, error) {
+		return "", providerErr
+	})
+
+	if result.Title != "" {
+		t.Fatalf("Title = %q; want empty title", result.Title)
+	}
+	if result.Status != TitleStatusProviderFailed {
+		t.Fatalf("Status = %q; want %q", result.Status, TitleStatusProviderFailed)
+	}
+	if result.Evidence.Kind != TitleStatusProviderFailed {
+		t.Fatalf("Evidence.Kind = %q; want %q", result.Evidence.Kind, TitleStatusProviderFailed)
+	}
+	if len(captured) != 1 {
+		t.Fatalf("callback calls = %d; want 1 (%+v)", len(captured), captured)
+	}
+	if captured[0].Kind != TitleStatusProviderFailed {
+		t.Fatalf("callback evidence kind = %q; want %q", captured[0].Kind, TitleStatusProviderFailed)
+	}
+	if !strings.Contains(captured[0].Message, "openrouter 402") {
+		t.Fatalf("callback evidence message = %q; want provider detail", captured[0].Message)
+	}
+	if len(result.AuxiliaryEvidence) != 0 {
+		t.Fatalf("AuxiliaryEvidence = %+v; want none when callback succeeds", result.AuxiliaryEvidence)
+	}
+}
+
+func TestTitleFailureCallback_SwallowsCallbackError(t *testing.T) {
+	t.Parallel()
+
+	providerErr := errors.New("openrouter 402: credits exhausted")
+	callbackErr := errors.New("warning sink unavailable")
+	result := GenerateTitle(context.Background(), TitleRequest{
+		History: []TitleMessage{
+			{Role: "user", Content: "name this failed provider turn"},
+			{Role: "assistant", Content: "the foreground answer already completed"},
+		},
+		FailureCallback: func(ctx context.Context, evidence TitleEvidence) error {
+			return callbackErr
+		},
+	}, func(ctx context.Context, req TitleModelRequest) (string, error) {
+		return "", providerErr
+	})
+
+	if result.Title != "" {
+		t.Fatalf("Title = %q; want empty title", result.Title)
+	}
+	if result.Status != TitleStatusProviderFailed {
+		t.Fatalf("Status = %q; want foreground title status preserved as %q", result.Status, TitleStatusProviderFailed)
+	}
+	if result.Evidence.Kind != TitleStatusProviderFailed {
+		t.Fatalf("Evidence.Kind = %q; want provider failure evidence preserved", result.Evidence.Kind)
+	}
+	if !errors.Is(result.Err, providerErr) {
+		t.Fatalf("Err = %v; want provider error %v, not callback error %v", result.Err, providerErr, callbackErr)
+	}
+	if len(result.AuxiliaryEvidence) != 1 {
+		t.Fatalf("AuxiliaryEvidence = %+v; want one callback failure evidence", result.AuxiliaryEvidence)
+	}
+	if result.AuxiliaryEvidence[0].Kind != TitleStatusCallbackFailed {
+		t.Fatalf("callback evidence kind = %q; want %q", result.AuxiliaryEvidence[0].Kind, TitleStatusCallbackFailed)
+	}
+	if !strings.Contains(result.AuxiliaryEvidence[0].Message, "warning sink unavailable") {
+		t.Fatalf("callback evidence message = %q; want sink error detail", result.AuxiliaryEvidence[0].Message)
+	}
+}
+
+func TestTitleFailureCallback_SwallowsCallbackPanic(t *testing.T) {
+	t.Parallel()
+
+	providerErr := errors.New("openrouter 402: credits exhausted")
+	result := GenerateTitle(context.Background(), TitleRequest{
+		History: []TitleMessage{
+			{Role: "user", Content: "name this failed provider turn"},
+			{Role: "assistant", Content: "the foreground answer already completed"},
+		},
+		FailureCallback: func(ctx context.Context, evidence TitleEvidence) error {
+			panic("warning sink panic")
+		},
+	}, func(ctx context.Context, req TitleModelRequest) (string, error) {
+		return "", providerErr
+	})
+
+	if result.Status != TitleStatusProviderFailed {
+		t.Fatalf("Status = %q; want foreground title status preserved as %q", result.Status, TitleStatusProviderFailed)
+	}
+	if result.Evidence.Kind != TitleStatusProviderFailed {
+		t.Fatalf("Evidence.Kind = %q; want provider failure evidence preserved", result.Evidence.Kind)
+	}
+	if len(result.AuxiliaryEvidence) != 1 {
+		t.Fatalf("AuxiliaryEvidence = %+v; want one callback failure evidence", result.AuxiliaryEvidence)
+	}
+	if result.AuxiliaryEvidence[0].Kind != TitleStatusCallbackFailed {
+		t.Fatalf("callback evidence kind = %q; want %q", result.AuxiliaryEvidence[0].Kind, TitleStatusCallbackFailed)
+	}
+	if !strings.Contains(result.AuxiliaryEvidence[0].Message, "warning sink panic") {
+		t.Fatalf("callback evidence message = %q; want panic detail", result.AuxiliaryEvidence[0].Message)
+	}
+}
+
+func TestTitleFailureCallback_NoCallbackLegacyPath(t *testing.T) {
+	t.Parallel()
+
+	providerErr := errors.New("openrouter 402: credits exhausted")
+	result := GenerateTitle(context.Background(), TitleRequest{
+		History: []TitleMessage{
+			{Role: "user", Content: "name this failed provider turn"},
+			{Role: "assistant", Content: "the foreground answer already completed"},
+		},
+	}, func(ctx context.Context, req TitleModelRequest) (string, error) {
+		return "", providerErr
+	})
+
+	if result.Title != "" {
+		t.Fatalf("Title = %q; want empty title", result.Title)
+	}
+	if result.Status != TitleStatusProviderFailed {
+		t.Fatalf("Status = %q; want %q", result.Status, TitleStatusProviderFailed)
+	}
+	if result.Evidence.Kind != TitleStatusProviderFailed {
+		t.Fatalf("Evidence.Kind = %q; want %q", result.Evidence.Kind, TitleStatusProviderFailed)
+	}
+	if len(result.AuxiliaryEvidence) != 0 {
+		t.Fatalf("AuxiliaryEvidence = %+v; want none when no callback is configured", result.AuxiliaryEvidence)
+	}
+	if !errors.Is(result.Err, providerErr) {
+		t.Fatalf("Err = %v; want provider error %v", result.Err, providerErr)
+	}
+}

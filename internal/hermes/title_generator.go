@@ -2,6 +2,7 @@ package hermes
 
 import (
 	"context"
+	"fmt"
 	"strings"
 )
 
@@ -21,6 +22,7 @@ const (
 	TitleStatusAutoTitleSkipped TitleStatus = "auto_title_skipped"
 	TitleStatusBlankResult      TitleStatus = "title_blank_result"
 	TitleStatusProviderFailed   TitleStatus = "title_provider_failed"
+	TitleStatusCallbackFailed   TitleStatus = "callback_failed"
 )
 
 type TitleMessage struct {
@@ -33,6 +35,7 @@ type TitleRequest struct {
 	MaxHistoryMessages int
 	MaxContentChars    int
 	MaxTitleChars      int
+	FailureCallback    TitleFailureCallback
 }
 
 type TitleModelMessage struct {
@@ -48,11 +51,14 @@ type TitleModelRequest struct {
 
 type TitleModelFunc func(context.Context, TitleModelRequest) (string, error)
 
+type TitleFailureCallback func(context.Context, TitleEvidence) error
+
 type TitleResult struct {
-	Title    string
-	Status   TitleStatus
-	Evidence TitleEvidence
-	Err      error
+	Title             string
+	Status            TitleStatus
+	Evidence          TitleEvidence
+	AuxiliaryEvidence []TitleEvidence
+	Err               error
 }
 
 type TitleEvidence struct {
@@ -103,7 +109,7 @@ func GenerateTitle(ctx context.Context, req TitleRequest, model TitleModelFunc) 
 	}
 	title, err := model(ctx, modelReq)
 	if err != nil {
-		return TitleResult{
+		result := TitleResult{
 			Status: TitleStatusProviderFailed,
 			Evidence: TitleEvidence{
 				Kind:    TitleStatusProviderFailed,
@@ -111,6 +117,10 @@ func GenerateTitle(ctx context.Context, req TitleRequest, model TitleModelFunc) 
 			},
 			Err: &TitleProviderError{Kind: TitleStatusProviderFailed, Err: err},
 		}
+		if callbackEvidence, ok := invokeTitleFailureCallback(ctx, req.FailureCallback, result.Evidence); ok {
+			result.AuxiliaryEvidence = append(result.AuxiliaryEvidence, callbackEvidence)
+		}
+		return result
 	}
 	title = cleanTitleCandidate(title, req.MaxTitleChars)
 	if title == "" {
@@ -126,6 +136,28 @@ func GenerateTitle(ctx context.Context, req TitleRequest, model TitleModelFunc) 
 		Title:  title,
 		Status: TitleStatusGenerated,
 	}
+}
+
+func invokeTitleFailureCallback(ctx context.Context, callback TitleFailureCallback, evidence TitleEvidence) (failure TitleEvidence, ok bool) {
+	if callback == nil {
+		return TitleEvidence{}, false
+	}
+	defer func() {
+		if v := recover(); v != nil {
+			failure = TitleEvidence{
+				Kind:    TitleStatusCallbackFailed,
+				Message: fmt.Sprintf("title failure callback failed: %v", v),
+			}
+			ok = true
+		}
+	}()
+	if err := callback(ctx, evidence); err != nil {
+		return TitleEvidence{
+			Kind:    TitleStatusCallbackFailed,
+			Message: "title failure callback failed: " + err.Error(),
+		}, true
+	}
+	return TitleEvidence{}, false
 }
 
 func buildTitlePrompt(req TitleRequest) string {

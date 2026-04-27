@@ -8076,9 +8076,9 @@
             },
             {
               "name": "Title auxiliary failure visibility",
-              "status": "planned",
+              "status": "complete",
               "contract": "CLI and gateway title-generation callers route nonfatal title_provider_failed evidence through the same operator-visible auxiliary-failure channel used for other background provider failures, while swallowing callback errors so title generation cannot crash the foreground turn",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -8115,7 +8115,7 @@
                 "TestTitleFailureCallback_NoCallbackLegacyPath proves missing callbacks preserve the nonfatal title result and do not require operator channel wiring.",
                 "Gateway/CLI fake-turn fixtures prove the user-visible warning channel receives the provider message without persisting a title."
               ],
-              "note": "Second title-generation slice for Hermes 4a2ee6c1. Keep callback routing separate from title prompt construction and from session metadata writes so workers do not mix provider, gateway, and persistence concerns.",
+              "note": "Complete: TDD added title failure callback routing to the native title helper. Provider errors now emit title_provider_failed evidence to a supplied auxiliary-failure callback exactly once; callback return errors and panics are swallowed as callback_failed auxiliary evidence while preserving the nonfatal provider-failure result. Kernel/gateway fake warning fixtures prove the provider message reaches the operator-visible warning path without session title persistence or live provider calls.",
               "write_scope": [
                 "internal/hermes/title_generator.go",
                 "internal/hermes/title_generator_test.go",
