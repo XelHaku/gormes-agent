@@ -882,6 +882,19 @@ func runPlannerGitRepairAgent(ctx context.Context, cfg Config, runner cmdrunner.
 		return err
 	}
 
+	if err := verifyPlannerMainReconciledAfterRepair(ctx, cfg, runner, reason); err != nil {
+		appendPlannerLedger(ledgerPath, LedgerEvent{
+			TS:      time.Now().UTC().Format(time.RFC3339Nano),
+			RunID:   runID,
+			Event:   "git_repair_failed",
+			Status:  "unreconciled_main",
+			Detail:  truncatePlannerDetail(err.Error()),
+			Backend: cfg.Backend,
+			Mode:    cfg.Mode,
+		})
+		return err
+	}
+
 	appendPlannerLedger(ledgerPath, LedgerEvent{
 		TS:      time.Now().UTC().Format(time.RFC3339Nano),
 		RunID:   runID,
@@ -891,6 +904,31 @@ func runPlannerGitRepairAgent(ctx context.Context, cfg Config, runner cmdrunner.
 		Backend: cfg.Backend,
 		Mode:    cfg.Mode,
 	})
+	return nil
+}
+
+func verifyPlannerMainReconciledAfterRepair(ctx context.Context, cfg Config, runner cmdrunner.Runner, reason string) error {
+	switch reason {
+	case "pre_pr_intake", "pr_intake_sync_failed":
+	default:
+		return nil
+	}
+	fetch := runner.Run(ctx, cmdrunner.Command{
+		Name: "git",
+		Args: []string{"fetch", "origin", "main"},
+		Dir:  cfg.RepoRoot,
+	})
+	if fetch.Err != nil {
+		return fmt.Errorf("git repair agent left main unreconciled: %w", commandError("git fetch origin main", fetch))
+	}
+	fastForward := runner.Run(ctx, cmdrunner.Command{
+		Name: "git",
+		Args: []string{"merge", "--ff-only", "FETCH_HEAD"},
+		Dir:  cfg.RepoRoot,
+	})
+	if fastForward.Err != nil {
+		return fmt.Errorf("git repair agent left main unreconciled: %w", commandError("git merge --ff-only FETCH_HEAD", fastForward))
+	}
 	return nil
 }
 

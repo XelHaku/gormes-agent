@@ -94,6 +94,45 @@ func TestAppendLedgerEvent_AppendsAtomicallyAcrossWriters(t *testing.T) {
 	}
 }
 
+func TestAppendLedgerEvent_QuarantinesTrailingPartialLine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "runs.jsonl")
+	if err := os.WriteFile(path, []byte(`{"ts`), 0o644); err != nil {
+		t.Fatalf("write partial ledger: %v", err)
+	}
+
+	if err := AppendLedgerEvent(path, LedgerEvent{
+		TS:     "2026-04-27T03:00:00Z",
+		RunID:  "after-partial",
+		Status: "ok",
+	}); err != nil {
+		t.Fatalf("AppendLedgerEvent() error = %v", err)
+	}
+
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(string(body), "\n"), "\n")
+	if len(lines) != 1 {
+		t.Fatalf("ledger lines = %d, want only valid event:\n%s", len(lines), body)
+	}
+	var event LedgerEvent
+	if err := json.Unmarshal([]byte(lines[0]), &event); err != nil {
+		t.Fatalf("ledger line is not valid event JSON: %v\n%s", err, lines[0])
+	}
+	if event.RunID != "after-partial" {
+		t.Fatalf("RunID = %q, want after-partial", event.RunID)
+	}
+	corruptBody, err := os.ReadFile(path + ".corrupt")
+	if err != nil {
+		t.Fatalf("read corrupt sidecar: %v", err)
+	}
+	if !strings.Contains(string(corruptBody), `{"ts`) || !strings.Contains(string(corruptBody), "trailing_partial_line") {
+		t.Fatalf("corrupt sidecar missing partial evidence:\n%s", corruptBody)
+	}
+}
+
 func TestLoadLedger_SkipsCorruptLines(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "runs.jsonl")

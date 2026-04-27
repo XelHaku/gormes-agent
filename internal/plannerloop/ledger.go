@@ -2,11 +2,13 @@ package plannerloop
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -72,9 +74,12 @@ type ProgressStats struct {
 	NeedsHuman  int `json:"needs_human,omitempty"`
 }
 
-// AppendLedgerEvent atomically appends one event as a single JSON line.
-// Uses O_APPEND|O_CREATE|O_WRONLY for POSIX-atomic line writes (lines under
-// PIPE_BUF (4096 bytes on Linux) are atomic per the syscall contract).
+// AppendLedgerEvent appends one event as a single JSON line.
+//
+// The lock and newline repair make appends robust across multiple planner
+// goroutines/processes and after hard kills that can leave a trailing partial
+// line. Corrupt partial lines move to a .corrupt sidecar for forensics so the
+// main ledger remains parseable by readers and shell tooling.
 func AppendLedgerEvent(path string, event LedgerEvent) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("mkdir ledger dir: %w", err)
@@ -85,13 +90,123 @@ func AppendLedgerEvent(path string, event LedgerEvent) error {
 	}
 	body = append(body, '\n')
 
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return fmt.Errorf("open ledger: %w", err)
 	}
 	defer f.Close()
-	_, err = f.Write(body)
-	return err
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("lock ledger: %w", err)
+	}
+	defer func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	}()
+	if err := ensureLedgerLineBoundary(path, f); err != nil {
+		return err
+	}
+	return writeAll(f, body)
+}
+
+func ensureLedgerLineBoundary(path string, f *os.File) error {
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("stat ledger: %w", err)
+	}
+	if info.Size() == 0 {
+		return nil
+	}
+	var last [1]byte
+	if _, err := f.ReadAt(last[:], info.Size()-1); err != nil {
+		return fmt.Errorf("read ledger tail: %w", err)
+	}
+	if last[0] == '\n' {
+		return nil
+	}
+	start, fragment, err := trailingLedgerFragment(f, info.Size())
+	if err != nil {
+		return err
+	}
+	trimmed := bytes.TrimSpace(fragment)
+	if len(trimmed) > 0 && !json.Valid(trimmed) {
+		if err := appendCorruptLedgerFragment(path+".corrupt", fragment); err != nil {
+			return err
+		}
+		if err := f.Truncate(start); err != nil {
+			return fmt.Errorf("truncate corrupt ledger tail: %w", err)
+		}
+		return nil
+	}
+	if err := writeAll(f, []byte("\n")); err != nil {
+		return fmt.Errorf("repair ledger line boundary: %w", err)
+	}
+	return nil
+}
+
+func trailingLedgerFragment(f *os.File, size int64) (int64, []byte, error) {
+	const chunkSize int64 = 64 * 1024
+	end := size
+	for end > 0 {
+		start := end - chunkSize
+		if start < 0 {
+			start = 0
+		}
+		buf := make([]byte, end-start)
+		if _, err := f.ReadAt(buf, start); err != nil {
+			return 0, nil, fmt.Errorf("read ledger fragment: %w", err)
+		}
+		if idx := bytes.LastIndexByte(buf, '\n'); idx >= 0 {
+			fragmentStart := start + int64(idx) + 1
+			return fragmentStart, buf[idx+1:], nil
+		}
+		end = start
+	}
+	buf := make([]byte, size)
+	if size > 0 {
+		if _, err := f.ReadAt(buf, 0); err != nil {
+			return 0, nil, fmt.Errorf("read ledger fragment: %w", err)
+		}
+	}
+	return 0, buf, nil
+}
+
+func appendCorruptLedgerFragment(path string, fragment []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("mkdir corrupt ledger dir: %w", err)
+	}
+	event := struct {
+		TS       string `json:"ts"`
+		Reason   string `json:"reason"`
+		Fragment string `json:"fragment"`
+	}{
+		TS:       time.Now().UTC().Format(time.RFC3339Nano),
+		Reason:   "trailing_partial_line",
+		Fragment: string(fragment),
+	}
+	body, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("marshal corrupt ledger fragment: %w", err)
+	}
+	body = append(body, '\n')
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("open corrupt ledger: %w", err)
+	}
+	defer f.Close()
+	return writeAll(f, body)
+}
+
+func writeAll(f *os.File, body []byte) error {
+	for len(body) > 0 {
+		n, err := f.Write(body)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+		body = body[n:]
+	}
+	return nil
 }
 
 // LoadLedger reads all events from the ledger file. Bad lines are logged

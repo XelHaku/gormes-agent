@@ -290,6 +290,8 @@ func TestRunOnceRunsGitRepairAgentWhenPRIntakeSyncFails(t *testing.T) {
 			{},
 			{},
 			{},
+			{},
+			{},
 			{Stdout: "planner ran ok\n"},
 		},
 	}
@@ -328,6 +330,43 @@ func TestRunOnceRunsGitRepairAgentWhenPRIntakeSyncFails(t *testing.T) {
 	}
 	if _, ok := findPlannerLedgerEvent(events, "git_repair_completed", "ok"); !ok {
 		t.Fatalf("ledger missing git_repair_completed: %+v", events)
+	}
+}
+
+func TestReconcilePlannerMainFailsWhenRepairLeavesMainStale(t *testing.T) {
+	repoRoot := writePlannerFixture(t)
+	if err := os.MkdirAll(filepath.Join(repoRoot, ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(.git) error = %v", err)
+	}
+	cfg := mustConfig(t, repoRoot)
+	ledgerPath := filepath.Join(cfg.RunRoot, "state", "runs.jsonl")
+	runner := &cmdrunner.FakeRunner{
+		Results: []cmdrunner.Result{
+			{},
+			{},
+			{Err: errors.New("exit status 128"), Stderr: "fatal: Not possible to fast-forward\n"},
+			{Err: errors.New("exit status 1"), Stderr: "CONFLICT (content): progress.json\n"},
+			{},
+			{Stdout: "repair complete\n"},
+			{},
+			{},
+			{},
+			{},
+			{Err: errors.New("exit status 128"), Stderr: "fatal: Not possible to fast-forward\n"},
+		},
+	}
+
+	err := reconcilePlannerMain(context.Background(), cfg, runner, ledgerPath, "run-1", "pre_pr_intake")
+	if err == nil {
+		t.Fatal("reconcilePlannerMain() error = nil, want stale main failure")
+	}
+	if !strings.Contains(err.Error(), "left main unreconciled") {
+		t.Fatalf("reconcilePlannerMain() error = %q, want unreconciled main detail", err)
+	}
+
+	events := mustReadLedger(t, ledgerPath)
+	if _, ok := findPlannerLedgerEvent(events, "git_repair_failed", "unreconciled_main"); !ok {
+		t.Fatalf("ledger missing git_repair_failed:unreconciled_main: %+v", events)
 	}
 }
 
