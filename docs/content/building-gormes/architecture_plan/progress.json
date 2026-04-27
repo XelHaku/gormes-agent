@@ -7535,9 +7535,9 @@
             {
               "name": "Gormes self-help skill/docs prompt guidance",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Native prompt assembly exposes a pure guidance block that tells the model, when the user asks about configuring, setting up, troubleshooting, or using Gormes itself, to consult Gormes-owned docs/skills before answering; the block must say Gormes/Gormes Agent, must not mention Hermes Agent as the product, and must be gated so unrelated user prompts do not receive extra self-help text.",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
