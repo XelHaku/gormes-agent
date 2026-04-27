@@ -58,6 +58,7 @@ type workerRun struct {
 	BaseCommit   string
 	RepoRoot     string
 	WorktreePath string
+	Backend      string
 	Result       Result
 }
 
@@ -334,8 +335,10 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		return PushMainIfConfigured(ctx, opts.Config, runner, runID, "run_completed")
 	}
 
-	argv, err := BuildBackendCommandWithRepoRoot(opts.Config.Backend, opts.Config.Mode, opts.Config.RepoRoot)
-	if err != nil {
+	resolveBackendCommand := func() ([]string, error) {
+		return BuildBackendCommandWithRepoRoot(degrader.Current(), opts.Config.Mode, opts.Config.RepoRoot)
+	}
+	if _, err := resolveBackendCommand(); err != nil {
 		return RunSummary{}, err
 	}
 
@@ -356,10 +359,10 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		for _, sk := range skipped {
 			acc.RecordFailure(sk.Candidate, progress.FailureProgressSummary, degrader.Current(), sk.Reason)
 		}
-		runBackendWorkers(ctx, opts.Config, runner, runID, argv, workers)
+		runBackendWorkers(ctx, opts.Config, runner, runID, resolveBackendCommand, workers)
 		for _, worker := range workers {
-			finishErr := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker)
-			recordWorkerOutcome(acc, observeOutcome, degrader.Current(), worker, finishErr)
+			finishErr := finishWorker(ctx, opts.Config, runner, worker.Backend, runID, baseBranch, hasGit, worker)
+			recordWorkerOutcome(acc, observeOutcome, worker.Backend, worker, finishErr)
 			if finishErr != nil {
 				if errors.Is(finishErr, errWorkerNoChanges) {
 					continue
@@ -437,8 +440,13 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			}
 		}
 
+		argv, err := resolveBackendCommand()
+		if err != nil {
+			return RunSummary{}, err
+		}
 		args := append([]string(nil), argv[1:]...)
 		args = append(args, BuildWorkerPromptWithBranch(candidate, worker.Branch))
+		worker.Backend = argv[0]
 		worker.Result = runLoggedBackendCommand(ctx, opts.Config, runner, runID, jobSpec{
 			ID:            fmt.Sprintf("%s/worker/%d/backend", runID, worker.ID),
 			Kind:          "worker_backend",
@@ -453,8 +461,8 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 			Args: args,
 			Dir:  worker.RepoRoot,
 		})
-		finishErr := finishWorker(ctx, opts.Config, runner, argv[0], runID, baseBranch, hasGit, worker)
-		recordWorkerOutcome(acc, observeOutcome, degrader.Current(), worker, finishErr)
+		finishErr := finishWorker(ctx, opts.Config, runner, worker.Backend, runID, baseBranch, hasGit, worker)
+		recordWorkerOutcome(acc, observeOutcome, worker.Backend, worker, finishErr)
 		if finishErr != nil {
 			if errors.Is(finishErr, errWorkerNoChanges) {
 				continue
@@ -1324,13 +1332,20 @@ type skippedCandidate struct {
 	Reason    string
 }
 
-func runBackendWorkers(ctx context.Context, cfg Config, runner Runner, runID string, argv []string, workers []workerRun) {
+func runBackendWorkers(ctx context.Context, cfg Config, runner Runner, runID string, backendResolver func() ([]string, error), workers []workerRun) {
 	var wg sync.WaitGroup
 	for i := range workers {
 		worker := &workers[i]
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			argv, err := backendResolver()
+			if err != nil {
+				worker.Result = Result{Err: err}
+				worker.Backend = ""
+				return
+			}
+			worker.Backend = argv[0]
 			args := append([]string(nil), argv[1:]...)
 			args = append(args, BuildWorkerPromptWithBranch(worker.Candidate, worker.Branch))
 			worker.Result = runLoggedBackendCommand(ctx, cfg, runner, runID, jobSpec{
