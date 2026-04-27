@@ -12,9 +12,11 @@ const (
 	FileReadDedupStatusUnchanged     = "unchanged"
 	FileReadStatusDedupCacheDisabled = "read_dedup_cache_disabled"
 	FileReadStatusGuardUnavailable   = "guard_unavailable"
+	FileReadStatusDedupStubBlocked   = "read_dedup_stub_blocked"
 )
 
 const fileReadDedupStatusMessage = "File unchanged since last read. The earlier read_file result in this conversation is still current; use that content instead of writing this status text."
+const fileReadDedupStubBlockedMessage = "BLOCKED: repeated read_file status stub detected. The earlier read_file content is still current; stop treating this status text as file content."
 
 // ErrFileReadGuardStatusContent reports an attempt to persist internal status text.
 var ErrFileReadGuardStatusContent = errors.New("file read guard: internal read_file status text cannot be file content")
@@ -29,6 +31,7 @@ type FileReadGuard struct {
 	mu            sync.Mutex
 	workspaceRoot string
 	cache         map[fileReadCacheKey][]byte
+	stubHits      map[fileReadCacheKey]int
 }
 
 // FileReadResult is the read model returned by the file-read helper.
@@ -63,6 +66,7 @@ func NewFileReadGuard(opts FileReadGuardOptions) *FileReadGuard {
 	return &FileReadGuard{
 		workspaceRoot: root,
 		cache:         make(map[fileReadCacheKey][]byte),
+		stubHits:      make(map[fileReadCacheKey]int),
 	}
 }
 
@@ -134,6 +138,55 @@ func readFileWithoutCache(path, resolved string, read func(string) ([]byte, erro
 	}, nil
 }
 
+// GuardRepeatedReadStatus keeps model-visible read_file status stubs out of
+// content and escalates repeated stubs to blocked evidence.
+func (g *FileReadGuard) GuardRepeatedReadStatus(result FileReadResult) FileReadResult {
+	guarded := cloneFileReadResult(result)
+	kind, message, ok := fileReadStatusStub(guarded)
+	if !ok {
+		g.resetReadStatusStub(guarded.Path)
+		return guarded
+	}
+
+	if message == "" && kind == FileReadDedupStatusUnchanged {
+		message = fileReadDedupStatusMessage
+	}
+
+	hits := 1
+	if g != nil {
+		key := g.readStatusStubKey(guarded.Path)
+		g.mu.Lock()
+		if g.stubHits == nil {
+			g.stubHits = make(map[fileReadCacheKey]int)
+		}
+		hits = g.stubHits[key] + 1
+		g.stubHits[key] = hits
+		g.mu.Unlock()
+	}
+
+	if hits >= 2 {
+		return FileReadResult{
+			Path:        guarded.Path,
+			DedupStatus: FileReadStatusDedupStubBlocked,
+			Evidence: []FileReadEvidence{{
+				Kind:    FileReadStatusDedupStubBlocked,
+				Path:    guarded.Path,
+				Message: fileReadDedupStubBlockedMessage,
+			}},
+		}
+	}
+
+	return FileReadResult{
+		Path:        guarded.Path,
+		DedupStatus: kind,
+		Evidence: []FileReadEvidence{{
+			Kind:    kind,
+			Path:    guarded.Path,
+			Message: message,
+		}},
+	}
+}
+
 // WriteFile runs write and invalidates cached reads for the written path.
 func (g *FileReadGuard) WriteFile(path string, content []byte, write func(string, []byte) error) error {
 	if isFileReadGuardStatusText(content) {
@@ -163,6 +216,48 @@ func (g *FileReadGuard) PatchFile(path string, apply func(string) error) error {
 	return nil
 }
 
+func cloneFileReadResult(result FileReadResult) FileReadResult {
+	result.Content = append([]byte(nil), result.Content...)
+	result.Evidence = append([]FileReadEvidence(nil), result.Evidence...)
+	return result
+}
+
+func fileReadStatusStub(result FileReadResult) (kind, message string, ok bool) {
+	if isFileReadGuardStatusText(result.Content) {
+		return FileReadDedupStatusUnchanged, strings.TrimSpace(string(result.Content)), true
+	}
+	if len(result.Content) != 0 {
+		return "", "", false
+	}
+	if isFileReadStatusKind(result.DedupStatus) {
+		return result.DedupStatus, fileReadEvidenceMessage(result, result.DedupStatus), true
+	}
+	for _, evidence := range result.Evidence {
+		if isFileReadStatusKind(evidence.Kind) {
+			return evidence.Kind, evidence.Message, true
+		}
+	}
+	return "", "", false
+}
+
+func fileReadEvidenceMessage(result FileReadResult, kind string) string {
+	for _, evidence := range result.Evidence {
+		if evidence.Kind == kind {
+			return evidence.Message
+		}
+	}
+	return ""
+}
+
+func isFileReadStatusKind(kind string) bool {
+	switch kind {
+	case FileReadDedupStatusUnchanged, FileReadStatusDedupCacheDisabled, FileReadStatusGuardUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 func isFileReadGuardStatusText(content []byte) bool {
 	stripped := strings.TrimSpace(string(content))
 	if stripped == "" {
@@ -173,6 +268,30 @@ func isFileReadGuardStatusText(content []byte) bool {
 	}
 	return strings.Contains(stripped, fileReadDedupStatusMessage) &&
 		len(stripped) <= 2*len(fileReadDedupStatusMessage)
+}
+
+func (g *FileReadGuard) resetReadStatusStub(path string) {
+	if g == nil {
+		return
+	}
+	key := g.readStatusStubKey(path)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.stubHits, key)
+}
+
+func (g *FileReadGuard) readStatusStubKey(path string) fileReadCacheKey {
+	if g == nil {
+		return fileReadCacheKey{path: filepath.Clean(path)}
+	}
+	key, err := g.cacheKey(path)
+	if err == nil {
+		return key
+	}
+	return fileReadCacheKey{
+		workspaceRoot: g.workspaceRoot,
+		path:          filepath.Clean(path),
+	}
 }
 
 func (g *FileReadGuard) invalidatePath(key fileReadCacheKey) {
