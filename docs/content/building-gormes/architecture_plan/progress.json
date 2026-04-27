@@ -9565,9 +9565,9 @@
             {
               "name": "Cron prompt/script safety + pre-run script contract",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cron exposes pure safety helpers for cron creation/update: ScanPromptForCronThreat(prompt string) (CronSafetyFinding, bool) blocks Hermes critical prompt-injection/exfiltration patterns plus invisible Unicode controls, and ValidatePreRunScriptPath(script string, scriptsRoot string) returns a clean relative script path only when it stays under the injected scriptsRoot. No script execution or scheduler wiring occurs in this slice.",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9606,7 +9606,7 @@
                 "TestValidatePreRunScriptPath_AcceptsRelativeScript returns `daily/fetch.go` unchanged for a scriptsRoot temp dir.",
                 "TestValidatePreRunScriptPath_RejectsAbsoluteHomeAndTraversal rejects `/tmp/x`, `~/x`, `../x`, and `daily/../../x` with distinct evidence codes."
               ],
-              "note": "Planner split 2026-04-26: this keeps Hermes' cron prompt/script hardening as a pure helper slice. Tool mutation and script execution remain downstream so workers do not mix safety parsing with scheduler effects.",
+              "note": "Complete: TDD landed internal/cron/prompt_script_safety.go and prompt_script_safety_test.go as pure create/update boundary helpers. Fixtures prove Hermes critical prompt threat IDs, invisible Unicode codepoint evidence, benign prompt pass-through, relative script acceptance, and absolute/home/traversal rejection without config reads, store writes, scheduler wiring, or script execution.",
               "write_scope": [
                 "internal/cron/prompt_script_safety.go",
                 "internal/cron/prompt_script_safety_test.go",
@@ -9620,6 +9620,11 @@
               "done_signal": [
                 "Prompt/script safety fixtures prove critical prompt threat IDs, invisible Unicode evidence, relative script acceptance, and absolute/home/traversal rejection without script execution."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T00:30:41Z",
+                "last_success": "2026-04-27T00:30:41Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-26T23:52:41Z"
