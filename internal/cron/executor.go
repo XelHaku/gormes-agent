@@ -107,7 +107,7 @@ func (e *Executor) Run(ctx context.Context, job Job) {
 	// Submit.
 	submitErr := e.cfg.Kernel.Submit(kernel.PlatformEvent{
 		Kind:      kernel.PlatformEventSubmit,
-		Text:      BuildPrompt(job.Prompt),
+		Text:      BuildPromptForJob(ctx, job, e.cfg.RunStore, e.log),
 		SessionID: sessionID,
 		CronJobID: job.ID,
 	})

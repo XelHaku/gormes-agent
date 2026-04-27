@@ -1,6 +1,11 @@
 package cron
 
-import "strings"
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"strings"
+)
 
 // CronHeartbeatPrefix is the verbatim port of upstream Hermes'
 // cron/scheduler.py cron_hint. Prepended to every scheduled-job
@@ -28,6 +33,84 @@ const CronHeartbeatPrefix = "[IMPORTANT: You are running as a scheduled cron job
 // user message for the cron turn.
 func BuildPrompt(userPrompt string) string {
 	return CronHeartbeatPrefix + userPrompt
+}
+
+// BuildPromptForJob prepends bounded context_from output before the job prompt,
+// then applies the standard cron heartbeat.
+func BuildPromptForJob(ctx context.Context, job Job, runStore *RunStore, log *slog.Logger) string {
+	body := job.Prompt
+	blocks := contextFromBlocks(ctx, job.ContextFrom, runStore, log)
+	if len(blocks) > 0 {
+		body = strings.Join(blocks, "") + body
+	}
+	return BuildPrompt(body)
+}
+
+const (
+	maxContextFromOutputChars = 8000
+	contextFromTruncated      = "\n\n[... output truncated ...]"
+)
+
+func contextFromBlocks(ctx context.Context, sourceIDs []string, runStore *RunStore, log *slog.Logger) []string {
+	if len(sourceIDs) == 0 {
+		return nil
+	}
+	if log == nil {
+		log = slog.Default()
+	}
+	if runStore == nil {
+		log.Warn("cron: context_from skipped because run store is unavailable")
+		return nil
+	}
+	blocks := make([]string, 0, len(sourceIDs))
+	for _, rawID := range sourceIDs {
+		sourceID := strings.TrimSpace(rawID)
+		if !validContextFromJobID(sourceID) {
+			log.Warn("cron: context_from skipped invalid job id", "job_id", sourceID)
+			continue
+		}
+		output, ok, err := runStore.LatestCompletedOutput(ctx, sourceID)
+		if err != nil {
+			log.Warn("cron: context_from output read failed", "job_id", sourceID, "err", err)
+			continue
+		}
+		output = strings.TrimSpace(output)
+		if !ok || output == "" {
+			log.Info("cron: context_from source has no completed output", "job_id", sourceID)
+			continue
+		}
+		blocks = append(blocks, formatContextFromBlock(sourceID, boundContextFromOutput(output)))
+	}
+	return blocks
+}
+
+func formatContextFromBlock(sourceID, output string) string {
+	return fmt.Sprintf(
+		"## Output from job '%s'\n"+
+			"The following is the most recent output from a preceding cron job. Use it as context for your analysis.\n\n"+
+			"```\n%s\n```\n\n",
+		sourceID,
+		output,
+	)
+}
+
+func boundContextFromOutput(output string) string {
+	if len(output) <= maxContextFromOutputChars {
+		return output
+	}
+	return output[:maxContextFromOutputChars] + contextFromTruncated
+}
+
+func validContextFromJobID(id string) bool {
+	if len(id) != 32 {
+		return false
+	}
+	for _, r := range id {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // DetectSilent returns true ONLY when the final response, after

@@ -9936,9 +9936,9 @@
             },
             {
               "name": "Cron context_from output chaining",
-              "status": "planned",
+              "status": "complete",
               "contract": "Cron jobs can reference prior job outputs as bounded prompt context without waiting for same-tick jobs or reading outside the cron output store",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9972,7 +9972,7 @@
                 "Prompt assembly injects the most recent completed output from each referenced job before the job prompt, truncates each output at 8000 characters with a marker, and skips missing/deleted/unreadable outputs without failing the run.",
                 "The implementation reuses the Go cron store/run audit or a derived output read model instead of introducing Hermes' Markdown output directory as source of truth."
               ],
-              "note": "Refined 2026-04-26: blocked on the new `Cronjob tool action envelope over native store` row instead of the deprecated umbrella. Hermes b35d692f/755a2804 added cron job chaining through context_from. Gormes should preserve the behavior over its SQLite/bbolt cron substrate and CRON.md mirror, not by copying Hermes' ~/.hermes/cron/output directory layout.",
+              "note": "Complete: TDD added Go-native cron context_from prompt chaining over RunStore output previews. Executor prompt assembly now injects the most recent completed output for referenced job IDs before the base prompt, truncates each context block at 8000 characters with a marker, skips invalid/missing/not-yet-run/unreadable sources with log evidence, and keeps the source of truth in SQLite/bbolt rather than Hermes' Markdown output directory.",
               "write_scope": [
                 "internal/cron/",
                 "internal/tools/",
@@ -9987,10 +9987,15 @@
               "done_signal": [
                 "Cron context_from fixtures prove validation, clearing, most-recent-output injection, truncation, and graceful skip behavior over the Go cron store."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T01:28:16Z",
+                "last_success": "2026-04-27T01:28:16Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-26T23:52:41Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",

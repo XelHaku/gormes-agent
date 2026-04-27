@@ -90,6 +90,28 @@ func (s *RunStore) LatestRuns(ctx context.Context, jobID string, limit int) ([]R
 	return out, rows.Err()
 }
 
+// LatestCompletedOutput returns the most recent non-empty output preview for a
+// completed run of jobID. It intentionally reads the native cron run audit
+// instead of any file-based output directory.
+func (s *RunStore) LatestCompletedOutput(ctx context.Context, jobID string) (string, bool, error) {
+	var output string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COALESCE(output_preview, '')
+		FROM cron_runs
+		WHERE job_id = ?
+		  AND finished_at IS NOT NULL
+		  AND COALESCE(output_preview, '') <> ''
+		ORDER BY started_at DESC, id DESC
+		LIMIT 1`, jobID).Scan(&output)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return output, true, nil
+}
+
 // runFinishedAtValue returns nil for a zero FinishedAt so the column
 // stays NULL (distinguishable from a genuinely-zero finish timestamp).
 func runFinishedAtValue(n int64) any {
