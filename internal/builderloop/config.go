@@ -71,6 +71,8 @@ type Config struct {
 	PRConflictAction        string   // PR_INTAKE_CONFLICT_ACTION, default close
 	PRIntakeEmptyBackoff    time.Duration
 	AutoCommitDirtyWorktree bool // AUTO_COMMIT_DIRTY_WORKTREE, default true for CLI cycles
+	PromotionMode           string // BUILDER_LOOP_PROMOTION_MODE, default cherry-pick; pr is opt-in
+	PushMainOnComplete      bool   // BUILDER_LOOP_PUSH_MAIN, default true for CLI cycles
 
 	PostPromotionVerifyCommands []string // POST_PROMOTION_VERIFY_COMMANDS, default full-suite gate
 	PostPromotionRepairEnabled  bool     // POST_PROMOTION_REPAIR, default true
@@ -173,6 +175,8 @@ func ConfigFromEnv(repoRoot string, lookup EnvLookup) (Config, error) {
 		PRConflictAction:        PRConflictActionClose,
 		PRIntakeEmptyBackoff:    5 * time.Minute,
 		AutoCommitDirtyWorktree: true,
+		PromotionMode:           "cherry-pick",
+		PushMainOnComplete:      true,
 
 		PostPromotionVerifyCommands: defaultPostPromotionVerifyCommands(),
 		PostPromotionRepairEnabled:  true,
@@ -327,6 +331,20 @@ func ConfigFromEnv(repoRoot string, lookup EnvLookup) (Config, error) {
 		}
 		cfg.AutoCommitDirtyWorktree = b
 	}
+	if value := envValue(lookup, "BUILDER_LOOP_PROMOTION_MODE"); value != "" {
+		mode, err := parsePromotionMode(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("BUILDER_LOOP_PROMOTION_MODE: %w", err)
+		}
+		cfg.PromotionMode = mode
+	}
+	if value := envValue(lookup, "BUILDER_LOOP_PUSH_MAIN"); value != "" {
+		b, err := parseBoolEnv(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("BUILDER_LOOP_PUSH_MAIN: %w", err)
+		}
+		cfg.PushMainOnComplete = b
+	}
 	if value := envValue(lookup, "POST_PROMOTION_VERIFY_COMMANDS"); value != "" {
 		commands := splitCommandList(value)
 		if len(commands) == 0 {
@@ -466,4 +484,14 @@ func parsePRConflictAction(value string) (string, error) {
 		return PRConflictActionSkip, nil
 	}
 	return "", fmt.Errorf("invalid action %q (want close or skip)", value)
+}
+
+func parsePromotionMode(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "pr":
+		return "pr", nil
+	case "cherry-pick":
+		return "cherry-pick", nil
+	}
+	return "", fmt.Errorf("invalid mode %q (want pr or cherry-pick)", value)
 }

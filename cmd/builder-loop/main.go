@@ -589,7 +589,11 @@ func defaultAutoloopRuntime(deps cliDeps, root string) autoloopRuntime {
 			return nil
 		},
 		checkpoint: func(ctx context.Context, cfg builderloop.Config) error {
-			return builderloop.CheckpointDirtyWorktree(ctx, cfg, loopCheckpointRunID(time.Now().UTC()))
+			runID := loopCheckpointRunID(time.Now().UTC())
+			if err := builderloop.CheckpointDirtyWorktree(ctx, cfg, runID); err != nil {
+				return err
+			}
+			return builderloop.PushMainIfConfigured(ctx, cfg, runner, runID, "loop_checkpoint")
 		},
 		sleep: sleepContext,
 	}

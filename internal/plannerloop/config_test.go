@@ -48,6 +48,9 @@ func TestConfigFromEnvDefaultsToArchitecturePlannerPaths(t *testing.T) {
 	if cfg.BackendTimeout != 20*time.Minute {
 		t.Fatalf("BackendTimeout = %s, want 20m", cfg.BackendTimeout)
 	}
+	if !cfg.GitRepairEnabled {
+		t.Fatalf("GitRepairEnabled = false, want true")
+	}
 }
 
 func TestConfigFromEnvPreservesLegacyRunRootWhenCanonicalOnlyHasTriggers(t *testing.T) {
@@ -95,6 +98,7 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 		"PLANNER_IMPL_LOOKBACK":         "48h",
 		"PLANNER_TRIGGER_REASON":        "impl_change",
 		"PLANNER_BACKEND_TIMEOUT":       "7m",
+		"PLANNER_GIT_REPAIR":            "0",
 	}))
 	if err != nil {
 		t.Fatalf("ConfigFromEnv() error = %v", err)
@@ -144,6 +148,9 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 	}
 	if cfg.BackendTimeout != 7*time.Minute {
 		t.Fatalf("BackendTimeout = %s, want 7m", cfg.BackendTimeout)
+	}
+	if cfg.GitRepairEnabled {
+		t.Fatalf("GitRepairEnabled = true, want false")
 	}
 }
 

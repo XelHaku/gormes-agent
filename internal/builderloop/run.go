@@ -328,7 +328,10 @@ func RunOnce(ctx context.Context, opts RunOptions) (RunSummary, error) {
 		}); err != nil {
 			return errors.Join(err, flushHealth())
 		}
-		return flushHealth()
+		if err := flushHealth(); err != nil {
+			return err
+		}
+		return PushMainIfConfigured(ctx, opts.Config, runner, runID, "run_completed")
 	}
 
 	argv, err := BuildBackendCommand(opts.Config.Backend, opts.Config.Mode)
@@ -1112,6 +1115,8 @@ func postPromotionCommandEnv(cfg Config) []string {
 		"MAX_RETRIES=",
 		"CANDIDATE_LOW_WATERMARK=",
 		"MIN_MEM_PER_WORKER_MB=",
+		"BUILDER_LOOP_PROMOTION_MODE=cherry-pick",
+		"BUILDER_LOOP_PUSH_MAIN=0",
 	}
 	if len(cfg.PriorityBoost) > 0 {
 		env = append(env, "PRIORITY_BOOST="+strings.Join(cfg.PriorityBoost, ","))
@@ -1986,10 +1991,11 @@ func preflightCleanWorktree(cfg Config, runID string) error {
 
 func promoteWorkerCommit(ctx context.Context, cfg Config, runner Runner, runID string, workerID int, task string, workerBranch string, commitSha string) error {
 	err := PromoteWorker(ctx, PromoteOptions{
-		Runner:       runner,
-		RepoRoot:     cfg.RepoRoot,
-		WorkerBranch: workerBranch,
-		WorkerCommit: commitSha,
+		Runner:        runner,
+		RepoRoot:      cfg.RepoRoot,
+		WorkerBranch:  workerBranch,
+		WorkerCommit:  commitSha,
+		PromotionMode: cfg.PromotionMode,
 	})
 	if err != nil {
 		if ledgerErr := appendRunLedgerEvent(cfg, LedgerEvent{
@@ -2059,6 +2065,56 @@ func commitRunHealth(ctx context.Context, cfg Config, runner Runner) error {
 		return fmt.Errorf("commit progress health: %w", commit.Err)
 	}
 	return nil
+}
+
+func PushMainIfConfigured(ctx context.Context, cfg Config, runner Runner, runID, reason string) error {
+	if !cfg.PushMainOnComplete || cfg.RepoRoot == "" || !repoHasGit(cfg.RepoRoot) {
+		return nil
+	}
+	if runner == nil {
+		runner = ExecRunner{}
+	}
+
+	detail := ""
+	if strings.TrimSpace(reason) != "" {
+		detail = "reason=" + reason
+	}
+	if err := appendRunLedgerEvent(cfg, LedgerEvent{
+		TS:     time.Now().UTC(),
+		RunID:  runID,
+		Event:  "main_push_started",
+		Status: "started",
+		Detail: detail,
+	}); err != nil {
+		return err
+	}
+
+	result := runner.Run(ctx, Command{
+		Name: "git",
+		Args: []string{"push", "origin", "HEAD:main"},
+		Dir:  cfg.RepoRoot,
+	})
+	if result.Err != nil {
+		pushErr := promotionCommandError("git push origin HEAD:main", result)
+		if ledgerErr := appendRunLedgerEvent(cfg, LedgerEvent{
+			TS:     time.Now().UTC(),
+			RunID:  runID,
+			Event:  "main_push_failed",
+			Status: "failed",
+			Detail: pushErr.Error(),
+		}); ledgerErr != nil {
+			return errors.Join(pushErr, ledgerErr)
+		}
+		return pushErr
+	}
+
+	return appendRunLedgerEvent(cfg, LedgerEvent{
+		TS:     time.Now().UTC(),
+		RunID:  runID,
+		Event:  "main_push_completed",
+		Status: "ok",
+		Detail: detail,
+	})
 }
 
 func removeCleanWorkerWorktree(repoRoot, worktreePath string) {

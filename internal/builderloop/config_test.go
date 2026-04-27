@@ -52,6 +52,12 @@ func TestConfigFromEnvDefaultsToRepoRootPaths(t *testing.T) {
 	if cfg.BackendTimeout != 30*time.Minute {
 		t.Fatalf("BackendTimeout = %s, want 30m", cfg.BackendTimeout)
 	}
+	if cfg.PromotionMode != "cherry-pick" {
+		t.Fatalf("PromotionMode = %q, want cherry-pick", cfg.PromotionMode)
+	}
+	if cfg.PushMainOnComplete != true {
+		t.Fatalf("PushMainOnComplete = %v, want true", cfg.PushMainOnComplete)
+	}
 }
 
 func TestConfigFromEnvReadsOverrides(t *testing.T) {
@@ -65,6 +71,8 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 		"MAX_PHASE":                "5",
 		"PRIORITY_BOOST":           "3.E.7, 4.A ",
 		"AUTOLOOP_BACKEND_TIMEOUT": "9m",
+		"BUILDER_LOOP_PROMOTION_MODE": "pr",
+		"BUILDER_LOOP_PUSH_MAIN":      "0",
 	}))
 	if err != nil {
 		t.Fatalf("ConfigFromEnv() error = %v", err)
@@ -95,6 +103,12 @@ func TestConfigFromEnvReadsOverrides(t *testing.T) {
 	}
 	if cfg.BackendTimeout != 9*time.Minute {
 		t.Fatalf("BackendTimeout = %s, want 9m", cfg.BackendTimeout)
+	}
+	if cfg.PromotionMode != "pr" {
+		t.Fatalf("PromotionMode = %q, want pr", cfg.PromotionMode)
+	}
+	if cfg.PushMainOnComplete != false {
+		t.Fatalf("PushMainOnComplete = %v, want false", cfg.PushMainOnComplete)
 	}
 }
 
