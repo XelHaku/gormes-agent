@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T04:32:08Z",
+    "last_updated": "2026-04-27T04:52:17Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1903,7 +1903,7 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:32:08Z",
+            "last_upstream_check": "2026-04-27T04:52:17Z",
             "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; after a worker_error on the broader row, Gormes tracks it as three dependency-ordered slices. Hermes cebf9585 adds bounded MessageDeduplicator eviction; after a status-field validation failure, Gormes now splits that work into a pure shared helper and a dependent manager wiring row so platform adapters stay thin. Hermes 91512b82/6993e566 adds WhatsApp identifier hardening; after write-scope failures, Gormes now splits that work into a pure identifier safety predicate and a dependent inbound-evidence row so the completed 2.B.4 adapter runtime remains closed."
           }
         },
@@ -3676,7 +3676,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T04:18:56Z"
+                "last_reshape": "2026-04-27T04:18:56Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -5966,6 +5967,70 @@
               }
             },
             {
+              "name": "Azure Foundry Responses-only model-family API mode",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Azure Foundry runtime resolution upgrades GPT-5.x, codex, o1, o3, and o4 deployment/model names to codex_responses unless the configured api_mode is anthropic_messages, while leaving GPT-4o, GPT-4.1, Llama, Mistral, Grok, empty names, and explicit non-Anthropic configured modes on their existing mode",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Provider status reports azure_foundry_api_mode_inferred, azure_foundry_api_mode_preserved, or azure_foundry_api_mode_unknown evidence instead of sending Responses-only Azure deployments to /chat/completions.",
+              "fixture": "internal/hermes/azure_foundry_api_mode_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/models.py@c5781d50:azure_foundry_model_api_mode",
+                "../hermes-agent/hermes_cli/runtime_provider.py@c5781d50:_resolve_azure_foundry_runtime",
+                "../hermes-agent/tests/hermes_cli/test_model_validation.py@c5781d50:TestAzureFoundryModelApiMode",
+                "../hermes-agent/tests/hermes_cli/test_runtime_provider_resolution.py@c5781d50:TestAzureFoundryResolution",
+                "internal/hermes/azure_foundry_runtime.go",
+                "internal/hermes/azure_foundry_runtime_test.go"
+              ],
+              "ready_when": [
+                "Azure Foundry runtime env/config read model is validated and owns the redacted runtime result shape.",
+                "The worker can prove this with pure model-name/config fixtures; no live Azure endpoint, setup wizard, HTTP probe, or credential lookup is required.",
+                "Use the existing Gormes AzureTransport/API-mode vocabulary; do not introduce Hermes Python api_mode strings anywhere outside the mapper boundary."
+              ],
+              "not_ready_when": [
+                "The slice changes Azure Foundry path sniffing, /models probing, Anthropic endpoint normalization, CLI status rendering, or request-builder payload serialization in the same diff.",
+                "The slice downgrades explicit anthropic_messages or invents a live model catalog lookup to decide the API mode.",
+                "The tests require AZURE_FOUNDRY_API_KEY, network access, or persisted config files."
+              ],
+              "blocked_by": [
+                "Azure Foundry runtime env/config read model"
+              ],
+              "acceptance": [
+                "TestAzureFoundryAPIMode_ResponsesFamilies maps gpt-5, gpt-5.3-codex, gpt-5-mini, codex, codex-mini, o1-preview, o3-mini, and o4-mini to the Gormes codex_responses mode.",
+                "TestAzureFoundryAPIMode_NonResponsesFamilies returns no override for gpt-4o, gpt-4.1, gpt-3.5-turbo, llama-3.1, mistral-large, grok-4, empty, and whitespace model names.",
+                "TestAzureFoundryAPIMode_StripsVendorPrefixAndCase proves openai/GPT-5.3-Codex still infers codex_responses while openai/gpt-4o does not.",
+                "TestAzureFoundryRuntime_TargetModelOverridesDefault proves a target_model=/model switch to gpt-5.3-codex upgrades a stale gpt-4o default before the next request.",
+                "TestAzureFoundryRuntime_AnthropicMessagesGuard proves an explicit anthropic_messages runtime is preserved even when the model string looks like gpt-5."
+              ],
+              "note": "Added 2026-04-27 after Hermes c5781d50 found Azure Foundry GPT-5.x/codex/o-series deployments reject chat.completions with 400 unsupported-operation. Gormes already has probe/runtime/status rows, so this is a narrow model-family inference slice on the native runtime read model.",
+              "write_scope": [
+                "internal/hermes/azure_foundry_api_mode.go",
+                "internal/hermes/azure_foundry_api_mode_test.go",
+                "internal/hermes/azure_foundry_runtime.go",
+                "internal/hermes/azure_foundry_runtime_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run 'TestAzureFoundryAPIMode|TestAzureFoundryRuntime' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Azure Foundry fixtures prove Responses-only family inference, target-model precedence, non-OpenAI preservation, anthropic_messages guard, and zero live Azure dependency."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:c5781d50 hermes_cli/models.py",
+                "note": "Hermes supplies the Azure Foundry model-family routing regression; Gormes adapts it to the Go runtime read model after probe/config evidence is already validated."
+              }
+            },
+            {
               "name": "Bedrock",
               "status": "planned",
               "note": "Umbrella only: do not assign directly. Five codexu/* worker attempts on 2026-04-23 produced broad Bedrock adapters that did not merge, but the pure request-body mapping has since landed as internal/hermes/bedrock_converse.go and internal/hermes/bedrock_converse_mapping_test.go. Remaining work is dependency-ordered: stream event decoding -> SigV4/credential seam -> stale-client eviction/retry classification. No worker should attempt a full Bedrock adapter until those three rows are validated."
@@ -6614,8 +6679,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T22:45:56Z",
-            "origin_decision": "Hermes 755a2804 is current after the 2026-04-26 sync. Gormes provider fixtures now validate DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, Azure Foundry probing, Codex Responses conversion/repair, and Bedrock request-body mapping. Bedrock remains upstream-led but no longer blank: the next safe executable slice is pure ConverseStream event decoding, followed by a blocked SigV4/credential seam and then stale-client cache eviction. Azure Foundry remains upstream-led for runtime env/config read-model closeout. Later Hermes 192e7eb2 provider-rate drift is tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift are tracked under 5.O/4.D."
+            "last_upstream_check": "2026-04-27T04:52:17Z",
+            "origin_decision": "Hermes 4a2ee6c1 is current after the 2026-04-27 sync. Gormes provider fixtures validate DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, Azure Foundry probing/runtime/status, Codex Responses conversion/repair, and Bedrock request/cache mapping. Hermes c5781d50 adds Azure Foundry GPT-5.x/codex/o-series Responses-only api_mode inference; Gormes tracks that as a small runtime read-model row instead of reopening the probe/status rows. Bedrock remains upstream-led for ConverseStream event decoding and the blocked SigV4/credential seam. Hermes 192e7eb2 provider-rate drift remains tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift remain under 5.O/4.D."
           }
         },
         "4.B": {
@@ -6962,6 +7027,72 @@
               }
             },
             {
+              "name": "Compression protected-tail multimodal length estimator",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Context-compression tail/protect-boundary code uses one pure content-length estimator that counts plain strings by rune length, list/map text blocks by their text field length, bare string list items by their own length, unknown list items by fmt.Sprint length, and image-only blocks as zero text chars; it must never call .get-style assumptions on non-map content and must not mutate message history",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Context status reports compression_length_estimator_unavailable and falls back to conservative tail preservation instead of crashing on mixed multimodal content.",
+              "fixture": "internal/hermes/context_compressor_content_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/context_compressor.py@cfc8befe:_find_tail_cut_by_tokens",
+                "../hermes-agent/agent/context_compressor.py@94346523:_find_tail_cut_by_tokens",
+                "../hermes-agent/agent/context_compressor.py@bda2dbc2:_calculate_protect_tail_boundary",
+                "../hermes-agent/tests/agent/test_context_compressor.py@cfc8befe:TestTokenBudgetTailProtection",
+                "internal/hermes/context_compressor_budget.go",
+                "internal/hermes/context_engine.go"
+              ],
+              "ready_when": [
+                "Compression token-budget trigger + summary sizing and Aux compression single-prompt threshold reconciliation are validated on main.",
+                "The worker can write table tests over synthetic string/map/list content values without invoking the kernel, provider clients, summarizer, or transcript storage.",
+                "This is a helper-only row; later pruning/head-tail rows consume it when they mutate live message history."
+              ],
+              "not_ready_when": [
+                "The slice changes kernel transcript lineage, summarization prompts, tool-result pruning, manual compression, provider routing, or Goncho/Honcho memory extraction.",
+                "The implementation treats image_url-only blocks as the number of blocks instead of zero text chars plus caller overhead.",
+                "The tests depend on live multimodal provider requests or Python fixtures rather than synthetic Go values."
+              ],
+              "blocked_by": [
+                "Aux compression single-prompt threshold reconciliation"
+              ],
+              "unblocks": [
+                "Tool-result pruning + protected head/tail summary",
+                "ContextEngine compression-boundary notification"
+              ],
+              "acceptance": [
+                "TestCompressionContentLength_PlainString counts a 500-character string as 500 chars and preserves existing budget math expectations.",
+                "TestCompressionContentLength_MultimodalTextAndImage counts only text fields from mixed text/image blocks, not len(list).",
+                "TestCompressionContentLength_BareStringsInList covers []any{\"hello\", map[string]any{\"text\":\"extra\"}} without panic and sums both text sources.",
+                "TestCompressionContentLength_UnknownListItemFallback converts non-map/non-string list items with fmt.Sprint or equivalent deterministic fallback.",
+                "TestCompressionContentLength_ImageOnlyBlockZeroText proves image-only maps contribute zero text chars before the caller adds per-message overhead."
+              ],
+              "note": "Added after Hermes cfc8befe/94346523/bda2dbc2 fixed three related compressor crashes/underestimates around multimodal lists and bare strings. Gormes keeps this as a pure estimator first so future head/tail pruning does not rediscover Python's content-shape assumptions.",
+              "write_scope": [
+                "internal/hermes/context_compressor_content.go",
+                "internal/hermes/context_compressor_content_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run '^TestCompressionContentLength_' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Compression content-length fixtures prove plain strings, multimodal text blocks, bare strings in lists, unknown list-item fallback, and image-only zero-text handling without provider or kernel side effects."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:cfc8befe+94346523+bda2dbc2 agent/context_compressor.py",
+                "note": "Hermes supplies the multimodal/bare-string compressor regressions; Gormes adapts the invariant as a Go helper before live history pruning is implemented."
+              }
+            },
+            {
               "name": "Manual compression feedback + context references",
               "status": "planned",
               "note": "TDD: port `manual_compression_feedback.py` and `context_references.py` as separate read/write contracts so user-visible compression feedback and reference handles are testable without a provider call."
@@ -7046,8 +7177,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T02:20:01Z",
-            "origin_decision": "Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, superseding the earlier f92006ce/6e561ffa tool-schema headroom rationale while preserving d635e2df provider-cap lookup. Hermes e85b7525 adds an explicit compression-boundary signal to the context engine. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation, so this subphase remains upstream-led until compression-boundary notification, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
+            "last_upstream_check": "2026-04-27T04:52:17Z",
+            "origin_decision": "Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, superseding the earlier f92006ce/6e561ffa tool-schema headroom rationale while preserving d635e2df provider-cap lookup. Hermes e85b7525 adds an explicit compression-boundary signal to the context engine, and cfc8befe/94346523/bda2dbc2 harden protected-tail token estimates for multimodal content lists and bare string items. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation, so this subphase remains upstream-led until the pure content estimator, compression-boundary notification, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
           }
         },
         "4.C": {
@@ -7485,14 +7616,196 @@
             {
               "name": "Title prompt and truncation contract",
               "status": "planned",
-              "note": "TDD: port `agent/title_generator.py` prompt inputs, length caps, empty-history fallback, and provider-error fallback with fake model responses before persistence wiring."
+              "contract": "Native title generation exposes a pure request/response boundary that builds Hermes-compatible title prompts from bounded session history, truncates candidate titles deterministically, returns empty-title fallback evidence for empty history or blank model output, and surfaces provider failures through a typed nonfatal error result without writing session metadata",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Title status reports auto_title_skipped, title_provider_failed, or title_blank_result evidence instead of silently leaving NULL titles with no operator-visible cause.",
+              "fixture": "internal/hermes/title_generator_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/title_generator.py@4a2ee6c1:generate_title",
+                "../hermes-agent/agent/title_generator.py@4a2ee6c1:maybe_auto_title",
+                "../hermes-agent/tests/agent/test_title_generator.py@4a2ee6c1",
+                "internal/tui/auto_title.go",
+                "internal/session/",
+                "internal/transcript/"
+              ],
+              "ready_when": [
+                "TUI prompt-submit auto-title eligibility helper is validated, so callers can produce a TitleRequest without starting provider work inside the TUI update loop.",
+                "The worker can use a fake title model function and synthetic history; no provider credential, goroutine, TUI program, or session DB write is required."
+              ],
+              "not_ready_when": [
+                "The slice writes session.Metadata, starts background title workers, changes TUI submit behavior, or calls a live LLM.",
+                "The slice swallows provider failures without returning typed evidence that the CLI/gateway can surface later.",
+                "The slice mutates transcript history or uses Goncho/Honcho memory as a title source."
+              ],
+              "acceptance": [
+                "TestTitlePrompt_BuildsFromBoundedHistory proves only the configured recent user/assistant turns enter the prompt and long content is truncated before model invocation.",
+                "TestTitleGenerator_TruncatesAndCleansCandidate proves whitespace/newline/quote cleanup plus deterministic max-title-length truncation.",
+                "TestTitleGenerator_EmptyHistorySkipsModel returns skipped evidence and never calls the fake model.",
+                "TestTitleGenerator_BlankModelOutput returns title_blank_result evidence without writing metadata.",
+                "TestTitleGenerator_ProviderFailureReturnsTypedEvidence proves the fake model error is returned as nonfatal title_provider_failed evidence."
+              ],
+              "note": "Refined 2026-04-27 after Hermes 4a2ee6c1 made title-generation failures visible through the auxiliary failure channel. This first Gormes row owns only the pure prompt/model-result boundary; persistence and callback routing are separate rows.",
+              "write_scope": [
+                "internal/hermes/title_generator.go",
+                "internal/hermes/title_generator_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run '^TestTitle' -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Title generator fixtures prove bounded prompt construction, candidate cleanup/truncation, empty-history skip, blank-output evidence, and provider-failure evidence with a fake model only."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T04:49:49Z"
+              },
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:4a2ee6c1 agent/title_generator.py",
+                "note": "Hermes defines the title prompt/failure behavior; Gormes ports it as a pure provider-boundary helper before session persistence wiring."
+              }
+            },
+            {
+              "name": "Title auxiliary failure visibility",
+              "status": "planned",
+              "contract": "CLI and gateway title-generation callers route nonfatal title_provider_failed evidence through the same operator-visible auxiliary-failure channel used for other background provider failures, while swallowing callback errors so title generation cannot crash the foreground turn",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "If the failure callback is unavailable or itself fails, title generation records callback_failed evidence and preserves the foreground turn instead of panicking or hiding the provider failure.",
+              "fixture": "internal/kernel/title_failure_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/title_generator.py@4a2ee6c1:failure_callback",
+                "../hermes-agent/cli.py@4a2ee6c1:_emit_auxiliary_failure",
+                "../hermes-agent/gateway/run.py@4a2ee6c1:_emit_auxiliary_failure",
+                "../hermes-agent/tests/agent/test_title_generator.py@4a2ee6c1:test_failure_callback",
+                "internal/hermes/title_generator.go",
+                "internal/kernel/",
+                "internal/gateway/"
+              ],
+              "ready_when": [
+                "Title prompt and truncation contract is validated and returns typed title_provider_failed evidence.",
+                "Kernel/gateway already surface provider and auxiliary degraded evidence through RenderFrame or gateway status fixtures."
+              ],
+              "not_ready_when": [
+                "The title prompt helper is not complete in the worker checkout.",
+                "The slice writes session title metadata, starts a persistent worker, changes provider retry behavior, or calls live providers.",
+                "Callback errors are allowed to abort foreground CLI/gateway turns."
+              ],
+              "blocked_by": [
+                "Title prompt and truncation contract"
+              ],
+              "acceptance": [
+                "TestTitleFailureCallback_FiresOnProviderError proves title_provider_failed evidence reaches a fake auxiliary-failure sink exactly once.",
+                "TestTitleFailureCallback_SwallowsCallbackError proves sink errors return callback_failed evidence without panicking or changing the foreground turn result.",
+                "TestTitleFailureCallback_NoCallbackLegacyPath proves missing callbacks preserve the nonfatal title result and do not require operator channel wiring.",
+                "Gateway/CLI fake-turn fixtures prove the user-visible warning channel receives the provider message without persisting a title."
+              ],
+              "note": "Second title-generation slice for Hermes 4a2ee6c1. Keep callback routing separate from title prompt construction and from session metadata writes so workers do not mix provider, gateway, and persistence concerns.",
+              "write_scope": [
+                "internal/hermes/title_generator.go",
+                "internal/hermes/title_generator_test.go",
+                "internal/kernel/title_failure_test.go",
+                "internal/gateway/title_failure_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes ./internal/kernel ./internal/gateway -run '^TestTitleFailure' -count=1",
+                "go test ./internal/hermes ./internal/kernel ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Title failure fixtures prove provider errors reach the auxiliary warning sink, callback errors are swallowed with evidence, and no title persistence or live provider call occurs."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:4a2ee6c1 cli.py,gateway/run.py",
+                "note": "Hermes routes title-generator failures through _emit_auxiliary_failure; Gormes adapts that behavior to native CLI/gateway evidence after the title helper exists."
+              }
             },
             {
               "name": "Auto-naming sessions",
               "status": "planned",
-              "note": "TDD: update session-title persistence only after the title contract is green, proving titles are generated once, can be manually overridden, and do not mutate historical transcript content."
+              "contract": "Session auto-naming persists exactly one generated title for eligible untitled sessions after the native title helper succeeds, respects manual title overrides, preserves historical transcript content, and records skip/failure evidence without retry storms",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Untitled sessions remain searchable with auto_title_skipped or title_provider_failed evidence instead of being repeatedly retried without user-visible status.",
+              "fixture": "internal/session/auto_title_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/title_generator.py@4a2ee6c1:maybe_auto_title",
+                "../hermes-agent/tests/agent/test_title_generator.py@4a2ee6c1",
+                "internal/hermes/title_generator.go",
+                "internal/session/",
+                "internal/transcript/"
+              ],
+              "ready_when": [
+                "Title prompt and truncation contract and Title auxiliary failure visibility are validated on main.",
+                "Session metadata write helpers can be exercised with temp stores; no live provider or TUI program is required."
+              ],
+              "not_ready_when": [
+                "The slice starts title persistence before the pure title helper and failure visibility rows are complete.",
+                "The slice overwrites manual titles, mutates transcript turns, or creates background retry loops without bounded evidence."
+              ],
+              "blocked_by": [
+                "Title prompt and truncation contract",
+                "Title auxiliary failure visibility"
+              ],
+              "acceptance": [
+                "TestAutoTitleSession_WritesOnceForUntitledSession stores the generated title and marks auto_title_complete.",
+                "TestAutoTitleSession_ManualTitlePreserved proves existing/manual titles are not overwritten.",
+                "TestAutoTitleSession_FailureEvidenceNoRetryStorm records title_provider_failed once and does not enqueue repeated provider calls in the same turn.",
+                "TestAutoTitleSession_DoesNotMutateTranscript compares transcript turn content before and after auto-title persistence."
+              ],
+              "note": "Blocked persistence row. It remains draft until pure title generation and failure visibility are validated, preventing workers from hiding provider/session side effects inside title prompt work.",
+              "write_scope": [
+                "internal/session/auto_title.go",
+                "internal/session/auto_title_test.go",
+                "internal/transcript/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/session ./internal/transcript -run '^TestAutoTitleSession_' -count=1",
+                "go test ./internal/session ./internal/transcript ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Auto-title persistence fixtures prove one-time title writes, manual-title preservation, failure evidence, no retry storm, and transcript immutability."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T04:49:49Z"
+              },
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:4a2ee6c1 agent/title_generator.py",
+                "note": "Hermes defines maybe_auto_title persistence behavior; Gormes wires it only after native title/failure boundaries are fixture-backed."
+              }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T04:52:17Z",
+            "origin_decision": "Hermes 4a2ee6c1 makes title-generation failures visible through _emit_auxiliary_failure after provider errors were previously swallowed. Gormes has a native TUI auto-title eligibility helper but no title prompt/model boundary, no auxiliary failure routing, and no session title persistence, so this subphase remains upstream-led and is split into prompt/failure/persistence rows."
+          }
         },
         "4.G": {
           "name": "Credentials + OAuth",
@@ -7608,7 +7921,8 @@
               ],
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T04:18:56Z"
+                "last_reshape": "2026-04-27T04:18:56Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -10879,7 +11193,7 @@
                 "since": "2026-04-27T04:18:56Z",
                 "reshape_count": 4,
                 "last_reshape": "2026-04-27T04:18:56Z",
-                "last_outcome": "still_failing"
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -11105,6 +11419,75 @@
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:755a2804 cron/jobs.py:parse_schedule",
                 "note": "Hermes defines the operator schedule grammar; Gormes adapts it as a Go-native pure parser before exposing tool mutation."
+              }
+            },
+            {
+              "name": "Cron recurring next-run failure preservation",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "internal/cron adds a pure run-completion state helper and executor post-run hook that updates LastRunUnix, LastStatus, and RepeatCompleted after every run while preserving recurring cron/interval jobs as active (Paused=false) when next-run computation is unavailable or returns no future time; one-shot or finite-repeat exhaustion may become terminal, but recurring compute failures must produce typed evidence instead of being confused with user pause/completion",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "When the next-run decision cannot be computed for a recurring schedule, the job remains unpaused with LastStatus=error and run-store/evidence text describing cron_next_run_unavailable; the scheduler may skip the bad tick but must not silently disable the schedule.",
+              "fixture": "internal/cron/run_completion_test.go",
+              "source_refs": [
+                "../hermes-agent/cron/jobs.py@7c63c246:mark_job_run",
+                "../hermes-agent/cron/jobs.py@7c63c246:compute_next_run",
+                "../hermes-agent/tests/cron/test_jobs.py@7c63c246:test_recurring_cron_not_disabled_when_croniter_missing",
+                "../hermes-agent/tests/cron/test_jobs.py@7c63c246:test_recurring_interval_not_disabled_when_next_run_is_none",
+                "../hermes-agent/tests/cron/test_jobs.py@7c63c246:test_oneshot_still_completes_when_next_run_is_none",
+                "internal/cron/job.go:Job",
+                "internal/cron/schedule_parser.go:CronNextRunDecision",
+                "internal/cron/executor.go:recordAndUpdateJob"
+              ],
+              "ready_when": [
+                "Cron schedule parser + repeat state fixtures is validated, so the worker can reuse ParsedSchedule/CronNextRunDecision instead of re-parsing operator text ad hoc.",
+                "Executor already funnels all success, timeout, suppressed, delivery-error, and submit-error paths through recordAndUpdateJob, so the post-run hook can be covered with fake stores and synthetic Run values.",
+                "Tests can inject a fixed now time and fake next-run function; no live scheduler ticker, provider, gateway, croniter, or wall clock is required."
+              ],
+              "not_ready_when": [
+                "The slice changes cronjob tool create/update/list behavior, API admin endpoints, channel delivery, RunStore schema, or scheduler registration/reload logic.",
+                "The implementation pauses recurring jobs when next-run computation fails or overloads Paused to mean both user pause and schedule-compute error.",
+                "The tests require a running robfig cron ticker, real time sleeps, provider credentials, or Hermes Python."
+              ],
+              "blocked_by": [
+                "Cron schedule parser + repeat state fixtures"
+              ],
+              "unblocks": [
+                "API server cron admin read-only endpoints"
+              ],
+              "acceptance": [
+                "TestCronRunCompletion_RecurringCronNextRunUnavailablePreservesActiveStatus proves a recurring cron-expression job remains Paused=false, increments RepeatCompleted, records LastRunUnix, and reports cron_next_run_unavailable evidence when the next-run decision is empty/error.",
+                "TestCronRunCompletion_RecurringIntervalNextRunUnavailablePreservesActiveStatus proves interval schedules follow the same active/error path as cron-expression schedules.",
+                "TestCronRunCompletion_OneShotNoNextRunBecomesTerminal proves one-shot jobs may be marked terminal without being treated as a user pause.",
+                "TestCronRunCompletion_FiniteRepeatExhaustionBecomesTerminal proves Repeat=3 and RepeatCompleted=2 transitions to completed after the third run, while RepeatCompleted=1 remains active.",
+                "TestExecutorRecordAndUpdateJob_UsesRunCompletionState proves success, timeout, and suppressed runs all pass through the helper and persist LastStatus/RepeatCompleted without starting Scheduler.Start."
+              ],
+              "note": "Added 2026-04-27 after Hermes 7c63c246 fixed recurring jobs being silently disabled when compute_next_run returned None. Gormes uses robfig/cron instead of Python croniter, but the same operator contract applies: recurring schedules should surface compute-state evidence and remain active unless the user pauses them or finite repeat exhaustion is reached.",
+              "write_scope": [
+                "internal/cron/run_completion.go",
+                "internal/cron/run_completion_test.go",
+                "internal/cron/executor.go",
+                "internal/cron/executor_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cron -run '^TestCronRunCompletion_|^TestExecutorRecordAndUpdateJob_UsesRunCompletionState' -count=1",
+                "go test ./internal/cron -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Cron run-completion fixtures prove recurring next-run failures preserve active jobs with evidence, one-shot/finite-repeat terminal behavior remains distinct, and Executor post-run updates use the helper without scheduler/provider side effects."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:7c63c246 cron/jobs.py",
+                "note": "Hermes supplies the recurring-job preservation regression; Gormes adapts the invariant to native cron Job/Run state instead of Python croniter."
               }
             },
             {
@@ -11406,8 +11789,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:32:08Z",
-            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Hermes dbe50155 adds a deterministic session-search recent-mode exclusion for the current lineage root; Gormes maps that onto the Phase 3 session catalog and Goncho/Honcho-compatible scope rules in the refined Session search row. After still-failing attempts, Session search is narrowed to a wrapper-only tool over internal/memory.SearchSessions/SearchMessages and explicitly excludes memory catalog or Goncho persistence edits. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, and CRON.md mirror; the cron umbrella is split into parser/repeat, safety, action-envelope, context_from, and delivery-plan rows so autoloop workers can advance Phase 5.N without guessing."
+            "last_upstream_check": "2026-04-27T04:52:17Z",
+            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Hermes 7c63c246 adds recurring-job preservation when next-run computation is unavailable; Gormes maps that to a native run-completion helper over Job/Run state because robfig/cron removes the Python croniter dependency but not the operator contract. Hermes dbe50155 adds a deterministic session-search recent-mode exclusion for the current lineage root; Gormes maps that onto the Phase 3 session catalog and Goncho/Honcho-compatible scope rules in the refined Session search row. After still-failing attempts, Session search is narrowed to a wrapper-only tool over internal/memory.SearchSessions/SearchMessages and explicitly excludes memory catalog or Goncho persistence edits. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, and CRON.md mirror; the cron umbrella is split into parser/repeat, run-completion preservation, safety, action-envelope, context_from, and delivery-plan rows so autoloop workers can advance Phase 5.N without guessing."
           }
         },
         "5.O": {
@@ -11624,6 +12007,62 @@
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:e63929d4 agent/onboarding.py",
                 "note": "Hermes defines the OpenClaw-residue first-touch hint; Gormes adapts the helper text and state shape before any command binding."
+              }
+            },
+            {
+              "name": "CLI bracketed-paste wrapper sanitizer",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "internal/cli exposes StripLeakedBracketedPasteWrappers(text string) string, a pure sanitizer that removes canonical ESC [200~/[201~ wrappers, visible caret-escape wrappers, degraded boundary [200~/[201~ wrappers, and boundary 00~/01~ fragments while preserving non-wrapper substrings inside ordinary text",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "If a terminal leaks bracketed-paste markers into a CLI buffer, Gormes strips only recognized boundary wrappers before command/path detection; ambiguous inline text is preserved rather than over-sanitized.",
+              "fixture": "internal/cli/paste_sanitizer_test.go",
+              "source_refs": [
+                "../hermes-agent/cli.py@a0fe73ba:_strip_leaked_bracketed_paste_wrappers",
+                "../hermes-agent/tests/cli/test_cli_bracketed_paste_sanitizer.py@a0fe73ba",
+                "internal/cli/command_registry.go",
+                "internal/cli/output.go"
+              ],
+              "ready_when": [
+                "internal/cli already has pure helper/test seams; this slice adds one sanitizer file and does not need Cobra command wiring.",
+                "Tests can use string literals for canonical escape, caret-escape, bracket-only, fragment-only, and normal-text inputs; no TTY, prompt toolkit, clipboard, or terminal emulator is required."
+              ],
+              "not_ready_when": [
+                "The slice edits cmd/gormes startup, TUI input handling, clipboard/image attachment behavior, file-drop detection, command dispatch, or gateway parsing.",
+                "The sanitizer deletes non-boundary substrings like build00~tag or literal[200~tag.",
+                "The tests depend on real terminal bracketed-paste mode or prompt_toolkit behavior."
+              ],
+              "acceptance": [
+                "TestStripLeakedBracketedPasteWrappers_CanonicalEscape strips \\u001b[200~hello\\u001b[201~ to hello.",
+                "TestStripLeakedBracketedPasteWrappers_CaretEscape strips ^[[200~hello^[[201~ to hello.",
+                "TestStripLeakedBracketedPasteWrappers_DegradedBracketBoundaries strips [200~hello[201~ at start/whitespace boundaries while preserving literal[200~tag.",
+                "TestStripLeakedBracketedPasteWrappers_FragmentBoundaries strips 00~hello01~ at start/whitespace boundaries while preserving build00~tag.",
+                "TestStripLeakedBracketedPasteWrappers_MultilinePreserved keeps embedded newlines and content bytes after wrapper removal."
+              ],
+              "note": "Added after Hermes a0fe73ba fixed leaked bracketed-paste wrappers in prompt_toolkit buffers. Gormes tracks the sanitizer as a pure internal/cli helper first so later CLI/TUI input binding does not mix terminal normalization with command dispatch.",
+              "write_scope": [
+                "internal/cli/paste_sanitizer.go",
+                "internal/cli/paste_sanitizer_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/cli -run '^TestStripLeakedBracketedPasteWrappers_' -count=1",
+                "go test ./internal/cli -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Paste sanitizer fixtures prove canonical/caret/degraded wrapper stripping, boundary fragment stripping, normal-text preservation, multiline preservation, and zero TTY/clipboard dependencies."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:a0fe73ba cli.py",
+                "note": "Hermes supplies the bracketed-paste leak regression; Gormes adapts it as a pure Go CLI helper before input-loop wiring."
               }
             },
             {
@@ -13125,7 +13564,7 @@
           "drift_state": {
             "status": "porting",
             "last_upstream_check": "2026-04-27T04:32:08Z",
-            "origin_decision": "Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; and 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes. Hermes e63929d4 adds one-time OpenClaw-residue onboarding after migration; Gormes tracks this as a pure internal/cli helper row with Gormes-specific cleanup text before any startup binding. Gormes has native oneshot/model override and helper rows, but it still lacks typed reasoning-effort propagation, gateway /reasoning session overrides, custom-endpoint doctor readiness fixtures, and a pure custom-provider model-switch resolver, so this CLI/gateway surface remains upstream-led."
+            "origin_decision": "Hermes 25ba6a4a moved /reasoning to session-scoped-by-default gateway state with --global persistence; b2d3308f fixed doctor so bare custom provider config is accepted; and 2c56dce0/1fdc31b2/8bbeaea6 fixed custom-provider model switching so named providers, configured cloud aliases, and env-template secrets survive CLI/TUI model changes. Hermes e63929d4 adds one-time OpenClaw-residue onboarding after migration and a0fe73ba strips leaked bracketed-paste wrappers from CLI buffers; Gormes tracks both as pure internal/cli helper rows before startup or input-loop binding. Gormes has native oneshot/model override and helper rows, but it still lacks typed reasoning-effort propagation, gateway /reasoning session overrides, custom-endpoint doctor readiness fixtures, and a pure custom-provider model-switch resolver, so this CLI/gateway surface remains upstream-led."
           }
         },
         "5.P": {
@@ -14800,7 +15239,8 @@
               ],
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T04:18:56Z"
+                "last_reshape": "2026-04-27T04:18:56Z",
+                "last_outcome": "no_attempts_yet"
               },
               "provenance": {
                 "origin_type": "hybrid",

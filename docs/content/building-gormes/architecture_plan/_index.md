@@ -37,7 +37,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 35/74 subphases shipped · 21 in progress · 18 planned
+**Overall:** 35/74 subphases shipped · 22 in progress · 17 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -127,7 +127,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 - [x] Non-editable gateway progress/commentary send fallback
-- [ ] WhatsApp identifier safety predicate
+- [x] WhatsApp identifier safety predicate
 - [ ] WhatsApp unsafe identifier inbound evidence
 - [x] Gateway fresh-final eligibility helper
 - [x] Gateway fresh-final send/delete fallback
@@ -229,9 +229,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Manager remember-source hook
 - [ ] Mirror + sticker cache surfaces
 
-### 2.F.5 — Gateway Mid-Run Steering + Active-Turn Policy ⏳
+### 2.F.5 — Gateway Mid-Run Steering + Active-Turn Policy 🔨
 
-- [ ] Steer slash command parser + preview helper
+- [x] Steer slash command parser + preview helper
 - [ ] Steer slash command registry + queue fallback
 - [ ] Mid-run steer injection between tool calls
 - [ ] Gateway-handled slash commands bypass active-session guard
@@ -366,6 +366,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Azure Foundry probe — /models classification + Anthropic fallback
 - [x] Azure Foundry runtime env/config read model
 - [x] Azure Foundry CLI setup/status manual fallback
+- [ ] Azure Foundry Responses-only model-family API mode
 - [ ] Bedrock
 - [x] Bedrock Converse payload mapping (no AWS SDK)
 - [x] Bedrock stream event decoding (SSE fixtures)
@@ -392,6 +393,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Aux compression provider-aware context cap
 - [ ] Tool-result pruning + protected head/tail summary
 - [x] Aux compression single-prompt threshold reconciliation
+- [ ] Compression protected-tail multimodal length estimator
 - [ ] Manual compression feedback + context references
 - [ ] ContextEngine compression-boundary notification
 
@@ -421,6 +423,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 4.F — Title Generation ⏳
 
 - [ ] Title prompt and truncation contract
+- [ ] Title auxiliary failure visibility
 - [ ] Auto-naming sessions
 
 ### 4.G — Credentials + OAuth ⏳
@@ -564,6 +567,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Autoloop recent-failure detail excerpts
 - [ ] Cronjob tool API + schedule parser parity
 - [x] Cron schedule parser + repeat state fixtures
+- [ ] Cron recurring next-run failure preservation
 - [x] Cron prompt/script safety + pre-run script contract
 - [x] Cronjob tool action envelope over native store
 - [x] Cron context_from output chaining
@@ -577,6 +581,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] CLI banner/output formatting helpers
 - [x] CLI deterministic tip selector
 - [ ] CLI OpenClaw residue onboarding hint
+- [ ] CLI bracketed-paste wrapper sanitizer
 - [x] CLI webhook URL normalizer
 - [x] CLI dump support-summary helper
 - [x] PTY bridge protocol adapter

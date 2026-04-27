@@ -43,25 +43,24 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Durable worker RSS drain integration
 - Why now: Unblocks Durable worker RSS drain integration.
 
-## 2. Steer slash command parser + preview helper
+## 2. Title prompt and truncation contract
 
-- Phase: 2 / 2.F.5
-- Owner: `gateway`
+- Phase: 4 / 4.F
+- Owner: `provider`
 - Size: `small`
 - Status: `planned`
-- Contract: Gateway exposes a pure /steer parser and preview helper that validates non-empty text guidance, rejects image-bearing or attachment-bearing payloads, and returns deterministic preview/evidence strings without touching active sessions
-- Trust class: operator, gateway
-- Ready when: Concurrent-tool cancellation (2.E.2) and the shared CommandDef registry are complete on main., This slice is pure parser/preview behavior only; no manager state, running-agent hook, TUI keybinding, or platform adapter is touched., Tests use table inputs for raw slash text and synthetic payload metadata; no provider, active tool loop, Slack, Telegram, or session store is required.
-- Not ready when: The slice queues guidance, injects mid-run prompts, changes active-session policy, or persists /busy configuration., The slice accepts empty/image-bearing steer payloads instead of returning usage/fallback evidence.
-- Degraded mode: Invalid steer input returns steer_usage or steer_payload_unsupported evidence before gateway dispatch can queue or inject it.
-- Fixture: `internal/gateway/steer_command_test.go::TestParseSteerCommand`
-- Write scope: `internal/gateway/steer_command.go`, `internal/gateway/steer_command_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/gateway -run '^TestParseSteerCommand_\|^TestSteerPreview_' -count=1`, `go test ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Gateway steer parser fixtures prove usage errors, unsupported payload evidence, text trimming, deterministic preview truncation, and no active-session side effects.
-- Acceptance: TestParseSteerCommand_MissingArgs returns steer_usage evidence and no guidance., TestParseSteerCommand_RejectsImageBearingPayload returns steer_payload_unsupported evidence for image/attachment metadata., TestParseSteerCommand_TrimsText preserves internal whitespace but trims leading/trailing spaces., TestSteerPreview_TruncatesLongGuidance returns a deterministic preview that does not exceed 80 runes and marks truncation.
-- Source refs: ../hermes-agent/cli.py@635253b9:busy_input_mode=steer, ../hermes-agent/gateway/run.py@635253b9:running_agent.steer, ../hermes-agent/hermes_cli/commands.py@635253b9:/busy steer, ../hermes-agent/tests/gateway/test_busy_session_ack.py@635253b9, internal/gateway/commands.go
-- Unblocks: Steer slash command registry + queue fallback
-- Why now: Unblocks Steer slash command registry + queue fallback.
+- Contract: Native title generation exposes a pure request/response boundary that builds Hermes-compatible title prompts from bounded session history, truncates candidate titles deterministically, returns empty-title fallback evidence for empty history or blank model output, and surfaces provider failures through a typed nonfatal error result without writing session metadata
+- Trust class: operator, system
+- Ready when: TUI prompt-submit auto-title eligibility helper is validated, so callers can produce a TitleRequest without starting provider work inside the TUI update loop., The worker can use a fake title model function and synthetic history; no provider credential, goroutine, TUI program, or session DB write is required.
+- Not ready when: The slice writes session.Metadata, starts background title workers, changes TUI submit behavior, or calls a live LLM., The slice swallows provider failures without returning typed evidence that the CLI/gateway can surface later., The slice mutates transcript history or uses Goncho/Honcho memory as a title source.
+- Degraded mode: Title status reports auto_title_skipped, title_provider_failed, or title_blank_result evidence instead of silently leaving NULL titles with no operator-visible cause.
+- Fixture: `internal/hermes/title_generator_test.go`
+- Write scope: `internal/hermes/title_generator.go`, `internal/hermes/title_generator_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run '^TestTitle' -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Title generator fixtures prove bounded prompt construction, candidate cleanup/truncation, empty-history skip, blank-output evidence, and provider-failure evidence with a fake model only.
+- Acceptance: TestTitlePrompt_BuildsFromBoundedHistory proves only the configured recent user/assistant turns enter the prompt and long content is truncated before model invocation., TestTitleGenerator_TruncatesAndCleansCandidate proves whitespace/newline/quote cleanup plus deterministic max-title-length truncation., TestTitleGenerator_EmptyHistorySkipsModel returns skipped evidence and never calls the fake model., TestTitleGenerator_BlankModelOutput returns title_blank_result evidence without writing metadata., TestTitleGenerator_ProviderFailureReturnsTypedEvidence proves the fake model error is returned as nonfatal title_provider_failed evidence.
+- Source refs: ../hermes-agent/agent/title_generator.py@4a2ee6c1:generate_title, ../hermes-agent/agent/title_generator.py@4a2ee6c1:maybe_auto_title, ../hermes-agent/tests/agent/test_title_generator.py@4a2ee6c1, internal/tui/auto_title.go, internal/session/, internal/transcript/
+- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
 ## 3. Provider timeout config fail-closed helper
 
@@ -205,24 +204,24 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: OpenClaw residue startup banner binding
 - Why now: Unblocks OpenClaw residue startup banner binding.
 
-## 10. Native TUI /save XDG file writer binding
+## 10. CLI bracketed-paste wrapper sanitizer
 
-- Phase: 5 / 5.Q
-- Owner: `gateway`
+- Phase: 5 / 5.O
+- Owner: `tools`
 - Size: `small`
 - Status: `planned`
 - Priority: `P2`
-- Contract: cmd/gormes binds the native TUI /save SessionExportFunc to the canonical persisted transcript reader and writes markdown exports under the Gormes XDG data directory, never under upstream HERMES_HOME or the process working directory
+- Contract: internal/cli exposes StripLeakedBracketedPasteWrappers(text string) string, a pure sanitizer that removes canonical ESC [200~/[201~ wrappers, visible caret-escape wrappers, degraded boundary [200~/[201~ wrappers, and boundary 00~/01~ fragments while preserving non-wrapper substrings inside ordinary text
 - Trust class: operator, system
-- Ready when: Native TUI /save canonical session export is validated on main and exposes SessionExportFunc on Model options., The prior /save handler write-scope issue is closed; slash_dispatch_test.go was already included in the completed handler row and should not be touched here., cmd/gormes/session.go already proves transcript.ExportMarkdown works against config.MemoryDBPath for the CLI export command., Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence.
-- Not ready when: The slice reopens internal/tui slash handler behavior or changes transcript.ExportMarkdown output format., The slice writes exports under HERMES_HOME, the repository root, or the current working directory., The slice starts a provider, API server, remote TUI gateway, or live session browser.
-- Degraded mode: TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location.
-- Fixture: `cmd/gormes/tui_save_export_test.go`
-- Write scope: `cmd/gormes/main.go`, `cmd/gormes/tui_save_export_test.go`, `internal/tui/slash_save.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./cmd/gormes -run '^TestTUISaveExport_' -count=1`, `go test ./cmd/gormes ./internal/tui ./internal/transcript -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: cmd/gormes TUI save-export fixtures prove the real SessionExportFunc writes under XDG_DATA_HOME/gormes/sessions/exports, ignores HERMES_HOME for runtime state, cleans partial files, and returns the exported path to /save.
-- Acceptance: cmd/gormes constructs a SessionExportFunc for the local TUI Model that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`., TestTUISaveExport_WritesUnderXDGDataHome sets XDG_DATA_HOME and HERMES_HOME to different temp roots, invokes the bound SessionExportFunc, and proves the file lands under the Gormes XDG export directory only., TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path., The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway.
-- Source refs: ../hermes-agent/tests/cli/test_save_conversation_location.py@5eb6cd82, ../hermes-agent/cli.py@5eb6cd82:save conversation location, ../hermes-agent/tui_gateway/server.py@5eb6cd82:session.save, internal/tui/slash_save.go:SessionExportFunc, cmd/gormes/session.go:sessionExportCmd, internal/config/config.go:MemoryDBPath
+- Ready when: internal/cli already has pure helper/test seams; this slice adds one sanitizer file and does not need Cobra command wiring., Tests can use string literals for canonical escape, caret-escape, bracket-only, fragment-only, and normal-text inputs; no TTY, prompt toolkit, clipboard, or terminal emulator is required.
+- Not ready when: The slice edits cmd/gormes startup, TUI input handling, clipboard/image attachment behavior, file-drop detection, command dispatch, or gateway parsing., The sanitizer deletes non-boundary substrings like build00~tag or literal[200~tag., The tests depend on real terminal bracketed-paste mode or prompt_toolkit behavior.
+- Degraded mode: If a terminal leaks bracketed-paste markers into a CLI buffer, Gormes strips only recognized boundary wrappers before command/path detection; ambiguous inline text is preserved rather than over-sanitized.
+- Fixture: `internal/cli/paste_sanitizer_test.go`
+- Write scope: `internal/cli/paste_sanitizer.go`, `internal/cli/paste_sanitizer_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/cli -run '^TestStripLeakedBracketedPasteWrappers_' -count=1`, `go test ./internal/cli -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Paste sanitizer fixtures prove canonical/caret/degraded wrapper stripping, boundary fragment stripping, normal-text preservation, multiline preservation, and zero TTY/clipboard dependencies.
+- Acceptance: TestStripLeakedBracketedPasteWrappers_CanonicalEscape strips \u001b[200~hello\u001b[201~ to hello., TestStripLeakedBracketedPasteWrappers_CaretEscape strips ^[[200~hello^[[201~ to hello., TestStripLeakedBracketedPasteWrappers_DegradedBracketBoundaries strips [200~hello[201~ at start/whitespace boundaries while preserving literal[200~tag., TestStripLeakedBracketedPasteWrappers_FragmentBoundaries strips 00~hello01~ at start/whitespace boundaries while preserving build00~tag., TestStripLeakedBracketedPasteWrappers_MultilinePreserved keeps embedded newlines and content bytes after wrapper removal.
+- Source refs: ../hermes-agent/cli.py@a0fe73ba:_strip_leaked_bracketed_paste_wrappers, ../hermes-agent/tests/cli/test_cli_bracketed_paste_sanitizer.py@a0fe73ba, internal/cli/command_registry.go, internal/cli/output.go
 - Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
 <!-- PROGRESS:END -->
