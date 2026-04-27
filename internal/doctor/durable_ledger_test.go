@@ -134,6 +134,41 @@ func TestCheckDurableLedgerReportsWorkerSupervisorDegradedModes(t *testing.T) {
 	}
 }
 
+func TestCheckDurableLedgerReportsDurableWorkerHeartbeatEvidence(t *testing.T) {
+	ctx := context.Background()
+	ms, err := memory.OpenSqlite(filepath.Join(t.TempDir(), "ledger.db"), 0, nil)
+	if err != nil {
+		t.Fatalf("OpenSqlite: %v", err)
+	}
+	defer ms.Close(ctx)
+	ledger, err := subagent.NewDurableLedger(ms.DB())
+	if err != nil {
+		t.Fatalf("NewDurableLedger: %v", err)
+	}
+
+	noHeartbeat := CheckDurableLedger(ctx, ledger, "")
+	workerItem := findDoctorItem(noHeartbeat.Items, "durable_worker")
+	if workerItem.Name == "" {
+		t.Fatalf("Items = %+v, want durable_worker item", noHeartbeat.Items)
+	}
+	if !strings.Contains(workerItem.Note, "heartbeat=heartbeat_unavailable") {
+		t.Fatalf("worker note = %q, want heartbeat_unavailable evidence", workerItem.Note)
+	}
+
+	heartbeatAt := time.Now().UTC().Add(-time.Minute)
+	if err := ledger.RecordWorkerHeartbeat(ctx, subagent.DurableWorkerHeartbeat{
+		WorkerID:    "worker-a",
+		HeartbeatAt: heartbeatAt,
+	}); err != nil {
+		t.Fatalf("RecordWorkerHeartbeat: %v", err)
+	}
+	withHeartbeat := CheckDurableLedger(ctx, ledger, "")
+	workerItem = findDoctorItem(withHeartbeat.Items, "durable_worker")
+	if !strings.Contains(workerItem.Note, "heartbeat="+heartbeatAt.Format(time.RFC3339)) {
+		t.Fatalf("worker note = %q, want last heartbeat %s", workerItem.Note, heartbeatAt.Format(time.RFC3339))
+	}
+}
+
 func TestCheckDurableLedgerReportsRestartIntentAuditEvidence(t *testing.T) {
 	ctx := context.Background()
 	ms, err := memory.OpenSqlite(filepath.Join(t.TempDir(), "ledger.db"), 0, nil)
@@ -176,6 +211,15 @@ func TestCheckDurableLedgerReportsRestartIntentAuditEvidence(t *testing.T) {
 			t.Fatalf("Summary = %q, want %q", result.Summary, want)
 		}
 	}
+}
+
+func findDoctorItem(items []ItemInfo, name string) ItemInfo {
+	for _, item := range items {
+		if item.Name == name {
+			return item
+		}
+	}
+	return ItemInfo{}
 }
 
 func TestCheckDurableLedgerReportsLifecycleControlEvidence(t *testing.T) {

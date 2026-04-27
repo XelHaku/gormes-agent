@@ -1947,9 +1947,9 @@
             {
               "name": "Durable worker execution loop",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes durable jobs have a Go-native fake-handler execution seam that claims one waiting job from the SQLite ledger, invokes an injected handler with context.Context, records progress/result/failure evidence, and exits cleanly when no job is claimable",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -1986,7 +1986,7 @@
                 "TestDurableWorkerRunOne_NoJobReturnsIdle proves an empty ledger returns idle evidence, records no fake heartbeat, and does not mutate existing terminal jobs.",
                 "Doctor/status fixtures expose the last durable-worker heartbeat or heartbeat_unavailable evidence without requiring operators to inspect raw ledger rows."
               ],
-              "note": "GBrain c78c3d0 shows the durable worker lifecycle that later watchdog rows depend on, but Gormes only needs the smallest Go-native execution seam first: one deterministic RunOne helper over the existing SQLite DurableLedger with injected fake handlers. This row makes the blocker explicit so abort-slot and RSS-watchdog rows do not invent daemons or shell execution.",
+              "note": "Complete: TDD landed internal/subagent/durable_worker_test.go over the existing SQLite DurableLedger. DurableWorker.RunOne now claims one waiting job, records heartbeat evidence only after a successful claim, invokes an injected Go handler with context.Context, persists handler progress, completes result JSON, records handler failures as failed terminal jobs, and returns idle without mutating terminal jobs or starting subprocesses, daemons, shell execution, polling loops, network services, or GBrain TypeScript runtime code. Doctor output now exposes either the last durable-worker heartbeat or heartbeat_unavailable evidence.",
               "write_scope": [
                 "internal/subagent/durable_worker.go",
                 "internal/subagent/durable_worker_test.go",
@@ -2002,6 +2002,11 @@
               "done_signal": [
                 "Durable worker fake-handler fixtures prove claim, progress, completion, failure, idle return, and heartbeat/status evidence without external worker processes."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T00:34:36Z",
+                "last_success": "2026-04-27T00:34:36Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:c78c3d0 src/core/minions/worker.ts",

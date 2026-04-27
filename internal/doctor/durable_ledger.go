@@ -119,6 +119,11 @@ func CheckDurableLedger(ctx context.Context, ledger *subagent.DurableLedger, run
 	if protectedSubmitDegraded {
 		protectedSubmitStatus = StatusWarn
 	}
+	workerHeartbeat := formatDurableTime(status.Worker.LastHeartbeat)
+	workerHeartbeatEvidence := workerHeartbeat
+	if status.Worker.LastHeartbeat.IsZero() {
+		workerHeartbeatEvidence = "heartbeat_unavailable"
+	}
 	result.Items = []ItemInfo{
 		{Name: "ledger", Status: StatusPass, Note: "SQLite durable job ledger configured"},
 		{Name: "replay", Status: replayStatus, Note: fmt.Sprintf(
@@ -139,9 +144,9 @@ func CheckDurableLedger(ctx context.Context, ledger *subagent.DurableLedger, run
 			status.Paused, status.ResumePending, status.LifecycleControlUnsupported,
 		)},
 		{Name: "durable_worker", Status: workerStatus, Note: fmt.Sprintf(
-			"liveness=%s worker_id=%s last_heartbeat=%s stale_after=%s",
+			"liveness=%s worker_id=%s heartbeat=%s last_heartbeat=%s stale_after=%s",
 			status.Worker.Liveness, status.Worker.WorkerID,
-			formatDurableTime(status.Worker.LastHeartbeat), status.Worker.HeartbeatStaleAfter,
+			workerHeartbeatEvidence, workerHeartbeat, status.Worker.HeartbeatStaleAfter,
 		)},
 		{Name: "supervisor", Status: supervisorStatus, Note: supervisorNote},
 		{Name: "restart_intent", Status: restartStatus, Note: fmt.Sprintf(
