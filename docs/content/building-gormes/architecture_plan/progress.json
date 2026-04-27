@@ -2056,9 +2056,9 @@
             {
               "name": "Gateway inbound dedup key helper",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway exposes a pure helper that derives a dedup tracking key from InboundEvent.Platform, ChatID, ThreadID, and MessageID, returning explicit missing-ID evidence without dropping or submitting events",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -2095,7 +2095,7 @@
                 "TestInboundDedupKey_MissingMessageIDDegrades proves empty MessageID returns dedup_unavailable_missing_message_id evidence and no key.",
                 "Existing MessageDeduplicator helper tests remain green without editing message_deduplicator.go."
               ],
-              "note": "Split 2026-04-27T12:56:05Z after repeated manager-row write-scope/report-validation failures. This first row is helper-only and drops the stale failed health/verdict block by replacing the contract with a new spec hash.",
+              "note": "Complete: TDD landed the pure gateway inbound dedup key helper with deterministic platform/chat/thread/message scoping and dedup_unavailable_missing_message_id evidence for empty MessageID. This row remains helper-only: no manager wiring, no MessageDeduplicator.Track call, no stored history, and no platform adapter edits.",
               "write_scope": [
                 "internal/gateway/inbound_dedup_key.go",
                 "internal/gateway/inbound_dedup_key_test.go",
@@ -2109,6 +2109,11 @@
               "done_signal": [
                 "Gateway helper fixtures prove deterministic scoped dedup keys and missing-ID degraded evidence without manager wiring or deduplicator-helper edits."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T13:08:41Z",
+                "last_success": "2026-04-27T13:08:41Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 tests/gateway/test_message_deduplicator.py",
