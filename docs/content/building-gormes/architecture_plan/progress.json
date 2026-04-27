@@ -9232,9 +9232,9 @@
             {
               "name": "Browser SSRF quoted-false guard",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Browser and URL safety helpers coerce quoted false-like config values (`\"false\"`, `'false'`, `0`, `no`, `off`) to disabled booleans before private/local URL SSRF guards decide whether cloud navigation is allowed",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9265,7 +9265,7 @@
                 "TestBrowserSSRFGuard_PublicURLAllowed covers a public URL and proves no private_url_blocked evidence is emitted.",
                 "Tests use synthetic strings only and do not start a browser, resolve DNS, or open network sockets."
               ],
-              "note": "Hermes 7317d69f fixed quoted false handling in browser SSRF guards. Gormes already has private-host routing helpers, so this is a small safety row over config coercion and guard evidence before browser provider bridges become executable.",
+              "note": "Complete: TDD landed pure Browser SSRF guard helpers in internal/tools/browser_ssrf_guard.go. Fixtures prove quoted false-like config values are disabled before guard decisions, localhost/RFC1918 URLs return private_url_blocked when cloud routing would receive them, public URLs pass without private_url_blocked evidence, and tests use only synthetic strings without browser, network, DNS, Chromedp, Rod, Browserbase, Firecrawl, or Camofox runtime dependencies.",
               "write_scope": [
                 "internal/tools/browser_ssrf_guard.go",
                 "internal/tools/browser_ssrf_guard_test.go",
