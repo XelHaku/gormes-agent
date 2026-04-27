@@ -3898,7 +3898,7 @@
             {
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
-              "contract": "Registry-owned active-turn steering command",
+              "contract": "Gateway registers /steer as a busy-aware CommandDef and queue-fallback handler using the existing ParseSteerCommand preview helper, without attempting live mid-run injection until the dependent kernel hook row lands",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -3906,8 +3906,8 @@
                 "operator",
                 "gateway"
               ],
-              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately. Planner 2026-04-27: the last three attempts stopped at backend stdin/usage-limit before a useful diff; keep this row needs_human until a noninteractive backend worker can run the fixture, then restore fixture_ready without widening the contract.",
-              "fixture": "internal/gateway/steer_queue_test.go",
+              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately. Planner 2026-04-27T11:18:57Z: the last three attempts stopped at backend stdin/usage-limit before a useful diff, so this row stays human-escalated and blocked behind the backend health bypass row.",
+              "fixture": "internal/gateway/steer_queue_test.go::TestSteerCommandRegistry_*",
               "source_refs": [
                 "../hermes-agent/cli.py@635253b9:busy_input_mode=steer",
                 "../hermes-agent/gateway/run.py@635253b9:running_agent.steer",
@@ -3923,9 +3923,13 @@
                 "Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior.",
                 "The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code.",
                 "The parser row is not present in the worker checkout."
+              ],
+              "blocked_by": [
+                "Backend usage-limit stdin health bypass"
               ],
               "unblocks": [
                 "Mid-run steer injection between tool calls",
@@ -3937,7 +3941,7 @@
                 "TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands.",
                 "Existing gateway command parsing and active-session policy tests remain green."
               ],
-              "note": "Refined 2026-04-27T05:38Z: the parser prerequisite is complete on main, so this row is now unblocked and fixture-ready. It consumes the pure parser and is intentionally queue/fallback only so workers do not mix command registration with kernel tool-loop steering.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: kept the implementation contract small but blocked it behind the backend usage-limit/stdin health bypass because recent attempts produced only infrastructure stdin/usage-limit failures. The parser prerequisite remains complete; after backend health is fixed, a human can clear the needs_human verdict and restore fixture_ready if the row still has no implementation diff.",
               "write_scope": [
                 "internal/gateway/commands.go",
                 "internal/gateway/manager.go",
@@ -7422,8 +7426,8 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression. Planner 2026-04-27: the last three attempts stopped at backend stdin/usage-limit before a useful diff; keep this row needs_human until a noninteractive backend worker can run the fixture, then restore fixture_ready without widening the contract.",
-              "fixture": "internal/kernel/compression_boundary_test.go",
+              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression. Planner 2026-04-27T11:18:57Z: the last three attempts stopped at backend stdin/usage-limit before a useful diff, so this row stays human-escalated and blocked behind the backend health bypass row.",
+              "fixture": "internal/kernel/compression_boundary_test.go::TestKernelCompressionBoundary_*",
               "source_refs": [
                 "../hermes-agent/run_agent.py@e85b7525",
                 "../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525",
@@ -7439,6 +7443,7 @@
                 "internal/kernel/context_engine.go owns the kernel-side context-engine adapter seam; workers should not edit internal/kernel/kernel.go for this row."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice implements summarization, tool-result pruning, manual compression, or context references instead of the boundary callback.",
                 "The slice hides boundary failures or lets a context cache survive across a compression lineage change without observable status evidence.",
                 "The slice edits internal/kernel/kernel.go, internal/hermes/context_compressor_budget.go, transcript storage, or session lineage helpers instead of the context-engine adapter files named in write_scope.",
@@ -7446,7 +7451,8 @@
               ],
               "blocked_by": [
                 "ContextEngine interface + status tool contract",
-                "Aux compression single-prompt threshold reconciliation"
+                "Aux compression single-prompt threshold reconciliation",
+                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "A fake ContextEngine receives exactly one CompressionBoundary notification after a successful compression result is accepted into the kernel transcript lineage.",
@@ -7454,7 +7460,7 @@
                 "The notification includes old_session_id/new_session_id or equivalent lineage evidence so caches can distinguish pre-compress and post-compress context.",
                 "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
               ],
-              "note": "Refined 2026-04-27T05:38Z after a write-scope failure: Hermes e85b7525 added a regression hook so context-engine state sees compression boundaries. Gormes already has a Go ContextEngine boundary and budget math, but no explicit cache/lineage notification row; include internal/kernel/context_engine.go in scope because that file owns the adapter seam workers were reaching for, while keeping kernel.go, transcript, and session lineage out of scope.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: retained the small adapter-only boundary notification scope but blocked execution behind the backend usage-limit/stdin health bypass because the latest attempts produced only infrastructure failures. The prior write-scope repair still stands: internal/kernel/context_engine.go is in scope; kernel.go, transcript, and session lineage remain out of scope.",
               "write_scope": [
                 "internal/hermes/context_engine.go",
                 "internal/hermes/context_engine_test.go",
@@ -13893,15 +13899,15 @@
               "priority": "P2",
               "status": "planned",
               "contract": "internal/cli exposes a pure model-switch patch helper that updates a custom provider default_model while preserving original credential storage: providers that relied on key_env and had no inline api_key/api_key_ref must not gain an api_key entry, while providers that already had an inline plaintext or `${VAR}` api_key may keep that existing api_key value without writing resolved plaintext",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Model-switch planning returns credential_write_skipped_key_env, credential_ref_preserved, plaintext_preserved, or credential_missing evidence so setup/status surfaces can explain why api_key was not written.",
-              "fixture": "internal/cli/custom_provider_model_switch_test.go",
+              "degraded_mode": "Model-switch planning returns credential_write_skipped_key_env, credential_ref_preserved, plaintext_preserved, or credential_missing evidence so setup/status surfaces can explain why api_key was not written. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "fixture": "internal/cli/custom_provider_model_switch_test.go::TestCustomProviderModelSwitchPatch_*",
               "source_refs": [
                 "../hermes-agent/hermes_cli/main.py@8258f4dc:_model_flow_named_custom",
                 "../hermes-agent/tests/hermes_cli/test_custom_provider_model_switch.py@8258f4dc",
@@ -13915,12 +13921,14 @@
                 "Table tests should construct input provider maps/structs in memory and assert the planned write shape; no process environment, filesystem, or network access is needed."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice changes internal/config, internal/hermes, provider catalog probing, TUI model picker behavior, or command wiring.",
                 "The helper writes an api_key field for a provider whose original config relied only on key_env.",
                 "The helper writes resolved plaintext when the original provider used `${VAR}` or key_env references."
               ],
               "blocked_by": [
-                "Custom provider model-switch credential preservation"
+                "Custom provider model-switch credential preservation",
+                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "TestCustomProviderModelSwitchPatch_KeyEnvDoesNotSynthesizeAPIKey starts with {default_model:'old', key_env:'ACME_KEY'} and proves the patch sets default_model='new', preserves key_env, omits api_key, and returns credential_write_skipped_key_env evidence.",
@@ -13929,7 +13937,7 @@
                 "TestCustomProviderModelSwitchPatch_MissingCredentialStillUpdatesModelWithEvidence proves model changes remain possible while credential_missing evidence is returned for setup/status guidance.",
                 "Existing TestResolveCustomProviderSecret_* fixtures remain green; this row does not redefine resolver semantics."
               ],
-              "note": "Added after Hermes 8258f4dc tightened named custom-provider model switching: key_env-backed providers should not gain a synthesized api_key entry during model changes. Gormes already landed the pure secret resolver; this dependent row freezes the write-shape helper before command/TUI binding.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: preserved the pure patch-helper scope but demoted from fixture_ready to draft and blocked it behind backend usage-limit health repair because current quarantine evidence is infrastructural. Once the backend bypass lands, this can return to fixture_ready without widening beyond internal/cli.",
               "write_scope": [
                 "internal/cli/custom_provider_model_switch.go",
                 "internal/cli/custom_provider_model_switch_test.go",
@@ -14942,15 +14950,15 @@
               "priority": "P2",
               "status": "planned",
               "contract": "cmd/gormes binds the native TUI /save SessionExportFunc to the canonical persisted transcript reader and writes markdown exports under the Gormes XDG data directory, never under upstream HERMES_HOME or the process working directory",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location.",
-              "fixture": "cmd/gormes/tui_save_export_test.go",
+              "degraded_mode": "TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "fixture": "cmd/gormes/tui_save_export_test.go::TestTUISaveExport_*",
               "source_refs": [
                 "../hermes-agent/tests/cli/test_save_conversation_location.py@5eb6cd82",
                 "../hermes-agent/cli.py@5eb6cd82:save conversation location",
@@ -14968,9 +14976,13 @@
                 "Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice reopens internal/tui slash handler behavior or changes transcript.ExportMarkdown output format.",
                 "The slice writes exports under HERMES_HOME, the repository root, or the current working directory.",
                 "The slice starts a provider, API server, remote TUI gateway, or live session browser."
+              ],
+              "blocked_by": [
+                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "cmd/gormes constructs a SessionExportFunc for the local TUI Model, preferably through a small helper in cmd/gormes/session.go, that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
@@ -14979,7 +14991,7 @@
                 "TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path.",
                 "The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway."
               ],
-              "note": "Refined 2026-04-27T05:38Z: the native TUI /save handler is complete on main, so this row is unblocked and limited to cmd/gormes binding plus XDG output-location fixtures. internal/tui/slash_save.go is now a read-only donor for this slice; do not reopen slash dispatch tests or change transcript markdown formatting.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: the native TUI /save handler remains complete on main, but this cmd/gormes binding is demoted to draft and blocked behind backend usage-limit health repair because current quarantine evidence is infrastructure-only. internal/tui/slash_save.go remains a read-only donor; do not reopen slash dispatch tests or transcript markdown formatting.",
               "write_scope": [
                 "cmd/gormes/main.go",
                 "cmd/gormes/session.go",
@@ -15193,15 +15205,15 @@
               "priority": "P2",
               "status": "planned",
               "contract": "Native Bubble Tea conversation rendering limits each frame to the visible tail of RenderFrame.History plus DraftText/LastError under a caller-provided height budget, emits a stable omitted-history sentinel when earlier turns are hidden, and avoids rebuilding unbounded conversation strings during long sessions",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "If height is too small or width is narrow, the helper still renders the latest visible turn/draft/error and a compact omitted-history sentinel rather than panicking or allocating the full history body.",
-              "fixture": "internal/tui/viewport_history_test.go",
+              "degraded_mode": "If height is too small or width is narrow, the helper still renders the latest visible turn/draft/error and a compact omitted-history sentinel rather than panicking or allocating the full history body. Planner 2026-04-27T11:18:57Z: recent attempts stopped at backend stdin/usage-limit before a diff, so keep this row blocked until backend usage-limit health is no longer charged to feature rows.",
+              "fixture": "internal/tui/viewport_history_test.go::TestRenderConversationViewport_*",
               "source_refs": [
                 "../hermes-agent/ui-tui/src/hooks/useVirtualHistory.ts@e63929d4",
                 "../hermes-agent/ui-tui/src/lib/virtualHeights.ts@e63929d4",
@@ -15215,9 +15227,13 @@
                 "The row is a Gormes-native performance guard, not a direct port of Hermes' React/Ink virtualization stack."
               ],
               "not_ready_when": [
+                "Backend usage-limit/stdin exits are still being charged to feature-row health instead of the run-level backend outage path.",
                 "The slice imports React/Ink concepts, starts Node, changes kernel.RenderFrame shape, truncates stored session/transcript history, or edits internal/kernel/internal/transcript persistence.",
                 "The slice changes slash-command, remote TUI SSE, API server, or dashboard behavior in the same diff.",
                 "The slice silently drops DraftText or LastError when history is long."
+              ],
+              "blocked_by": [
+                "Backend usage-limit stdin health bypass"
               ],
               "acceptance": [
                 "TestRenderConversationViewport_OmitsEarlierHistory builds 120 alternating user/assistant messages and asserts the rendered output contains the latest turns, excludes the earliest turn body, and includes a deterministic omitted-history sentinel with the hidden count.",
@@ -15226,7 +15242,7 @@
                 "TestRenderConversationViewport_RenderedLineBudget asserts the helper returns no more than the requested visible budget plus a small sentinel allowance for wrapped content.",
                 "The implementation stays in internal/tui/view.go plus its test; no kernel/session/transcript files are edited."
               ],
-              "note": "Added after Hermes e63929d4 landed long-session TUI perf work across useVirtualHistory, virtualHeights, streaming markdown, and profiling scripts. Gormes does not have the Ink stack, so the first safe slice is a bounded native render helper over Bubble Tea's existing RenderFrame.",
+              "note": "Reshaped 2026-04-27T11:18:57Z: retained the pure internal/tui viewport-helper contract but demoted to draft and blocked behind backend usage-limit health repair because the quarantine evidence is infrastructure-only. Hermes e63929d4 remains the donor for the invariant; Gormes keeps the implementation native to Bubble Tea.",
               "write_scope": [
                 "internal/tui/view.go",
                 "internal/tui/viewport_history_test.go",
