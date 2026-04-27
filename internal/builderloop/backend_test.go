@@ -108,7 +108,11 @@ func TestBuildBackendCommandWithRepoRootUsesRepoClaudeuShim(t *testing.T) {
 	}
 
 	want := []string{scriptPath, "exec", "--json", "-m", "gpt-5.5", "-c", "approval_policy=never", "--sandbox", "workspace-write"}
-	want[0], _ = filepath.Abs(want[0])
+	if abs, err := filepath.Abs(want[0]); err == nil {
+		want[0] = abs
+	} else {
+		t.Fatalf("filepath.Abs(%q) error = %v", want[0], err)
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("BuildBackendCommandWithRepoRoot() = %#v, want %#v", got, want)
 	}

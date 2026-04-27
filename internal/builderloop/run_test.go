@@ -430,7 +430,7 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 	wantCommands := []Command{
 		{
 			Name: "opencode",
-			Args: []string{"run", "--no-interactive", BuildWorkerPrompt(Candidate{
+			Args: []string{"run", BuildWorkerPrompt(Candidate{
 				PhaseID:    "12",
 				SubphaseID: "12.A",
 				ItemName:   "active candidate",
@@ -441,7 +441,7 @@ func TestRunOnceExecutesOncePerSelectedCandidate(t *testing.T) {
 		},
 		{
 			Name: "opencode",
-			Args: []string{"run", "--no-interactive", BuildWorkerPrompt(Candidate{
+			Args: []string{"run", BuildWorkerPrompt(Candidate{
 				PhaseID:        "12",
 				SubphaseID:     "12.A",
 				ItemName:       "planned candidate",
