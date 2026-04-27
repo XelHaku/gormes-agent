@@ -2999,9 +2999,9 @@
             {
               "name": "Durable worker RSS doctor/status evidence",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "Doctor and durable-worker status output expose RSS watchdog configuration, latest threshold/read-failure/drain reason, and unavailable evidence from the durable ledger without killing the single Gormes process",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -3035,7 +3035,7 @@
                 "TestDoctorDurableWorkerRSSWatchdog_StableRestartEvidence proves stable_watchdog_restart appears without incrementing crash-loop degradation.",
                 "Doctor/status tests do not start workers, read real process RSS, or inspect GBrain files at runtime."
               ],
-              "note": "Final row in the 2026-04-27 RSS split. It is doctor/status only, preventing workers from mixing status rendering with runtime drain cancellation.",
+              "note": "Complete: TDD added internal/doctor/durable_rss_watchdog_test.go and extended internal/doctor/durable_ledger.go to surface durable worker RSS watchdog ledger events in doctor/status output. The fixture seeds SQLite durable_worker_events directly or through RecordWorkerRSSWatchdogEvent and proves rss_watchdog_disabled, rss_watchdog_unavailable, rss_threshold_exceeded, rss_drain_started, and stable_watchdog_restart are rendered separately. Threshold/drain output includes max_mb, observed_mb, checked_at, latest reason, evidence reason, and redacted error text; stable_watchdog_restart remains PASS evidence and does not increment restart-intent/crash-loop degradation. This slice did not start workers, read real process RSS, inspect GBrain files at runtime, change DurableWorker drain behavior, alter cmd/gormes lifecycle, add main-process RSS limits, or touch builder-loop backend watchdogs.",
               "write_scope": [
                 "internal/doctor/durable_ledger.go",
                 "internal/doctor/durable_ledger_test.go",
