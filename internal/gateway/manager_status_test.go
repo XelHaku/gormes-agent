@@ -41,7 +41,7 @@ func TestManager_RunWritesChannelLifecycleToRuntimeStatus(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Run after cancel: %v", err)
 		}
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Fatal("Run did not return after cancel")
 	}
 

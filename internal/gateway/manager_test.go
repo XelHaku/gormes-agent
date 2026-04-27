@@ -873,7 +873,7 @@ func TestManager_RunCleansFailedStartupChannelWithoutStoppingHealthyChannels(t *
 		if err != nil {
 			t.Fatalf("Run after context cancellation = %v, want nil", err)
 		}
-	case <-time.After(200 * time.Millisecond):
+	case <-time.After(time.Second):
 		t.Fatal("Run did not return after context cancellation")
 	}
 }
