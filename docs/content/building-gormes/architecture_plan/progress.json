@@ -11768,6 +11768,11 @@
               "done_signal": [
                 "Builder-loop usage-limit fixtures prove backend stdin/usage-limit outages produce run-level degraded evidence without mutating feature-row health, while ordinary worker_error paths still update row health."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T11:38:51Z",
+                "last_success": "2026-04-27T11:38:51Z"
+              },
               "provenance": {
                 "origin_type": "gormes",
                 "owned_since": "2026-04-27T11:18:57Z",
