@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-26T23:57:40Z",
+    "last_updated": "2026-04-27T00:12:04Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -9356,9 +9356,9 @@
             {
               "name": "Cron schedule parser + repeat state fixtures",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cron adds a pure Hermes-compatible schedule parser and repeat-state read model before any public cronjob tool handler is exposed. ParseCronSchedule(input string, now time.Time) returns a typed ParsedSchedule for one-shot durations (`30m`, `2h`, `1d`), recurring intervals (`every 30m`, `every 2h`), 5-field cron expressions, and ISO timestamps. CronNextRunDecision(parsed, lastRunUnix, repeatCompleted, now) reports whether a one-shot is still recoverable inside the 120s grace window, whether recurring jobs should fast-forward stale next-run times, and whether finite repeat counts are exhausted.",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9396,7 +9396,7 @@
                 "TestCronNextRunDecision_FiniteRepeatExhaustion marks repeat=1 completed=1 as exhausted while repeat=3 completed=2 remains runnable.",
                 "TestCronNextRunDecision_RecurringFastForward returns a next run after now when the stored next-run time is stale by multiple intervals."
               ],
-              "note": "Planner split 2026-04-26: the old `Cronjob tool API + schedule parser parity` row bundled schedule parsing, repeat state, tool mutation, context chaining, and delivery. This first executable slice is pure parser/read-model work so workers can TDD it without touching cron stores or public tool wiring.",
+              "note": "Complete: TDD landed internal/cron/schedule_parser.go and schedule_parser_test.go as a pure parser/read-model slice. Fixtures prove one-shot durations, recurring intervals, 5-field cron validation, ISO timestamps with injected-location naive parsing, one-shot grace recovery, finite repeat exhaustion, and stale recurring fast-forward without touching scheduler goroutines, cron stores, cmd/gormes, or public cronjob tool wiring.",
               "write_scope": [
                 "internal/cron/schedule_parser.go",
                 "internal/cron/schedule_parser_test.go",
