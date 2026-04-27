@@ -209,6 +209,18 @@ Gormes should prove compatibility with behavior, not file structure.
 
 ## Latest Sync Lessons
 
+The 2026-04-27 upstream sync adds security and argument-normalization contracts:
+
+- WhatsApp identity hardening is a Go alias-graph concern, not a reason to port
+  Hermes' filesystem `lid-mapping-*` files. Reject traversal-like and non-ASCII
+  identifiers before they become gateway session keys or outbound targets.
+- Hook auto-accept must parse only explicit bools and known truthy strings.
+  Quoted false-like strings, integers, arrays, and maps are not consent.
+- Discord REST handler ports need a typed limit normalizer before making live
+  requests, because model arguments may arrive as strings or JSON numbers.
+- Provider timeout config should fail closed if config loading is unavailable;
+  add that only when Gormes exposes provider-specific timeout config.
+
 The 2026-04-26 upstream sync adds several small contracts:
 
 - Azure Foundry remains upstream-led, but the quarantined Gormes row should stay

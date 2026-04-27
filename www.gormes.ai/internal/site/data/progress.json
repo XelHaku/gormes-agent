@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T03:17:39Z",
+    "last_updated": "2026-04-27T03:55:07Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1125,7 +1125,12 @@
                 "last_success": "2026-04-25T09:22:51Z"
               }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T03:55:07Z",
+            "origin_decision": "Hermes 91512b82/6993e566 hardened WhatsApp identity alias expansion against traversal-like and non-ASCII identifiers. Gormes already owns bridge/native identity, self-chat suppression, outbound pairing, and retry fixtures, so this adapter subphase remains complete. The remaining upstream-led safety delta is tracked under 2.B.5 session/delivery routing because unsafe raw IDs affect session keys and outbound targets rather than bridge/native runtime selection."
+          }
         },
         "2.B.5": {
           "name": "Session Context + Delivery Routing",
@@ -1246,6 +1251,69 @@
               "done_signal": [
                 "Gateway manager tests cover both editable streaming and Channel-only send fallback without platform-specific branches."
               ]
+            },
+            {
+              "name": "WhatsApp ASCII identifier guard",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "WhatsApp raw peer and alias canonicalization rejects path-like, traversal, and non-ASCII identifiers before they can enter gateway session keys or outbound pairing state",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Unsafe WhatsApp identifiers are dropped with whatsapp_identifier_unsafe evidence instead of being canonicalized into a session, alias graph, or outbound pairing target.",
+              "fixture": "internal/channels/whatsapp/identity_safety_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/whatsapp_identity.py@91512b82:expand_whatsapp_aliases path traversal guard",
+                "../hermes-agent/gateway/whatsapp_identity.py@6993e566:_SAFE_IDENTIFIER_RE ASCII guard",
+                "internal/channels/whatsapp/identity.go:NormalizeWhatsAppIdentifier,canonicalWhatsAppUserID",
+                "internal/channels/whatsapp/identity_test.go"
+              ],
+              "ready_when": [
+                "WhatsApp identity resolution + self-chat guard is validated and owns raw-to-canonical peer mapping in internal/channels/whatsapp/identity.go.",
+                "Gormes does not use Hermes' filesystem lid-mapping files; the worker should adapt only the identifier safety contract to the Go alias graph and session-key surface.",
+                "The row can be tested with pure table fixtures; no bridge, native WhatsApp client, pairing store, or send/reconnect runtime is required."
+              ],
+              "not_ready_when": [
+                "The slice imports Hermes' lid-mapping filesystem layout or reads/writes mapping files.",
+                "The slice starts WhatsApp bridge/native runtimes, changes send/reconnect behavior, or rewrites gateway session key generation outside the WhatsApp adapter.",
+                "The slice treats Unicode full-width digits, slash/backslash, or `..` traversal-like values as valid aliases because NormalizeWhatsAppIdentifier strips other JID suffixes."
+              ],
+              "blocked_by": [
+                "WhatsApp identity resolution + self-chat guard"
+              ],
+              "acceptance": [
+                "TestWhatsAppIdentifierGuard_AllowsASCIIJIDForms proves phone digits, plus-prefixed numbers, LID-like IDs, `@s.whatsapp.net`, `@lid`, and `@g.us` forms still canonicalize deterministically.",
+                "TestWhatsAppIdentifierGuard_DropsPathLikeAliases seeds alias endpoints containing `/`, `\\`, `..`, `%2f`, and empty strings and proves they do not enter the canonical alias graph.",
+                "TestWhatsAppIdentifierGuard_DropsNonASCIIWordChars proves full-width digits and Unicode word characters are rejected rather than normalized into a lookalike bot/user ID.",
+                "Unsafe raw sender/chat IDs cause NormalizeInboundWithIdentity to return unresolved/degraded evidence instead of creating Event.ChatID, Event.UserID, Reply.ChatID, or PairOutboundTarget state.",
+                "Existing identity_contract.json fixtures still pass unchanged for safe bridge/native DM and group cases."
+              ],
+              "note": "Hermes 91512b82/6993e566 hardened whatsapp_identity against path traversal and Unicode lookalikes in filesystem alias expansion. Gormes has no lid-mapping files, but the same safety invariant belongs in the Go alias graph before unsafe peer strings can become session keys or outbound pairing targets.",
+              "write_scope": [
+                "internal/channels/whatsapp/identity.go",
+                "internal/channels/whatsapp/identity_test.go",
+                "internal/channels/whatsapp/identity_safety_test.go",
+                "internal/channels/whatsapp/testdata/identity_contract.json",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/channels/whatsapp -run 'TestWhatsAppIdentifierGuard|TestNormalizeInboundWithIdentity' -count=1",
+                "go test ./internal/channels/whatsapp -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "WhatsApp identity safety fixtures prove unsafe raw IDs and aliases are dropped with visible evidence while existing safe bridge/native identity fixtures remain green."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:6993e566 gateway/whatsapp_identity.py",
+                "note": "Hermes supplies the identifier hardening lesson; Gormes applies it to the local WhatsApp alias graph without adopting Hermes' filesystem lid-mapping files."
+              }
             },
             {
               "name": "Gateway fresh-final eligibility helper",
@@ -1643,9 +1711,9 @@
             {
               "name": "Gateway message deduplicator bounded helper",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Shared gateway exposes a pure in-memory MessageDeduplicator that caps tracked message IDs at max_size, evicts the oldest ID deterministically, and returns duplicate/evicted/disabled evidence without touching manager routing",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1679,7 +1747,7 @@
                 "TestMessageDeduplicator_ZeroMaxSizeDisabled treats max_size=0 as disabled, never rejects messages, and never allocates a seen-ID queue.",
                 "The helper exposes enough evidence for a later manager row to distinguish duplicate_message, deduplicator_evicted, and deduplicator_disabled without importing platform adapters."
               ],
-              "note": "Split 2026-04-27 from the broader `Gateway message deduplicator bounded eviction` row after autoloop produced a status-field validation failure. This first row is helper-only: workers should not edit manager/event code, and completion means status=complete plus contract_status=validated.",
+              "note": "Complete: TDD landed the pure in-memory gateway MessageDeduplicator helper with bounded oldest eviction, duplicate rejection, disabled mode, and stable duplicate_message, deduplicator_evicted, and deduplicator_disabled evidence. This first row is helper-only: workers did not edit manager/event code, add platform-specific state, store history on disk, or wire inbound dispatch.",
               "write_scope": [
                 "internal/gateway/message_deduplicator.go",
                 "internal/gateway/message_deduplicator_test.go",
@@ -1693,6 +1761,11 @@
               "done_signal": [
                 "Gateway helper fixtures prove bounded oldest eviction, duplicate rejection, disabled mode, and evidence values without platform SDKs, manager wiring, or disk state."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T03:51:02Z",
+                "last_success": "2026-04-27T03:51:02Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 gateway/platforms/helpers.py",
@@ -1765,8 +1838,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T03:17:39Z",
-            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; after a worker_error on the broader row, Gormes tracks it as three dependency-ordered slices. Hermes cebf9585 adds bounded MessageDeduplicator eviction; after a status-field validation failure, Gormes now splits that work into a pure shared helper and a dependent manager wiring row so platform adapters stay thin."
+            "last_upstream_check": "2026-04-27T03:55:07Z",
+            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; after a worker_error on the broader row, Gormes tracks it as three dependency-ordered slices. Hermes cebf9585 adds bounded MessageDeduplicator eviction; after a status-field validation failure, Gormes now splits that work into a pure shared helper and a dependent manager wiring row so platform adapters stay thin. Hermes 91512b82/6993e566 adds WhatsApp identifier hardening; Gormes tracks it here as a session-key/outbound-target safety row so the completed 2.B.4 adapter runtime remains closed."
           }
         },
         "2.B.10": {
@@ -2661,7 +2734,12 @@
               "status": "complete",
               "note": "TDD landed: gateway startup now reads $XDG_DATA_HOME/gormes/BOOT.md, runs it through an isolated background boot kernel, and treats missing files or boot execution failures as non-blocking startup conditions."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T03:55:07Z",
+            "origin_decision": "Gormes has shipped the hook registry, manifest loader, and BOOT.md startup hook, so this subphase remains complete. Hermes e19854d8 adds a security parsing lesson for executable hook auto-accept; track it under Phase 5.J approval/security guards before any Gormes auto-accept config or CLI flag becomes executable."
+          }
         },
         "2.F.3": {
           "name": "Restart / Pairing / Status",
@@ -3453,6 +3531,20 @@
               "done_signal": [
                 "Gateway command fixtures prove /steer argument validation, preview truncation, queued fallback, and no live mid-run injection."
               ],
+              "health": {
+                "attempt_count": 1,
+                "consecutive_failures": 1,
+                "last_attempt": "2026-04-27T03:51:02Z",
+                "last_failure": {
+                  "run_id": "20260427T033850Z-190029259",
+                  "category": "worker_error",
+                  "backend": "codexu",
+                  "stderr_tail": "Reading additional input from stdin...\n"
+                },
+                "backends_tried": [
+                  "codexu"
+                ]
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:635253b9 gateway/run.py",
@@ -7698,6 +7790,64 @@
               }
             },
             {
+              "name": "Provider timeout config fail-closed helper",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Provider timeout lookup handles missing or failed config loading by returning explicit unset evidence, and parses provider request/stale timeout overrides without panicking or applying stale defaults",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Provider status reports timeout_config_unavailable, timeout_config_invalid, or timeout_unset evidence instead of crashing startup or silently applying a stale provider timeout.",
+              "fixture": "internal/hermes/provider_timeout_config_test.go",
+              "source_refs": [
+                "../hermes-agent/hermes_cli/timeouts.py@16e243e0:get_provider_request_timeout",
+                "../hermes-agent/hermes_cli/timeouts.py@16e243e0:get_provider_stale_timeout",
+                "../hermes-agent/hermes_cli/timeouts.py@366351b9",
+                "internal/config/config.go:HermesCfg",
+                "internal/hermes/http_client.go"
+              ],
+              "ready_when": [
+                "Classified provider-error taxonomy and Retry-After hint handling are validated, so timeout evidence can reuse provider status vocabulary without changing retry loops.",
+                "This row is pure lookup/parsing only; workers should not add new public config fields or wire live HTTP client timeouts until the helper behavior is fixture-locked.",
+                "The helper can use injected loader callbacks and synthetic provider maps; no real config file, network call, or provider client is required."
+              ],
+              "not_ready_when": [
+                "The slice changes internal/config public TOML schema, provider HTTP client construction, or kernel retry behavior in the same change.",
+                "The helper panics or returns a non-zero timeout when config loading/import fails, when providers is not a map, or when the requested provider block is malformed.",
+                "The tests depend on wall-clock sleeps or live provider credentials."
+              ],
+              "acceptance": [
+                "TestProviderTimeoutConfig_LoadFailureReturnsUnset injects a loader error and proves request and stale timeout lookup return unset evidence without panic.",
+                "TestProviderTimeoutConfig_MissingProviderReturnsUnset proves nil providers, missing provider IDs, and non-map provider blocks return timeout_unset.",
+                "TestProviderTimeoutConfig_ParsesRequestAndStaleTimeouts proves numeric seconds and duration strings resolve to deterministic time.Duration values.",
+                "TestProviderTimeoutConfig_InvalidValuesFailClosed proves negative, zero when not allowed, non-numeric, and overflow values return timeout_config_invalid evidence.",
+                "No HTTP client, kernel retry, or public config schema is changed by this helper-only slice."
+              ],
+              "note": "Hermes 16e243e0/366351b9 made provider timeout helpers return None when load_config fails instead of crashing. Gormes does not yet expose provider-specific request/stale timeout config, so this row first freezes a typed fail-closed helper and evidence shape before any public config wiring.",
+              "write_scope": [
+                "internal/hermes/provider_timeout_config.go",
+                "internal/hermes/provider_timeout_config_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/hermes -run TestProviderTimeoutConfig -count=1",
+                "go test ./internal/hermes -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Provider timeout config fixtures prove load failures, missing providers, malformed values, and valid overrides return explicit evidence without wiring live clients or config schema."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:16e243e0 hermes_cli/timeouts.py",
+                "note": "Hermes supplies the fail-closed timeout lesson; Gormes captures it as a typed helper before public provider timeout config exists."
+              }
+            },
+            {
               "name": "Prompt-cache capability guard",
               "status": "planned",
               "note": "TDD: port `agent/prompt_caching.py` model/provider capability checks so cache-control metadata is attached only when the selected provider supports it."
@@ -7933,8 +8083,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T19:00:00Z",
-            "origin_decision": "Hermes 7c17accb added a streaming retry interrupt guard and Hermes 192e7eb2 sharpened Nous 429 handling so upstream-capacity responses do not trip a cross-session quota breaker. The current Hermes donor bucket tags are requests, requests-1h, tokens, and tokens-1h, and genuine quota requires remaining<=0 plus a reset window >=60s; Gormes has retry/backoff and provider-hint behavior, but this subphase remains upstream-led until prompt-cache guards and provider budget/rate telemetry are fixture-backed."
+            "last_upstream_check": "2026-04-27T03:55:07Z",
+            "origin_decision": "Hermes 7c17accb added a streaming retry interrupt guard and Hermes 192e7eb2 sharpened Nous 429 handling so upstream-capacity responses do not trip a cross-session quota breaker. The current Hermes donor bucket tags are requests, requests-1h, tokens, and tokens-1h, and genuine quota requires remaining<=0 plus a reset window >=60s. Hermes 16e243e0/366351b9 adds a provider-timeout fail-closed config lookup lesson, now tracked as a helper-only row before Gormes exposes provider-specific timeout config. Gormes has retry/backoff and provider-hint behavior, but this subphase remains upstream-led until prompt-cache guards, provider budget/rate telemetry, and timeout config evidence are fixture-backed."
           }
         }
       }
@@ -8147,6 +8297,72 @@
               }
             },
             {
+              "name": "Discord tool limit coercion helper",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Discord tool argument normalization coerces string/float/integer limit inputs for search_members and fetch_messages, applies Hermes-compatible defaults, and clamps model-visible values before any REST handler is ported",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Invalid Discord limit arguments fall back to action defaults with discord_limit_defaulted evidence instead of surfacing a type panic or sending unbounded API queries.",
+              "fixture": "internal/tools/discord_limit_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/discord_tool.py@b288934d:_search_members limit coercion",
+                "../hermes-agent/tools/discord_tool.py@b288934d:_fetch_messages limit coercion",
+                "internal/tools/discord_toolset.go:discordSchemaProperties",
+                "internal/tools/discord_toolset_test.go",
+                "internal/tools/testdata/upstream_tool_parity_manifest.json:discord"
+              ],
+              "ready_when": [
+                "Discord tool split + platform-scoped toolsets is complete, so the descriptor schema already exposes `limit` for search_members and fetch_messages.",
+                "The row is argument-normalization only; workers should not add Discord REST calls, live bot tokens, or platform toolset widening.",
+                "The helper can be tested with table-driven raw values and action names without importing discordgo or making network calls."
+              ],
+              "not_ready_when": [
+                "The slice ports _discord_request, REST handlers, member/message formatting, or guild/channel permission checks.",
+                "The slice changes descriptor/platform scoping or enables Discord tools outside Discord/gateway surfaces.",
+                "The helper accepts unlimited, negative, NaN, or non-numeric string limits without explicit default/clamp evidence."
+              ],
+              "blocked_by": [
+                "Discord tool split + platform-scoped toolsets"
+              ],
+              "unblocks": [
+                "Stateful tool migration queue"
+              ],
+              "acceptance": [
+                "TestDiscordLimitCoercion_SearchMembersDefault proves missing, nil, non-numeric, and boolean values default to 20.",
+                "TestDiscordLimitCoercion_FetchMessagesDefault proves missing, nil, non-numeric, and boolean values default to 50.",
+                "TestDiscordLimitCoercion_ParsesStringAndFloatIntegers proves `\"7\"`, `7`, `7.0`, and JSON-decoded float64(7) all normalize to 7.",
+                "TestDiscordLimitCoercion_ClampsToSchemaBounds proves values below 1 become 1 and values above 100 become 100, matching the Gormes descriptor bounds while preserving Hermes' max-100 behavior.",
+                "Returned evidence distinguishes provided, clamped, and defaulted values so future REST handlers can report degraded input without panics."
+              ],
+              "note": "Hermes b288934d fixed Discord runtime handlers that received model-provided string limits and crashed when min() compared str to int. Gormes has only descriptor-level Discord tools today, so the safe next slice is a pure Go argument helper before any REST handler is exposed.",
+              "write_scope": [
+                "internal/tools/discord_limit.go",
+                "internal/tools/discord_limit_test.go",
+                "internal/tools/discord_toolset.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run TestDiscordLimitCoercion -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Discord limit fixtures prove string, JSON-number, invalid, too-small, and too-large limit inputs normalize with stable evidence and no live Discord API calls."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:b288934d tools/discord_tool.py",
+                "note": "Hermes supplies the runtime argument bug; Gormes captures it as a typed helper before porting Discord REST handlers."
+              }
+            },
+            {
               "name": "Home Assistant HASS_TOKEN platform-toolset carveout",
               "priority": "P2",
               "status": "complete",
@@ -8292,8 +8508,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T21:50:06Z",
-            "origin_decision": "Hermes still leads terminal/process and platform-toolset behavior. The 97d54f0e watch-pattern flood-control fix is now validated, and Hermes 4921b269 adds the next narrow default-off carveout: HASS_TOKEN should keep homeassistant available for cron/CLI defaults without enabling unrelated default-off toolsets."
+            "last_upstream_check": "2026-04-27T03:55:07Z",
+            "origin_decision": "Hermes still leads terminal/process and platform-toolset behavior. The 97d54f0e watch-pattern flood-control fix and 4921b269 HASS_TOKEN carveout are validated. Hermes b288934d adds a narrow Discord runtime argument lesson: coerce model-provided limit values before clamping, now tracked as a pure Gormes helper before any Discord REST handler is exposed."
           }
         },
         "5.B": {
@@ -9962,6 +10178,67 @@
               "name": "Approval mode config normalization",
               "status": "planned",
               "note": "TDD: add config parsing for manual/smart/off approval modes, including YAML/TOML boolean edge cases such as bare off, before wiring prompts or smart auxiliary review."
+            },
+            {
+              "name": "Gateway hook auto-accept strict parser",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Gateway hook consent resolves CLI/env/config auto-accept values through a strict bool/string parser so quoted false-like strings and non-bool scalars cannot silently authorize executable hooks",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Ambiguous or invalid hook auto-accept configuration leaves executable hooks in explicit-consent-required mode and reports hook_auto_accept_invalid instead of running handlers automatically.",
+              "fixture": "internal/gateway/hook_consent_test.go",
+              "source_refs": [
+                "../hermes-agent/agent/shell_hooks.py@e19854d8:_resolve_effective_accept",
+                "../hermes-agent/tests/agent/test_shell_hooks_consent.py@e19854d8:TestHooksAutoAcceptParsing",
+                "internal/gateway/hook_loader.go:LoadHookScripts",
+                "internal/gateway/hooks.go",
+                "internal/config/config.go:HooksRoot"
+              ],
+              "ready_when": [
+                "Hook manifest discovery + handler loading and Built-in BOOT.md startup hook are complete, so executable hook registration already exists.",
+                "This row is parser-only: workers can add an injected consent decision helper without changing live gateway startup, BOOT.md dispatch, or hook process execution.",
+                "The worker should mirror Hermes truthy strings `1`, `true`, `yes`, and `on` case-insensitively while making every other string/scalar false."
+              ],
+              "not_ready_when": [
+                "The slice adds interactive approval prompts, edits the TUI, changes hook manifest discovery, or executes real hook scripts in tests.",
+                "The slice treats TOML/YAML strings like `\"false\"`, `\"no\"`, `\"0\"`, arbitrary non-empty strings, integer `1`, arrays, or maps as opt-in.",
+                "The slice wires new CLI flags or config fields without first fixture-locking the pure parser behavior."
+              ],
+              "blocked_by": [
+                "Hook manifest discovery + handler loading"
+              ],
+              "acceptance": [
+                "TestHookAutoAcceptParser_BoolValues proves bool true accepts and bool false rejects.",
+                "TestHookAutoAcceptParser_StringTruthTable proves strings `1`, `true`, `yes`, `on` accept with whitespace/case folding, while `false`, `no`, `0`, `off`, empty, and arbitrary strings reject.",
+                "TestHookAutoAcceptParser_NonBoolScalarsReject proves nil, integer 1, slices, and maps reject instead of using Go/Python truthiness.",
+                "TestHookAutoAcceptParser_CLIOverride proves an explicit CLI accept flag wins over false-like config.",
+                "The helper returns stable evidence codes for accepted_by_cli, accepted_by_env, accepted_by_config, rejected_default, and hook_auto_accept_invalid without starting a hook process."
+              ],
+              "note": "Hermes e19854d8 fixed a security regression where `hooks_auto_accept: \"false\"` became truthy through Python bool() coercion. Gormes hook execution is Go-native, but the same executable-hook consent invariant belongs with approval/security guard work before adding auto-accept config or CLI wiring.",
+              "write_scope": [
+                "internal/gateway/hook_consent.go",
+                "internal/gateway/hook_consent_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run TestHookAutoAcceptParser -count=1",
+                "go test ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Hook consent parser fixtures prove quoted false-like strings and non-bool scalars cannot auto-accept executable hooks, while explicit CLI/env truthy values still work."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:e19854d8 agent/shell_hooks.py",
+                "note": "Hermes supplies the consent parsing regression; Gormes applies it to the native gateway hook registry before exposing auto-accept wiring."
+              }
             },
             {
               "name": "Subagent dangerous-command non-interactive approval policy",
@@ -13883,8 +14160,8 @@
             },
             {
               "name": "API server detailed health read-model",
-              "status": "planned",
               "priority": "P2",
+              "status": "planned",
               "contract": "Native API server exposes a detailed health read-model that reports provider, response-store, run-event stream, gateway, and cron availability/degradation without leaking secrets or adding cron mutations",
               "contract_status": "fixture_ready",
               "slice_size": "small",
@@ -13942,8 +14219,8 @@
             },
             {
               "name": "API server cron admin read-only endpoints",
-              "status": "planned",
               "priority": "P2",
+              "status": "planned",
               "contract": "Native API server exposes authenticated read-only cron admin endpoints for list/get/run-history over the existing cron store and run audit without creating a second scheduler control plane",
               "contract_status": "draft",
               "slice_size": "small",
@@ -14007,8 +14284,8 @@
             },
             {
               "name": "API server cron admin mutating endpoints",
-              "status": "planned",
               "priority": "P2",
+              "status": "planned",
               "contract": "Native API server exposes authenticated cron admin create/update/delete/pause/resume/trigger endpoints that reuse the native cron action envelope, schedule parser, safety policy, and delivery plan",
               "contract_status": "draft",
               "slice_size": "small",
@@ -14181,6 +14458,74 @@
           "name": "Skill Storage Format",
           "items": [
             {
+              "name": "SKILL.md frontmatter validation guard",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Skill storage exposes a GBrain v0.22.4-inspired frontmatter validator that reports malformed SKILL.md files before parser/store promotion or prompt injection can use them",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Skill status reports skill_frontmatter_invalid with validation codes and excludes the skill from prompt injection instead of silently accepting malformed YAML/frontmatter.",
+              "fixture": "internal/skills/frontmatter_validation_test.go",
+              "source_refs": [
+                "../gbrain/src/core/markdown.ts@891c28b:ParseValidationCode,collectValidationErrors",
+                "../gbrain/src/commands/frontmatter.ts@891c28b",
+                "../gbrain/skills/frontmatter-guard/SKILL.md@891c28b",
+                "../gbrain/test/markdown-validation.test.ts@891c28b",
+                "internal/skills/parser.go",
+                "internal/skills/parser_test.go"
+              ],
+              "ready_when": [
+                "Phase 2.G skills runtime is complete and internal/skills/parser.go already requires SKILL.md frontmatter delimiters.",
+                "This row is validation-only: workers should add structured error codes and parser/status evidence before versioned metadata, atomic writes, auto-fix, or hook installation.",
+                "The worker can use temp SKILL.md files and path-derived slug fixtures; no GBrain CLI, pre-commit hook, live embedding, or learning-loop extractor is required."
+              ],
+              "not_ready_when": [
+                "The slice implements auto-fix, `.bak` backup writes, pre-commit hook installation, or gbrain frontmatter CLI compatibility.",
+                "The slice changes skill selection scoring, candidate promotion, learning-loop distillation, or semantic lookup behavior.",
+                "The validator treats MISSING_OPEN, EMPTY_FRONTMATTER, YAML_PARSE, NULL_BYTES, NESTED_QUOTES, or SLUG_MISMATCH as warnings while still injecting the skill."
+              ],
+              "blocked_by": [
+                "Phase 2.G skills runtime"
+              ],
+              "unblocks": [
+                "Portable SKILL.md format"
+              ],
+              "acceptance": [
+                "TestSkillFrontmatterValidation_MissingOpenAndClose reports MISSING_OPEN when the first non-empty line is not `---` and MISSING_CLOSE when a body heading appears before a closing delimiter.",
+                "TestSkillFrontmatterValidation_EmptyAndYAMLParse reports EMPTY_FRONTMATTER for an empty block and YAML_PARSE for malformed YAML.",
+                "TestSkillFrontmatterValidation_NullBytesAndNestedQuotes reports NULL_BYTES with line evidence and NESTED_QUOTES for `title: \"Phil \"Nick\" Last\"`-style values.",
+                "TestSkillFrontmatterValidation_SlugMismatch derives the expected slug from the SKILL.md directory and reports SLUG_MISMATCH when a declared slug differs.",
+                "Parse/Load fixtures prove invalid active skills are omitted from BuildSkillBlock/selection and surfaced with skill_frontmatter_invalid status, while valid existing parser fixtures remain green."
+              ],
+              "note": "GBrain 891c28b/v0.22.4 added a frontmatter-guard skill plus shared validation classes for markdown pages. Gormes should first adapt the validation-code contract to SKILL.md assets, not import GBrain's CLI or auto-fix workflow.",
+              "write_scope": [
+                "internal/skills/frontmatter_validation.go",
+                "internal/skills/frontmatter_validation_test.go",
+                "internal/skills/parser.go",
+                "internal/skills/parser_test.go",
+                "internal/skills/status.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/skills -run 'TestSkillFrontmatterValidation|TestParse' -count=1",
+                "go test ./internal/skills -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Skill frontmatter fixtures prove all seven validation classes are reported and invalid SKILL.md files are excluded from prompt injection with visible status evidence."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:891c28b src/core/markdown.ts",
+                "note": "GBrain defines the validation classes; Gormes adapts them to local SKILL.md assets before broader skill storage metadata lands."
+              }
+            },
+            {
               "name": "Portable SKILL.md format",
               "status": "planned",
               "contract": "Reviewed skill-as-code storage format",
@@ -14194,16 +14539,20 @@
               "degraded_mode": "Skill status excludes unreviewed or invalid drafts from prompt injection and records resolver or metadata failures.",
               "fixture": "internal/skills SKILL.md metadata, provenance, and review-state fixtures",
               "source_refs": [
+                "../gbrain/skills/frontmatter-guard/SKILL.md@891c28b",
                 "docs/content/upstream-gbrain/gormes-takeaways.md",
                 "docs/content/building-gormes/architecture_plan/phase-6-learning-loop.md"
               ],
               "ready_when": [
+                "SKILL.md frontmatter validation guard is validated so malformed skill files are excluded before review metadata is interpreted.",
                 "Phase 2.G skills runtime is complete and the parser/store seam is stable enough for versioned metadata."
               ],
               "not_ready_when": [
-                "Generated drafts are allowed into prompt injection without explicit review metadata."
+                "Generated drafts are allowed into prompt injection without explicit review metadata.",
+                "The slice tries to implement GBrain frontmatter auto-fix or pre-commit hook installation instead of storage metadata and review gating."
               ],
               "blocked_by": [
+                "SKILL.md frontmatter validation guard",
                 "Phase 2.G skills runtime"
               ],
               "unblocks": [
@@ -14216,7 +14565,7 @@
                 "Invalid, disabled, or unreviewed drafts never enter prompt injection.",
                 "Atomic writes preserve human-editable skill files and version history."
               ],
-              "note": "TDD: extend the Phase 2.G parser/store contract with versioned metadata, provenance, review state, and atomic writes while preserving human-editable SKILL.md files.",
+              "note": "Refined after GBrain 891c28b/v0.22.4: first land the SKILL.md frontmatter validation guard, then extend the Phase 2.G parser/store contract with versioned metadata, provenance, review state, and atomic writes while preserving human-editable skill files.",
               "write_scope": [
                 "internal/skills/",
                 "docs/content/building-gormes/architecture_plan/progress.json"
@@ -14226,9 +14575,19 @@
               ],
               "done_signal": [
                 "SKILL.md metadata fixtures prove invalid, disabled, or unreviewed drafts stay out of prompt injection."
-              ]
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:891c28b skills/frontmatter-guard/SKILL.md",
+                "note": "GBrain supplies skill/frontmatter quality gates; Gormes owns the Go-native SKILL.md storage and review-state contract."
+              }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T03:55:07Z",
+            "origin_decision": "GBrain 891c28b/v0.22.4 adds shared frontmatter validation, audit, migration, doctor, and hook flows. Gormes should adapt only the validation-code contract to local SKILL.md assets first, then keep broader reviewed skill storage metadata as a dependent row; do not import GBrain's CLI, auto-fix, PGLite/Postgres, or pre-commit workflow."
+          }
         },
         "6.D": {
           "name": "Skill Retrieval + Matching",

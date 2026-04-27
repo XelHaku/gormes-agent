@@ -22,28 +22,7 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. Gateway message deduplicator bounded helper
-
-- Phase: 2 / 2.B.5
-- Owner: `gateway`
-- Size: `small`
-- Status: `planned`
-- Priority: `P2`
-- Contract: Shared gateway exposes a pure in-memory MessageDeduplicator that caps tracked message IDs at max_size, evicts the oldest ID deterministically, and returns duplicate/evicted/disabled evidence without touching manager routing
-- Trust class: gateway, system
-- Ready when: The helper can be tested as a pure in-memory structure with synthetic message IDs; no live platform SDK or manager run loop is required., internal/gateway/message_deduplicator.go and internal/gateway/message_deduplicator_test.go are the only runtime files needed for this first slice., When closing the row, set status to complete and keep contract_status as validated; never use status=validated.
-- Not ready when: The slice changes gateway.Manager, channel session keys, authorization/pairing policy, message rendering, or outbound coalescing., The slice adds platform-specific Telegram/Slack/Discord dedup state instead of a shared helper., The slice stores dedup history on disk or wires the helper into inbound dispatch; manager wiring is the dependent row.
-- Degraded mode: Gateway helper reports deduplicator_disabled, duplicate_message, or deduplicator_evicted evidence instead of growing unbounded in long-running platform adapters.
-- Fixture: `internal/gateway/message_deduplicator_test.go::TestMessageDeduplicator_MaxSizeEvictsOldest`
-- Write scope: `internal/gateway/message_deduplicator.go`, `internal/gateway/message_deduplicator_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/gateway -run '^TestMessageDeduplicator_' -count=1`, `go test ./internal/gateway -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Gateway helper fixtures prove bounded oldest eviction, duplicate rejection, disabled mode, and evidence values without platform SDKs, manager wiring, or disk state.
-- Acceptance: TestMessageDeduplicator_MaxSizeEvictsOldest adds max_size+1 distinct IDs and proves the first ID is no longer considered duplicate while the newest IDs remain tracked., TestMessageDeduplicator_DuplicateReturnsSeen proves repeated IDs are rejected before eviction and emits duplicate evidence., TestMessageDeduplicator_ZeroMaxSizeDisabled treats max_size=0 as disabled, never rejects messages, and never allocates a seen-ID queue., The helper exposes enough evidence for a later manager row to distinguish duplicate_message, deduplicator_evicted, and deduplicator_disabled without importing platform adapters.
-- Source refs: ../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator, ../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585, internal/gateway/event.go, internal/gateway/manager.go
-- Unblocks: Gateway inbound dedup evidence wiring
-- Why now: Unblocks Gateway inbound dedup evidence wiring.
-
-## 2. Durable worker RSS watchdog policy helper
+## 1. Durable worker RSS watchdog policy helper
 
 - Phase: 2 / 2.E.3
 - Owner: `orchestrator`
@@ -64,7 +43,7 @@ tests, and candidate policy. Keep those control-plane facts in
 - Unblocks: Durable worker RSS drain integration
 - Why now: Unblocks Durable worker RSS drain integration.
 
-## 3. Steer slash command registry + queue fallback
+## 2. Steer slash command registry + queue fallback
 
 - Phase: 2 / 2.F.5
 - Owner: `gateway`
@@ -83,6 +62,26 @@ tests, and candidate policy. Keep those control-plane facts in
 - Source refs: ../hermes-agent/cli.py@635253b9:busy_input_mode=steer, ../hermes-agent/gateway/run.py@635253b9:running_agent.steer, ../hermes-agent/hermes_cli/commands.py@635253b9:/busy steer, ../hermes-agent/tests/gateway/test_busy_session_ack.py@635253b9, internal/gateway/commands.go, internal/gateway/manager.go
 - Unblocks: Mid-run steer injection between tool calls, Gateway-handled slash commands bypass active-session guard
 - Why now: Unblocks Mid-run steer injection between tool calls, Gateway-handled slash commands bypass active-session guard.
+
+## 3. Provider timeout config fail-closed helper
+
+- Phase: 4 / 4.H
+- Owner: `provider`
+- Size: `small`
+- Status: `planned`
+- Priority: `P3`
+- Contract: Provider timeout lookup handles missing or failed config loading by returning explicit unset evidence, and parses provider request/stale timeout overrides without panicking or applying stale defaults
+- Trust class: operator, system
+- Ready when: Classified provider-error taxonomy and Retry-After hint handling are validated, so timeout evidence can reuse provider status vocabulary without changing retry loops., This row is pure lookup/parsing only; workers should not add new public config fields or wire live HTTP client timeouts until the helper behavior is fixture-locked., The helper can use injected loader callbacks and synthetic provider maps; no real config file, network call, or provider client is required.
+- Not ready when: The slice changes internal/config public TOML schema, provider HTTP client construction, or kernel retry behavior in the same change., The helper panics or returns a non-zero timeout when config loading/import fails, when providers is not a map, or when the requested provider block is malformed., The tests depend on wall-clock sleeps or live provider credentials.
+- Degraded mode: Provider status reports timeout_config_unavailable, timeout_config_invalid, or timeout_unset evidence instead of crashing startup or silently applying a stale provider timeout.
+- Fixture: `internal/hermes/provider_timeout_config_test.go`
+- Write scope: `internal/hermes/provider_timeout_config.go`, `internal/hermes/provider_timeout_config_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/hermes -run TestProviderTimeoutConfig -count=1`, `go test ./internal/hermes -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Provider timeout config fixtures prove load failures, missing providers, malformed values, and valid overrides return explicit evidence without wiring live clients or config schema.
+- Acceptance: TestProviderTimeoutConfig_LoadFailureReturnsUnset injects a loader error and proves request and stale timeout lookup return unset evidence without panic., TestProviderTimeoutConfig_MissingProviderReturnsUnset proves nil providers, missing provider IDs, and non-map provider blocks return timeout_unset., TestProviderTimeoutConfig_ParsesRequestAndStaleTimeouts proves numeric seconds and duration strings resolve to deterministic time.Duration values., TestProviderTimeoutConfig_InvalidValuesFailClosed proves negative, zero when not allowed, non-numeric, and overflow values return timeout_config_invalid evidence., No HTTP client, kernel retry, or public config schema is changed by this helper-only slice.
+- Source refs: ../hermes-agent/hermes_cli/timeouts.py@16e243e0:get_provider_request_timeout, ../hermes-agent/hermes_cli/timeouts.py@16e243e0:get_provider_stale_timeout, ../hermes-agent/hermes_cli/timeouts.py@366351b9, internal/config/config.go:HermesCfg, internal/hermes/http_client.go
+- Why now: Contract metadata is present; ready for a focused spec or fixture slice.
 
 ## 4. Browser SSRF quoted-false guard
 

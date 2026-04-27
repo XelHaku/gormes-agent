@@ -13,14 +13,42 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `cb51baec`
+- Upstream commit: `b288934d`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Gormes commit: `f9c4222c`
+- Gormes commit: `23909ea3`
 - Date: 2026-04-27
+
+## 2026-04-27 (Hermes b288934d) Drift Check
+
+The synchronized Hermes head is now `b288934d`, moving beyond the prior
+`cb51baec` study snapshot. Honcho remains at `e659b6b`; GBrain moved to
+`891c28b` and is covered in the upstream GBrain study. No new Honcho/Goncho
+memory naming behavior changed. Gormes should keep the internal `goncho`
+package direction and preserve public `honcho_*` tool contracts where
+compatibility requires them.
+
+Material deltas in this window:
+
+- `91512b82` and `6993e566` harden `gateway/whatsapp_identity.py` by rejecting
+  path-like and non-ASCII identifiers before alias expansion. Gormes does not
+  port Hermes' filesystem `lid-mapping-*` files, but the same invariant belongs
+  in the Go WhatsApp alias graph. The roadmap now adds Phase 2.B.4
+  `WhatsApp ASCII identifier guard`.
+- `e19854d8` fixes `agent/shell_hooks.py` so `hooks_auto_accept: "false"` no
+  longer bypasses consent through truthy string coercion. Gormes hook loading is
+  Go-native; the roadmap now adds Phase 5.J
+  `Gateway hook auto-accept strict parser` before any auto-accept config wiring.
+- `16e243e0` and `366351b9` make Hermes provider timeout helpers fail closed
+  when config loading raises. Gormes has not exposed provider request/stale
+  timeout config yet, so this remains a provider-config hardening lesson instead
+  of an executable row in this pass.
+- `b288934d` coerces Discord tool `limit` arguments to int before clamping.
+  Gormes' Discord tools are still descriptor-only, so the roadmap adds Phase
+  5.A `Discord tool limit coercion helper` before any Discord REST handler.
 
 ## 2026-04-27 (Hermes cb51baec) Drift Check
 
-The synchronized Hermes head is now `cb51baec`, moving beyond the prior
+The synchronized Hermes head was `cb51baec`, moving beyond the prior
 `b16f9d43` study snapshot. Honcho remains at `e659b6b` and GBrain remains at
 `c78c3d0`; no new Honcho/Goncho naming change is required. Gormes should keep
 the internal `goncho` package direction and preserve public `honcho_*` tool

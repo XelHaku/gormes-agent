@@ -12,14 +12,39 @@ The content below is preserved verbatim from the upstream docs so operators eval
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `cb51baec`
+- Upstream commit: `b288934d`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
 - Date: 2026-04-27
 
-## 2026-04-27 Drift Check
+## 2026-04-27 Security And Tooling Drift Check
 
-Hermes `cb51baec` is current in the synchronized sibling repo. Honcho remains
-at `e659b6b` and GBrain remains at `c78c3d0`; no new Goncho/Honcho memory row
+Hermes `b288934d` is current in the synchronized sibling repo. Honcho remains
+at `e659b6b` and GBrain moved to `891c28b`; no new Goncho/Honcho memory row is
+needed from this Hermes sync, and Gormes keeps the internal `goncho` package
+name while preserving public `honcho_*` compatibility surfaces.
+
+- WhatsApp identity drift: `91512b82` and `6993e566` reject traversal-like and
+  non-ASCII identifiers before alias expansion. Gormes already avoids Hermes'
+  filesystem `lid-mapping-*` files, but now tracks a Phase 2.B.4
+  `WhatsApp ASCII identifier guard` row so the Go alias graph cannot promote
+  unsafe raw peers into session keys or outbound pairing state.
+- Hook consent drift: `e19854d8` parses `hooks_auto_accept` strictly so quoted
+  false-like strings and non-bool scalars do not authorize executable hooks.
+  Gormes now tracks this as a parser-only Phase 5.J approval/security row
+  before any native auto-accept config or CLI wiring is exposed.
+- Provider timeout drift: `16e243e0` and `366351b9` make Hermes provider timeout
+  lookup fail closed when config loading raises. Gormes has no equivalent
+  provider timeout config surface yet, so this is recorded as a future provider
+  config hardening lesson rather than a runtime row in this pass.
+- Discord tool drift: `b288934d` coerces model-provided Discord `limit`
+  arguments to integers before clamping. Gormes only has descriptor-level
+  Discord tools today, so the roadmap adds a pure Phase 5.A
+  `Discord tool limit coercion helper` before REST handlers land.
+
+## 2026-04-27 MCP And Gateway Drift Check
+
+Hermes `cb51baec` was current in the synchronized sibling repo. Honcho remained
+at `e659b6b` and GBrain remained at `c78c3d0`; no new Goncho/Honcho memory row
 is needed from this sync, and Gormes keeps the internal `goncho` package name
 while preserving public `honcho_*` compatibility surfaces.
 

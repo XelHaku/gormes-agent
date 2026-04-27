@@ -77,6 +77,7 @@ The handler can remain ordinary Go.
 | v0.22.1 worker abort and slot recovery | durable worker loop and builder/autoloop health | Propagate cancellation through every long phase and free claimed worker slots with auditable timeout evidence when a handler ignores cancellation. |
 | v0.22.2 RSS watchdog and stable-run reset | future durable worker loop only | Add opt-in worker RSS/capacity watchdog evidence after a Go durable worker exists; do not self-terminate the main Gormes process or make Goncho memory depend on supervised workers. |
 | v0.22.1 incremental extract + embed-stale filters | learning-loop skill and memory maintenance passes | Carry changed-source IDs through extract/index/embed phases and prove stale-only work avoids whole-corpus scans. |
+| v0.22.4 frontmatter guard | SKILL.md validation and skill status evidence | Add structured frontmatter validation before reviewed skill storage; exclude malformed skills from prompt injection with visible codes. |
 | `subagent_messages` and tool ledger | run logs and transcript export | Persist child-agent messages/tool calls enough to resume or replay. |
 | skills resolver and checks | `internal/skills` active/inactive store | Add resolver conformance, routing evals, conflict checks, and promotion evidence. |
 | `gbrain doctor`/skillpack-check | `gormes doctor --offline` | Extend doctor to report operation registry, memory degradation, job queue health, and skill resolver health. |
@@ -220,6 +221,13 @@ promotion. Borrow GBrain's checks:
 - usage logs tie selected skills to turn outcome
 
 This will matter before Phase 6 learning-loop extraction writes new skills.
+
+GBrain v0.22.4 makes the frontmatter part concrete. Gormes should start with a
+small SKILL.md validation guard that reports missing open/close delimiters,
+YAML parse failures, slug mismatches, null bytes, nested quotes, and empty
+frontmatter. Invalid skills should be visible in status and excluded from prompt
+injection. Auto-fix, `.bak` backup handling, and pre-commit installation are
+GBrain workflow features; keep them out of the first Gormes slice.
 
 ### 5a. Keep Code Context Optional And Explained
 

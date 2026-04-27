@@ -282,6 +282,15 @@ The strongest idea is the resolver-plus-conformance discipline:
 - skillpack install/update tracks managed blocks.
 - `skillify` turns repeated failures into new skills.
 
+GBrain `891c28b` turns this into an explicit frontmatter quality gate. The
+frontmatter-guard release defines seven validation classes for malformed
+markdown (`MISSING_OPEN`, `MISSING_CLOSE`, `YAML_PARSE`, `SLUG_MISMATCH`,
+`NULL_BYTES`, `NESTED_QUOTES`, and `EMPTY_FRONTMATTER`), exposes audit/validate
+commands, wires a doctor subcheck, and documents an optional pre-commit hook.
+For Gormes, the first useful slice is not the GBrain CLI or auto-fix workflow.
+It is a Go-native SKILL.md validator that reports the same kinds of structural
+errors and excludes invalid skills from prompt injection.
+
 Gormes already has a static `internal/skills` runtime. The next step is not more
 prompt text; it is conformance, routing evals, active/inactive promotion rules,
 and operator-visible evidence.

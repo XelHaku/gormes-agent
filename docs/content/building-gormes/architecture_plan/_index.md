@@ -127,12 +127,13 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 - [x] Non-editable gateway progress/commentary send fallback
+- [ ] WhatsApp ASCII identifier guard
 - [x] Gateway fresh-final eligibility helper
 - [x] Gateway fresh-final send/delete fallback
 - [x] Telegram fresh-final delete and config exposure
 - [x] Slack rich-text quotes/lists + link-unfurl ingress
 - [x] Slack thread-parent context + team-scoped cache key
-- [ ] Gateway message deduplicator bounded helper
+- [x] Gateway message deduplicator bounded helper
 - [ ] Gateway inbound dedup evidence wiring
 
 ### 2.B.10 — WeChat Adapter ✅
@@ -438,6 +439,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Retry-After header parsing + HTTPError hint
 - [x] Kernel retry honors Retry-After hint
 - [x] Streaming interrupt retry suppression
+- [ ] Provider timeout config fail-closed helper
 - [ ] Prompt-cache capability guard
 - [x] Provider rate guard + budget telemetry
 - [x] Provider rate guard — x-ratelimit header classification
@@ -453,6 +455,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Tool registry inventory + schema parity harness
 - [x] Tool parity manifest refresh for Hermes b35d692f
 - [x] Discord tool split + platform-scoped toolsets
+- [ ] Discord tool limit coercion helper
 - [x] Home Assistant HASS_TOKEN platform-toolset carveout
 - [ ] Pure core tools first
 - [ ] Stateful tool migration queue
@@ -528,6 +531,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Hardline command pattern table + DetectHardline function
 - [x] Recoverable dangerous patterns + blocked-result schema
 - [ ] Approval mode config normalization
+- [ ] Gateway hook auto-accept strict parser
 - [ ] Subagent dangerous-command non-interactive approval policy
 - [ ] Cron dangerous-command approval mode
 - [ ] Tirith, path, URL, and website policy integration
@@ -654,6 +658,7 @@ machine-readable queue for developing the full `gormes-agent`.
 
 ### 6.C — Skill Storage Format ⏳
 
+- [ ] SKILL.md frontmatter validation guard
 - [ ] Portable SKILL.md format
 
 ### 6.D — Skill Retrieval + Matching ⏳

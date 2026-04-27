@@ -13,9 +13,23 @@ Go-native `gormes-agent`.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/gbrain`
-- Upstream commit: `c78c3d0`
+- Upstream commit: `891c28b`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
 - Date: 2026-04-27
+
+## 2026-04-27 v0.22.4 Drift Check
+
+GBrain `891c28b` ships the frontmatter-guard release: shared markdown
+validation codes, `gbrain frontmatter audit/validate/install-hook`, a doctor
+subcheck, a migration, and an agent-facing skill for structural frontmatter
+repair. Gormes should not import the GBrain CLI or its auto-fix/pre-commit
+workflow. The portable lesson is smaller: SKILL.md assets need a structured
+frontmatter validator that can exclude malformed skills from prompt injection
+with visible status evidence before the broader reviewed skill storage format
+lands.
+
+The roadmap now adds Phase 6.C `SKILL.md frontmatter validation guard` and makes
+`Portable SKILL.md format` depend on it.
 
 ## 2026-04-27 v0.22.2 Drift Check
 
