@@ -3832,14 +3832,14 @@
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
               "contract": "Registry-owned active-turn steering command",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
                 "gateway"
               ],
-              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately.",
+              "degraded_mode": "Gateway returns visible usage, busy, steer_unavailable, or queued status instead of dropping steer text when the command cannot run immediately. Planner 2026-04-27: the last three attempts stopped at backend stdin/usage-limit before a useful diff; keep this row needs_human until a noninteractive backend worker can run the fixture, then restore fixture_ready without widening the contract.",
               "fixture": "internal/gateway/steer_queue_test.go",
               "source_refs": [
                 "../hermes-agent/cli.py@635253b9:busy_input_mode=steer",
@@ -3909,9 +3909,12 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 3,
-                "last_reshape": "2026-04-27T05:33:36Z",
-                "last_outcome": "no_attempts_yet"
+                "needs_human": true,
+                "reason": "worker_error/backend stdin wait before diff; re-enable after backend quota/noninteractive execution is healthy",
+                "since": "2026-04-27T11:09:04Z",
+                "reshape_count": 4,
+                "last_reshape": "2026-04-27T11:09:04Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -5592,6 +5595,8 @@
               "source_refs": [
                 "../hermes-agent/run_agent.py@f93d4624:_copy_reasoning_content_for_api",
                 "../hermes-agent/run_agent.py@f93d4624:_needs_deepseek_tool_reasoning",
+                "../hermes-agent/run_agent.py@ee1a07f:_copy_reasoning_content_for_api",
+                "../hermes-agent/tests/run_agent/test_deepseek_reasoning_content_echo.py@ee1a07f",
                 "internal/hermes/http_client.go:openAICompatibleReasoningContent",
                 "internal/hermes/reasoning_content_echo_test.go",
                 "docs/content/upstream-hermes/source-study.md"
@@ -5615,7 +5620,7 @@
                 "An explicit ReasoningContent string on the assistant tool-call message is still preserved verbatim.",
                 "Non-tool assistant turns and non-thinking providers still omit reasoning_content and the storage-only reasoning field from outgoing API payloads."
               ],
-              "note": "Complete: TDD landed DeepSeek/Kimi cross-provider reasoning isolation in `internal/hermes/reasoning_content_echo_test.go` and `internal/hermes/http_client.go`. Replay fixtures now prove provider-native `ReasoningContent` is preserved, but generic storage-only `Message.Reasoning` from a prior provider is not forwarded to DeepSeek/Kimi/Moonshot assistant tool-call continuations; those turns receive `reasoning_content=\"\"` instead. Non-tool assistant turns and non-thinking provider payloads still omit `reasoning_content` and never serialize the storage-only `reasoning` field.",
+              "note": "Complete: TDD landed DeepSeek/Kimi cross-provider reasoning isolation in `internal/hermes/reasoning_content_echo_test.go` and `internal/hermes/http_client.go`. Replay fixtures now prove provider-native `ReasoningContent` is preserved, but generic storage-only `Message.Reasoning` from a prior provider is not forwarded to DeepSeek/Kimi/Moonshot assistant tool-call continuations; those turns receive `reasoning_content=\"\"` instead. Non-tool assistant turns and non-thinking provider payloads still omit `reasoning_content` and never serialize the storage-only `reasoning` field. 2026-04-27 sync: Hermes ee1a07f reasserts the same MiniMax-to-DeepSeek/Kimi leak guard; Gormes already satisfies it through the storage-only reasoning fixtures.",
               "write_scope": [
                 "internal/hermes/http_client.go",
                 "internal/hermes/reasoning_content_echo_test.go",
@@ -5636,8 +5641,8 @@
               },
               "provenance": {
                 "origin_type": "upstream",
-                "upstream_ref": "hermes:f93d4624 run_agent.py",
-                "note": "Hermes changed provider replay ordering to avoid cross-provider reasoning leakage; Gormes should port the behavior as a focused provider-boundary fixture."
+                "upstream_ref": "hermes:ee1a07f run_agent.py",
+                "note": "Hermes changed provider replay ordering to avoid cross-provider reasoning leakage and revalidated it at ee1a07f; Gormes has the focused provider-boundary fixture in place."
               }
             },
             {
@@ -6918,8 +6923,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T04:52:17Z",
-            "origin_decision": "Hermes 4a2ee6c1 is current after the 2026-04-27 sync. Gormes provider fixtures validate DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, Azure Foundry probing/runtime/status, Codex Responses conversion/repair, and Bedrock request/cache mapping. Hermes c5781d50 adds Azure Foundry GPT-5.x/codex/o-series Responses-only api_mode inference; Gormes tracks that as a small runtime read-model row instead of reopening the probe/status rows. Bedrock remains upstream-led for ConverseStream event decoding and the blocked SigV4/credential seam. Hermes 192e7eb2 provider-rate drift remains tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift remain under 5.O/4.D."
+            "last_upstream_check": "2026-04-27T11:09:04Z",
+            "origin_decision": "Hermes ee1a07f is current after the 2026-04-27 sync. Gormes provider fixtures validate DeepSeek/Kimi, Azure OpenAI, Azure Anthropic, Azure Foundry probing/runtime/status, Codex Responses conversion/repair, and Bedrock request/cache mapping. Hermes ee1a07f reasserts the cross-provider reasoning leak guard for DeepSeek/Kimi; the completed Gormes reasoning_content isolation fixtures already cover storage-only reasoning from prior providers. Hermes c5781d50 adds Azure Foundry GPT-5.x/codex/o-series Responses-only api_mode inference; Gormes tracks that as a small runtime read-model row instead of reopening the probe/status rows. Bedrock remains upstream-led for ConverseStream event decoding and the blocked SigV4/credential seam. Hermes 192e7eb2 provider-rate drift remains tracked under 4.H; b2d3308f/25ba6a4a doctor and gateway reasoning drift remain under 5.O/4.D."
           }
         },
         "4.B": {
@@ -7343,14 +7348,14 @@
               "priority": "P2",
               "status": "planned",
               "contract": "Kernel compression execution signals the ContextEngine when a compression boundary is crossed so cached/replayed context state cannot silently span the pre-compress and post-compress transcript",
-              "contract_status": "fixture_ready",
+              "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "provider",
               "trust_class": [
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression.",
+              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression. Planner 2026-04-27: the last three attempts stopped at backend stdin/usage-limit before a useful diff; keep this row needs_human until a noninteractive backend worker can run the fixture, then restore fixture_ready without widening the contract.",
               "fixture": "internal/kernel/compression_boundary_test.go",
               "source_refs": [
                 "../hermes-agent/run_agent.py@e85b7525",
@@ -7422,8 +7427,12 @@
                 }
               },
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-27T05:33:36Z"
+                "needs_human": true,
+                "reason": "worker_error/backend stdin wait before diff; re-enable after backend quota/noninteractive execution is healthy",
+                "since": "2026-04-27T11:09:04Z",
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T11:09:04Z",
+                "last_outcome": "still_failing"
               },
               "provenance": {
                 "origin_type": "hybrid",
