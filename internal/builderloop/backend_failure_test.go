@@ -31,6 +31,20 @@ func TestClassifyBackendFailureDetectsStdinWaitWithoutProcessKill(t *testing.T) 
 	}
 }
 
+func TestClassifyBackendFailureDetectsUsageLimitStdinExit(t *testing.T) {
+	stdout := "You've hit your usage limit. Reading additional input from stdin...\n"
+	failure := ClassifyBackendFailure(errors.New("exit status 1"), stdout, "")
+
+	if failure.Status != "backend_usage_limited" {
+		t.Fatalf("Status = %q, want backend_usage_limited", failure.Status)
+	}
+	for _, want := range []string{"backend_usage_limited", "You've hit your usage limit", "Reading additional input from stdin"} {
+		if !strings.Contains(failure.Detail, want) {
+			t.Fatalf("Detail = %q, want containing %q", failure.Detail, want)
+		}
+	}
+}
+
 func TestClassifyBackendFailureDetectsNoProgressTimeout(t *testing.T) {
 	failure := ClassifyBackendFailure(context.DeadlineExceeded, "", "")
 

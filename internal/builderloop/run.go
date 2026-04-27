@@ -1171,12 +1171,6 @@ func recordWorkerOutcome(
 		return
 	}
 	cat := mapFinishErrorToCategory(worker, finishErr)
-	stderrTail := worker.Result.Stderr
-	if stderrTail == "" {
-		stderrTail = finishErr.Error()
-	}
-	acc.RecordFailure(worker.Candidate, cat, currentBackend, stderrTail)
-
 	out := workerOutcome{
 		Backend:  currentBackend,
 		Commit:   "",
@@ -1188,7 +1182,48 @@ func recordWorkerOutcome(
 	if worker.Result.Err != nil && cat == progress.FailureWorkerError {
 		out.IsBackendErrorFlag = true
 	}
+	if backendInfraFailureWithoutWorkerDiff(worker, cat) {
+		observe(out)
+		return
+	}
+
+	stderrTail := worker.Result.Stderr
+	if stderrTail == "" {
+		stderrTail = finishErr.Error()
+	}
+	acc.RecordFailure(worker.Candidate, cat, currentBackend, stderrTail)
 	observe(out)
+}
+
+func backendInfraFailureWithoutWorkerDiff(worker workerRun, cat progress.FailureCategory) bool {
+	if worker.Result.Err == nil || cat != progress.FailureWorkerError {
+		return false
+	}
+	failure := ClassifyBackendFailure(worker.Result.Err, worker.Result.Stdout, worker.Result.Stderr)
+	if failure.Status != "backend_usage_limited" && failure.Status != "backend_waiting_for_stdin" {
+		return false
+	}
+	return workerLeftNoDiff(worker)
+}
+
+func workerLeftNoDiff(worker workerRun) bool {
+	if worker.BaseCommit == "" || !repoHasGit(worker.RepoRoot) {
+		return true
+	}
+	if err := ensureCurrentBranch(worker.RepoRoot, worker.Branch); err != nil {
+		return false
+	}
+	if err := ensureNoMergeConflicts(worker.RepoRoot); err != nil {
+		return false
+	}
+	if err := ensureWorktreeClean(worker.RepoRoot); err != nil {
+		return false
+	}
+	head, err := gitHeadSha(worker.RepoRoot)
+	if err != nil {
+		return false
+	}
+	return head == worker.BaseCommit
 }
 
 // mapFinishErrorToCategory classifies a finishWorker error into the closed

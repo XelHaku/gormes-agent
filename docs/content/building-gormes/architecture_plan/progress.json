@@ -11710,9 +11710,9 @@
             {
               "name": "Backend usage-limit stdin health bypass",
               "priority": "P1",
-              "status": "planned",
+              "status": "complete",
               "contract": "Builder-loop treats backend usage-limit/stdin-wait exits that produce no worker diff as backend infrastructure degradation, emits run-level backend evidence, and avoids charging the selected feature row as a worker_error quarantine candidate",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [

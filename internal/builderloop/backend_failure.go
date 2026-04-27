@@ -20,6 +20,8 @@ func ClassifyBackendFailure(err error, stdout, stderr string) BackendFailure {
 		status = "backend_killed"
 	case errors.Is(err, context.DeadlineExceeded) || strings.Contains(haystack, context.DeadlineExceeded.Error()):
 		status = "backend_no_progress"
+	case backendHitUsageLimit(haystack):
+		status = "backend_usage_limited"
 	case strings.Contains(haystack, "reading additional input from stdin"):
 		status = "backend_waiting_for_stdin"
 	}
@@ -59,6 +61,11 @@ func backendWasKilled(text string) bool {
 		strings.Contains(text, "signal: terminated") ||
 		strings.Contains(text, "signal: interrupt") ||
 		strings.Contains(text, "killed")
+}
+
+func backendHitUsageLimit(text string) bool {
+	return strings.Contains(text, "hit your usage limit") ||
+		strings.Contains(text, "usage limit")
 }
 
 func errorText(err error) string {

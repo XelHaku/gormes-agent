@@ -781,6 +781,85 @@ func TestRunOnce_BackendDegradedEventEmittedAfterThreshold(t *testing.T) {
 	}
 }
 
+func TestRunOnce_BackendUsageLimitDoesNotQuarantineRow(t *testing.T) {
+	progressPath := writeNamedProgressJSON(t, baseNamedProgress)
+	if err := progress.ApplyHealthUpdates(progressPath, []progress.HealthUpdate{{
+		PhaseID:    "12",
+		SubphaseID: "12.A",
+		ItemName:   "row-1",
+		Mutate: func(h *progress.RowHealth) {
+			h.AttemptCount = 2
+			h.ConsecutiveFailures = 2
+		},
+	}}); err != nil {
+		t.Fatalf("seed health: %v", err)
+	}
+
+	runRoot := t.TempDir()
+	wantErr := errors.New("exit status 1")
+	usageLimit := "You've hit your usage limit. Reading additional input from stdin...\n"
+	runner := &FakeRunner{Results: []Result{{Err: wantErr, Stdout: usageLimit}}}
+
+	_, err := RunOnce(context.Background(), RunOptions{
+		Config: Config{
+			RepoRoot:                t.TempDir(),
+			ProgressJSON:            progressPath,
+			RunRoot:                 runRoot,
+			Backend:                 "opencode",
+			Mode:                    "safe",
+			MaxAgents:               1,
+			QuarantineThreshold:     3,
+			BackendFallback:         []string{"opencode", "codexu"},
+			BackendDegradeThreshold: 1,
+		},
+		Runner: runner,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("RunOnce() error = %v, want wrapped %v", err, wantErr)
+	}
+
+	item := loadItem(t, progressPath, "12", "12.A", "row-1")
+	if item.Health == nil {
+		t.Fatal("item.Health is nil after seeded run")
+	}
+	if item.Health.AttemptCount != 2 {
+		t.Fatalf("AttemptCount = %d, want unchanged 2", item.Health.AttemptCount)
+	}
+	if item.Health.ConsecutiveFailures != 2 {
+		t.Fatalf("ConsecutiveFailures = %d, want unchanged 2", item.Health.ConsecutiveFailures)
+	}
+	if item.Health.Quarantine != nil {
+		t.Fatalf("Quarantine = %+v, want nil for backend usage-limit outage", item.Health.Quarantine)
+	}
+
+	events := readLedgerEvents(t, filepath.Join(runRoot, "state", "runs.jsonl"))
+	var failed *LedgerEvent
+	var degraded *LedgerEvent
+	for i := range events {
+		switch events[i].Event {
+		case "worker_failed":
+			failed = &events[i]
+		case "backend_degraded":
+			degraded = &events[i]
+		}
+	}
+	if failed == nil {
+		t.Fatalf("worker_failed event missing; got=%v", ledgerEventNames(events))
+	}
+	if failed.Status != "backend_usage_limited" {
+		t.Fatalf("worker_failed status = %q, want backend_usage_limited", failed.Status)
+	}
+	if !strings.Contains(failed.Detail, "You've hit your usage limit") {
+		t.Fatalf("worker_failed detail = %q, want usage-limit detail", failed.Detail)
+	}
+	if degraded == nil {
+		t.Fatalf("backend_degraded event missing; got=%v", ledgerEventNames(events))
+	}
+	if !strings.Contains(degraded.Detail, "from=opencode") || !strings.Contains(degraded.Detail, "to=codexu") {
+		t.Fatalf("backend_degraded detail = %q, want from/to fields", degraded.Detail)
+	}
+}
+
 func ledgerEventNames(events []LedgerEvent) []string {
 	names := make([]string, 0, len(events))
 	for _, ev := range events {
