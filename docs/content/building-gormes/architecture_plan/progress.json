@@ -674,12 +674,79 @@
                 "owned_since": "2026-04-26T17:47:44Z",
                 "note": "Surfaces the self-improvement vs user-feature skew observed in the overnight 2026-04-26 post-mortem (9 ships, almost all on the loop itself)."
               }
+            },
+            {
+              "name": "Backend usage-limit stdin health bypass",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Builder-loop treats backend usage-limit/stdin-wait exits that produce no worker diff as backend infrastructure degradation, emits run-level backend evidence, and avoids charging the selected feature row as a worker_error quarantine candidate",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "system"
+              ],
+              "degraded_mode": "When every configured backend is usage-limited or waiting for stdin, the loop emits backend_degraded/backend_waiting_for_stdin evidence and leaves feature-row health unchanged so the planner sees an infrastructure outage instead of a toxic implementation row.",
+              "fixture": "internal/builderloop/run_health_test.go::TestRunOnce_BackendUsageLimitDoesNotQuarantineRow",
+              "source_refs": [
+                "internal/builderloop/backend_failure.go:ClassifyBackendFailure",
+                "internal/builderloop/backend_failure_test.go",
+                "internal/builderloop/run.go:recordWorkerOutcome",
+                "internal/builderloop/run_health_test.go:TestRunOnce_BackendDegradedEventEmittedAfterThreshold",
+                "internal/builderloop/health_writer.go:RecordFailure",
+                ".codex/builder-loop/state/runs.jsonl recent backend_waiting_for_stdin usage-limit entries"
+              ],
+              "ready_when": [
+                "Autoloop audit shows backend_waiting_for_stdin rows whose detail contains `You've hit your usage limit` and no promoted diff.",
+                "Existing backend failure classification already detects killed, deadline, and stdin-wait exits; this slice only adds the usage-limit/no-diff health bypass around that path.",
+                "The test can use FakeRunner with a backend Result{Err: errors.New(\"exit status 1\"), Stdout: usage-limit text plus `Reading additional input from stdin...`} and a one-row progress fixture; no real backend, git remote, provider, or worktree promotion is required."
+              ],
+              "not_ready_when": [
+                "The slice changes feature-row contracts, candidate ranking, post-promotion gates, planner prompt generation, or backend command construction.",
+                "The slice suppresses real row failures that produced a commit, dirty worktree, write-scope violation, validation failure, or no-progress diff.",
+                "The slice retries forever instead of emitting bounded backend_degraded evidence when no fallback backend remains."
+              ],
+              "unblocks": [
+                "Steer slash command registry + queue fallback",
+                "ContextEngine compression-boundary notification",
+                "Custom provider model-switch key_env write guard",
+                "Native TUI /save XDG file writer binding",
+                "Native TUI bounded conversation viewport"
+              ],
+              "acceptance": [
+                "TestClassifyBackendFailureDetectsUsageLimitStdinExit proves usage-limit text is classified distinctly from ordinary stdin wait while preserving the original detail tail.",
+                "TestRunOnce_BackendUsageLimitDoesNotQuarantineRow runs a selected feature row through FakeRunner usage-limit/stdin output and proves the row's health block is not incremented or quarantined.",
+                "The same run emits a ledger event with backend_waiting_for_stdin or backend_usage_limited detail plus backend_degraded evidence when fallback switching is configured.",
+                "A separate worker_error fixture with a non-backend row failure still increments row health, so real implementation failures remain visible to quarantine math.",
+                "Existing TestRunOnce_BackendDegradedEventEmittedAfterThreshold and backend_failure_test.go fixtures remain green."
+              ],
+              "note": "Added 2026-04-27T11:18:57Z after the last 7-day audit showed 37 backend_waiting_for_stdin failures, including repeated usage-limit/stdin exits against otherwise TDD-ready feature rows. This is a Gormes-owned control-plane repair row; it should land before reopening the quarantined feature slices.",
+              "write_scope": [
+                "internal/builderloop/backend_failure.go",
+                "internal/builderloop/backend_failure_test.go",
+                "internal/builderloop/run.go",
+                "internal/builderloop/run_health_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/builderloop -run '^(TestClassifyBackendFailureDetectsUsageLimitStdinExit|TestRunOnce_BackendUsageLimitDoesNotQuarantineRow|TestRunOnce_BackendDegradedEventEmittedAfterThreshold)$' -count=1",
+                "go test ./internal/builderloop -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Builder-loop usage-limit fixtures prove backend stdin/usage-limit outages produce run-level degraded evidence without mutating feature-row health, while ordinary worker_error paths still update row health."
+              ],
+              "provenance": {
+                "origin_type": "gormes",
+                "owned_since": "2026-04-27T11:18:57Z",
+                "note": "Backend outage shielding is Gormes-owned planner-builder control-plane behavior with no upstream Hermes, Honcho, or GBrain analog."
+              }
             }
           ],
           "drift_state": {
             "status": "owned",
-            "last_upstream_check": "2026-04-27T00:18:30Z",
-            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes 755a2804, GBrain c78c3d0, and Honcho e659b6b were checked this run; this subphase remains owned and complete. GBrain's v0.22.1/v0.22.2 durable-worker lessons are tracked as small future rows in 2.E.3, and delta-maintenance remains in 6.D rather than reopening Phase 1 control-plane closeout."
+            "last_upstream_check": "2026-04-27T11:18:57Z",
+            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, drift/provenance awareness, and backend-outage shielding are Gormes-original control-plane surfaces. Upstream Hermes ee1a07f9, GBrain 891c28b, and Honcho e659b6b were checked this run; no upstream code owns the planner-builder health bypass. GBrain's durable-worker lessons remain tracked as small future rows in 2.E.3, while the new backend usage-limit/stdin row reopens this owned subphase only to stop infrastructure failures from quarantining feature rows."
           }
         }
       }
