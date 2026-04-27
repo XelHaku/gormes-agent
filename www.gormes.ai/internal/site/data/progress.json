@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-26T23:57:40Z",
+    "last_updated": "2026-04-27T00:18:30Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -678,8 +678,8 @@
           ],
           "drift_state": {
             "status": "owned",
-            "last_upstream_check": "2026-04-26T23:11:47Z",
-            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes 755a2804, GBrain e2961c0, and Honcho e659b6b were checked this run; this subphase remains owned and complete. GBrain's v0.22.1 abort-slot and delta-maintenance lessons are tracked as small future rows in 2.E.3 and 6.D rather than reopening Phase 1 control-plane closeout."
+            "last_upstream_check": "2026-04-27T00:18:30Z",
+            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes 755a2804, GBrain c78c3d0, and Honcho e659b6b were checked this run; this subphase remains owned and complete. GBrain's v0.22.1/v0.22.2 durable-worker lessons are tracked as small future rows in 2.E.3, and delta-maintenance remains in 6.D rather than reopening Phase 1 control-plane closeout."
           }
         }
       }
@@ -1738,6 +1738,8 @@
               "degraded_mode": "Doctor/status reports queue full, timeout-at, and stale waiting counts before accepting more durable work.",
               "fixture": "internal/subagent/durable_backpressure_test.go",
               "source_refs": [
+                "../gbrain/CHANGELOG.md@c78c3d0:v0.22.2",
+                "../gbrain/src/commands/autopilot.ts@c78c3d0:autopilot-cycle maxWaiting=1",
                 "../gbrain/src/core/minions/backpressure-audit.ts",
                 "../gbrain/src/core/minions/queue.ts",
                 "../gbrain/docs/guides/queue-operations-runbook.md",
@@ -1758,7 +1760,7 @@
                 "Wall-clock timeout_at is recorded and surfaced separately from context cancellation.",
                 "Doctor/status evidence reports waiting, claimed, timed-out, and backpressure-denied counts."
               ],
-              "note": "Complete: TDD landed internal/subagent/durable_backpressure_test.go over the Go SQLite ledger. Durable submissions now reject with audited backpressure evidence when max_waiting is reached, claims persist timeout_at wall-clock evidence separately from cancellation intent, and doctor/status surfaces waiting, claimed, timed-out, stale waiting, queue-full, and backpressure-denied counts without importing GBrain Minions runtime code.",
+              "note": "Complete: TDD landed internal/subagent/durable_backpressure_test.go over the Go SQLite ledger. Durable submissions now reject with audited backpressure evidence when max_waiting is reached, claims persist timeout_at wall-clock evidence separately from cancellation intent, and doctor/status surfaces waiting, claimed, timed-out, stale waiting, queue-full, and backpressure-denied counts without importing GBrain Minions runtime code. The 2026-04-27 GBrain c78c3d0 drift check confirmed the same durable-queue lesson via autopilot maxWaiting=1; no new Gormes row is needed for queue pileup.",
               "write_scope": [
                 "internal/subagent/",
                 "internal/doctor/",
@@ -1943,6 +1945,70 @@
               }
             },
             {
+              "name": "Durable worker execution loop",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Gormes durable jobs have a Go-native fake-handler execution seam that claims one waiting job from the SQLite ledger, invokes an injected handler with context.Context, records progress/result/failure evidence, and exits cleanly when no job is claimable",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Durable-worker status reports idle, claim_unavailable, handler_failed, or heartbeat_unavailable without starting a background daemon or shell executor.",
+              "fixture": "internal/subagent/durable_worker_test.go",
+              "source_refs": [
+                "../gbrain/src/core/minions/worker.ts@c78c3d0:launchJob/executeJob",
+                "../gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts",
+                "../gbrain/test/minions.test.ts@c78c3d0",
+                "internal/subagent/durable_ledger.go:Claim/UpdateProgress/Complete/Fail/RecordWorkerHeartbeat",
+                "internal/subagent/durable_ledger_test.go",
+                "internal/subagent/durable_backpressure_test.go",
+                "internal/subagent/durable_supervisor_status_test.go",
+                "internal/doctor/durable_ledger.go"
+              ],
+              "ready_when": [
+                "Durable job backpressure + timeout audit, Durable worker supervisor status seam, and Durable replay and inbox message contract are validated on main.",
+                "The first implementation can be tested with injected fake handlers, fake clock, and SQLite ledger only; no shell executor, external worker daemon, or GBrain TypeScript runtime is required."
+              ],
+              "not_ready_when": [
+                "The slice starts subprocess workers, creates a systemd service, implements shell execution, changes live delegate_task or cron semantics, or imports GBrain TypeScript code.",
+                "The worker needs polling goroutines, real sleeps, network services, Postgres/PGLite, or claim loops beyond a single deterministic RunOne-style helper."
+              ],
+              "unblocks": [
+                "Durable worker abort-slot recovery safety net"
+              ],
+              "acceptance": [
+                "TestDurableWorkerRunOne_ClaimsWaitingJobAndCompletesResult seeds a waiting durable job, runs a fake handler that returns JSON, and asserts the ledger records completed status, result_json, lock owner, and worker heartbeat evidence.",
+                "TestDurableWorkerRunOne_HandlerProgressPersists runs a fake handler that emits progress through the worker seam and asserts the ledger stores the progress_json before completion.",
+                "TestDurableWorkerRunOne_HandlerErrorFailsJob runs a fake handler that returns an error and asserts the ledger records failed status with the error text preserved.",
+                "TestDurableWorkerRunOne_NoJobReturnsIdle proves an empty ledger returns idle evidence, records no fake heartbeat, and does not mutate existing terminal jobs.",
+                "Doctor/status fixtures expose the last durable-worker heartbeat or heartbeat_unavailable evidence without requiring operators to inspect raw ledger rows."
+              ],
+              "note": "GBrain c78c3d0 shows the durable worker lifecycle that later watchdog rows depend on, but Gormes only needs the smallest Go-native execution seam first: one deterministic RunOne helper over the existing SQLite DurableLedger with injected fake handlers. This row makes the blocker explicit so abort-slot and RSS-watchdog rows do not invent daemons or shell execution.",
+              "write_scope": [
+                "internal/subagent/durable_worker.go",
+                "internal/subagent/durable_worker_test.go",
+                "internal/doctor/durable_ledger.go",
+                "internal/doctor/durable_ledger_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/subagent -run '^TestDurableWorkerRunOne_' -count=1",
+                "go test ./internal/subagent ./internal/doctor -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Durable worker fake-handler fixtures prove claim, progress, completion, failure, idle return, and heartbeat/status evidence without external worker processes."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:c78c3d0 src/core/minions/worker.ts",
+                "note": "GBrain provides the durable worker lifecycle shape; Gormes adapts it as a minimal Go fake-handler loop over the SQLite durable ledger."
+              }
+            },
+            {
               "name": "Durable worker abort-slot recovery safety net",
               "priority": "P2",
               "status": "planned",
@@ -2006,12 +2072,82 @@
                 "upstream_ref": "gbrain:e2961c0 src/core/minions/worker.ts",
                 "note": "GBrain provides the abort-slot recovery lesson; Gormes adapts it only after a Go-native durable worker loop exists."
               }
+            },
+            {
+              "name": "Durable worker RSS watchdog + graceful drain policy",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "After Gormes has a real durable worker execution loop, that worker exposes an opt-in RSS watchdog policy that drains cooperative handlers, aborts in-flight jobs, records watchdog evidence, and treats long healthy watchdog exits as restartable rather than crash loops",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Durable-worker status reports rss_watchdog_disabled, rss_threshold_exceeded, rss_drain_started, rss_handler_abort_sent, rss_watchdog_unavailable, or stable_watchdog_restart instead of silently wedging capacity.",
+              "fixture": "internal/subagent/durable_worker_rss_watchdog_test.go",
+              "source_refs": [
+                "../gbrain/CHANGELOG.md@c78c3d0:v0.22.2",
+                "../gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts.maxRssMb/getRss/rssCheckInterval",
+                "../gbrain/src/core/minions/worker.ts@c78c3d0:checkMemoryLimit/gracefulShutdown",
+                "../gbrain/src/core/minions/supervisor.ts@c78c3d0:maxRssMb",
+                "../gbrain/src/commands/jobs.ts@c78c3d0:parseMaxRssFlag",
+                "../gbrain/src/commands/autopilot.ts@c78c3d0:stable-run reset",
+                "../gbrain/test/minions.test.ts@c78c3d0:MinionWorker --max-rss watchdog",
+                "../gbrain/test/supervisor.test.ts@c78c3d0:max-rss spawn args",
+                "internal/subagent/durable_ledger.go",
+                "internal/subagent/durable_supervisor_status_test.go"
+              ],
+              "ready_when": [
+                "A Gormes durable worker execution loop exists that claims jobs from the SQLite ledger and invokes handlers through context.Context.",
+                "Durable worker abort-slot recovery safety net is validated on main, so in-flight handler cancellation and capacity release already have ledger evidence.",
+                "Tests can inject a fake RSS reader, fake clock, and fake restart policy; no real process RSS, external supervisor, shell handler, or GBrain TypeScript runtime is required."
+              ],
+              "not_ready_when": [
+                "The slice must create the first durable worker execution loop before RSS watchdog behavior can be exercised.",
+                "The slice changes cmd/gormes main-process lifecycle, builder-loop backend watchdogs, live delegate_task behavior, or cron execution semantics.",
+                "The tests require real RSS measurements, sleeps longer than 100ms, subprocess workers, systemd, Postgres/PGLite, or GBrain imports."
+              ],
+              "blocked_by": [
+                "Durable worker execution loop",
+                "Durable worker abort-slot recovery safety net"
+              ],
+              "acceptance": [
+                "TestDurableWorkerRSSWatchdog_PostJobThresholdAbortsSibling runs two fake jobs; after the quick job completes and injected RSS exceeds threshold, the sibling handler observes ctx cancellation and the ledger records rss_handler_abort_sent.",
+                "TestDurableWorkerRSSWatchdog_PeriodicZeroCompletionsTriggersDrain runs one fake handler that never completes; the injected periodic check exceeds threshold, starts drain, and records rss_drain_started without waiting for a post-job hook.",
+                "TestDurableWorkerRSSWatchdog_DisabledAtZero proves max_rss_mb=0 records rss_watchdog_disabled and never reads the RSS seam.",
+                "TestDurableWorkerWatchdogRestartPolicy_StableRunReset classifies a watchdog exit after at least five minutes as stable_watchdog_restart and does not increment crash count past one.",
+                "Doctor/status fixtures expose RSS watchdog threshold, last watchdog reason, and unavailable evidence without killing the single Gormes process."
+              ],
+              "note": "GBrain c78c3d0 fixed a production Minions freeze by combining per-job and periodic RSS checks, graceful shutdown, supervisor --max-rss defaults, and stable-run crash-counter reset. Gormes is still a single local binary with no durable worker daemon, so this is deliberately blocked until the Go durable worker loop exists. The row must not add process RSS limits to the main interactive runtime or rename Goncho/Honcho memory surfaces.",
+              "write_scope": [
+                "internal/subagent/durable_worker.go",
+                "internal/subagent/durable_worker_rss_watchdog.go",
+                "internal/subagent/durable_worker_rss_watchdog_test.go",
+                "internal/doctor/durable_ledger.go",
+                "internal/doctor/durable_ledger_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/subagent -run 'TestDurableWorkerRSSWatchdog_|TestDurableWorkerWatchdogRestartPolicy_' -count=1",
+                "go test ./internal/subagent ./internal/doctor -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Durable worker RSS watchdog fixtures prove post-job and periodic threshold checks, disabled mode, stable watchdog restart classification, and doctor/status evidence without supervising the main Gormes process."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:c78c3d0 src/core/minions/worker.ts",
+                "note": "GBrain provides the RSS watchdog and stable restart lesson; Gormes adapts it only for a future Go durable worker loop, not for the internal Goncho memory service or main TUI process."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T23:11:47Z",
-            "origin_decision": "GBrain 11abb24 unified the jobs lane into minion-orchestrator, and GBrain e2961c0 adds abort propagation plus a force-eviction safety net for wedged workers. Gormes has Go-native durable routing, ledger, backpressure, supervisor status, pause/resume, replay, inbox, and protected-submit denial validated over SQLite. The remaining upstream-led delta is blocked until Gormes has a real durable worker execution loop, so the new abort-slot recovery row is non-executable and does not ask workers to invent a daemon."
+            "last_upstream_check": "2026-04-27T00:18:30Z",
+            "origin_decision": "GBrain 11abb24 unified the jobs lane into minion-orchestrator, e2961c0 added abort propagation plus force-eviction for wedged workers, and c78c3d0 added RSS watchdog drains, stable-run restart reset, cold-start DB connect retry, and autopilot maxWaiting=1. Gormes has Go-native durable routing, ledger, backpressure, supervisor status, pause/resume, replay, inbox, and protected-submit denial validated over SQLite. Existing max_waiting evidence covers the queue-pileup lesson; the explicit Durable worker execution loop row now supplies the missing fake-handler seam that must land before abort-slot and RSS-watchdog deltas. The Postgres/Supabase connect-retry lesson does not apply to the default SQLite-first runtime or internal Goncho memory unless a future optional remote database connector is introduced."
           }
         },
         "2.F.1": {
@@ -5692,23 +5828,19 @@
                 "internal/hermes/reasoning_tag_sanitizer_test.go fixtures prove stored assistant text, visible text, resume recap text, and raw audit text have distinct sanitized/raw behavior with no provider or kernel dependencies."
               ],
               "health": {
-                "attempt_count": 2,
-                "last_attempt": "2026-04-26T23:52:41Z",
-                "last_success": "2026-04-26T23:52:41Z"
+                "attempt_count": 1,
+                "last_attempt": "2026-04-26T23:50:41Z",
+                "last_success": "2026-04-26T23:50:41Z"
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-26T23:34:04Z"
+                "last_reshape": "2026-04-26T23:34:04Z",
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:ec48ec55+9489d157+bd01ec78 run_agent.py,cli.py",
                 "note": "Hermes provides the reasoning-tag sanitization regressions; Gormes centralizes them as a provider-neutral Go text sanitizer before more reasoning-model adapters land."
-              },
-              "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-26T23:50:41Z",
-                "last_success": "2026-04-26T23:50:41Z"
               }
             },
             {
@@ -9360,9 +9492,9 @@
             {
               "name": "Cron schedule parser + repeat state fixtures",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cron adds a pure Hermes-compatible schedule parser and repeat-state read model before any public cronjob tool handler is exposed. ParseCronSchedule(input string, now time.Time) returns a typed ParsedSchedule for one-shot durations (`30m`, `2h`, `1d`), recurring intervals (`every 30m`, `every 2h`), 5-field cron expressions, and ISO timestamps. CronNextRunDecision(parsed, lastRunUnix, repeatCompleted, now) reports whether a one-shot is still recoverable inside the 120s grace window, whether recurring jobs should fast-forward stale next-run times, and whether finite repeat counts are exhausted.",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9400,7 +9532,7 @@
                 "TestCronNextRunDecision_FiniteRepeatExhaustion marks repeat=1 completed=1 as exhausted while repeat=3 completed=2 remains runnable.",
                 "TestCronNextRunDecision_RecurringFastForward returns a next run after now when the stored next-run time is stale by multiple intervals."
               ],
-              "note": "Planner split 2026-04-26: the old `Cronjob tool API + schedule parser parity` row bundled schedule parsing, repeat state, tool mutation, context chaining, and delivery. This first executable slice is pure parser/read-model work so workers can TDD it without touching cron stores or public tool wiring.",
+              "note": "Complete: TDD landed internal/cron/schedule_parser.go and schedule_parser_test.go as a pure parser/read-model slice. Fixtures prove one-shot durations, recurring intervals, 5-field cron validation, ISO timestamps with injected-location naive parsing, one-shot grace recovery, finite repeat exhaustion, and stale recurring fast-forward without touching scheduler goroutines, cron stores, cmd/gormes, or public cronjob tool wiring.",
               "write_scope": [
                 "internal/cron/schedule_parser.go",
                 "internal/cron/schedule_parser_test.go",
@@ -9414,6 +9546,11 @@
               "done_signal": [
                 "internal/cron/schedule_parser_test.go proves one-shot, interval, cron-expression, ISO timestamp, one-shot grace, finite repeat, and stale-recurring fast-forward behavior under an injected clock."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T00:15:13Z",
+                "last_success": "2026-04-27T00:15:13Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:755a2804 cron/jobs.py:parse_schedule",
@@ -9478,6 +9615,10 @@
               "done_signal": [
                 "Prompt/script safety fixtures prove critical prompt threat IDs, invisible Unicode evidence, relative script acceptance, and absolute/home/traversal rejection without script execution."
               ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-26T23:52:41Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:755a2804 tools/cronjob_tools.py:_scan_cron_prompt",
@@ -9608,6 +9749,10 @@
               "done_signal": [
                 "Cron context_from fixtures prove validation, clearing, most-recent-output injection, truncation, and graceful skip behavior over the Go cron store."
               ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-26T23:52:41Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:755a2804 tests/cron/test_cron_context_from.py",
@@ -9678,6 +9823,10 @@
               "done_signal": [
                 "Cron delivery-plan fixtures prove target normalization, MEDIA tag extraction, live-adapter fallback, and degraded delivery evidence without live network sends."
               ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-26T23:52:41Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:755a2804 cron/scheduler.py",
@@ -12773,8 +12922,8 @@
                 "API fixtures prove detailed health plus cron admin CRUD/pause/resume/trigger over native store contracts with shared auth/error-envelope behavior."
               ],
               "planner_verdict": {
-                "reshape_count": 1,
-                "last_reshape": "2026-04-25T21:04:49Z",
+                "reshape_count": 2,
+                "last_reshape": "2026-04-26T23:52:41Z",
                 "last_outcome": "no_attempts_yet"
               },
               "provenance": {

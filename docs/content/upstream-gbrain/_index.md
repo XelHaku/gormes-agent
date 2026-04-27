@@ -13,9 +13,26 @@ Go-native `gormes-agent`.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/gbrain`
-- Upstream commit: `e2961c0`
+- Upstream commit: `c78c3d0`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
-- Date: 2026-04-26
+- Date: 2026-04-27
+
+## 2026-04-27 v0.22.2 Drift Check
+
+GBrain `c78c3d0` ships Minions worker reliability fixes after a production
+freeze: an RSS watchdog checked after jobs and on a periodic timer,
+`--max-rss` supervisor/autopilot defaults, stable-run crash-counter reset,
+`connectWithRetry` for transient Postgres/Supabase startup failures, and
+autopilot `maxWaiting: 1` submissions. Gormes already has a validated durable
+queue backpressure contract over its SQLite ledger, so no new row is needed for
+the queue-pileup lesson. The remaining RSS-watchdog lesson is now a blocked
+Phase 2.E.3 row that must wait for a real Go durable worker execution loop; it
+must not add RSS self-termination to the main Gormes TUI/API process or to the
+internal Goncho memory service.
+
+The cold-start DB retry lesson is Postgres-specific. Gormes remains
+SQLite-first, so the planner records it as a future optional remote-database
+connector concern rather than a Goncho/Honcho memory requirement.
 
 ## 2026-04-26 v0.22.1 Drift Check
 
