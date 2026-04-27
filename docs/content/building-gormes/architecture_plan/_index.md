@@ -37,7 +37,7 @@ machine-readable queue for developing the full `gormes-agent`.
 ## Progress
 
 <!-- PROGRESS:START kind=docs-full-checklist -->
-**Overall:** 36/74 subphases shipped · 20 in progress · 18 planned
+**Overall:** 35/74 subphases shipped · 21 in progress · 18 planned
 
 | Phase | Status | Shipped |
 |-------|--------|---------|
@@ -45,7 +45,7 @@ machine-readable queue for developing the full `gormes-agent`.
 | Phase 2 — The Gateway | 🔨 | 15/20 subphases |
 | Phase 3 — The Black Box (Memory) | ✅ | 14/14 subphases |
 | Phase 4 — The Brain Transplant | 🔨 | 0/8 subphases |
-| Phase 5 — The Final Purge | 🔨 | 2/18 subphases |
+| Phase 5 — The Final Purge | 🔨 | 1/18 subphases |
 | Phase 6 — The Learning Loop (Soul) | ⏳ | 0/6 subphases |
 | Phase 7 — Paused Channel Backlog | 🔨 | 2/5 subphases |
 
@@ -132,7 +132,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Telegram fresh-final delete and config exposure
 - [x] Slack rich-text quotes/lists + link-unfurl ingress
 - [x] Slack thread-parent context + team-scoped cache key
-- [ ] Gateway message deduplicator bounded eviction
+- [ ] Gateway message deduplicator bounded helper
+- [ ] Gateway inbound dedup evidence wiring
 
 ### 2.B.10 — WeChat Adapter ✅
 
@@ -185,7 +186,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Durable replay and inbox message contract
 - [x] Durable worker execution loop
 - [x] Durable worker abort-slot recovery safety net
-- [ ] Durable worker RSS watchdog + graceful drain policy
+- [ ] Durable worker RSS watchdog policy helper
+- [ ] Durable worker RSS drain integration
+- [ ] Durable worker RSS doctor/status evidence
 
 ### 2.F.1 — Slash Command Registry + Gateway Dispatch ✅
 
@@ -471,6 +474,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Rod
 - [ ] Browser provider bridge + Firecrawl fallback
 - [x] Browser hybrid private-URL local sidecar routing
+- [ ] Browser SSRF quoted-false guard
 
 ### 5.D — Vision + Image Generation ⏳
 
@@ -494,7 +498,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Skills list — enabled/disabled status column + --enabled-only filter
 - [ ] Bundled Airtable productivity skill contract
 
-### 5.G — MCP Integration ✅
+### 5.G — MCP Integration 🔨
 
 - [x] MCP client
 - [x] MCP server config/env resolver
@@ -504,6 +508,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] MCP OAuth state store + noninteractive auth errors
 - [x] MCP OAuth refresh + 401 session-expired recovery
 - [x] Managed tool gateway bridge
+- [ ] MCP stdio orphan cleanup after cron ticks
 
 ### 5.H — ACP Integration ⏳
 
@@ -624,7 +629,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Gateway proxy mode forwarding contract
 - [x] Dashboard API client contract
 - [x] Dashboard PTY chat sidecar contract
-- [ ] API server health + cron admin endpoints
+- [ ] API server detailed health read-model
+- [ ] API server cron admin read-only endpoints
+- [ ] API server cron admin mutating endpoints
 
 ### 5.R — Code Execution Mode Policy ⏳
 

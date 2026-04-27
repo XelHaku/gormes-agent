@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T01:07:49Z",
+    "last_updated": "2026-04-27T03:17:39Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1464,7 +1464,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T01:04:55Z"
+                "last_reshape": "2026-04-27T01:04:55Z",
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1640,10 +1641,10 @@
               }
             },
             {
-              "name": "Gateway message deduplicator bounded eviction",
+              "name": "Gateway message deduplicator bounded helper",
               "priority": "P2",
               "status": "planned",
-              "contract": "Shared gateway deduplication caps tracked message IDs at max_size with deterministic oldest-entry eviction and visible dropped-duplicate evidence",
+              "contract": "Shared gateway exposes a pure in-memory MessageDeduplicator that caps tracked message IDs at max_size, evicts the oldest ID deterministically, and returns duplicate/evicted/disabled evidence without touching manager routing",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -1651,8 +1652,8 @@
                 "gateway",
                 "system"
               ],
-              "degraded_mode": "Gateway status reports deduplicator_disabled or deduplicator_evicted evidence instead of growing unbounded in long-running platform adapters.",
-              "fixture": "internal/gateway/message_deduplicator_test.go",
+              "degraded_mode": "Gateway helper reports deduplicator_disabled, duplicate_message, or deduplicator_evicted evidence instead of growing unbounded in long-running platform adapters.",
+              "fixture": "internal/gateway/message_deduplicator_test.go::TestMessageDeduplicator_MaxSizeEvictsOldest",
               "source_refs": [
                 "../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator",
                 "../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585",
@@ -1660,48 +1661,112 @@
                 "internal/gateway/manager.go"
               ],
               "ready_when": [
-                "Shared gateway inbound event normalization is validated and platform adapters already pass stable message IDs where available.",
                 "The helper can be tested as a pure in-memory structure with synthetic message IDs; no live platform SDK or manager run loop is required.",
-                "Adapters without message IDs remain accepted and produce dedup_unavailable evidence rather than being dropped."
+                "internal/gateway/message_deduplicator.go and internal/gateway/message_deduplicator_test.go are the only runtime files needed for this first slice.",
+                "When closing the row, set status to complete and keep contract_status as validated; never use status=validated."
               ],
               "not_ready_when": [
-                "The slice changes channel session keys, authorization/pairing policy, message rendering, or outbound coalescing.",
+                "The slice changes gateway.Manager, channel session keys, authorization/pairing policy, message rendering, or outbound coalescing.",
                 "The slice adds platform-specific Telegram/Slack/Discord dedup state instead of a shared helper.",
-                "The slice stores dedup history on disk; this row is an in-memory bounded guard only."
+                "The slice stores dedup history on disk or wires the helper into inbound dispatch; manager wiring is the dependent row."
+              ],
+              "unblocks": [
+                "Gateway inbound dedup evidence wiring"
               ],
               "acceptance": [
                 "TestMessageDeduplicator_MaxSizeEvictsOldest adds max_size+1 distinct IDs and proves the first ID is no longer considered duplicate while the newest IDs remain tracked.",
                 "TestMessageDeduplicator_DuplicateReturnsSeen proves repeated IDs are rejected before eviction and emits duplicate evidence.",
-                "TestMessageDeduplicator_ZeroMaxSizeDisabled treats max_size=0 as disabled and never rejects messages.",
-                "TestGatewayInbound_DedupMissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence."
+                "TestMessageDeduplicator_ZeroMaxSizeDisabled treats max_size=0 as disabled, never rejects messages, and never allocates a seen-ID queue.",
+                "The helper exposes enough evidence for a later manager row to distinguish duplicate_message, deduplicator_evicted, and deduplicator_disabled without importing platform adapters."
               ],
-              "note": "Hermes cebf9585 fixed MessageDeduplicator max_size enforcement after long-running platform adapters could keep growing seen-message state. Gormes should port the bounded helper at the shared gateway layer, not separately inside each adapter.",
+              "note": "Split 2026-04-27 from the broader `Gateway message deduplicator bounded eviction` row after autoloop produced a status-field validation failure. This first row is helper-only: workers should not edit manager/event code, and completion means status=complete plus contract_status=validated.",
               "write_scope": [
                 "internal/gateway/message_deduplicator.go",
                 "internal/gateway/message_deduplicator_test.go",
-                "internal/gateway/event.go",
-                "internal/gateway/manager.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/gateway -run 'TestMessageDeduplicator|TestGatewayInbound_Dedup' -count=1",
+                "go test ./internal/gateway -run '^TestMessageDeduplicator_' -count=1",
                 "go test ./internal/gateway -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Gateway deduplicator fixtures prove max_size eviction, duplicate rejection, disabled mode, and missing-ID degraded evidence without platform SDKs or disk state."
+                "Gateway helper fixtures prove bounded oldest eviction, duplicate rejection, disabled mode, and evidence values without platform SDKs, manager wiring, or disk state."
               ],
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:cebf9585 gateway/platforms/helpers.py",
                 "note": "Hermes provides the bounded deduplicator regression; Gormes centralizes it in the shared Go gateway so platform adapters stay thin."
               }
+            },
+            {
+              "name": "Gateway inbound dedup evidence wiring",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Gateway manager applies the shared MessageDeduplicator to inbound events with stable message IDs, drops duplicate submissions with visible evidence, and degrades missing message IDs without suppressing the turn",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Gateway status reports dedup_unavailable for missing IDs and duplicate_message for dropped repeats instead of silently replaying duplicate platform events.",
+              "fixture": "internal/gateway/message_deduplicator_manager_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator",
+                "../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585",
+                "internal/gateway/message_deduplicator.go",
+                "internal/gateway/event.go",
+                "internal/gateway/manager.go"
+              ],
+              "ready_when": [
+                "Gateway message deduplicator bounded helper is complete and exposes duplicate/evicted/disabled evidence.",
+                "Shared gateway inbound event normalization is validated and platform adapters already pass stable message IDs where available.",
+                "The worker can use fake gateway.Channel and fake kernel fixtures only; no Telegram, Slack, Discord, or provider SDK is needed."
+              ],
+              "not_ready_when": [
+                "The slice changes channel session keys, authorization/pairing policy, message rendering, outbound coalescing, or platform-specific adapter state.",
+                "The slice stores dedup history on disk or treats empty message IDs as duplicates.",
+                "The helper row is not complete in the worker checkout."
+              ],
+              "blocked_by": [
+                "Gateway message deduplicator bounded helper"
+              ],
+              "acceptance": [
+                "TestGatewayInbound_DedupDropsRepeatedMessageID submits the same channel/chat/message ID twice and proves the fake kernel receives only the first turn while status evidence records duplicate_message.",
+                "TestGatewayInbound_DedupScopesByChannelChatAndThread proves identical platform message IDs in different chats or threads do not collide.",
+                "TestGatewayInbound_DedupMissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence.",
+                "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green."
+              ],
+              "note": "Second half of the 2026-04-27 deduplicator split. This row may touch manager/event tests after the helper lands, but it must not reopen platform adapters or change outbound streaming behavior.",
+              "write_scope": [
+                "internal/gateway/message_deduplicator.go",
+                "internal/gateway/message_deduplicator_manager_test.go",
+                "internal/gateway/event.go",
+                "internal/gateway/manager.go",
+                "internal/gateway/fake_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run '^TestGatewayInbound_Dedup' -count=1",
+                "go test ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:cebf9585 tests/gateway/test_message_deduplicator.py",
+                "note": "Hermes applies deduplication inside platform helpers; Gormes wires the shared Go helper at the gateway manager boundary after the helper contract is fixture-backed."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T02:20:01Z",
-            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; after a worker_error on the broader row, Gormes tracks it as three dependency-ordered slices. Hermes cebf9585 adds bounded MessageDeduplicator eviction; Gormes tracks that as a shared gateway helper so platform adapters stay thin."
+            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; after a worker_error on the broader row, Gormes tracks it as three dependency-ordered slices. Hermes cebf9585 adds bounded MessageDeduplicator eviction; after a status-field validation failure, Gormes now splits that work into a pure shared helper and a dependent manager wiring row so platform adapters stay thin."
           }
         },
         "2.B.10": {
@@ -2364,10 +2429,76 @@
               }
             },
             {
-              "name": "Durable worker RSS watchdog + graceful drain policy",
+              "name": "Durable worker RSS watchdog policy helper",
               "priority": "P3",
               "status": "planned",
-              "contract": "After Gormes has a real durable worker execution loop, that worker exposes an opt-in RSS watchdog policy that drains cooperative handlers, aborts in-flight jobs, records watchdog evidence, and treats long healthy watchdog exits as restartable rather than crash loops",
+              "contract": "Gormes durable worker exposes a pure RSS watchdog policy helper that classifies disabled mode, unavailable RSS reads, threshold exceeded evidence, and stable watchdog restart reset without integrating with the worker loop yet",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Durable-worker policy reports rss_watchdog_disabled, rss_threshold_exceeded, rss_watchdog_unavailable, or stable_watchdog_restart before runtime drain wiring exists.",
+              "fixture": "internal/subagent/durable_worker_rss_watchdog_test.go::TestDurableWorkerRSSWatchdogPolicy",
+              "source_refs": [
+                "../gbrain/CHANGELOG.md@c78c3d0:v0.22.2",
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts.maxRssMb/getRss/rssCheckInterval",
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/core/minions/worker.ts@c78c3d0:checkMemoryLimit",
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/commands/autopilot.ts@c78c3d0:stable-run reset",
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/test/minions.test.ts@c78c3d0:--max-rss watchdog",
+                "../gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts.maxRssMb/getRss/rssCheckInterval",
+                "../gbrain/src/core/minions/worker.ts@c78c3d0:checkMemoryLimit/gracefulShutdown",
+                "../gbrain/src/commands/autopilot.ts@c78c3d0:stable-run reset",
+                "../gbrain/test/minions.test.ts@c78c3d0:MinionWorker --max-rss watchdog",
+                "internal/subagent/durable_worker.go",
+                "internal/subagent/durable_worker_abort_test.go"
+              ],
+              "ready_when": [
+                "Durable worker execution loop and Durable worker abort-slot recovery safety net are validated on main.",
+                "The worker should read sibling GBrain files through the absolute /home/xel/git/sages-openclaw/workspace-mineru/gbrain path above, not by running git show in the Gormes checkout.",
+                "The helper can be tested with fake RSS reader, fake clock, and value-only policy structs; no real process RSS, worker goroutine, external supervisor, shell handler, or GBrain TypeScript runtime is required."
+              ],
+              "not_ready_when": [
+                "The slice changes DurableWorker.RunOne, doctor/status output, cmd/gormes lifecycle, builder-loop backend watchdogs, live delegate_task behavior, or cron execution semantics.",
+                "The tests require real RSS measurements, sleeps longer than 100ms, subprocess workers, systemd, Postgres/PGLite, or importing GBrain code.",
+                "The slice adds process self-termination to the main Gormes process or internal Goncho memory service."
+              ],
+              "unblocks": [
+                "Durable worker RSS drain integration"
+              ],
+              "acceptance": [
+                "TestDurableWorkerRSSWatchdog_DisabledAtZero proves max_rss_mb=0 records rss_watchdog_disabled and never reads the RSS seam.",
+                "TestDurableWorkerRSSWatchdog_ThresholdExceeded injects an RSS value over max_rss_mb and returns rss_threshold_exceeded evidence with observed_mb, max_mb, and checked_at from the fake clock.",
+                "TestDurableWorkerRSSWatchdog_RSSReadFailure returns rss_watchdog_unavailable evidence and does not request a drain.",
+                "TestDurableWorkerWatchdogRestartPolicy_StableRunReset classifies a watchdog exit after at least five minutes as stable_watchdog_restart and does not increment crash count past one."
+              ],
+              "note": "Split 2026-04-27 from the broader RSS watchdog row after worker failures came from upstream lookup commands and an oversized write scope. This row is helper-only and fixture-ready; it creates the policy vocabulary before any worker-loop or doctor wiring.",
+              "write_scope": [
+                "internal/subagent/durable_worker_rss_watchdog.go",
+                "internal/subagent/durable_worker_rss_watchdog_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/subagent -run 'TestDurableWorkerRSSWatchdog_|TestDurableWorkerWatchdogRestartPolicy_' -count=1",
+                "go test ./internal/subagent -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Durable worker RSS policy fixtures prove disabled mode, threshold evidence, read-failure degradation, and stable watchdog restart classification without runtime drain or doctor/status edits."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:c78c3d0 src/core/minions/worker.ts",
+                "note": "GBrain provides the RSS watchdog policy lesson; Gormes adapts it first as a pure Go durable-worker helper, not for the internal Goncho memory service or main TUI/API process."
+              }
+            },
+            {
+              "name": "Durable worker RSS drain integration",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "DurableWorker integrates the validated RSS watchdog policy after job completion and on an injected periodic check, starts graceful drain, cancels in-flight handlers through existing abort-slot recovery, and records watchdog drain evidence",
               "contract_status": "draft",
               "slice_size": "small",
               "execution_owner": "orchestrator",
@@ -2375,83 +2506,124 @@
                 "operator",
                 "system"
               ],
-              "degraded_mode": "Durable-worker status reports rss_watchdog_disabled, rss_threshold_exceeded, rss_drain_started, rss_handler_abort_sent, rss_watchdog_unavailable, or stable_watchdog_restart instead of silently wedging capacity.",
-              "fixture": "internal/subagent/durable_worker_rss_watchdog_test.go",
+              "degraded_mode": "Durable-worker status reports rss_drain_started or rss_handler_abort_sent instead of wedging capacity after threshold evidence.",
+              "fixture": "internal/subagent/durable_worker_rss_drain_test.go",
               "source_refs": [
-                "../gbrain/CHANGELOG.md@c78c3d0:v0.22.2",
-                "../gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts.maxRssMb/getRss/rssCheckInterval",
-                "../gbrain/src/core/minions/worker.ts@c78c3d0:checkMemoryLimit/gracefulShutdown",
-                "../gbrain/src/core/minions/supervisor.ts@c78c3d0:maxRssMb",
-                "../gbrain/src/commands/jobs.ts@c78c3d0:parseMaxRssFlag",
-                "../gbrain/src/commands/autopilot.ts@c78c3d0:stable-run reset",
-                "../gbrain/test/minions.test.ts@c78c3d0:MinionWorker --max-rss watchdog",
-                "../gbrain/test/supervisor.test.ts@c78c3d0:max-rss spawn args",
-                "internal/subagent/durable_ledger.go",
-                "internal/subagent/durable_supervisor_status_test.go"
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/core/minions/worker.ts@c78c3d0:gracefulShutdown",
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/test/minions.test.ts@c78c3d0:graceful memory shutdown",
+                "internal/subagent/durable_worker.go",
+                "internal/subagent/durable_worker_abort_test.go",
+                "internal/subagent/durable_worker_rss_watchdog.go"
               ],
               "ready_when": [
-                "A Gormes durable worker execution loop exists that claims jobs from the SQLite ledger and invokes handlers through context.Context.",
-                "Durable worker abort-slot recovery safety net is validated on main, so in-flight handler cancellation and capacity release already have ledger evidence.",
-                "Tests can inject a fake RSS reader, fake clock, and fake restart policy; no real process RSS, external supervisor, shell handler, or GBrain TypeScript runtime is required."
+                "Durable worker RSS watchdog policy helper is complete and exposes threshold/read-failure evidence.",
+                "Durable worker abort-slot recovery safety net is complete, so handler cancellation and slot release already have ledger evidence.",
+                "The worker can inject a fake RSS reader and fake ticker/channel; no real periodic sleep, process RSS, subprocess, or supervisor is required."
               ],
               "not_ready_when": [
-                "The slice must create the first durable worker execution loop before RSS watchdog behavior can be exercised.",
-                "The slice changes cmd/gormes main-process lifecycle, builder-loop backend watchdogs, live delegate_task behavior, or cron execution semantics.",
-                "The tests require real RSS measurements, sleeps longer than 100ms, subprocess workers, systemd, Postgres/PGLite, or GBrain imports."
+                "The slice changes doctor/status rendering, cmd/gormes lifecycle, builder-loop backend watchdogs, live delegate_task behavior, cron execution semantics, or main-process termination.",
+                "The slice reimplements abort-slot recovery instead of reusing the existing cancellation/grace path.",
+                "The helper row is not complete in the worker checkout."
               ],
               "blocked_by": [
-                "Durable worker execution loop",
-                "Durable worker abort-slot recovery safety net"
+                "Durable worker RSS watchdog policy helper"
+              ],
+              "unblocks": [
+                "Durable worker RSS doctor/status evidence"
               ],
               "acceptance": [
-                "TestDurableWorkerRSSWatchdog_PostJobThresholdAbortsSibling runs two fake jobs; after the quick job completes and injected RSS exceeds threshold, the sibling handler observes ctx cancellation and the ledger records rss_handler_abort_sent.",
-                "TestDurableWorkerRSSWatchdog_PeriodicZeroCompletionsTriggersDrain runs one fake handler that never completes; the injected periodic check exceeds threshold, starts drain, and records rss_drain_started without waiting for a post-job hook.",
-                "TestDurableWorkerRSSWatchdog_DisabledAtZero proves max_rss_mb=0 records rss_watchdog_disabled and never reads the RSS seam.",
-                "TestDurableWorkerWatchdogRestartPolicy_StableRunReset classifies a watchdog exit after at least five minutes as stable_watchdog_restart and does not increment crash count past one.",
-                "Doctor/status fixtures expose RSS watchdog threshold, last watchdog reason, and unavailable evidence without killing the single Gormes process."
+                "TestDurableWorkerRSSDrain_PostJobThresholdAbortsSibling runs two fake jobs; after the quick job completes and injected RSS exceeds threshold, the sibling handler observes ctx cancellation and ledger/audit evidence records rss_handler_abort_sent.",
+                "TestDurableWorkerRSSDrain_PeriodicZeroCompletionsTriggersDrain runs one fake handler that never completes; an injected periodic check exceeds threshold, starts drain, and records rss_drain_started without waiting for a post-job hook.",
+                "TestDurableWorkerRSSDrain_ReadFailureDoesNotCancel proves rss_watchdog_unavailable evidence does not cancel handlers.",
+                "Existing DurableWorker abort-slot recovery tests remain green without sleeps longer than 100ms."
               ],
-              "note": "GBrain c78c3d0 fixed a production Minions freeze by combining per-job and periodic RSS checks, graceful shutdown, supervisor --max-rss defaults, and stable-run crash-counter reset. Gormes is still a single local binary with no durable worker daemon, so this is deliberately blocked until the Go durable worker loop exists. The row must not add process RSS limits to the main interactive runtime or rename Goncho/Honcho memory surfaces.",
+              "note": "Second row in the 2026-04-27 RSS split. It may touch DurableWorker runtime integration only after the policy helper lands, and it deliberately leaves doctor/status rendering to the final row.",
               "write_scope": [
                 "internal/subagent/durable_worker.go",
                 "internal/subagent/durable_worker_rss_watchdog.go",
-                "internal/subagent/durable_worker_rss_watchdog_test.go",
-                "internal/doctor/durable_ledger.go",
-                "internal/doctor/durable_ledger_test.go",
+                "internal/subagent/durable_worker_rss_drain_test.go",
+                "internal/subagent/durable_worker_abort_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/subagent -run 'TestDurableWorkerRSSWatchdog_|TestDurableWorkerWatchdogRestartPolicy_' -count=1",
-                "go test ./internal/subagent ./internal/doctor -count=1",
+                "go test ./internal/subagent -run '^TestDurableWorkerRSSDrain_|^TestDurableWorker_' -count=1",
+                "go test ./internal/subagent -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "Durable worker RSS watchdog fixtures prove post-job and periodic threshold checks, disabled mode, stable watchdog restart classification, and doctor/status evidence without supervising the main Gormes process."
+                "Durable worker fixtures prove post-job and injected periodic RSS drains cancel handlers through the existing abort path, preserve read-failure degradation, and avoid real RSS/sleeps/supervisors."
               ],
-              "health": {
-                "attempt_count": 2,
-                "consecutive_failures": 2,
-                "last_attempt": "2026-04-27T02:20:01Z",
-                "last_failure": {
-                  "run_id": "20260427T020832Z-813123731",
-                  "category": "report_validation_failed",
-                  "backend": "codexu",
-                  "stderr_tail": "Reading additional input from stdin...\n2026-04-27T02:10:01.030297Z ERROR codex_core::tools::router: error=exec_command failed for `/bin/bash -lc \"git show c78c3d0:src/core/minions/worker.ts | sed -n '1,260p'\"`: CreateProcess { message: \"Rejected(\\\"Failed to create unified exec process: No such file or directory (os error 2)\\\")\" }\n2026-04-27T02:10:01.202357Z ERROR codex_core::tools::router: error=exec_command failed for `/bin/bash -lc 'git show c78c3d0:src/core/minions/types.ts | rg -n \"maxRss|getRss|rssCheckInterval|MinionWorkerOpts\" -C 4'`: CreateProcess { message: \"Rejected(\\\"Failed to create unified exec process: No such file or directory (os error 2)\\\")\" }\n2026-04-27T02:10:01.204388Z ERROR codex_core::tools::router: error=exec_command failed for `/bin/bash -lc 'git show c78c3d0:src/commands/autopilot.ts | rg -n \"stable|crash|five|5|reset\" -C 4'`: CreateProcess { message: \"Rejected(\\\"Failed to create unified exec process: No such file or directory (os error 2)\\\")\" }\n2026-04-27T02:10:01.206515Z ERROR codex_core::tools::router: error=exec_command failed for `/bin/bash -lc 'git show c78c3d0:test/minions.test.ts | rg -n \"rss|max-rss|graceful|memory\" -C 6'`: CreateProcess { message: \"Rejected(\\\"Failed to create unified exec process: No such file or directory (os error 2)\\\")\" }\n"
-                },
-                "backends_tried": [
-                  "codexu"
-                ]
-              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:c78c3d0 src/core/minions/worker.ts",
-                "note": "GBrain provides the RSS watchdog and stable restart lesson; Gormes adapts it only for a future Go durable worker loop, not for the internal Goncho memory service or main TUI process."
+                "note": "GBrain provides graceful RSS drain semantics; Gormes adapts them to the Go DurableWorker after the pure policy helper is available."
+              }
+            },
+            {
+              "name": "Durable worker RSS doctor/status evidence",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Doctor and durable-worker status output expose RSS watchdog configuration, latest threshold/read-failure/drain reason, and unavailable evidence from the durable ledger without killing the single Gormes process",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "orchestrator",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Doctor/status reports rss_watchdog_disabled, rss_watchdog_unavailable, rss_threshold_exceeded, rss_drain_started, and stable_watchdog_restart evidence separately.",
+              "fixture": "internal/doctor/durable_rss_watchdog_test.go",
+              "source_refs": [
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/commands/jobs.ts@c78c3d0:parseMaxRssFlag",
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/src/core/minions/supervisor.ts@c78c3d0:maxRssMb",
+                "/home/xel/git/sages-openclaw/workspace-mineru/gbrain/test/supervisor.test.ts@c78c3d0:max-rss spawn args",
+                "internal/subagent/durable_worker_rss_watchdog.go",
+                "internal/doctor/durable_ledger.go"
+              ],
+              "ready_when": [
+                "Durable worker RSS drain integration is complete and records watchdog evidence in the same durable-worker status path used by doctor.",
+                "The status fixture can seed the existing SQLite durable ledger/read model directly; no worker loop, RSS reader, or shell supervisor is required."
+              ],
+              "not_ready_when": [
+                "The slice changes DurableWorker drain behavior, cmd/gormes lifecycle, builder-loop backend watchdogs, live delegate_task behavior, cron execution semantics, or Goncho/Honcho memory surfaces.",
+                "The slice introduces process RSS limits to the main Gormes binary or requires a supervised worker daemon.",
+                "The drain integration row is not complete in the worker checkout."
+              ],
+              "blocked_by": [
+                "Durable worker RSS drain integration"
+              ],
+              "acceptance": [
+                "TestDoctorDurableWorkerRSSWatchdog_DisabledAndUnavailable seeds disabled/read-failure status and proves doctor reports rss_watchdog_disabled and rss_watchdog_unavailable distinctly.",
+                "TestDoctorDurableWorkerRSSWatchdog_ThresholdAndDrainEvidence seeds threshold and drain evidence and proves max_mb, observed_mb, checked_at, and last watchdog reason are visible with secrets redacted.",
+                "TestDoctorDurableWorkerRSSWatchdog_StableRestartEvidence proves stable_watchdog_restart appears without incrementing crash-loop degradation.",
+                "Doctor/status tests do not start workers, read real process RSS, or inspect GBrain files at runtime."
+              ],
+              "note": "Final row in the 2026-04-27 RSS split. It is doctor/status only, preventing workers from mixing status rendering with runtime drain cancellation.",
+              "write_scope": [
+                "internal/doctor/durable_ledger.go",
+                "internal/doctor/durable_ledger_test.go",
+                "internal/doctor/durable_rss_watchdog_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/doctor -run '^TestDoctorDurableWorkerRSSWatchdog_' -count=1",
+                "go test ./internal/doctor ./internal/subagent -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Doctor/status fixtures prove RSS watchdog disabled, unavailable, threshold, drain, and stable-restart evidence is visible without supervising or killing the main Gormes process."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "gbrain:c78c3d0 src/commands/jobs.ts",
+                "note": "GBrain exposes max-RSS operator flags; Gormes exposes equivalent evidence in the existing doctor/status surface while keeping Goncho memory and the main process unsupervised."
               }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T00:18:30Z",
-            "origin_decision": "GBrain 11abb24 unified the jobs lane into minion-orchestrator, e2961c0 added abort propagation plus force-eviction for wedged workers, and c78c3d0 added RSS watchdog drains, stable-run restart reset, cold-start DB connect retry, and autopilot maxWaiting=1. Gormes has Go-native durable routing, ledger, backpressure, supervisor status, pause/resume, replay, inbox, and protected-submit denial validated over SQLite. Existing max_waiting evidence covers the queue-pileup lesson; the explicit Durable worker execution loop row now supplies the missing fake-handler seam that must land before abort-slot and RSS-watchdog deltas. The Postgres/Supabase connect-retry lesson does not apply to the default SQLite-first runtime or internal Goncho memory unless a future optional remote database connector is introduced."
+            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "origin_decision": "GBrain 11abb24 unified the jobs lane into minion-orchestrator, e2961c0 added abort propagation plus force-eviction for wedged workers, and c78c3d0 added RSS watchdog drains, stable-run restart reset, cold-start DB connect retry, and autopilot maxWaiting=1. Gormes has Go-native durable routing, ledger, backpressure, supervisor status, pause/resume, replay, inbox, protected-submit denial, a fake-handler DurableWorker loop, and abort-slot recovery validated over SQLite. Existing max_waiting evidence covers the queue-pileup lesson; the RSS lesson is now split into policy helper, drain integration, and doctor/status evidence so workers do not mix upstream lookup, runtime cancellation, and operator rendering in one slice. The Postgres/Supabase connect-retry lesson does not apply to the default SQLite-first runtime or internal Goncho memory unless a future optional remote database connector is introduced."
           }
         },
         "2.F.1": {
@@ -3228,7 +3400,7 @@
             {
               "name": "Steer slash command registry + queue fallback",
               "status": "planned",
-              "contract": "Registry-owned active-turn steering command",
+              "contract": "Registry-owned /steer command accepts operator/gateway text during a busy turn, validates/truncates preview text, and queues visible guidance when no running-agent steer hook is available",
               "contract_status": "fixture_ready",
               "slice_size": "small",
               "execution_owner": "gateway",
@@ -3237,41 +3409,55 @@
                 "gateway"
               ],
               "degraded_mode": "Gateway returns visible usage, busy, or queued status instead of dropping steer text when the command cannot run immediately.",
-              "fixture": "internal/gateway active-turn command registry fixtures",
+              "fixture": "internal/gateway/steer_command_test.go",
               "source_refs": [
-                "docs/content/upstream-hermes/source-study.md",
-                "docs/content/building-gormes/upstream-lessons.md"
+                "../hermes-agent/cli.py@635253b9:busy_input_mode=steer",
+                "../hermes-agent/gateway/run.py@635253b9:running_agent.steer",
+                "../hermes-agent/hermes_cli/commands.py@635253b9:/busy steer",
+                "../hermes-agent/tests/gateway/test_busy_session_ack.py@635253b9",
+                "internal/gateway/commands.go",
+                "internal/gateway/manager.go"
               ],
               "ready_when": [
-                "2.E.2 is complete and the shared CommandDef registry is stable for gateway commands."
+                "Concurrent-tool cancellation (2.E.2) and the shared CommandDef registry are complete on main.",
+                "This slice only registers /steer and queue fallback behavior; the live between-tool-call injection hook remains in the dependent row.",
+                "Tests can use fake running-agent state and fake command dispatch; no provider, active tool loop, TUI, Slack, or Telegram transport is required."
               ],
               "not_ready_when": [
-                "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior."
-              ],
-              "blocked_by": [
-                "2.E.2"
+                "The implementation tries to inject mid-run prompts instead of only registering /steer and queue fallback behavior.",
+                "The slice changes /queue, /bg, /busy config persistence, TUI keybindings, or platform adapter code.",
+                "The slice accepts empty/image-bearing steer payloads instead of returning usage/fallback evidence."
               ],
               "unblocks": [
                 "Mid-run steer injection between tool calls",
                 "Gateway-handled slash commands bypass active-session guard"
               ],
               "acceptance": [
-                "The shared CommandDef registry exposes /steer with argument validation and preview truncation.",
-                "No-running-agent paths queue follow-up guidance instead of dropping it.",
-                "Running-agent paths do not inject mid-run guidance until the next slice owns that hook."
+                "TestSteerCommandRegistry_ValidatesArgs exposes /steer with missing-argument usage text and rejects image-bearing payloads.",
+                "TestSteerCommandRegistry_PreviewTruncation returns deterministic preview text for long guidance.",
+                "TestSteerCommandRegistry_NoRunningAgentQueuesGuidance queues follow-up guidance instead of dropping it.",
+                "TestSteerCommandRegistry_RunningAgentFallbackDoesNotInject proves running-agent paths return explicit steer_unavailable/queued evidence until the mid-run hook row lands."
               ],
-              "note": "TDD: port upstream PR #12116 `/steer` ingress (see `gateway/run.py` steer handler) as a CommandDef on the shared registry with queue-fallback when no agent is running, explicit missing-argument usage text, and deterministic preview truncation. Keep the mid-run inject hook unimplemented until the next 2.F.5 slice lands.",
+              "note": "Refined 2026-04-27 against Hermes 635253b9. This is only the registry/fallback slice for /steer; the upstream busy_input_mode=steer runtime injection remains blocked behind the next row so workers do not mix command parsing with kernel tool-loop steering.",
               "write_scope": [
-                "internal/gateway/",
-                "internal/channels/",
+                "internal/gateway/commands.go",
+                "internal/gateway/manager.go",
+                "internal/gateway/steer_command_test.go",
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/gateway ./internal/channels/... -count=1"
+                "go test ./internal/gateway -run '^TestSteerCommandRegistry_' -count=1",
+                "go test ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "The shared command registry exposes /steer and no-agent paths return visible queued guidance."
-              ]
+                "Gateway command fixtures prove /steer argument validation, preview truncation, queued fallback, and no live mid-run injection."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:635253b9 gateway/run.py",
+                "note": "Hermes defines busy-input steer behavior; Gormes splits command registration/fallback from the later native kernel injection hook."
+              }
             },
             {
               "name": "Mid-run steer injection between tool calls",
@@ -8295,12 +8481,69 @@
                 "upstream_ref": "hermes:42c076d3 tools/browser_tool.py",
                 "note": "Direct upstream browser behavior drift; Gormes keeps it as a small Go tool-routing helper before native browser runtime work."
               }
+            },
+            {
+              "name": "Browser SSRF quoted-false guard",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Browser and URL safety helpers coerce quoted false-like config values (`\"false\"`, `'false'`, `0`, `no`, `off`) to disabled booleans before private/local URL SSRF guards decide whether cloud navigation is allowed",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Browser safety status reports ssrf_guard_config_invalid or private_url_blocked instead of treating quoted false as truthy and sending private URLs to a cloud/browser provider.",
+              "fixture": "internal/tools/browser_ssrf_guard_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/browser_tool.py@7317d69f",
+                "../hermes-agent/tools/url_safety.py@7317d69f",
+                "../hermes-agent/tests/tools/test_browser_ssrf_local.py@7317d69f",
+                "../hermes-agent/tests/tools/test_url_safety.py@7317d69f",
+                "internal/tools/browser_hybrid_routing.go"
+              ],
+              "ready_when": [
+                "Browser hybrid private-URL local sidecar routing is complete and already classifies private/LAN hosts without DNS or browser startup.",
+                "The worker can add a pure config coercion and guard decision helper under internal/tools; no browser runtime, network, DNS, Chromedp, Rod, Browserbase, Firecrawl, or Camofox dependency is required."
+              ],
+              "not_ready_when": [
+                "The slice starts a browser, performs DNS resolution, follows redirects, or changes cloud/local routing behavior beyond quoted-false coercion.",
+                "The slice weakens private host classification already validated by Browser hybrid private-URL local sidecar routing.",
+                "The slice implements provider bridges or screenshot/navigation actions."
+              ],
+              "acceptance": [
+                "TestBrowserSSRFGuard_CoercesQuotedFalseValues covers `\"false\"`, `'false'`, `0`, `no`, and `off` as disabled while true/yes/on remain enabled.",
+                "TestBrowserSSRFGuard_PrivateURLBlockedWhenCloudWouldReceiveIt proves localhost/RFC1918 URLs return private_url_blocked when cloud routing is enabled and auto-local routing is disabled.",
+                "TestBrowserSSRFGuard_PublicURLAllowed covers a public URL and proves no private_url_blocked evidence is emitted.",
+                "Tests use synthetic strings only and do not start a browser, resolve DNS, or open network sockets."
+              ],
+              "note": "Hermes 7317d69f fixed quoted false handling in browser SSRF guards. Gormes already has private-host routing helpers, so this is a small safety row over config coercion and guard evidence before browser provider bridges become executable.",
+              "write_scope": [
+                "internal/tools/browser_ssrf_guard.go",
+                "internal/tools/browser_ssrf_guard_test.go",
+                "internal/tools/browser_hybrid_routing.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestBrowserSSRFGuard_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Browser SSRF guard fixtures prove quoted false values disable cloud routing guards correctly, private URLs are blocked when they would reach cloud providers, and no browser/network runtime is used."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:7317d69f tools/url_safety.py",
+                "note": "Direct browser security drift from Hermes; Gormes ports it as a pure Go safety helper before browser runtime work."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T18:14:51Z",
-            "origin_decision": "Hermes 42c076d3 added browser cloud/local hybrid routing for private URLs. Gormes still lacks native browser runtime wiring, so Phase 5.C stays upstream-led and now carries a pure route-key helper row before browser provider bridge work."
+            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "origin_decision": "Hermes 42c076d3 added browser cloud/local hybrid routing for private URLs, and 7317d69f tightened quoted-false handling in SSRF guard config. Gormes still lacks native browser runtime wiring, so Phase 5.C stays upstream-led and now carries pure route-key and SSRF-config guard rows before browser provider bridge work."
           }
         },
         "5.D": {
@@ -9241,12 +9484,73 @@
                 "upstream_ref": "hermes:edc78e25 tools/managed_tool_gateway.py",
                 "note": "Hermes defines managed gateway behavior; Gormes ports it after native MCP config/discovery/OAuth contracts."
               }
+            },
+            {
+              "name": "MCP stdio orphan cleanup after cron ticks",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Cron and MCP stdio tooling track orphaned stdio server PIDs after cancellation/timeout and sweep only orphaned children after a cron tick joins, without killing active MCP sessions from parallel work",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "MCP status reports mcp_orphan_reaped, mcp_orphan_reap_failed, or mcp_active_pid_preserved instead of leaking detached stdio subprocesses or killing active sessions.",
+              "fixture": "internal/tools/mcp_orphan_cleanup_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/mcp_tool.py@930494d6:_orphan_stdio_pids",
+                "../hermes-agent/cron/scheduler.py@930494d6:tick cleanup",
+                "../hermes-agent/tests/tools/test_mcp_stability.py@930494d6",
+                "internal/tools/mcp_stdio.go",
+                "internal/cron/scheduler.go"
+              ],
+              "ready_when": [
+                "MCP stdio transport + tool/list discovery and Cronjob tool action envelope over native store are validated on main.",
+                "The worker can implement this as a pure process-tracker/reaper seam with fake PID liveness and fake kill functions; no real subprocess, cron goroutine, or MCP SDK is required.",
+                "Cleanup after a cron tick must run only after sibling futures/jobs for that tick have joined."
+              ],
+              "not_ready_when": [
+                "The slice kills every active MCP PID during normal cron ticks instead of orphan-only cleanup.",
+                "The slice starts real MCP stdio subprocesses or depends on OS-specific process groups in unit tests.",
+                "The slice changes MCP protocol parsing, OAuth, HTTP transport, managed gateway behavior, or cron schedule parsing."
+              ],
+              "acceptance": [
+                "TestMCPOrphanCleanup_MarksAlivePIDOrphanOnSessionExit moves an injected alive PID from active to orphaned when a stdio session exits through cancellation/error.",
+                "TestMCPOrphanCleanup_ReapsOnlyOrphansAfterCronTick kills orphaned PIDs after a fake cron tick join while preserving active PIDs.",
+                "TestMCPOrphanCleanup_ShutdownIncludesActive preserves existing shutdown behavior that can reap both active and orphaned PIDs.",
+                "TestCronSchedulerRunsMCPOrphanCleanupAfterTickJoin proves cleanup is called after all fake tick jobs complete and never while a sibling job is still marked active."
+              ],
+              "note": "Hermes 930494d6 fixed leaked MCP stdio subprocesses after cancelled cron ticks. Gormes has in-process MCP stdio fixtures and native cron execution; this row adds the process-tracker/reaper seam without spawning real processes in tests.",
+              "write_scope": [
+                "internal/tools/mcp_orphan_cleanup.go",
+                "internal/tools/mcp_orphan_cleanup_test.go",
+                "internal/tools/mcp_stdio.go",
+                "internal/cron/scheduler.go",
+                "internal/cron/scheduler_mcp_cleanup_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestMCPOrphanCleanup_' -count=1",
+                "go test ./internal/cron -run '^TestCronSchedulerRunsMCPOrphanCleanupAfterTickJoin$' -count=1",
+                "go test ./internal/tools ./internal/cron -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "MCP/cron fixtures prove cancelled stdio PIDs become orphaned, cron tick cleanup reaps only orphans after join, shutdown can include active PIDs, and no real subprocess is spawned."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:930494d6 tools/mcp_tool.py",
+                "note": "Hermes provides the orphan-cleanup failure mode; Gormes adapts it to native MCP stdio and cron seams with injected process operations."
+              }
             }
           ],
           "drift_state": {
-            "status": "converged",
-            "last_upstream_check": "2026-04-26T22:45:56Z",
-            "origin_decision": "Hermes 755a2804 and Honcho e659b6b/51497f1 were checked on 2026-04-26. Gormes now has validated Go-native MCP config/env parsing, stdio and HTTP tool/list discovery, schema normalization/structured content, OAuth state/refresh recovery, and managed gateway bridge slices. Honcho MCP HONCHO_API_URL remains server-local MCP config and does not change internal Goncho memory naming. Future upstream MCP drift should become new small rows rather than keeping this subphase porting."
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "origin_decision": "Hermes 930494d6 added MCP stdio orphan cleanup after cron ticks, so this subphase is no longer fully converged. Gormes already has validated Go-native MCP config/env parsing, stdio and HTTP tool/list discovery, schema normalization/structured content, OAuth state/refresh recovery, and managed gateway bridge slices; the remaining drift is a small process-tracker/reaper seam shared with native cron. Honcho MCP HONCHO_API_URL remains server-local MCP config and does not change internal Goncho memory naming."
           }
         },
         "5.H": {
@@ -9925,6 +10229,7 @@
               ],
               "ready_when": [
                 "Source-filtered session/message search core and Lineage-aware source-filtered search hits are validated on main.",
+                "Operator-auditable search evidence is validated on main, so this row is unblocked for the tool wrapper only.",
                 "The tool can use seeded SQLite/session.Metadata fixtures and does not need a live gateway, provider, or Goncho cloud service.",
                 "Existing Goncho/Honcho-compatible scope rules remain the authority for user/source widening."
               ],
@@ -9933,17 +10238,13 @@
                 "The slice shells out to Hermes Python or reads ~/.hermes session logs.",
                 "The slice includes todo/debug/clarify tools or cronjob tools in the same change."
               ],
-              "blocked_by": [
-                "Lineage-aware source-filtered search hits",
-                "Operator-auditable search evidence"
-              ],
               "acceptance": [
                 "TestSessionSearchTool_SameChatDefault seeds two chats and proves no cross-chat hit appears without explicit scope=user or sources.",
                 "TestSessionSearchTool_UserScopeSourceFilter passes scope=user sources=[telegram] and proves only the allowed source's sessions are returned with source evidence.",
                 "TestSessionSearchTool_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155.",
                 "TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening."
               ],
-              "note": "Refined after Hermes dbe50155: the row is no longer a generic `port session_search_tool.py` bucket. It must wrap the existing Phase 3 catalog/Goncho scope contracts and fixture-lock the recent-mode current-lineage-root exclusion before any operator-visible tool is exposed.",
+              "note": "Refined 2026-04-27 after Hermes dbe50155 and current Gormes inventory: the Phase 3 lineage/search/evidence prerequisites are complete, so this row is now unblocked and limited to the native tool wrapper over the existing catalog/Goncho scope contracts.",
               "write_scope": [
                 "internal/tools/session_search_tool.go",
                 "internal/tools/session_search_tool_test.go",
@@ -9958,6 +10259,11 @@
               "done_signal": [
                 "Session search tool fixtures prove same-chat defaults, opt-in user/source widening, deterministic current-lineage-root exclusion in recent mode, and degraded evidence for unavailable/denied widening."
               ],
+              "planner_verdict": {
+                "reshape_count": 2,
+                "last_reshape": "2026-04-27T03:17:39Z",
+                "last_outcome": "no_attempts_yet"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:dbe50155 tools/session_search_tool.py",
@@ -10472,7 +10778,7 @@
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-26T23:52:41Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -10483,8 +10789,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T02:20:01Z",
-            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Hermes dbe50155 adds a deterministic session-search recent-mode exclusion for the current lineage root; Gormes maps that onto the Phase 3 session catalog and Goncho/Honcho-compatible scope rules in the refined Session search row. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, and CRON.md mirror; the cron umbrella is split into parser/repeat, safety, action-envelope, context_from, and delivery-plan rows so autoloop workers can advance Phase 5.N without guessing."
+            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Hermes dbe50155 adds a deterministic session-search recent-mode exclusion for the current lineage root; Gormes maps that onto the Phase 3 session catalog and Goncho/Honcho-compatible scope rules in the refined Session search row. The Phase 3 lineage/search/evidence prerequisites are now complete, so Session search is unblocked as a tool-wrapper slice. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, and CRON.md mirror; the cron umbrella is split into parser/repeat, safety, action-envelope, context_from, and delivery-plan rows so autoloop workers can advance Phase 5.N without guessing."
           }
         },
         "5.O": {
@@ -12998,6 +13304,7 @@
               ],
               "ready_when": [
                 "Native TUI /save canonical session export is validated on main and exposes SessionExportFunc on Model options.",
+                "The prior /save handler write-scope issue is closed; slash_dispatch_test.go was already included in the completed handler row and should not be touched here.",
                 "cmd/gormes/session.go already proves transcript.ExportMarkdown works against config.MemoryDBPath for the CLI export command.",
                 "Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence."
               ],
@@ -13006,16 +13313,13 @@
                 "The slice writes exports under HERMES_HOME, the repository root, or the current working directory.",
                 "The slice starts a provider, API server, remote TUI gateway, or live session browser."
               ],
-              "blocked_by": [
-                "Native TUI /save canonical session export"
-              ],
               "acceptance": [
                 "cmd/gormes constructs a SessionExportFunc for the local TUI Model that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
                 "TestTUISaveExport_WritesUnderXDGDataHome sets XDG_DATA_HOME and HERMES_HOME to different temp roots, invokes the bound SessionExportFunc, and proves the file lands under the Gormes XDG export directory only.",
                 "TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path.",
                 "The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway."
               ],
-              "note": "Hermes 5eb6cd82 fixed /save landing under HERMES_HOME. Gormes already has the TUI slash handler but the real cmd-level binding is still only documented in comments; this row makes the Gormes XDG export location explicit and keeps the HERMES_HOME divergence tested.",
+              "note": "Refined 2026-04-27: the native TUI /save handler is complete on main, so this row is unblocked and limited to cmd/gormes binding plus XDG output-location fixtures. Do not reopen slash dispatch tests or change transcript markdown formatting.",
               "write_scope": [
                 "cmd/gormes/main.go",
                 "cmd/gormes/tui_save_export_test.go",
@@ -13578,19 +13882,79 @@
               ]
             },
             {
-              "name": "API server health + cron admin endpoints",
+              "name": "API server detailed health read-model",
               "status": "planned",
-              "contract": "Native API server exposes detailed health and cron admin endpoints over the same scheduler/store contracts as CLI and tools",
-              "contract_status": "draft",
-              "slice_size": "medium",
+              "priority": "P2",
+              "contract": "Native API server exposes a detailed health read-model that reports provider, response-store, run-event stream, gateway, and cron availability/degradation without leaking secrets or adding cron mutations",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
                 "operator",
                 "gateway",
                 "system"
               ],
-              "degraded_mode": "HTTP health reports cron/admin unavailable until the Phase 5.N cron action, context_from, and delivery-plan slices are validated.",
-              "fixture": "internal/apiserver/health_cron_admin_test.go",
+              "degraded_mode": "HTTP health reports cron_unavailable, response_store_disabled, run_events_unavailable, gateway_unavailable, or provider_unconfigured evidence instead of returning a flat OK/failed bit.",
+              "fixture": "internal/apiserver/detailed_health_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/api_server.py@755a2804",
+                "internal/apiserver/",
+                "internal/cron/",
+                "internal/gateway/status.go"
+              ],
+              "ready_when": [
+                "OpenAI-compatible chat-completions API server, Responses API store + run event stream, and Gateway proxy mode forwarding contract are validated on main.",
+                "Cronjob tool action envelope over native store, Cron context_from output chaining, and Cron multi-target delivery + media/live-adapter fallback are validated on main, so cron health can be read without defining admin writes.",
+                "Tests can inject fake provider/gateway/cron/read-store health snapshots; no provider, live gateway, scheduler goroutine, or cron mutation endpoint is required."
+              ],
+              "not_ready_when": [
+                "The slice creates /api/jobs endpoints, mutates cron jobs, starts a scheduler, changes OpenAI-style error envelopes, or weakens API auth/body-size checks.",
+                "The slice imports Hermes Python, starts the remote TUI gateway, or changes dashboard client behavior.",
+                "Health output includes plaintext tokens, provider API keys, cron script bodies, or raw request payloads."
+              ],
+              "unblocks": [
+                "API server cron admin read-only endpoints"
+              ],
+              "acceptance": [
+                "TestAPIServerDetailedHealth_AllSystemsReady returns provider, response_store, run_events, gateway, and cron sections with status=ready and stable JSON field names.",
+                "TestAPIServerDetailedHealth_DegradedEvidence seeds disabled response store, missing cron store, and unavailable gateway status and proves each appears as separate degraded evidence.",
+                "TestAPIServerDetailedHealth_RedactsSecrets proves provider keys, cron script bodies, and gateway tokens are absent from the response body.",
+                "Auth failure, request-size, and method-not-allowed behavior match the existing API server error-envelope fixtures."
+              ],
+              "note": "Split 2026-04-27 from the medium `API server health + cron admin endpoints` row. The cron prerequisites are complete, but the old row mixed detailed health, read-only job listing, and mutating admin operations; this first slice is read-model health only.",
+              "write_scope": [
+                "internal/apiserver/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/apiserver -run '^TestAPIServerDetailedHealth_' -count=1",
+                "go test ./internal/apiserver -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "API server fixtures prove detailed health sections, degraded evidence, secret redaction, and existing auth/error-envelope behavior without cron admin writes."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:edc78e25 gateway/platforms/api_server.py",
+                "note": "Hermes defines the API health shape; Gormes adapts it to native Go read models before cron admin endpoints."
+              }
+            },
+            {
+              "name": "API server cron admin read-only endpoints",
+              "status": "planned",
+              "priority": "P2",
+              "contract": "Native API server exposes authenticated read-only cron admin endpoints for list/get/run-history over the existing cron store and run audit without creating a second scheduler control plane",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "HTTP cron admin reports cron_store_unavailable, cron_job_missing, or cron_runs_unavailable evidence using the shared API error envelope.",
+              "fixture": "internal/apiserver/cron_admin_read_test.go",
               "source_refs": [
                 "../hermes-agent/gateway/platforms/api_server.py@755a2804",
                 "../hermes-agent/cron/scheduler.py@755a2804",
@@ -13600,22 +13964,89 @@
                 "internal/tools/"
               ],
               "ready_when": [
-                "Cronjob tool action envelope over native store, Cron context_from output chaining, and Cron multi-target delivery + media/live-adapter fallback have stable native store/delivery contracts."
+                "API server detailed health read-model is complete.",
+                "Cronjob tool action envelope over native store, Cron context_from output chaining, and Cron multi-target delivery + media/live-adapter fallback are validated on main.",
+                "Tests can seed the native cron store/run audit directly; no scheduler goroutine, live delivery adapter, provider, or cron mutation endpoint is required."
               ],
               "not_ready_when": [
-                "The slice creates a second cron control plane, bypasses OpenAI-style error envelopes, or exposes admin writes before auth/body-limit fixtures are in place."
+                "The slice creates, updates, pauses, resumes, deletes, or triggers jobs; mutating endpoints are the dependent row.",
+                "The slice bypasses the existing API auth/body-size/error-envelope middleware or creates a second cron store.",
+                "The slice starts live cron execution, gateway delivery, or provider calls."
               ],
               "blocked_by": [
-                "Cronjob tool action envelope over native store",
-                "Cron context_from output chaining",
-                "Cron multi-target delivery + media/live-adapter fallback"
+                "API server detailed health read-model"
+              ],
+              "unblocks": [
+                "API server cron admin mutating endpoints"
               ],
               "acceptance": [
-                "/health/detailed reports provider, response-store, run-event, cron, and gateway degraded state without leaking secrets.",
-                "/api/jobs list/create/update/delete/pause/resume/trigger reuse the native cron store and schedule parser fixtures.",
-                "Auth failures, malformed bodies, missing jobs, and store-disabled states use the same error envelope and request-size limits as the OpenAI-compatible APIs."
+                "TestAPIServerCronAdmin_ListJobs returns stable JSON for enabled, disabled, paused, next-run, target, and last-run evidence from the native cron store.",
+                "TestAPIServerCronAdmin_GetJobMissing uses the shared API error envelope and 404 semantics for unknown IDs.",
+                "TestAPIServerCronAdmin_RunHistory returns bounded recent run records without exposing prompt/script secret payloads.",
+                "Auth failure and request-size behavior match existing API server fixtures."
               ],
-              "note": "Refined 2026-04-26 after splitting the old 5.N cron umbrella: keep HTTP admin behind the native cron action envelope, context_from output chain, and delivery-plan rows so API, CLI, and tool control share one scheduler/store contract instead of copying Hermes' Python control plane.",
+              "note": "Second row in the 2026-04-27 API split. It is read-only cron admin over the validated native cron store and run audit; all writes remain blocked behind the mutating endpoint row.",
+              "write_scope": [
+                "internal/apiserver/",
+                "internal/cron/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/apiserver -run '^TestAPIServerCronAdmin_(List|Get|RunHistory)' -count=1",
+                "go test ./internal/apiserver ./internal/cron -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "API server fixtures prove authenticated cron list/get/run-history over the native store with missing-job, store-unavailable, redaction, and shared error-envelope behavior."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:755a2804 tools/cronjob_tools.py",
+                "note": "Hermes exposes cron administration through API/tool surfaces; Gormes starts with read-only HTTP visibility over the native cron store."
+              }
+            },
+            {
+              "name": "API server cron admin mutating endpoints",
+              "status": "planned",
+              "priority": "P2",
+              "contract": "Native API server exposes authenticated cron admin create/update/delete/pause/resume/trigger endpoints that reuse the native cron action envelope, schedule parser, safety policy, and delivery plan",
+              "contract_status": "draft",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "HTTP cron admin reports validation_failed, unsafe_script_rejected, cron_job_missing, trigger_delivery_unavailable, or cron_store_unavailable using the shared API error envelope.",
+              "fixture": "internal/apiserver/cron_admin_mutation_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/api_server.py@755a2804",
+                "../hermes-agent/tools/cronjob_tools.py@755a2804",
+                "internal/apiserver/",
+                "internal/cron/",
+                "internal/tools/"
+              ],
+              "ready_when": [
+                "API server cron admin read-only endpoints is complete and exposes the same cron store/read model.",
+                "Cron prompt/script safety + pre-run script contract, Cronjob tool action envelope over native store, and Cron multi-target delivery + media/live-adapter fallback are validated on main.",
+                "Tests can inject fake delivery/action handlers; no live gateway adapter, provider, or wall-clock scheduler tick is required."
+              ],
+              "not_ready_when": [
+                "The slice bypasses cron safety validation, writes a second cron store, or invents a separate API-only scheduler.",
+                "The slice starts live provider/gateway delivery in tests or requires network credentials.",
+                "The read-only cron admin row is not complete in the worker checkout."
+              ],
+              "blocked_by": [
+                "API server cron admin read-only endpoints"
+              ],
+              "acceptance": [
+                "TestAPIServerCronAdmin_CreateUpdateDelete reuses the native cron action envelope and schedule parser, returns stable IDs, and records audit evidence.",
+                "TestAPIServerCronAdmin_PauseResume preserves job metadata and returns conflict/not-found errors through the shared envelope.",
+                "TestAPIServerCronAdmin_Trigger uses fake delivery/action handlers and records trigger_delivery_unavailable when delivery is disabled.",
+                "Unsafe scripts, malformed schedules, oversized bodies, and auth failures use existing validation and error-envelope behavior."
+              ],
+              "note": "Final row in the 2026-04-27 API split. This is the only row that may add cron admin mutations, and it must reuse the native cron tool/action contracts instead of copying Hermes' Python scheduler control plane.",
               "write_scope": [
                 "internal/apiserver/",
                 "internal/cron/",
@@ -13623,29 +14054,24 @@
                 "docs/content/building-gormes/architecture_plan/progress.json"
               ],
               "test_commands": [
-                "go test ./internal/apiserver ./internal/cron ./internal/tools -run 'Test.*Health|Test.*Cron.*Admin|Test.*Jobs' -count=1",
+                "go test ./internal/apiserver -run '^TestAPIServerCronAdmin_(Create|Update|Delete|Pause|Resume|Trigger)' -count=1",
                 "go test ./internal/apiserver ./internal/cron ./internal/tools -count=1",
                 "go run ./cmd/builder-loop progress validate"
               ],
               "done_signal": [
-                "API fixtures prove detailed health plus cron admin CRUD/pause/resume/trigger over native store contracts with shared auth/error-envelope behavior."
+                "API server fixtures prove cron create/update/delete/pause/resume/trigger reuse native cron validation, action envelope, fake delivery handlers, audit evidence, and shared auth/error behavior."
               ],
-              "planner_verdict": {
-                "reshape_count": 2,
-                "last_reshape": "2026-04-26T23:52:41Z",
-                "last_outcome": "no_attempts_yet"
-              },
               "provenance": {
                 "origin_type": "hybrid",
-                "upstream_ref": "hermes:edc78e25 gateway/platforms/api_server.py",
-                "note": "Hermes defines the API shape; Gormes gates it on native cron store parity."
+                "upstream_ref": "hermes:755a2804 gateway/platforms/api_server.py",
+                "note": "Hermes defines the operator-facing cron admin shape; Gormes adapts mutation behavior only after read-only visibility and native cron safety contracts are fixture-backed."
               }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T02:20:01Z",
-            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, edc78e25/31d7f195 add Ink selection-copy fixes that Gormes documents as a terminal-native divergence, 2536a36f routes TUI /save through canonical session.save JSON-RPC, and 5eb6cd82 fixes save-location semantics plus session-picker allowed sources. Gormes tracks /save as a native handler plus a separate XDG file-writer binding row, preserving Gormes XDG runtime state instead of upstream HERMES_HOME. Hermes 0824ba6a tightens /branch and 9662e321 wires prompt.submit auto-title generation; Gormes tracks those over internal/transcript, session.LineageKindFork, and native TUI helper seams."
+            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, edc78e25/31d7f195 add Ink selection-copy fixes that Gormes documents as a terminal-native divergence, 2536a36f routes TUI /save through canonical session.save JSON-RPC, and 5eb6cd82 fixes save-location semantics plus session-picker allowed sources. Gormes tracks /save as a native handler plus a now-unblocked XDG file-writer binding row, preserving Gormes XDG runtime state instead of upstream HERMES_HOME. The old API health+cron admin medium row is split into detailed health, cron read-only admin, and cron mutating admin rows so workers do not mix read models with scheduler writes. Hermes 0824ba6a tightens /branch and 9662e321 wires prompt.submit auto-title generation; Gormes tracks those over internal/transcript, session.LineageKindFork, and native TUI helper seams."
           }
         },
         "5.R": {

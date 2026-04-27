@@ -8512,9 +8512,6 @@
                 "The slice weakens private host classification already validated by Browser hybrid private-URL local sidecar routing.",
                 "The slice implements provider bridges or screenshot/navigation actions."
               ],
-              "blocked_by": [
-                "Browser hybrid private-URL local sidecar routing"
-              ],
               "acceptance": [
                 "TestBrowserSSRFGuard_CoercesQuotedFalseValues covers `\"false\"`, `'false'`, `0`, `no`, and `off` as disabled while true/yes/on remain enabled.",
                 "TestBrowserSSRFGuard_PrivateURLBlockedWhenCloudWouldReceiveIt proves localhost/RFC1918 URLs return private_url_blocked when cloud routing is enabled and auto-local routing is disabled.",
@@ -9518,10 +9515,6 @@
                 "The slice kills every active MCP PID during normal cron ticks instead of orphan-only cleanup.",
                 "The slice starts real MCP stdio subprocesses or depends on OS-specific process groups in unit tests.",
                 "The slice changes MCP protocol parsing, OAuth, HTTP transport, managed gateway behavior, or cron schedule parsing."
-              ],
-              "blocked_by": [
-                "MCP stdio transport + tool/list discovery",
-                "Cronjob tool action envelope over native store"
               ],
               "acceptance": [
                 "TestMCPOrphanCleanup_MarksAlivePIDOrphanOnSessionExit moves an injected alive PID from active to orphaned when a stdio session exits through cancellation/error.",
