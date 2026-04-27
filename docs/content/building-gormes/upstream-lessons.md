@@ -37,6 +37,24 @@ show degraded mode to operators
 | Skills as reviewed code | GBrain + Hermes | Skills have metadata, resolver tests, inactive drafts, review, feedback, and version history. |
 | Visible degraded mode | GBrain + Hermes | Missing embeddings, provider limits, stale extraction, plugin/tool gaps, and dead letters surface in status/doctor/audit. |
 
+## Latest Sync Notes
+
+The 2026-04-27 upstream Hermes sync adds a few contract deltas that are now
+split in `progress.json`:
+
+- Yuanbao is a new gateway family; Gormes tracks protocol/markdown, media
+  normalization, then disabled-by-default runtime/toolset registration as
+  separate Phase 7.E rows.
+- Airtable is a bundled productivity skill; Gormes treats it as reviewed
+  SKILL.md content plus optional credential evidence, not as a live integration
+  at startup.
+- Checkpoint shadow-repo cleanup and file-read dedup guards become the first
+  Phase 5.L slices before write-capable file tools.
+- Compression now needs an explicit ContextEngine boundary notification after
+  successful compression so cache state cannot span a lineage change silently.
+- Session search recent mode must exclude the current lineage root
+  deterministically while preserving GONCHO/Honcho-compatible scope rules.
+
 ## The Four Questions
 
 Every planned subsystem should answer these before implementation:

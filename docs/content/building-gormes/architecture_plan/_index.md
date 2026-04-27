@@ -129,9 +129,10 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Non-editable gateway progress/commentary send fallback
 - [x] Gateway fresh-final eligibility helper
 - [x] Gateway fresh-final send/delete fallback
-- [ ] Telegram fresh-final delete and config exposure
+- [x] Telegram fresh-final delete and config exposure
 - [x] Slack rich-text quotes/lists + link-unfurl ingress
 - [x] Slack thread-parent context + team-scoped cache key
+- [ ] Gateway message deduplicator bounded eviction
 
 ### 2.B.10 — WeChat Adapter ✅
 
@@ -386,6 +387,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [ ] Tool-result pruning + protected head/tail summary
 - [x] Aux compression single-prompt threshold reconciliation
 - [ ] Manual compression feedback + context references
+- [ ] ContextEngine compression-boundary notification
 
 ### 4.C — Native Prompt Builder 🔨
 
@@ -490,6 +492,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Skill preprocessing + dynamic slash commands
 - [x] [IMPORTANT:] prompt prefix for cron and skill commands
 - [x] Skills list — enabled/disabled status column + --enabled-only filter
+- [ ] Bundled Airtable productivity skill contract
 
 ### 5.G — MCP Integration ✅
 
@@ -531,6 +534,8 @@ machine-readable queue for developing the full `gormes-agent`.
 ### 5.L — File Ops + Patches ⏳
 
 - [ ] Atomic checkpoints
+- [ ] Checkpoint shadow-repo GC policy
+- [ ] File read dedup cache invalidation and wrapper guard
 
 ### 5.M — Mixture of Agents ⏳
 
@@ -548,9 +553,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Cron schedule parser + repeat state fixtures
 - [x] Cron prompt/script safety + pre-run script contract
 - [x] Cronjob tool action envelope over native store
-- [ ] Cron context_from output chaining
+- [x] Cron context_from output chaining
 - [ ] Cron prompt/script safety + pre-run script contract (deprecated umbrella)
-- [ ] Cron multi-target delivery + media/live-adapter fallback
+- [x] Cron multi-target delivery + media/live-adapter fallback
 
 ### 5.O — Hermes CLI Parity 🔨
 
@@ -609,6 +614,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] TUI TerminalNativeSelectionHelp constant + help-string fixture
 - [x] Native TUI slash-command dispatch table
 - [x] Native TUI /save canonical session export
+- [ ] Native TUI /save XDG file writer binding
 - [x] Native TUI /branch session fork + transcript target switch
 - [x] TUI running-agent placeholder surfaces interrupt + queued slash actions
 - [x] SSE streaming to Bubble Tea TUI
@@ -702,6 +708,9 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] DingTalk AI Cards streaming-update contract
 - [x] DingTalk emoji reaction send/receive parity
 - [x] DingTalk media (image/file) attachment routing
+- [ ] Yuanbao protocol envelope + markdown fixtures
+- [ ] Yuanbao media/sticker attachment normalization
+- [ ] Yuanbao gateway runtime + toolset registration
 - [ ] QQ Bot transport/bootstrap layer
 
 <!-- PROGRESS:END -->

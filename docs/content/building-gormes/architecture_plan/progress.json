@@ -1464,7 +1464,8 @@
               },
               "planner_verdict": {
                 "reshape_count": 1,
-                "last_reshape": "2026-04-27T01:04:55Z"
+                "last_reshape": "2026-04-27T01:04:55Z",
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -1638,12 +1639,70 @@
                 "upstream_ref": "hermes:c0d25df3 gateway/platforms/slack.py",
                 "note": "Direct Slack gateway drift from upstream Hermes, sequenced after rich-text ingress because both rows touch the Slack Event and Channel seams."
               }
+            },
+            {
+              "name": "Gateway message deduplicator bounded eviction",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Shared gateway deduplication caps tracked message IDs at max_size with deterministic oldest-entry eviction and visible dropped-duplicate evidence",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Gateway status reports deduplicator_disabled or deduplicator_evicted evidence instead of growing unbounded in long-running platform adapters.",
+              "fixture": "internal/gateway/message_deduplicator_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/helpers.py@cebf9585:MessageDeduplicator",
+                "../hermes-agent/tests/gateway/test_message_deduplicator.py@cebf9585",
+                "internal/gateway/event.go",
+                "internal/gateway/manager.go"
+              ],
+              "ready_when": [
+                "Shared gateway inbound event normalization is validated and platform adapters already pass stable message IDs where available.",
+                "The helper can be tested as a pure in-memory structure with synthetic message IDs; no live platform SDK or manager run loop is required.",
+                "Adapters without message IDs remain accepted and produce dedup_unavailable evidence rather than being dropped."
+              ],
+              "not_ready_when": [
+                "The slice changes channel session keys, authorization/pairing policy, message rendering, or outbound coalescing.",
+                "The slice adds platform-specific Telegram/Slack/Discord dedup state instead of a shared helper.",
+                "The slice stores dedup history on disk; this row is an in-memory bounded guard only."
+              ],
+              "acceptance": [
+                "TestMessageDeduplicator_MaxSizeEvictsOldest adds max_size+1 distinct IDs and proves the first ID is no longer considered duplicate while the newest IDs remain tracked.",
+                "TestMessageDeduplicator_DuplicateReturnsSeen proves repeated IDs are rejected before eviction and emits duplicate evidence.",
+                "TestMessageDeduplicator_ZeroMaxSizeDisabled treats max_size=0 as disabled and never rejects messages.",
+                "TestGatewayInbound_DedupMissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable evidence."
+              ],
+              "note": "Hermes cebf9585 fixed MessageDeduplicator max_size enforcement after long-running platform adapters could keep growing seen-message state. Gormes should port the bounded helper at the shared gateway layer, not separately inside each adapter.",
+              "write_scope": [
+                "internal/gateway/message_deduplicator.go",
+                "internal/gateway/message_deduplicator_test.go",
+                "internal/gateway/event.go",
+                "internal/gateway/manager.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run 'TestMessageDeduplicator|TestGatewayInbound_Dedup' -count=1",
+                "go test ./internal/gateway -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Gateway deduplicator fixtures prove max_size eviction, duplicate rejection, disabled mode, and missing-ID degraded evidence without platform SDKs or disk state."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:cebf9585 gateway/platforms/helpers.py",
+                "note": "Hermes provides the bounded deduplicator regression; Gormes centralizes it in the shared Go gateway so platform adapters stay thin."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-27T01:07:49Z",
-            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; after a worker_error on the broader row, Gormes now tracks it as three dependency-ordered slices: a pure shared gateway eligibility helper, a shared gateway send/delete fallback, then Telegram-only config/deleteMessage wiring."
+            "last_upstream_check": "2026-04-27T02:20:01Z",
+            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; after a worker_error on the broader row, Gormes tracks it as three dependency-ordered slices. Hermes cebf9585 adds bounded MessageDeduplicator eviction; Gormes tracks that as a shared gateway helper so platform adapters stay thin."
           }
         },
         "2.B.10": {
@@ -6496,12 +6555,75 @@
               "name": "Manual compression feedback + context references",
               "status": "planned",
               "note": "TDD: port `manual_compression_feedback.py` and `context_references.py` as separate read/write contracts so user-visible compression feedback and reference handles are testable without a provider call."
+            },
+            {
+              "name": "ContextEngine compression-boundary notification",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Kernel compression execution signals the ContextEngine when a compression boundary is crossed so cached/replayed context state cannot silently span the pre-compress and post-compress transcript",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "provider",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Context status reports compression_boundary_unavailable or last_boundary_missing evidence instead of implying context-engine caches were reset after compression.",
+              "fixture": "internal/kernel/compression_boundary_test.go",
+              "source_refs": [
+                "../hermes-agent/run_agent.py@e85b7525",
+                "../hermes-agent/tests/run_agent/test_compression_boundary_hook.py@e85b7525",
+                "internal/hermes/context_engine.go",
+                "internal/kernel/contextengine_test.go",
+                "internal/hermes/context_compressor_budget.go"
+              ],
+              "ready_when": [
+                "ContextEngine interface + status tool contract is validated on main.",
+                "Compression token-budget and single-prompt threshold fixtures are validated, so this slice only adds boundary notification semantics and does not invent compression budgeting.",
+                "A fake ContextEngine can record boundary notifications without calling a live provider or mutating real transcript storage."
+              ],
+              "not_ready_when": [
+                "The slice implements summarization, tool-result pruning, manual compression, or context references instead of the boundary callback.",
+                "The slice hides boundary failures or lets a context cache survive across a compression lineage change without observable status evidence.",
+                "The slice changes Goncho/Honcho memory extraction semantics; memory pre/post-compression observation remains a separate Phase 3/4 concern."
+              ],
+              "blocked_by": [
+                "ContextEngine interface + status tool contract",
+                "Aux compression single-prompt threshold reconciliation"
+              ],
+              "acceptance": [
+                "A fake ContextEngine receives exactly one CompressionBoundary notification after a successful compression result is accepted into the kernel transcript lineage.",
+                "A failed or skipped compression path does not emit the boundary notification and reports compression_boundary_unavailable in context status.",
+                "The notification includes old_session_id/new_session_id or equivalent lineage evidence so caches can distinguish pre-compress and post-compress context.",
+                "Existing context_status tool fixtures remain stable except for the added boundary evidence fields."
+              ],
+              "note": "Hermes e85b7525 added a regression hook so context-engine state sees compression boundaries. Gormes already has a Go ContextEngine boundary and budget math, but no explicit cache/lineage notification row, so this keeps the drift as a small fake-engine fixture before broader pruning/manual-compression work.",
+              "write_scope": [
+                "internal/hermes/context_engine.go",
+                "internal/hermes/context_engine_test.go",
+                "internal/kernel/contextengine_test.go",
+                "internal/kernel/compression_boundary_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/kernel -run 'Test.*CompressionBoundary|Test.*ContextEngine' -count=1",
+                "go test ./internal/hermes ./internal/kernel -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Fake ContextEngine fixtures prove successful compression emits one boundary notification with lineage evidence, skipped/failed compression does not, and context status exposes degraded evidence."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:e85b7525 run_agent.py",
+                "note": "Hermes provides the compression-boundary regression; Gormes maps it onto the Go ContextEngine and kernel lineage contracts without changing internal Goncho memory naming."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-25T16:28:34Z",
-            "origin_decision": "Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, superseding the earlier f92006ce/6e561ffa tool-schema headroom rationale while preserving d635e2df provider-cap lookup. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and legacy headroom helper, so this subphase remains upstream-led until the single-prompt threshold reconciliation, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
+            "last_upstream_check": "2026-04-27T02:20:01Z",
+            "origin_decision": "Hermes 5006b220 removed flush_memories and restored auxiliary compression feasibility to a single-prompt request model, superseding the earlier f92006ce/6e561ffa tool-schema headroom rationale while preserving d635e2df provider-cap lookup. Hermes e85b7525 adds an explicit compression-boundary signal to the context engine. Gormes has the Go ContextEngine status boundary, provider-cap resolver, and single-prompt budget reconciliation, so this subphase remains upstream-led until compression-boundary notification, tool-result pruning, protected head/tail summaries, and manual compression feedback/context-reference slices land."
           }
         },
         "4.C": {
@@ -8557,12 +8679,78 @@
                 "upstream_ref": "hermes:0e2a53ea hermes_cli/skills_hub.py do_list",
                 "note": "Mirrors PR #16129; pure introspection feature — no skill execution change."
               }
+            },
+            {
+              "name": "Bundled Airtable productivity skill contract",
+              "priority": "P3",
+              "status": "planned",
+              "contract": "Gormes can ship the upstream Airtable skill as reviewed SKILL.md content with optional credential discovery, prompt-safe cookbook text, and visible unavailable evidence without requiring Airtable credentials during startup",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "skills",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "Skill catalog marks Airtable unavailable or missing AIRTABLE_API_KEY/AIRTABLE_PAT evidence instead of omitting the skill or injecting unusable instructions into prompts.",
+              "fixture": "internal/skills/airtable_skill_test.go",
+              "source_refs": [
+                "../hermes-agent/skills/productivity/airtable/SKILL.md@c997183f",
+                "../hermes-agent/skills/productivity/airtable/SKILL.md@0d4247d9",
+                "../hermes-agent/hermes_cli/config.py@55e9329e:OPTIONAL_ENV_VARS",
+                "../hermes-agent/skills/productivity/airtable/SKILL.md@7e3c8a31",
+                "../hermes-agent/website/docs/reference/skills-catalog.md@7e3c8a31",
+                "internal/skills/parser.go",
+                "internal/skills/store.go",
+                "internal/config/dotenv.go"
+              ],
+              "ready_when": [
+                "Phase 2.G skill parser/store and the Skills list status-column row are validated on main.",
+                "Gormes has a static skills root or fixture directory that can load a hand-authored SKILL.md without executing shell code.",
+                "Credential checks can reuse the existing dotenv/optional-env redaction patterns and must not contact Airtable."
+              ],
+              "not_ready_when": [
+                "The slice implements live Airtable API calls, OAuth, a sync daemon, or workspace-specific base discovery.",
+                "The slice injects Airtable instructions when the skill is disabled or missing required credentials.",
+                "The slice changes the SKILL.md parser format beyond fields needed for reviewed bundled-skill metadata and credential evidence."
+              ],
+              "blocked_by": [
+                "Skills list — enabled/disabled status column + --enabled-only filter"
+              ],
+              "acceptance": [
+                "A fixture SKILL.md adapted from upstream Airtable parses with name, description, triggers, exclusions, review state, and cookbook sections intact.",
+                "Missing AIRTABLE_API_KEY/AIRTABLE_PAT reports a redacted missing-credential evidence string while keeping the catalog row visible as unavailable.",
+                "Present credentials discovered through the existing .env search path make the skill eligible without printing secret values.",
+                "Prompt rendering excludes the Airtable skill when disabled or unavailable and includes it deterministically when enabled and credentials are present."
+              ],
+              "note": "Hermes added and then refined a bundled Airtable productivity skill across c997183f/0d4247d9/55e9329e/7e3c8a31. Gormes should port the contract as reviewed local skill content plus credential evidence, not as a live Airtable integration or a parser rewrite.",
+              "write_scope": [
+                "skills/productivity/airtable/SKILL.md",
+                "internal/skills/airtable_skill_test.go",
+                "internal/skills/",
+                "internal/config/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/skills -run 'TestAirtableSkill|TestSkill' -count=1",
+                "go test ./internal/config -run 'TestLoadDotenv|TestOptionalEnv' -count=1",
+                "go test ./internal/skills ./internal/config -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Airtable skill fixtures prove SKILL.md metadata/cookbook parsing, credential-availability evidence, disabled/unavailable prompt exclusion, and secret redaction without live Airtable calls."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:c997183f..7e3c8a31 skills/productivity/airtable/SKILL.md",
+                "note": "Direct bundled-skill drift from Hermes; Gormes keeps it as reviewed local skill content under the existing skills runtime."
+              }
             }
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T18:00:00Z",
-            "origin_decision": "Hermes 93977675 removed the empty skills/feeds category and its static website label. Gormes does not have a static feeds category label in internal/skills; the skills surface remains upstream-led for hub search/list/install parity, but no new executable row is needed until a Gormes-generated skills catalog grows empty category markers."
+            "last_upstream_check": "2026-04-27T02:20:01Z",
+            "origin_decision": "Hermes 93977675 removed the empty skills/feeds category and its static website label. The latest Hermes window adds a bundled Airtable productivity skill and optional-env registration; Gormes has no equivalent bundled Airtable surface yet, so it is tracked as a credential-evidence SKILL.md row rather than a live Airtable integration. The skills surface remains upstream-led for hub search/list/install parity and reviewed bundled-skill content."
           }
         },
         "5.G": {
@@ -9551,9 +9739,146 @@
             {
               "name": "Atomic checkpoints",
               "status": "planned",
-              "note": "TDD: port `tools/{file_operations,file_tools,checkpoint_manager,patch_parser}.py` as checkpoint-first read/write/patch primitives with rollback and path-policy fixtures before agent-visible writes."
+              "slice_size": "umbrella",
+              "execution_owner": "tools",
+              "not_ready_when": [
+                "The row is assigned as one checkpoint/file/patch migration instead of the checkpoint policy, read-dedup guard, and patch/write slices below."
+              ],
+              "unblocks": [
+                "Checkpoint shadow-repo GC policy",
+                "File read dedup cache invalidation and wrapper guard"
+              ],
+              "note": "Umbrella only: port `tools/{file_operations,file_tools,checkpoint_manager,patch_parser}.py` through dependency-ordered rows. Start with checkpoint policy and read-dedup guards before exposing write-capable file tools to the native agent loop."
+            },
+            {
+              "name": "Checkpoint shadow-repo GC policy",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Native checkpoint manager prunes orphan and stale shadow repositories at startup using a deterministic policy before any write-capable file tools depend on rollback state",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Checkpoint status reports shadow_gc_unavailable, orphan_shadow_repo, or stale_shadow_repo evidence instead of silently leaving rollback directories to accumulate.",
+              "fixture": "internal/tools/checkpoint_manager_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/checkpoint_manager.py@478444c2",
+                "../hermes-agent/tests/tools/test_checkpoint_manager.py@478444c2",
+                "../hermes-agent/cli.py@478444c2:startup checkpoint cleanup",
+                "../hermes-agent/gateway/run.py@478444c2:startup checkpoint cleanup",
+                "docs/content/building-gormes/architecture_plan/phase-5-final-purge.md"
+              ],
+              "ready_when": [
+                "The row can be implemented as pure filesystem fixtures under t.TempDir with fake timestamps and no model/tool execution.",
+                "internal/tools exists and can own the checkpoint manager contract without exposing write_file or patch tools yet.",
+                "Rollback state paths are Gormes-owned XDG paths, not upstream ~/.hermes paths."
+              ],
+              "not_ready_when": [
+                "The slice exposes write_file, patch, or checkpoint restore tools before the cleanup/read-model contract is fixture-locked.",
+                "The slice shells out to git or deletes real repositories outside t.TempDir in tests.",
+                "The slice copies Hermes home layout instead of documenting the Gormes XDG rollback directory decision."
+              ],
+              "unblocks": [
+                "File read dedup cache invalidation and wrapper guard"
+              ],
+              "acceptance": [
+                "TestCheckpointManagerPrunesOrphanShadowRepos seeds an active shadow repo and an orphan repo under t.TempDir; startup cleanup removes only the orphan and records evidence.",
+                "TestCheckpointManagerPrunesStaleShadowRepos uses a fake clock to remove stale shadows older than the configured TTL while preserving fresh active shadows.",
+                "TestCheckpointManagerDryRunReportsCandidates returns the same orphan/stale candidates without deleting them.",
+                "Status evidence names counts and paths relative to the checkpoint root, with no absolute home-directory leakage."
+              ],
+              "note": "Hermes 478444c2 added startup pruning for orphan and stale checkpoint shadow repos. Gormes has only an umbrella checkpoint row, so this creates the first landable Go checkpoint-manager slice before broader file write/patch ports.",
+              "write_scope": [
+                "internal/tools/checkpoint_manager.go",
+                "internal/tools/checkpoint_manager_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestCheckpointManager' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Checkpoint manager fixtures prove startup orphan/stale shadow cleanup, dry-run reporting, fake-clock TTL behavior, and redacted status evidence under t.TempDir only."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:478444c2 tools/checkpoint_manager.py",
+                "note": "Hermes provides the cleanup policy; Gormes owns the Go internal/tools checkpoint manager and XDG rollback location."
+              }
+            },
+            {
+              "name": "File read dedup cache invalidation and wrapper guard",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Native file-read helpers keep dedup status out of returned file content, invalidate read caches on writes/patches, and detect small wrapper calls as guarded reads",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "File tool status reports read_dedup_cache_disabled or guard_unavailable instead of appending dedup metadata into user-visible file content.",
+              "fixture": "internal/tools/file_read_guard_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/file_tools.py@a32b325d",
+                "../hermes-agent/tools/file_tools.py@977d5f56",
+                "../hermes-agent/tools/file_tools.py@ced8f44c",
+                "../hermes-agent/tests/tools/test_file_read_guards.py@a32b325d",
+                "../hermes-agent/tests/tools/test_file_read_guards.py@977d5f56",
+                "../hermes-agent/tests/tools/test_file_read_guards.py@ced8f44c"
+              ],
+              "ready_when": [
+                "Checkpoint shadow-repo GC policy is fixture-ready or validated, so file-tool state has a stable root and status vocabulary.",
+                "This slice can be built as pure internal/tools helper tests without exposing model-visible read_file/write_file handlers yet.",
+                "Tests use t.TempDir fixtures and fake patch/write callbacks; no shell, git, or external editor is required."
+              ],
+              "not_ready_when": [
+                "The slice ports the whole file_tools.py handler surface, patch parser, checkpoint restore, or binary detection in the same change.",
+                "The slice writes dedup/status strings into returned file content instead of a separate result/evidence field.",
+                "The slice invalidates caches globally across unrelated workspaces instead of path/workspace-scoped entries."
+              ],
+              "blocked_by": [
+                "Checkpoint shadow-repo GC policy"
+              ],
+              "acceptance": [
+                "TestFileReadGuard_DedupStatusOutOfContent reads the same file twice and asserts returned Content is byte-identical to disk while DedupStatus or equivalent evidence is separate.",
+                "TestFileReadGuard_WriteInvalidatesCache writes through the fake write path and proves the next read returns new content rather than a cached prior value.",
+                "TestFileReadGuard_PatchInvalidatesCache applies a fake patch callback and proves the read cache for that path is invalidated.",
+                "TestFileReadGuard_SmallWrapperDetected covers helper wrappers around read_file so dedup guard status still applies when the read is one call frame removed."
+              ],
+              "note": "Hermes a32b325d/977d5f56/ced8f44c tightened file-read dedup and wrapper guards. Gormes should port the guard as a small read-model slice before exposing write-capable file tools.",
+              "write_scope": [
+                "internal/tools/file_read_guard.go",
+                "internal/tools/file_read_guard_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestFileReadGuard_' -count=1",
+                "go test ./internal/tools -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "File read guard fixtures prove dedup evidence is separate from content, writes and patches invalidate path-scoped caches, and small wrapper reads remain guarded."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:a32b325d+977d5f56+ced8f44c tools/file_tools.py",
+                "note": "Direct file-tool safety drift from Hermes, deliberately split before broader Go file-tool handler ports."
+              }
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T02:20:01Z",
+            "origin_decision": "Hermes 478444c2 adds checkpoint shadow-repo GC and a32b325d/977d5f56/ced8f44c tighten read dedup/cache guards. Gormes still has only the Phase 5.L inventory row, so this subphase remains upstream-led and is split into checkpoint cleanup first, then read-dedup guard behavior, before write_file/patch/restore tools become executable."
+          }
         },
         "5.M": {
           "name": "Mixture of Agents",
@@ -9581,7 +9906,68 @@
             {
               "name": "Session search",
               "status": "planned",
-              "note": "TDD: port `tools/session_search_tool.py` on top of the Phase 3 session catalog, preserving same-chat defaults and opt-in user/source filters."
+              "contract": "Native session_search tool uses the Phase 3 session catalog with same-chat defaults, opt-in user/source filters, and deterministic recent-mode exclusion of the current lineage root",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "child-agent",
+                "system"
+              ],
+              "degraded_mode": "Tool result reports session_search_unavailable, source_filter_denied, or lineage_root_excluded evidence instead of widening recall silently.",
+              "fixture": "internal/tools/session_search_tool_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/session_search_tool.py@dbe50155",
+                "../hermes-agent/tests/tools/test_session_search.py@dbe50155",
+                "internal/memory/session_catalog.go",
+                "internal/memory/session_lineage_search_test.go",
+                "internal/goncho/service.go"
+              ],
+              "ready_when": [
+                "Source-filtered session/message search core and Lineage-aware source-filtered search hits are validated on main.",
+                "The tool can use seeded SQLite/session.Metadata fixtures and does not need a live gateway, provider, or Goncho cloud service.",
+                "Existing Goncho/Honcho-compatible scope rules remain the authority for user/source widening."
+              ],
+              "not_ready_when": [
+                "The slice changes ranking, default same-chat recall fences, or Goncho/Honcho memory persistence instead of wrapping existing search results.",
+                "The slice shells out to Hermes Python or reads ~/.hermes session logs.",
+                "The slice includes todo/debug/clarify tools or cronjob tools in the same change."
+              ],
+              "blocked_by": [
+                "Lineage-aware source-filtered search hits",
+                "Operator-auditable search evidence"
+              ],
+              "acceptance": [
+                "TestSessionSearchTool_SameChatDefault seeds two chats and proves no cross-chat hit appears without explicit scope=user or sources.",
+                "TestSessionSearchTool_UserScopeSourceFilter passes scope=user sources=[telegram] and proves only the allowed source's sessions are returned with source evidence.",
+                "TestSessionSearchTool_RecentModeExcludesCurrentLineageRoot seeds root and compressed child sessions, runs recent mode from the child, and proves the current root is excluded deterministically per Hermes dbe50155.",
+                "TestSessionSearchTool_DegradedEvidence covers missing session directory and denied source widening without panics or hidden fallback widening."
+              ],
+              "note": "Refined after Hermes dbe50155: the row is no longer a generic `port session_search_tool.py` bucket. It must wrap the existing Phase 3 catalog/Goncho scope contracts and fixture-lock the recent-mode current-lineage-root exclusion before any operator-visible tool is exposed.",
+              "write_scope": [
+                "internal/tools/session_search_tool.go",
+                "internal/tools/session_search_tool_test.go",
+                "internal/memory/session_catalog.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestSessionSearchTool_' -count=1",
+                "go test ./internal/tools ./internal/memory ./internal/goncho -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Session search tool fixtures prove same-chat defaults, opt-in user/source widening, deterministic current-lineage-root exclusion in recent mode, and degraded evidence for unavailable/denied widening."
+              ],
+              "planner_verdict": {
+                "reshape_count": 1,
+                "last_reshape": "2026-04-27T02:20:01Z"
+              },
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:dbe50155 tools/session_search_tool.py",
+                "note": "Hermes provides the recent-mode exclusion regression; Gormes maps it onto the Go session catalog and Goncho/Honcho-compatible scope rules."
+              }
             },
             {
               "name": "Debug helpers",
@@ -10091,7 +10477,7 @@
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-26T23:52:41Z",
-                "last_outcome": "no_attempts_yet"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -10102,8 +10488,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T23:57:40Z",
-            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, and CRON.md mirror; the old umbrella row is now split into one unblocked parser/repeat slice followed by blocked safety, action-envelope, context_from, and delivery-plan rows so autoloop workers can advance Phase 5.N without guessing."
+            "last_upstream_check": "2026-04-27T02:20:01Z",
+            "origin_decision": "Hermes 755a2804 still leads cronjob tool, schedule grammar, prompt/script safety, context_from, and delivery/media behavior. Hermes dbe50155 adds a deterministic session-search recent-mode exclusion for the current lineage root; Gormes maps that onto the Phase 3 session catalog and Goncho/Honcho-compatible scope rules in the refined Session search row. Gormes already owns a Go-native cron Store, Scheduler, Executor, RunStore, durable-ledger audit, and CRON.md mirror; the cron umbrella is split into parser/repeat, safety, action-envelope, context_from, and delivery-plan rows so autoloop workers can advance Phase 5.N without guessing."
           }
         },
         "5.O": {
@@ -12594,6 +12980,68 @@
               }
             },
             {
+              "name": "Native TUI /save XDG file writer binding",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "cmd/gormes binds the native TUI /save SessionExportFunc to the canonical persisted transcript reader and writes markdown exports under the Gormes XDG data directory, never under upstream HERMES_HOME or the process working directory",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "TUI status reports `save: store unavailable` or `save: write failed: <err>` with partial-file cleanup instead of exposing an unwired /save handler or writing to an ambiguous location.",
+              "fixture": "cmd/gormes/tui_save_export_test.go",
+              "source_refs": [
+                "../hermes-agent/tests/cli/test_save_conversation_location.py@5eb6cd82",
+                "../hermes-agent/cli.py@5eb6cd82:save conversation location",
+                "../hermes-agent/tui_gateway/server.py@5eb6cd82:session.save",
+                "internal/tui/slash_save.go:SessionExportFunc",
+                "cmd/gormes/session.go:sessionExportCmd",
+                "internal/config/config.go:MemoryDBPath"
+              ],
+              "ready_when": [
+                "Native TUI /save canonical session export is validated on main and exposes SessionExportFunc on Model options.",
+                "cmd/gormes/session.go already proves transcript.ExportMarkdown works against config.MemoryDBPath for the CLI export command.",
+                "Gormes intentionally uses XDG_DATA_HOME/gormes instead of HERMES_HOME; the fixture should assert that divergence."
+              ],
+              "not_ready_when": [
+                "The slice reopens internal/tui slash handler behavior or changes transcript.ExportMarkdown output format.",
+                "The slice writes exports under HERMES_HOME, the repository root, or the current working directory.",
+                "The slice starts a provider, API server, remote TUI gateway, or live session browser."
+              ],
+              "blocked_by": [
+                "Native TUI /save canonical session export"
+              ],
+              "acceptance": [
+                "cmd/gormes constructs a SessionExportFunc for the local TUI Model that opens config.MemoryDBPath, calls transcript.ExportMarkdown, and writes `<session-id>.md` or a collision-safe variant under `$XDG_DATA_HOME/gormes/sessions/exports/`.",
+                "TestTUISaveExport_WritesUnderXDGDataHome sets XDG_DATA_HOME and HERMES_HOME to different temp roots, invokes the bound SessionExportFunc, and proves the file lands under the Gormes XDG export directory only.",
+                "TestTUISaveExport_RemovesPartialOnFailure injects a write failure after creating a partial file and proves /save removes it through the existing slash handler cleanup path.",
+                "The status message returned by /save contains the XDG export path and no test opens a network connection or starts the remote TUI gateway."
+              ],
+              "note": "Hermes 5eb6cd82 fixed /save landing under HERMES_HOME. Gormes already has the TUI slash handler but the real cmd-level binding is still only documented in comments; this row makes the Gormes XDG export location explicit and keeps the HERMES_HOME divergence tested.",
+              "write_scope": [
+                "cmd/gormes/main.go",
+                "cmd/gormes/tui_save_export_test.go",
+                "internal/tui/slash_save.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./cmd/gormes -run '^TestTUISaveExport_' -count=1",
+                "go test ./cmd/gormes ./internal/tui ./internal/transcript -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "cmd/gormes TUI save-export fixtures prove the real SessionExportFunc writes under XDG_DATA_HOME/gormes/sessions/exports, ignores HERMES_HOME for runtime state, cleans partial files, and returns the exported path to /save."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:5eb6cd82 cli.py,tui_gateway/server.py",
+                "note": "Hermes contributes the save-location regression; Gormes adapts it to the existing XDG runtime-state policy rather than using upstream HERMES_HOME."
+              }
+            },
+            {
               "name": "Native TUI /branch session fork + transcript target switch",
               "priority": "P3",
               "status": "complete",
@@ -13201,8 +13649,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T18:00:00Z",
-            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, edc78e25/31d7f195 add Ink selection-copy fixes that Gormes documents as a terminal-native divergence, 2536a36f routes TUI /save through canonical session.save JSON-RPC, 0824ba6a tightens /branch so post-branch writes target the branch session and branch children remain visible without becoming compression continuations, and 9662e321 wires prompt.submit auto-title generation after clean non-empty TUI completions. Gormes tracks those as native /save, /branch, and auto-title eligibility rows over internal/transcript, session.LineageKindFork, and native TUI helper seams instead of importing Hermes Python session_log_file or maybe_auto_title wiring."
+            "last_upstream_check": "2026-04-27T02:20:01Z",
+            "origin_decision": "Hermes still leads API server, remote TUI, TUI launch-model, selection/copy, slash-command, and dashboard contract discovery, but Gormes owns the native Go Bubble Tea/API implementation. Hermes ee0728c6 stays an explicit no-Node divergence row, 283c8fd6 adds TUI model override/static alias behavior, edc78e25/31d7f195 add Ink selection-copy fixes that Gormes documents as a terminal-native divergence, 2536a36f routes TUI /save through canonical session.save JSON-RPC, and 5eb6cd82 fixes save-location semantics plus session-picker allowed sources. Gormes tracks /save as a native handler plus a separate XDG file-writer binding row, preserving Gormes XDG runtime state instead of upstream HERMES_HOME. Hermes 0824ba6a tightens /branch and 9662e321 wires prompt.submit auto-title generation; Gormes tracks those over internal/transcript, session.LineageKindFork, and native TUI helper seams."
           }
         },
         "5.R": {
@@ -13895,11 +14343,217 @@
               "note": "TDD landed: DingTalk media routing now keeps image/file download-code handling SDK-neutral, resolves robot message file-download requests into gateway attachments with fixture-backed tests, preserves media-only turns, and falls back to the original DingTalk download code with an error note when URL resolution fails. Real SDK binding remains tracked separately."
             },
             {
+              "name": "Yuanbao protocol envelope + markdown fixtures",
+              "priority": "P4",
+              "status": "planned",
+              "contract": "Gormes parses Yuanbao websocket/protobuf-style envelopes and Markdown message fragments into gateway-neutral events using fixture data only",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Yuanbao adapter status reports protocol_unavailable or markdown_parse_failed evidence instead of starting a live session with unparsed payloads.",
+              "fixture": "internal/channels/yuanbao/proto_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/yuanbao_proto.py@ab687963",
+                "../hermes-agent/gateway/platforms/yuanbao.py@ab687963",
+                "../hermes-agent/tests/test_yuanbao_proto.py@ab687963",
+                "../hermes-agent/tests/test_yuanbao_markdown.py@ab687963",
+                "../hermes-agent/website/docs/user-guide/messaging/yuanbao.md@ab687963"
+              ],
+              "ready_when": [
+                "The Phase 2 shared gateway event shape and Regional + Device Adapter Backlog are available; this row does not need a live Yuanbao account.",
+                "Workers can start with captured JSON/proto/markdown testdata under internal/channels/yuanbao/testdata copied or minimized from upstream fixtures.",
+                "No send loop, login flow, tool registration, media download, or sticker parsing is required for this first slice."
+              ],
+              "not_ready_when": [
+                "The slice opens a websocket, performs login, calls Tencent/Yuanbao endpoints, downloads media, or registers user-visible tools.",
+                "The slice stores credentials or changes shared gateway session policy.",
+                "The slice combines protocol parsing with send/reply runtime behavior."
+              ],
+              "unblocks": [
+                "Yuanbao media/sticker attachment normalization",
+                "Yuanbao gateway runtime + toolset registration"
+              ],
+              "acceptance": [
+                "TestYuanbaoProto_DecodesInboundTextFixture loads a captured fixture and returns source, conversation id, message id, author role, and text content.",
+                "TestYuanbaoMarkdown_RendersCodeAndLinks proves code blocks, links, mentions, and list fragments are normalized into plain prompt-safe text without losing URLs.",
+                "Malformed/unknown envelope fixtures return typed degraded evidence and do not panic.",
+                "No test imports a generated protobuf runtime unless a local generated fixture file is checked in under internal/channels/yuanbao."
+              ],
+              "note": "Hermes ab687963 added a full Yuanbao platform with proto, markdown, pipeline, media, sticker, tools, skill, and docs. Gormes should start with the protocol/markdown fixture contract so later runtime slices do not rediscover payload shapes.",
+              "write_scope": [
+                "internal/channels/yuanbao/proto.go",
+                "internal/channels/yuanbao/proto_test.go",
+                "internal/channels/yuanbao/markdown.go",
+                "internal/channels/yuanbao/markdown_test.go",
+                "internal/channels/yuanbao/testdata/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/channels/yuanbao -run 'TestYuanbao(Proto|Markdown)' -count=1",
+                "go test ./internal/channels/yuanbao -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Yuanbao protocol/markdown fixtures prove inbound text event normalization and degraded parse evidence with no live Yuanbao network call."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ab687963 gateway/platforms/yuanbao_proto.py",
+                "note": "Direct Yuanbao platform drift from Hermes, split to fixture-only protocol/markdown parsing before runtime binding."
+              }
+            },
+            {
+              "name": "Yuanbao media/sticker attachment normalization",
+              "priority": "P4",
+              "status": "planned",
+              "contract": "Yuanbao image, file, voice, and sticker payloads normalize into gateway attachments with bounded metadata and explicit unavailable evidence before live downloads are enabled",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Unsupported or oversized Yuanbao media produces yuanbao_media_unavailable evidence while preserving the text portion of the inbound event.",
+              "fixture": "internal/channels/yuanbao/media_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/yuanbao_media.py@ab687963",
+                "../hermes-agent/gateway/platforms/yuanbao_sticker.py@ab687963",
+                "../hermes-agent/tests/test_yuanbao_pipeline.py@ab687963",
+                "../hermes-agent/tests/test_yuanbao_integration.py@ab687963",
+                "internal/gateway/event.go"
+              ],
+              "ready_when": [
+                "Yuanbao protocol envelope + markdown fixtures is fixture-ready or validated.",
+                "The row can use static media/sticker metadata fixtures and t.TempDir files; no live download, CDN auth, or sticker decoding service is required.",
+                "Gateway attachments already have a degraded evidence path for unavailable media."
+              ],
+              "not_ready_when": [
+                "The slice opens HTTP to fetch Yuanbao media, writes a cache daemon, transcodes voice/video, or binds a live SDK.",
+                "The slice changes generic gateway attachment policy for Slack/Telegram/Discord.",
+                "The slice registers Yuanbao tools or starts the Yuanbao platform runtime."
+              ],
+              "blocked_by": [
+                "Yuanbao protocol envelope + markdown fixtures"
+              ],
+              "unblocks": [
+                "Yuanbao gateway runtime + toolset registration"
+              ],
+              "acceptance": [
+                "TestYuanbaoMedia_NormalizesImageFileVoiceFixtures returns gateway attachments with stable type, filename, size, source id, and degraded evidence for missing bytes.",
+                "TestYuanbaoSticker_NormalizesStaticAndAnimatedStickers preserves sticker identifiers and marks unsupported animated sticker rendering as degraded instead of dropping the event.",
+                "Oversized or malformed media metadata is rejected with yuanbao_media_unavailable evidence and keeps the text body.",
+                "No test performs network fetches or depends on real Yuanbao credentials."
+              ],
+              "note": "Split after the Yuanbao protocol row: media/sticker payload shape is fixture-lockable without the platform login/send loop, and it prevents later workers from mixing binary handling with runtime registration.",
+              "write_scope": [
+                "internal/channels/yuanbao/media.go",
+                "internal/channels/yuanbao/media_test.go",
+                "internal/channels/yuanbao/sticker.go",
+                "internal/channels/yuanbao/sticker_test.go",
+                "internal/channels/yuanbao/testdata/",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/channels/yuanbao -run 'TestYuanbao(Media|Sticker)' -count=1",
+                "go test ./internal/channels/yuanbao -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Yuanbao media/sticker fixtures prove attachment normalization, unsupported-media degradation, text preservation, and no live network fetches."
+              ],
+              "provenance": {
+                "origin_type": "upstream",
+                "upstream_ref": "hermes:ab687963 gateway/platforms/yuanbao_media.py",
+                "note": "Direct Yuanbao media/sticker drift from Hermes; Gormes keeps binary handling behind gateway attachment fixtures."
+              }
+            },
+            {
+              "name": "Yuanbao gateway runtime + toolset registration",
+              "priority": "P4",
+              "status": "planned",
+              "contract": "Yuanbao runtime registration exposes a disabled-by-default gateway platform and toolset surface over the existing shared gateway manager without widening default enabled tools",
+              "contract_status": "fixture_ready",
+              "slice_size": "medium",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Config/status reports yuanbao_disabled, credentials_missing, or yuanbao_runtime_unavailable instead of starting an unauthenticated live session.",
+              "fixture": "cmd/gormes/yuanbao_gateway_test.go",
+              "source_refs": [
+                "../hermes-agent/gateway/platforms/yuanbao.py@ab687963",
+                "../hermes-agent/gateway/config.py@ab687963",
+                "../hermes-agent/hermes_cli/platforms.py@ab687963",
+                "../hermes-agent/tools/yuanbao_tools.py@ab687963",
+                "../hermes-agent/skills/yuanbao/SKILL.md@ab687963",
+                "../hermes-agent/toolsets.py@ab687963",
+                "../hermes-agent/website/docs/user-guide/messaging/yuanbao.md@ab687963"
+              ],
+              "ready_when": [
+                "Yuanbao protocol envelope + markdown fixtures and Yuanbao media/sticker attachment normalization are fixture-ready or validated.",
+                "Shared gateway manager registration and platform toolset config persistence are validated on main.",
+                "The first runtime slice may use fake login/send clients only; live QR/session handling remains disabled until operator config and docs are present."
+              ],
+              "not_ready_when": [
+                "The slice enables Yuanbao by default, requires live credentials in unit tests, or bundles live QR login with protocol parsing.",
+                "The slice changes Telegram/Slack/Discord default toolsets or the Goncho/Honcho memory package naming.",
+                "The slice implements the whole Yuanbao tool catalog before platform status/config and fake-client send/receive are stable."
+              ],
+              "blocked_by": [
+                "Yuanbao protocol envelope + markdown fixtures",
+                "Yuanbao media/sticker attachment normalization",
+                "Platform toolset config persistence + MCP sentinel"
+              ],
+              "acceptance": [
+                "Config fixtures parse a disabled-by-default [yuanbao] section with credential/session fields redacted in status.",
+                "cmd/gormes gateway registration lists Yuanbao as unavailable until explicitly enabled with required fake credentials.",
+                "Fake runtime fixtures prove inbound normalized events enter the shared gateway manager and outbound sends call a fake Yuanbao client without live network access.",
+                "Toolset fixtures expose Yuanbao-specific tools only when the platform is enabled and do not add them to default CLI/cron toolsets."
+              ],
+              "note": "Final Yuanbao planning slice for the current upstream drift. It keeps runtime registration behind fake clients and disabled-by-default config after protocol/media fixtures, matching Gormes' thin-adapter policy.",
+              "write_scope": [
+                "internal/channels/yuanbao/",
+                "internal/config/",
+                "internal/cli/toolset_config.go",
+                "internal/cli/toolset_config_test.go",
+                "cmd/gormes/yuanbao_gateway_test.go",
+                "cmd/gormes/gateway.go",
+                "docs/content/building-gormes/architecture_plan/progress.json",
+                "docs/content/building-gormes/gateway-donor-map/"
+              ],
+              "test_commands": [
+                "go test ./internal/channels/yuanbao ./internal/config -count=1",
+                "go test ./cmd/gormes -run 'TestYuanbaoGateway|TestGateway.*Yuanbao' -count=1",
+                "go test ./internal/cli -run 'Test.*Toolset.*Yuanbao' -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Yuanbao fake-runtime fixtures prove disabled-by-default config/status, shared gateway registration, fake-client send/receive, and platform-scoped toolset exposure without live Yuanbao credentials."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:ab687963 gateway/platforms/yuanbao.py",
+                "note": "Hermes defines the Yuanbao platform/tool surface; Gormes adapts it through shared Go gateway, config, and toolset contracts."
+              }
+            },
+            {
               "name": "QQ Bot transport/bootstrap layer",
               "status": "planned",
               "note": "TDD: freeze gateway/event receive loops, passive-reply lifecycle, and platform-specific send failure handling before binding a real QQ transport."
             }
-          ]
+          ],
+          "drift_state": {
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T02:20:01Z",
+            "origin_decision": "Hermes ab687963 adds a full Yuanbao platform with protocol, markdown, media/sticker, gateway runtime, tools, bundled skill, and user docs. Gormes has no Yuanbao implementation, so Phase 7.E remains upstream-led for this adapter and is split into protocol/markdown, media/sticker, then disabled-by-default runtime/toolset registration. Keep the adapter thin and fixture-first; Goncho/Honcho memory naming is unaffected."
+          }
         }
       }
     }
