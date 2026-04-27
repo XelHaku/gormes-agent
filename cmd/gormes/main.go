@@ -465,6 +465,7 @@ func runResolvedTUIWithRuntime(cmd *cobra.Command, invocation tuiInvocation, run
 
 	model := tui.NewModelWithOptions(hookedFrames, submit, cancelTurn, tui.Options{
 		MouseTracking: cfg.TUI.MouseTracking,
+		SessionExport: newTUISaveExportFunc(),
 	})
 	programOptions := []tea.ProgramOption{tea.WithAltScreen()}
 	if cfg.TUI.MouseTracking {
