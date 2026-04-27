@@ -9473,12 +9473,77 @@
                 "upstream_ref": "hermes:edc78e25 tools/managed_tool_gateway.py",
                 "note": "Hermes defines managed gateway behavior; Gormes ports it after native MCP config/discovery/OAuth contracts."
               }
+            },
+            {
+              "name": "MCP stdio orphan cleanup after cron ticks",
+              "priority": "P2",
+              "status": "planned",
+              "contract": "Cron and MCP stdio tooling track orphaned stdio server PIDs after cancellation/timeout and sweep only orphaned children after a cron tick joins, without killing active MCP sessions from parallel work",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "tools",
+              "trust_class": [
+                "operator",
+                "system"
+              ],
+              "degraded_mode": "MCP status reports mcp_orphan_reaped, mcp_orphan_reap_failed, or mcp_active_pid_preserved instead of leaking detached stdio subprocesses or killing active sessions.",
+              "fixture": "internal/tools/mcp_orphan_cleanup_test.go",
+              "source_refs": [
+                "../hermes-agent/tools/mcp_tool.py@930494d6:_orphan_stdio_pids",
+                "../hermes-agent/cron/scheduler.py@930494d6:tick cleanup",
+                "../hermes-agent/tests/tools/test_mcp_stability.py@930494d6",
+                "internal/tools/mcp_stdio.go",
+                "internal/cron/scheduler.go"
+              ],
+              "ready_when": [
+                "MCP stdio transport + tool/list discovery and Cronjob tool action envelope over native store are validated on main.",
+                "The worker can implement this as a pure process-tracker/reaper seam with fake PID liveness and fake kill functions; no real subprocess, cron goroutine, or MCP SDK is required.",
+                "Cleanup after a cron tick must run only after sibling futures/jobs for that tick have joined."
+              ],
+              "not_ready_when": [
+                "The slice kills every active MCP PID during normal cron ticks instead of orphan-only cleanup.",
+                "The slice starts real MCP stdio subprocesses or depends on OS-specific process groups in unit tests.",
+                "The slice changes MCP protocol parsing, OAuth, HTTP transport, managed gateway behavior, or cron schedule parsing."
+              ],
+              "blocked_by": [
+                "MCP stdio transport + tool/list discovery",
+                "Cronjob tool action envelope over native store"
+              ],
+              "acceptance": [
+                "TestMCPOrphanCleanup_MarksAlivePIDOrphanOnSessionExit moves an injected alive PID from active to orphaned when a stdio session exits through cancellation/error.",
+                "TestMCPOrphanCleanup_ReapsOnlyOrphansAfterCronTick kills orphaned PIDs after a fake cron tick join while preserving active PIDs.",
+                "TestMCPOrphanCleanup_ShutdownIncludesActive preserves existing shutdown behavior that can reap both active and orphaned PIDs.",
+                "TestCronSchedulerRunsMCPOrphanCleanupAfterTickJoin proves cleanup is called after all fake tick jobs complete and never while a sibling job is still marked active."
+              ],
+              "note": "Hermes 930494d6 fixed leaked MCP stdio subprocesses after cancelled cron ticks. Gormes has in-process MCP stdio fixtures and native cron execution; this row adds the process-tracker/reaper seam without spawning real processes in tests.",
+              "write_scope": [
+                "internal/tools/mcp_orphan_cleanup.go",
+                "internal/tools/mcp_orphan_cleanup_test.go",
+                "internal/tools/mcp_stdio.go",
+                "internal/cron/scheduler.go",
+                "internal/cron/scheduler_mcp_cleanup_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/tools -run '^TestMCPOrphanCleanup_' -count=1",
+                "go test ./internal/cron -run '^TestCronSchedulerRunsMCPOrphanCleanupAfterTickJoin$' -count=1",
+                "go test ./internal/tools ./internal/cron -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "MCP/cron fixtures prove cancelled stdio PIDs become orphaned, cron tick cleanup reaps only orphans after join, shutdown can include active PIDs, and no real subprocess is spawned."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:930494d6 tools/mcp_tool.py",
+                "note": "Hermes provides the orphan-cleanup failure mode; Gormes adapts it to native MCP stdio and cron seams with injected process operations."
+              }
             }
           ],
           "drift_state": {
-            "status": "converged",
-            "last_upstream_check": "2026-04-26T22:45:56Z",
-            "origin_decision": "Hermes 755a2804 and Honcho e659b6b/51497f1 were checked on 2026-04-26. Gormes now has validated Go-native MCP config/env parsing, stdio and HTTP tool/list discovery, schema normalization/structured content, OAuth state/refresh recovery, and managed gateway bridge slices. Honcho MCP HONCHO_API_URL remains server-local MCP config and does not change internal Goncho memory naming. Future upstream MCP drift should become new small rows rather than keeping this subphase porting."
+            "status": "porting",
+            "last_upstream_check": "2026-04-27T03:17:39Z",
+            "origin_decision": "Hermes 930494d6 added MCP stdio orphan cleanup after cron ticks, so this subphase is no longer fully converged. Gormes already has validated Go-native MCP config/env parsing, stdio and HTTP tool/list discovery, schema normalization/structured content, OAuth state/refresh recovery, and managed gateway bridge slices; the remaining drift is a small process-tracker/reaper seam shared with native cron. Honcho MCP HONCHO_API_URL remains server-local MCP config and does not change internal Goncho memory naming."
           }
         },
         "5.H": {
