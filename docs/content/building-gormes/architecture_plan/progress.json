@@ -1693,9 +1693,9 @@
             {
               "name": "Telegram require-mention config fields",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/config parses Telegram require_mention and bot_username fields with disabled defaults so group mention gating remains opt-in and can be tested without constructing a Telegram bot runtime",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -1729,7 +1729,7 @@
                 "TestLoad_TelegramRequireMentionInvalidType proves malformed require_mention returns config evidence/error without enabling the gate.",
                 "Existing Telegram config tests remain green and no internal/channels/telegram files change."
               ],
-              "note": "Split from the quarantined Telegram binding row after repeated worker_error/stdin failures. First land only the config vocabulary; the runtime adapter binding is a dependent row with a separate write scope.",
+              "note": "TDD landed: internal/config now parses Telegram require_mention and bot_username from TOML, preserves disabled defaults when absent, and returns config decode evidence for malformed require_mention without touching Telegram runtime binding.",
               "write_scope": [
                 "internal/config/config.go",
                 "internal/config/config_test.go",
@@ -1743,6 +1743,11 @@
               "done_signal": [
                 "Config fixtures prove Telegram require_mention and bot_username parse with disabled defaults and no Telegram runtime edits."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T12:19:31Z",
+                "last_success": "2026-04-27T12:19:31Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:3ff3dfb5 gateway/platforms/telegram.py",

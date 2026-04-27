@@ -46,6 +46,8 @@ type Config struct {
 type TelegramCfg struct {
 	BotToken               string  `toml:"bot_token"`
 	AllowedChatID          int64   `toml:"allowed_chat_id"`
+	RequireMention         bool    `toml:"require_mention"`
+	BotUsername            string  `toml:"bot_username"`
 	CoalesceMs             int     `toml:"coalesce_ms"`
 	FreshFinalAfterSeconds float64 `toml:"fresh_final_after_seconds"`
 	FirstRunDiscovery      bool    `toml:"first_run_discovery"`

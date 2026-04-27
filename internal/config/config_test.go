@@ -179,6 +179,74 @@ func TestLoad_TelegramDefaults(t *testing.T) {
 	}
 }
 
+func TestLoad_TelegramRequireMentionFields(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	dir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(`
+[telegram]
+require_mention = true
+bot_username = "gormes_bot"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Telegram.RequireMention {
+		t.Error("RequireMention = false, want true")
+	}
+	if cfg.Telegram.BotUsername != "gormes_bot" {
+		t.Errorf("BotUsername = %q, want %q", cfg.Telegram.BotUsername, "gormes_bot")
+	}
+}
+
+func TestLoad_TelegramRequireMentionDefaults(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	cfg, err := Load(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Telegram.RequireMention {
+		t.Error("RequireMention default = true, want false")
+	}
+	if cfg.Telegram.BotUsername != "" {
+		t.Errorf("BotUsername default = %q, want empty", cfg.Telegram.BotUsername)
+	}
+}
+
+func TestLoad_TelegramRequireMentionInvalidType(t *testing.T) {
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	dir := filepath.Join(cfgHome, "gormes")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(`
+[telegram]
+require_mention = "yes"
+bot_username = "gormes_bot"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(nil)
+	if err == nil {
+		t.Fatal("Load err = nil, want require_mention type error")
+	}
+	if !strings.Contains(err.Error(), "RequireMention") && !strings.Contains(err.Error(), "require_mention") {
+		t.Fatalf("Load err = %v, want require_mention evidence", err)
+	}
+	if cfg.Telegram.RequireMention {
+		t.Error("RequireMention = true after malformed config, want disabled")
+	}
+}
+
 func TestLoad_TelegramFreshFinalAfterSeconds(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
 		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
