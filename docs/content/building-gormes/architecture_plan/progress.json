@@ -2110,9 +2110,9 @@
                 "Gateway helper fixtures prove deterministic scoped dedup keys and missing-ID degraded evidence without manager wiring or deduplicator-helper edits."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-27T13:08:41Z",
-                "last_success": "2026-04-27T13:08:41Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T13:21:45Z",
+                "last_success": "2026-04-27T13:21:45Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -3050,6 +3050,11 @@
               "done_signal": [
                 "Doctor/status fixtures prove RSS watchdog disabled, unavailable, threshold, drain, and stable-restart evidence is visible without supervising or killing the main Gormes process."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T13:21:45Z",
+                "last_success": "2026-04-27T13:21:45Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:c78c3d0 src/commands/jobs.ts",
@@ -7583,6 +7588,11 @@
               "done_signal": [
                 "Self-help guidance fixtures prove Gormes docs/product wording, absence of Hermes Agent wording, deterministic gating, and no provider/model/runtime side effects."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T13:21:45Z",
+                "last_success": "2026-04-27T13:21:45Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "hermes:920ebd83 agent/prompt_builder.py",
@@ -8131,6 +8141,11 @@
               "done_signal": [
                 "Title failure fixtures prove provider errors reach the auxiliary warning sink, callback errors are swallowed with evidence, and no title persistence or live provider call occurs."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T13:21:45Z",
+                "last_success": "2026-04-27T13:21:45Z"
+              },
               "provenance": {
                 "origin_type": "upstream",
                 "upstream_ref": "hermes:4a2ee6c1 cli.py,gateway/run.py",
@@ -11721,9 +11736,9 @@
                 "File-read blocked-stub fixtures prove repeated dedup/status stubs become blocked evidence, legitimate file content is preserved, a single status is not blocked, and FileReadGuard tests remain green."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-27T13:10:02Z",
-                "last_success": "2026-04-27T13:10:02Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T13:21:45Z",
+                "last_success": "2026-04-27T13:21:45Z"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -11887,9 +11902,9 @@
                 "Session search execution fixtures prove same-chat defaults, opt-in user/source widening, current-lineage-root exclusion, and degraded evidence while memory ranking/persistence stay unchanged."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-27T13:13:59Z",
-                "last_success": "2026-04-27T13:13:59Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T13:21:45Z",
+                "last_success": "2026-04-27T13:21:45Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
@@ -12902,9 +12917,9 @@
                 "CLI onboarding-state fixtures prove malformed config tolerance, true-flag detection, in-memory mark behavior, and preservation of unrelated seen flags."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-27T13:08:28Z",
-                "last_success": "2026-04-27T13:08:28Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T13:21:45Z",
+                "last_success": "2026-04-27T13:21:45Z"
               },
               "provenance": {
                 "origin_type": "upstream",
@@ -15506,9 +15521,9 @@
                 "cmd/gormes binding fixtures prove local native TUI receives the XDG SessionExportFunc and remote TUI startup remains unchanged."
               ],
               "health": {
-                "attempt_count": 1,
-                "last_attempt": "2026-04-27T13:09:59Z",
-                "last_success": "2026-04-27T13:09:59Z"
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T13:21:45Z",
+                "last_success": "2026-04-27T13:21:45Z"
               },
               "provenance": {
                 "origin_type": "hybrid",
