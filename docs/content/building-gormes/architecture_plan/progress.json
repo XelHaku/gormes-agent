@@ -12598,9 +12598,9 @@
             {
               "name": "CLI OpenClaw residue detection and hint text",
               "priority": "P3",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cli exposes pure DetectOpenClawResidue(home string) bool and OpenClawResidueHint(commandName string) string helpers that detect only an existing ~/.openclaw directory and return Gormes-specific cleanup guidance without reading or writing config files",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -12634,7 +12634,7 @@
                 "TestOpenClawResidueHint_MentionsInjectedCleanupCommand proves the hint contains ~/.openclaw, the injected Gormes cleanup command, and no `hermes claw cleanup` substring.",
                 "No test touches the real user home, config.yaml, or cmd/gormes startup."
               ],
-              "note": "Split from the quarantined onboarding row. This first row is filesystem+text only; seen-state map helpers are separate so workers do not mix config-shape logic with HOME probing.",
+              "note": "Complete: TDD added pure internal/cli OpenClaw residue helpers. Fixtures prove DetectOpenClawResidue returns true only for a temp HOME containing a .openclaw directory, returns false for missing, regular-file, and unreadable HOME cases, and OpenClawResidueHint includes ~/.openclaw plus the injected Gormes cleanup command without Hermes cleanup wording. No cmd/gormes startup, config I/O, migration, rename, or real HOME probing landed.",
               "write_scope": [
                 "internal/cli/openclaw_residue.go",
                 "internal/cli/openclaw_residue_test.go",
