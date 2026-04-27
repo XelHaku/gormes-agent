@@ -662,12 +662,10 @@
                 ]
               },
               "planner_verdict": {
-                "needs_human": true,
-                "reason": "auto: 9 reshapes without unsticking; last category row_evaluation_failed",
-                "since": "2026-04-26T23:34:04Z",
+                "reason": "Row landed on main: internal/builderloop/ship_ratio.go and ship_ratio_test.go both exist with the ClassifySubphase/ComputeShipRatio helpers, status=complete, contract_status=validated. Prior needs_human verdicts were caused by codexu backend stalls (Reading additional input from stdin), not contract issues. Cleared 2026-04-27T14:50:00Z by Gormes Architecture Planner Loop after on-disk evidence verified.",
                 "reshape_count": 9,
                 "last_reshape": "2026-04-26T19:00:00Z",
-                "last_outcome": "still_failing"
+                "last_outcome": "unstuck"
               },
               "provenance": {
                 "origin_type": "gormes",
