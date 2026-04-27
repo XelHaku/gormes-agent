@@ -19,6 +19,7 @@ var startGreeting = gatewayHelpText()
 const shutdownNotice = "Gateway is shutting down — send /stop to cancel the active turn or try again shortly."
 const followUpQueueFullNotice = "Busy — follow-up queue is full; try again after the current turn."
 const followUpQueueCap = kernel.PlatformEventMailboxCap
+const defaultInboundDedupMaxSize = 4096
 
 type DrainTimeoutReason string
 
@@ -96,6 +97,8 @@ type Manager struct {
 
 	reasoningMu    sync.Mutex
 	reasoningState map[string]SessionReasoningState
+
+	inboundDedup *MessageDeduplicator
 
 	renderChan <-chan kernel.RenderFrame
 }
@@ -249,6 +252,7 @@ func newManagerInternal(cfg ManagerConfig, k kernelSubmitter, log *slog.Logger) 
 		log:            log,
 		channels:       map[string]Channel{},
 		reasoningState: map[string]SessionReasoningState{},
+		inboundDedup:   NewMessageDeduplicator(defaultInboundDedupMaxSize),
 	}
 }
 
@@ -579,6 +583,9 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) error {
 		if m.kernel == nil {
 			return nil
 		}
+		if m.dropDuplicateInboundSubmit(ev) {
+			return nil
+		}
 		queued, full := m.queueFollowUpIfActive(ev)
 		if queued {
 			return nil
@@ -595,6 +602,31 @@ func (m *Manager) handleInbound(ctx context.Context, ev InboundEvent) error {
 		return nil
 	}
 	return nil
+}
+
+func (m *Manager) dropDuplicateInboundSubmit(ev InboundEvent) bool {
+	key := InboundDedupKey(ev)
+	if key.Evidence != "" {
+		m.recordInboundDedupEvidence(ev, key.Evidence)
+		return false
+	}
+
+	result := m.inboundDedup.Track(key.Key)
+	if result.Evidence != "" {
+		m.recordInboundDedupEvidence(ev, result.Evidence)
+	}
+	return result.Duplicate
+}
+
+func (m *Manager) recordInboundDedupEvidence(ev InboundEvent, evidence MessageDeduplicatorEvidence) {
+	if evidence == "" {
+		return
+	}
+	m.writeRuntimeStatus(context.Background(), RuntimeStatusUpdate{
+		Platform:      ev.Platform,
+		PlatformState: PlatformStateRunning,
+		ErrorMessage:  string(evidence),
+	})
 }
 
 func (m *Manager) dispatchFrame(ctx context.Context, f kernel.RenderFrame, co **coalescer, coCancel *context.CancelFunc) {

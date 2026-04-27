@@ -2165,9 +2165,9 @@
             {
               "name": "Gateway inbound dedup manager binding",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gateway manager owns one in-memory MessageDeduplicator instance, derives tracking keys through the validated InboundDedupKey helper, drops repeated inbound submissions with duplicate_message evidence, and lets missing-ID events continue with dedup_unavailable_missing_message_id evidence",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "gateway",
               "trust_class": [
@@ -2205,7 +2205,7 @@
                 "TestGatewayInboundDedup_MissingMessageIDDegrades proves empty message IDs do not drop messages but expose dedup_unavailable_missing_message_id evidence.",
                 "Existing gateway command parsing, follow-up queue, and fresh-final coalescer tests remain green without editing helper files."
               ],
-              "note": "Refined 2026-04-27T13:21:48Z after the helper row landed and the prior worker attempted out-of-scope helper/event edits. This row owns only Manager/fake-test wiring; event.go, inbound_dedup_key.go, and message_deduplicator.go are read-only.",
+              "note": "Complete: TDD landed the manager-owned in-memory inbound MessageDeduplicator binding at EventSubmit. Manager now derives keys through InboundDedupKey, records duplicate_message or dedup_unavailable_missing_message_id evidence through runtime status updates, drops duplicate submissions before follow-up queuing, and lets empty MessageID submissions continue without touching event/helper/platform adapter files.",
               "write_scope": [
                 "internal/gateway/message_deduplicator_manager_test.go",
                 "internal/gateway/manager.go",
@@ -2220,6 +2220,11 @@
               "done_signal": [
                 "Gateway manager fixtures prove duplicate drop, scoped IDs, missing-ID degraded evidence, and unchanged command/follow-up/fresh-final behavior without editing event or dedup helper files."
               ],
+              "health": {
+                "attempt_count": 1,
+                "last_attempt": "2026-04-27T13:43:11Z",
+                "last_success": "2026-04-27T13:43:11Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-27T13:21:48Z"
