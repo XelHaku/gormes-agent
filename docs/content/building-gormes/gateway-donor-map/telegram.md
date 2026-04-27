@@ -11,6 +11,13 @@ Telegram is not a greenfield port for Gormes. `internal/channels/telegram/` alre
 
 Gormes already shipped Telegram for Phase 2.B.1, with long-poll ingress, shared-manager registration, streamed edit coalescing through `gateway.MessageEditor`, and session persistence through the gateway manager. The current adapter lives in `internal/channels/telegram/`.
 
+Hermes `b16f9d43` adds one new Telegram-specific delivery delta that PicoClaw did
+not cover in this dossier: long-lived streamed previews can finalize as a fresh
+message after `fresh_final_after_seconds` and best-effort delete the stale
+preview. Gormes tracks that behavior in Phase 2.B.5 as a shared gateway
+coalescer policy plus Telegram config/delete wiring; it should not replace the
+existing Telegram adapter base.
+
 Evidence level:
 
 - Donor code for this dossier was verified against the external sibling repo at `<picoclaw donor repo>`.
@@ -101,6 +108,8 @@ Rebuild in Gormes-native form:
 
 - `internal/channels/telegram/bot.go`: `Run`, `toInboundEvent`, `Send`, `SendPlaceholder`, `EditMessage`, `SendToChat`.
 - `internal/channels/telegram/client.go`
+- `../hermes-agent/gateway/stream_consumer.py@b16f9d43`: `_should_send_fresh_final`, `_try_fresh_final`.
+- `../hermes-agent/gateway/platforms/telegram.py@b16f9d43`: `delete_message`.
 - `docs/content/using-gormes/telegram-adapter.md`: stale high-level user doc; useful for operator-facing setup context, not as the authority for current shipped adapter behavior.
 - `picoclaw/pkg/channels/telegram/telegram.go`: `Start`, `Send`, `sendChunk`, `EditMessage`, `SendPlaceholder`, `SendMedia`, `handleMessage`, `parseContent`, `resolveTelegramOutboundTarget`, `isBotMentioned`.
 - `picoclaw/pkg/channels/telegram/command_registration.go`: `RegisterCommands`, `startCommandRegistration`, `commandRegistrationDelay`.

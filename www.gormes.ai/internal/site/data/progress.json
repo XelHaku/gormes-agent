@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T00:18:30Z",
+    "last_updated": "2026-04-27T00:40:52Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -1248,6 +1248,155 @@
               ]
             },
             {
+              "name": "Gateway fresh-final stream coalescer policy",
+              "priority": "P0",
+              "status": "planned",
+              "contract": "Gateway streaming finalization can replace an old editable preview with a fresh final message when the preview age is at or above a configured threshold, while preserving the legacy edit-in-place path when the threshold is zero, the preview is too young, the channel cannot send a fresh final, or the fresh send fails",
+              "contract_status": "fixture_ready",
+              "slice_size": "medium",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Until this lands, Telegram and other editable channels always finalize by editing the original preview, so long-running Telegram replies keep the first-token visible timestamp.",
+              "fixture": "internal/gateway/coalesce_fresh_final_test.go::TestCoalescerFreshFinal",
+              "source_refs": [
+                "../hermes-agent/gateway/stream_consumer.py@b16f9d43:GatewayStreamConsumer._should_send_fresh_final",
+                "../hermes-agent/gateway/stream_consumer.py@b16f9d43:GatewayStreamConsumer._try_fresh_final",
+                "../hermes-agent/tests/gateway/test_stream_consumer_fresh_final.py@b16f9d43:TestFreshFinalForLongLivedPreviews",
+                "internal/gateway/coalesce.go",
+                "internal/gateway/channel.go",
+                "internal/gateway/manager.go"
+              ],
+              "ready_when": [
+                "Gateway stream consumer for agent-event fan-out and Non-editable gateway progress/commentary send fallback are complete on main.",
+                "internal/gateway/coalesce.go currently owns placeholder send, edit cadence, and final flush; fresh-final should be implemented there with an injected clock in tests, not in Telegram-specific code.",
+                "The worker can use fake gateway.Channel values only; no Telegram SDK, network call, or real provider stream is needed for this row."
+              ],
+              "not_ready_when": [
+                "The slice changes provider streaming, kernel.RenderFrame phases, non-editable channel send fallback, or Slack/Discord channel implementations.",
+                "The slice adds a Telegram config field or Telegram delete API call; those are in the dependent Telegram row.",
+                "The slice sends duplicate final messages when fresh send fails instead of falling back to the existing edit finalization path."
+              ],
+              "unblocks": [
+                "Telegram fresh-final delete and config exposure"
+              ],
+              "acceptance": [
+                "internal/gateway/channel.go adds a small optional MessageDeleter interface with DeleteMessage(ctx, chatID, msgID string) error; existing channels need not implement it.",
+                "ManagerConfig carries FreshFinalAfter time.Duration and the coalescer tracks the placeholder creation time via an injected now function so tests do not sleep.",
+                "TestCoalescerFreshFinal_DisabledThresholdEditsInPlace proves FreshFinalAfter=0 keeps the existing EditMessageFinal path.",
+                "TestCoalescerFreshFinal_YoungPreviewEditsInPlace proves a final flush before the threshold edits the preview and does not call Channel.Send.",
+                "TestCoalescerFreshFinal_OldPreviewSendsFreshAndDeletesOld proves a final flush at or beyond the threshold calls Send for the final text, skips EditMessageFinal for the old preview, adopts the new message id, and best-effort calls DeleteMessage on the old id.",
+                "TestCoalescerFreshFinal_DeleteUnsupportedStillSucceeds proves a channel without MessageDeleter still delivers the fresh final.",
+                "TestCoalescerFreshFinal_FreshSendFailureFallsBackToEdit proves a failed fresh Send falls back to EditMessageFinal and returns success when the edit succeeds.",
+                "Existing manager outbound tests for non-editable channels and editable streaming remain green."
+              ],
+              "note": "New upstream Hermes drift from b16f9d43/openclaw#72038. This row ports the shared policy and coalescer state first, leaving Telegram config/defaults and deleteMessage SDK wiring to the blocked follow-up so workers do not collide in internal/channels/telegram.",
+              "write_scope": [
+                "internal/gateway/channel.go",
+                "internal/gateway/coalesce.go",
+                "internal/gateway/coalesce_fresh_final_test.go",
+                "internal/gateway/manager.go",
+                "internal/gateway/manager_test.go",
+                "internal/gateway/fake_test.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/gateway -run 'TestCoalescerFreshFinal' -count=1",
+                "go test ./internal/gateway -run 'TestManager_Outbound|TestGatewayStreamConsumer|TestCoalescer' -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Gateway coalescer fixtures prove old-preview fresh finalization, delete best-effort behavior, young-preview edit-in-place behavior, and fresh-send failure fallback without touching Telegram SDK code."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:b16f9d43 gateway/stream_consumer.py",
+                "note": "Hermes defines the fresh-final stream behavior; Gormes adapts it to the Go shared gateway coalescer before Telegram-specific config and delete wiring."
+              }
+            },
+            {
+              "name": "Telegram fresh-final delete and config exposure",
+              "priority": "P1",
+              "status": "planned",
+              "contract": "Telegram gateway streaming exposes fresh_final_after_seconds with a 60 second default and wires the Telegram adapter to best-effort delete stale preview messages via the Bot API deleteMessage call after the shared gateway coalescer successfully sends a fresh final",
+              "contract_status": "fixture_ready",
+              "slice_size": "small",
+              "execution_owner": "gateway",
+              "trust_class": [
+                "operator",
+                "gateway",
+                "system"
+              ],
+              "degraded_mode": "Until this lands, the shared fresh-final coalescer remains disabled in real Telegram gateway runs and stale previews are left visible after long-running replies.",
+              "fixture": "internal/channels/telegram/bot_test.go::TestBot_DeleteMessage and internal/config/config_test.go::TestLoad_TelegramFreshFinalAfterSeconds",
+              "source_refs": [
+                "../hermes-agent/gateway/config.py@b16f9d43:StreamingConfig.fresh_final_after_seconds",
+                "../hermes-agent/gateway/platforms/base.py@b16f9d43:BasePlatformAdapter.delete_message",
+                "../hermes-agent/gateway/platforms/telegram.py@b16f9d43:TelegramAdapter.delete_message",
+                "../hermes-agent/gateway/run.py@b16f9d43:StreamConsumerConfig(fresh_final_after_seconds=...)",
+                "../hermes-agent/website/docs/user-guide/configuration.md@b16f9d43:Gateway Streaming",
+                "internal/config/config.go:TelegramCfg",
+                "cmd/gormes/gateway.go:gatewayCoalesceMs",
+                "internal/channels/telegram/bot.go",
+                "internal/channels/telegram/client.go",
+                "github.com/go-telegram-bot-api/telegram-bot-api/v5@v5.5.1:NewDeleteMessage"
+              ],
+              "ready_when": [
+                "Gateway fresh-final stream coalescer policy is complete and exposes ManagerConfig.FreshFinalAfter plus the optional MessageDeleter interface.",
+                "Gormes uses TOML config, so the setting should live on config.TelegramCfg as fresh_final_after_seconds rather than copying Hermes YAML structures.",
+                "go-telegram-bot-api/v5 exposes tgbotapi.NewDeleteMessage and BotAPI.Request for deleteMessage; tests should assert the Chattable shape through the mock client, not call Telegram."
+              ],
+              "not_ready_when": [
+                "The slice modifies Slack, Discord, provider streaming, kernel render phases, or non-Telegram channel config defaults.",
+                "The slice uses tgbotapi.BotAPI.Send for deleteMessage; deleteMessage returns a bool API response and should go through a request/delete seam.",
+                "The slice changes the default coalesce_ms behavior or enables fresh-final for Discord/Slack."
+              ],
+              "blocked_by": [
+                "Gateway fresh-final stream coalescer policy"
+              ],
+              "acceptance": [
+                "config.TelegramCfg gains FreshFinalAfterSeconds float64 `toml:\"fresh_final_after_seconds\"`; defaults() sets it to 60.0 and TOML value 0 disables the behavior.",
+                "cmd/gormes/gateway.go passes FreshFinalAfter to gateway.ManagerConfig only when Telegram is configured; Discord/Slack-only gateway runs keep FreshFinalAfter=0.",
+                "telegramClient gains a narrow DeleteMessage(chatID int64, messageID int) error seam or equivalent request seam; realClient implements it with tgbotapi.NewDeleteMessage and BotAPI.Request, and mockClient records delete requests without network.",
+                "(*telegram.Bot).DeleteMessage(ctx, chatID, msgID string) error parses both IDs, calls the client seam, logs/debug-surfaces nonfatal errors through returned error only, and satisfies gateway.MessageDeleter.",
+                "TestLoad_TelegramFreshFinalAfterSeconds proves default=60, explicit 0 stays 0, and a nonzero TOML value round-trips.",
+                "TestGatewayFreshFinalAfter_TelegramOnly proves gateway manager config receives a positive threshold for Telegram config and zero for Discord/Slack-only config.",
+                "TestBot_DeleteMessage proves the Telegram bot builds a deleteMessage request for the parsed chat/message IDs and returns parse errors for invalid IDs.",
+                "No live Telegram token, network, or BotFather state is required."
+              ],
+              "note": "Blocked follow-up for Hermes b16f9d43/openclaw#72038. It keeps public config aligned with Hermes while preserving Gormes' TOML config and shared gateway boundary: the policy lives in internal/gateway, the SDK delete hook lives in internal/channels/telegram.",
+              "write_scope": [
+                "internal/config/config.go",
+                "internal/config/config_test.go",
+                "cmd/gormes/gateway.go",
+                "cmd/gormes/gateway_test.go",
+                "internal/channels/telegram/bot.go",
+                "internal/channels/telegram/bot_test.go",
+                "internal/channels/telegram/client.go",
+                "internal/channels/telegram/mock_test.go",
+                "internal/channels/telegram/real_client.go",
+                "docs/content/building-gormes/architecture_plan/progress.json"
+              ],
+              "test_commands": [
+                "go test ./internal/config -run TestLoad_TelegramFreshFinalAfterSeconds -count=1",
+                "go test ./cmd/gormes -run TestGatewayFreshFinalAfter_TelegramOnly -count=1",
+                "go test ./internal/channels/telegram -run TestBot_DeleteMessage -count=1",
+                "go test ./cmd/gormes ./internal/config ./internal/channels/telegram -count=1",
+                "go run ./cmd/builder-loop progress validate"
+              ],
+              "done_signal": [
+                "Config and Telegram adapter fixtures prove fresh_final_after_seconds defaults and disables correctly, manager enablement is Telegram-only, and deleteMessage requests are built through the mock client without live Telegram calls."
+              ],
+              "provenance": {
+                "origin_type": "hybrid",
+                "upstream_ref": "hermes:b16f9d43 gateway/config.py",
+                "note": "Hermes owns the operator-facing fresh_final_after_seconds default and Telegram-only delete behavior; Gormes preserves that public behavior through Go TOML config and the internal Telegram adapter."
+              }
+            },
+            {
               "name": "Slack rich-text quotes/lists + link-unfurl ingress",
               "priority": "P1",
               "status": "complete",
@@ -1417,8 +1566,8 @@
           ],
           "drift_state": {
             "status": "porting",
-            "last_upstream_check": "2026-04-26T21:50:06Z",
-            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific context details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete."
+            "last_upstream_check": "2026-04-27T00:40:52Z",
+            "origin_decision": "Session context and delivery routing remain upstream-led for channel-specific delivery details. Hermes 6087e040/c0d25df3/f414df3a add Slack rich_text, attachment-unfurl, thread-parent, and team-scoped cache behavior; those are tracked here as follow-up context/delivery rows while the 2.B.3 Slack shared-chassis closeout remains complete. Hermes b16f9d43/openclaw#72038 adds Telegram fresh-final streaming for long-lived previews; Gormes now tracks it as a shared gateway coalescer policy row followed by a Telegram-only config/deleteMessage row so workers do not conflate platform SDK wiring with the generic stream finalization contract."
           }
         },
         "2.B.10": {
@@ -1947,9 +2096,9 @@
             {
               "name": "Durable worker execution loop",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "Gormes durable jobs have a Go-native fake-handler execution seam that claims one waiting job from the SQLite ledger, invokes an injected handler with context.Context, records progress/result/failure evidence, and exits cleanly when no job is claimable",
-              "contract_status": "fixture_ready",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "orchestrator",
               "trust_class": [
@@ -1986,7 +2135,7 @@
                 "TestDurableWorkerRunOne_NoJobReturnsIdle proves an empty ledger returns idle evidence, records no fake heartbeat, and does not mutate existing terminal jobs.",
                 "Doctor/status fixtures expose the last durable-worker heartbeat or heartbeat_unavailable evidence without requiring operators to inspect raw ledger rows."
               ],
-              "note": "GBrain c78c3d0 shows the durable worker lifecycle that later watchdog rows depend on, but Gormes only needs the smallest Go-native execution seam first: one deterministic RunOne helper over the existing SQLite DurableLedger with injected fake handlers. This row makes the blocker explicit so abort-slot and RSS-watchdog rows do not invent daemons or shell execution.",
+              "note": "Complete: TDD landed internal/subagent/durable_worker_test.go over the existing SQLite DurableLedger. DurableWorker.RunOne now claims one waiting job, records heartbeat evidence only after a successful claim, invokes an injected Go handler with context.Context, persists handler progress, completes result JSON, records handler failures as failed terminal jobs, and returns idle without mutating terminal jobs or starting subprocesses, daemons, shell execution, polling loops, network services, or GBrain TypeScript runtime code. Doctor output now exposes either the last durable-worker heartbeat or heartbeat_unavailable evidence.",
               "write_scope": [
                 "internal/subagent/durable_worker.go",
                 "internal/subagent/durable_worker_test.go",
@@ -2002,6 +2151,11 @@
               "done_signal": [
                 "Durable worker fake-handler fixtures prove claim, progress, completion, failure, idle return, and heartbeat/status evidence without external worker processes."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T00:36:30Z",
+                "last_success": "2026-04-27T00:36:30Z"
+              },
               "provenance": {
                 "origin_type": "hybrid",
                 "upstream_ref": "gbrain:c78c3d0 src/core/minions/worker.ts",
@@ -9560,9 +9714,9 @@
             {
               "name": "Cron prompt/script safety + pre-run script contract",
               "priority": "P2",
-              "status": "planned",
+              "status": "complete",
               "contract": "internal/cron exposes pure safety helpers for cron creation/update: ScanPromptForCronThreat(prompt string) (CronSafetyFinding, bool) blocks Hermes critical prompt-injection/exfiltration patterns plus invisible Unicode controls, and ValidatePreRunScriptPath(script string, scriptsRoot string) returns a clean relative script path only when it stays under the injected scriptsRoot. No script execution or scheduler wiring occurs in this slice.",
-              "contract_status": "draft",
+              "contract_status": "validated",
               "slice_size": "small",
               "execution_owner": "tools",
               "trust_class": [
@@ -9601,7 +9755,7 @@
                 "TestValidatePreRunScriptPath_AcceptsRelativeScript returns `daily/fetch.go` unchanged for a scriptsRoot temp dir.",
                 "TestValidatePreRunScriptPath_RejectsAbsoluteHomeAndTraversal rejects `/tmp/x`, `~/x`, `../x`, and `daily/../../x` with distinct evidence codes."
               ],
-              "note": "Planner split 2026-04-26: this keeps Hermes' cron prompt/script hardening as a pure helper slice. Tool mutation and script execution remain downstream so workers do not mix safety parsing with scheduler effects.",
+              "note": "Complete: TDD landed internal/cron/prompt_script_safety.go and prompt_script_safety_test.go as pure create/update boundary helpers. Fixtures prove Hermes critical prompt threat IDs, invisible Unicode codepoint evidence, benign prompt pass-through, relative script acceptance, and absolute/home/traversal rejection without config reads, store writes, scheduler wiring, or script execution.",
               "write_scope": [
                 "internal/cron/prompt_script_safety.go",
                 "internal/cron/prompt_script_safety_test.go",
@@ -9615,6 +9769,11 @@
               "done_signal": [
                 "Prompt/script safety fixtures prove critical prompt threat IDs, invisible Unicode evidence, relative script acceptance, and absolute/home/traversal rejection without script execution."
               ],
+              "health": {
+                "attempt_count": 2,
+                "last_attempt": "2026-04-27T00:36:30Z",
+                "last_success": "2026-04-27T00:36:30Z"
+              },
               "planner_verdict": {
                 "reshape_count": 1,
                 "last_reshape": "2026-04-26T23:52:41Z"

@@ -22,26 +22,26 @@ tests, and candidate policy. Keep those control-plane facts in
 `meta.builder_loop`, and keep row-specific execution facts in `progress.json`.
 
 <!-- PROGRESS:START kind=agent-queue -->
-## 1. Durable worker execution loop
+## 1. Gateway fresh-final stream coalescer policy
 
-- Phase: 2 / 2.E.3
-- Owner: `orchestrator`
-- Size: `small`
+- Phase: 2 / 2.B.5
+- Owner: `gateway`
+- Size: `medium`
 - Status: `planned`
-- Priority: `P2`
-- Contract: Gormes durable jobs have a Go-native fake-handler execution seam that claims one waiting job from the SQLite ledger, invokes an injected handler with context.Context, records progress/result/failure evidence, and exits cleanly when no job is claimable
-- Trust class: operator, system
-- Ready when: Durable job backpressure + timeout audit, Durable worker supervisor status seam, and Durable replay and inbox message contract are validated on main., The first implementation can be tested with injected fake handlers, fake clock, and SQLite ledger only; no shell executor, external worker daemon, or GBrain TypeScript runtime is required.
-- Not ready when: The slice starts subprocess workers, creates a systemd service, implements shell execution, changes live delegate_task or cron semantics, or imports GBrain TypeScript code., The worker needs polling goroutines, real sleeps, network services, Postgres/PGLite, or claim loops beyond a single deterministic RunOne-style helper.
-- Degraded mode: Durable-worker status reports idle, claim_unavailable, handler_failed, or heartbeat_unavailable without starting a background daemon or shell executor.
-- Fixture: `internal/subagent/durable_worker_test.go`
-- Write scope: `internal/subagent/durable_worker.go`, `internal/subagent/durable_worker_test.go`, `internal/doctor/durable_ledger.go`, `internal/doctor/durable_ledger_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
-- Test commands: `go test ./internal/subagent -run '^TestDurableWorkerRunOne_' -count=1`, `go test ./internal/subagent ./internal/doctor -count=1`, `go run ./cmd/builder-loop progress validate`
-- Done signal: Durable worker fake-handler fixtures prove claim, progress, completion, failure, idle return, and heartbeat/status evidence without external worker processes.
-- Acceptance: TestDurableWorkerRunOne_ClaimsWaitingJobAndCompletesResult seeds a waiting durable job, runs a fake handler that returns JSON, and asserts the ledger records completed status, result_json, lock owner, and worker heartbeat evidence., TestDurableWorkerRunOne_HandlerProgressPersists runs a fake handler that emits progress through the worker seam and asserts the ledger stores the progress_json before completion., TestDurableWorkerRunOne_HandlerErrorFailsJob runs a fake handler that returns an error and asserts the ledger records failed status with the error text preserved., TestDurableWorkerRunOne_NoJobReturnsIdle proves an empty ledger returns idle evidence, records no fake heartbeat, and does not mutate existing terminal jobs., Doctor/status fixtures expose the last durable-worker heartbeat or heartbeat_unavailable evidence without requiring operators to inspect raw ledger rows.
-- Source refs: ../gbrain/src/core/minions/worker.ts@c78c3d0:launchJob/executeJob, ../gbrain/src/core/minions/types.ts@c78c3d0:MinionWorkerOpts, ../gbrain/test/minions.test.ts@c78c3d0, internal/subagent/durable_ledger.go:Claim/UpdateProgress/Complete/Fail/RecordWorkerHeartbeat, internal/subagent/durable_ledger_test.go, internal/subagent/durable_backpressure_test.go, internal/subagent/durable_supervisor_status_test.go, internal/doctor/durable_ledger.go
-- Unblocks: Durable worker abort-slot recovery safety net
-- Why now: Unblocks Durable worker abort-slot recovery safety net.
+- Priority: `P0`
+- Contract: Gateway streaming finalization can replace an old editable preview with a fresh final message when the preview age is at or above a configured threshold, while preserving the legacy edit-in-place path when the threshold is zero, the preview is too young, the channel cannot send a fresh final, or the fresh send fails
+- Trust class: operator, gateway, system
+- Ready when: Gateway stream consumer for agent-event fan-out and Non-editable gateway progress/commentary send fallback are complete on main., internal/gateway/coalesce.go currently owns placeholder send, edit cadence, and final flush; fresh-final should be implemented there with an injected clock in tests, not in Telegram-specific code., The worker can use fake gateway.Channel values only; no Telegram SDK, network call, or real provider stream is needed for this row.
+- Not ready when: The slice changes provider streaming, kernel.RenderFrame phases, non-editable channel send fallback, or Slack/Discord channel implementations., The slice adds a Telegram config field or Telegram delete API call; those are in the dependent Telegram row., The slice sends duplicate final messages when fresh send fails instead of falling back to the existing edit finalization path.
+- Degraded mode: Until this lands, Telegram and other editable channels always finalize by editing the original preview, so long-running Telegram replies keep the first-token visible timestamp.
+- Fixture: `internal/gateway/coalesce_fresh_final_test.go::TestCoalescerFreshFinal`
+- Write scope: `internal/gateway/channel.go`, `internal/gateway/coalesce.go`, `internal/gateway/coalesce_fresh_final_test.go`, `internal/gateway/manager.go`, `internal/gateway/manager_test.go`, `internal/gateway/fake_test.go`, `docs/content/building-gormes/architecture_plan/progress.json`
+- Test commands: `go test ./internal/gateway -run 'TestCoalescerFreshFinal' -count=1`, `go test ./internal/gateway -run 'TestManager_Outbound\|TestGatewayStreamConsumer\|TestCoalescer' -count=1`, `go run ./cmd/builder-loop progress validate`
+- Done signal: Gateway coalescer fixtures prove old-preview fresh finalization, delete best-effort behavior, young-preview edit-in-place behavior, and fresh-send failure fallback without touching Telegram SDK code.
+- Acceptance: internal/gateway/channel.go adds a small optional MessageDeleter interface with DeleteMessage(ctx, chatID, msgID string) error; existing channels need not implement it., ManagerConfig carries FreshFinalAfter time.Duration and the coalescer tracks the placeholder creation time via an injected now function so tests do not sleep., TestCoalescerFreshFinal_DisabledThresholdEditsInPlace proves FreshFinalAfter=0 keeps the existing EditMessageFinal path., TestCoalescerFreshFinal_YoungPreviewEditsInPlace proves a final flush before the threshold edits the preview and does not call Channel.Send., TestCoalescerFreshFinal_OldPreviewSendsFreshAndDeletesOld proves a final flush at or beyond the threshold calls Send for the final text, skips EditMessageFinal for the old preview, adopts the new message id, and best-effort calls DeleteMessage on the old id., TestCoalescerFreshFinal_DeleteUnsupportedStillSucceeds proves a channel without MessageDeleter still delivers the fresh final., TestCoalescerFreshFinal_FreshSendFailureFallsBackToEdit proves a failed fresh Send falls back to EditMessageFinal and returns success when the edit succeeds., Existing manager outbound tests for non-editable channels and editable streaming remain green.
+- Source refs: ../hermes-agent/gateway/stream_consumer.py@b16f9d43:GatewayStreamConsumer._should_send_fresh_final, ../hermes-agent/gateway/stream_consumer.py@b16f9d43:GatewayStreamConsumer._try_fresh_final, ../hermes-agent/tests/gateway/test_stream_consumer_fresh_final.py@b16f9d43:TestFreshFinalForLongLivedPreviews, internal/gateway/coalesce.go, internal/gateway/channel.go, internal/gateway/manager.go
+- Unblocks: Telegram fresh-final delete and config exposure
+- Why now: P0 handoff; needs contract proof before closeout.
 
 ## 2. BlueBubbles iMessage bubble formatting parity
 

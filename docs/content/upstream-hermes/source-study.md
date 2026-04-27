@@ -13,10 +13,39 @@ Hermes hard to shrink.
 ## Study Snapshot
 
 - Upstream studied: `/home/xel/git/sages-openclaw/workspace-mineru/hermes-agent`
-- Upstream commit: `755a2804`
+- Upstream commit: `b16f9d43`
 - Gormes repo studied: `/home/xel/git/sages-openclaw/workspace-mineru/gormes-agent`
 - Gormes commit: `4b408086`
-- Date: 2026-04-26
+- Date: 2026-04-27
+
+## 2026-04-27 (Telegram fresh-final streaming) Drift Check
+
+The synchronized Hermes head moved from `755a2804` to `b16f9d43`. GBrain is
+still at `c78c3d0` and Honcho is still at `e659b6b`; no new memory-provider
+or Honcho/Goncho compatibility behavior changed. Gormes should therefore keep
+the internal `goncho` package direction while preserving `honcho_*` public
+tool names where the external contract requires them.
+
+The Hermes delta is narrow but user-visible for gateway streaming:
+
+- `gateway/stream_consumer.py` now tracks when the editable preview message was
+  first created. On finalization, if `fresh_final_after_seconds > 0` and the
+  preview age meets the threshold, Hermes sends the final response as a fresh
+  message instead of editing the stale preview.
+- `gateway/platforms/base.py` adds an optional `delete_message` hook, and
+  `gateway/platforms/telegram.py` implements it through Telegram's
+  `deleteMessage` API so the stale preview can be cleaned up best-effort after
+  a successful fresh final send.
+- `gateway/config.py` and `website/docs/user-guide/configuration.md` expose
+  `streaming.fresh_final_after_seconds` with a 60 second default and `0` as
+  the disable switch. `gateway/run.py` enables the setting only for Telegram.
+
+Gormes already has `internal/gateway/coalesce.go`, `gateway.MessageEditor`,
+`gateway.FinalizingMessageEditor`, and `internal/channels/telegram.EditMessage`,
+but it has no preview-age threshold, fresh-final fallback, or Telegram delete
+seam. The roadmap now tracks this under Phase 2.B.5 as two worker-sized rows:
+`Gateway fresh-final stream coalescer policy` followed by
+`Telegram fresh-final delete and config exposure`.
 
 ## 2026-04-26 (auto-title, skills cleanup, Docker docs) Drift Check
 

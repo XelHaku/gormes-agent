@@ -127,6 +127,8 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] DeliveryRouter + --deliver target parsing
 - [x] Gateway stream consumer for agent-event fan-out
 - [x] Non-editable gateway progress/commentary send fallback
+- [ ] Gateway fresh-final stream coalescer policy
+- [ ] Telegram fresh-final delete and config exposure
 - [x] Slack rich-text quotes/lists + link-unfurl ingress
 - [x] Slack thread-parent context + team-scoped cache key
 
@@ -179,7 +181,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Durable worker supervisor status seam
 - [x] Durable pause/resume intent contract
 - [x] Durable replay and inbox message contract
-- [ ] Durable worker execution loop
+- [x] Durable worker execution loop
 - [ ] Durable worker abort-slot recovery safety net
 - [ ] Durable worker RSS watchdog + graceful drain policy
 
@@ -543,7 +545,7 @@ machine-readable queue for developing the full `gormes-agent`.
 - [x] Autoloop recent-failure detail excerpts
 - [ ] Cronjob tool API + schedule parser parity
 - [x] Cron schedule parser + repeat state fixtures
-- [ ] Cron prompt/script safety + pre-run script contract
+- [x] Cron prompt/script safety + pre-run script contract
 - [ ] Cronjob tool action envelope over native store
 - [ ] Cron context_from output chaining
 - [ ] Cron prompt/script safety + pre-run script contract (deprecated umbrella)
