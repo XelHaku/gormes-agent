@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "2.0",
-    "last_updated": "2026-04-27T12:29:11Z",
+    "last_updated": "2026-04-27T12:56:05Z",
     "links": {
       "github_readme": "https://github.com/TrebuchetDynamics/gormes-agent/blob/main/README.md",
       "landing_page": "https://gormes.ai",
@@ -678,8 +678,8 @@
           ],
           "drift_state": {
             "status": "owned",
-            "last_upstream_check": "2026-04-27T11:18:57Z",
-            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes ee1a07f9, GBrain 891c28b, and Honcho e659b6b were checked this run; this subphase remains owned and complete. GBrain durable-worker lessons remain tracked as small future rows in 2.E.3, while the backend usage-limit/stdin health bypass is tracked under 5.N Misc Operator Tools to preserve Phase 1 closeout."
+            "last_upstream_check": "2026-04-27T12:56:05Z",
+            "origin_decision": "Automation reliability, autoloop row health, planner self-healing, and drift/provenance awareness are Gormes-original control-plane surfaces. Upstream Hermes 8ed599dc, GBrain 891c28b, and Honcho e659b6b were checked this run; this subphase remains owned and complete. GBrain durable-worker lessons remain tracked as small future rows in 2.E.3, while the backend usage-limit/stdin health bypass is tracked under 5.N Misc Operator Tools to preserve Phase 1 closeout."
           }
         }
       }
